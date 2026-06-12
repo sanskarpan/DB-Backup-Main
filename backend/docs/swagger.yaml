@@ -1,0 +1,641 @@
+openapi: 3.0.3
+info:
+  title: DB Backup Utility API
+  description: |
+    A comprehensive database backup and restore utility supporting PostgreSQL, MySQL, MongoDB, and SQLite.
+
+    ## Authentication
+    The API supports multiple authentication methods:
+    - **JWT**: Bearer token authentication
+    - **OAuth2**: Social login via Google, GitHub, Microsoft, etc.
+    - **API Keys**: Static API key authentication
+
+    ## Features
+    - Multi-database support (PostgreSQL, MySQL, MongoDB, SQLite)
+    - Multiple storage backends (S3, GCS, Azure, Local)
+    - Compression and encryption
+    - Scheduled backups
+    - Point-in-time recovery
+    - Metrics and health monitoring
+  version: 1.0.0
+  contact:
+    name: DB Backup API Support
+    email: support@db-backup.example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Development server
+  - url: https://api.db-backup.example.com/api/v1
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization endpoints
+  - name: Backups
+    description: Backup management operations
+  - name: Restores
+    description: Restore operations
+  - name: Schedules
+    description: Backup schedule management
+  - name: Storage
+    description: Storage provider configuration
+  - name: Health
+    description: Health check and monitoring endpoints
+  - name: Metrics
+    description: Metrics and monitoring
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /auth/login or OAuth2
+
+    oauth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: /auth/oauth2/{provider}/login
+          tokenUrl: /auth/oauth2/callback
+          scopes:
+            read: Read access to resources
+            write: Write access to resources
+            admin: Administrative access
+
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional error details
+      required:
+        - error
+
+    UserCredentials:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          example: SecurePassword123!
+      required:
+        - email
+        - password
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT access token
+        refresh_token:
+          type: string
+          description: Refresh token for obtaining new access tokens
+        expires_in:
+          type: integer
+          description: Token expiration time in seconds
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+        - token
+        - user
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: usr_123456
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        name:
+          type: string
+          example: John Doe
+        roles:
+          type: array
+          items:
+            type: string
+          example: [user, admin]
+        created_at:
+          type: string
+          format: date-time
+
+    OAuth2Provider:
+      type: object
+      properties:
+        name:
+          type: string
+          example: google
+        display_name:
+          type: string
+          example: Google
+        enabled:
+          type: boolean
+
+    Backup:
+      type: object
+      properties:
+        id:
+          type: string
+          example: bkp_123456
+        database_id:
+          type: string
+          example: db_789
+        database_type:
+          type: string
+          enum: [postgres, mysql, mongodb, sqlite]
+        size:
+          type: integer
+          format: int64
+          description: Backup size in bytes
+        compressed_size:
+          type: integer
+          format: int64
+          description: Compressed backup size in bytes
+        status:
+          type: string
+          enum: [pending, in_progress, completed, failed]
+        storage_provider:
+          type: string
+          example: s3
+        storage_path:
+          type: string
+          example: s3://bucket/backups/backup_20250629.tar.gz
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          additionalProperties: true
+      required:
+        - id
+        - database_type
+        - status
+
+    BackupRequest:
+      type: object
+      properties:
+        database_id:
+          type: string
+          description: Database connection ID
+        database_type:
+          type: string
+          enum: [postgres, mysql, mongodb, sqlite]
+        compression:
+          type: string
+          enum: [none, gzip, zstd]
+          default: zstd
+        encryption:
+          type: boolean
+          default: false
+        storage_provider:
+          type: string
+          example: s3
+        metadata:
+          type: object
+          additionalProperties: true
+      required:
+        - database_id
+        - database_type
+
+    RestoreRequest:
+      type: object
+      properties:
+        backup_id:
+          type: string
+          description: Backup ID to restore from
+        target_database_id:
+          type: string
+          description: Target database connection ID
+        point_in_time:
+          type: string
+          format: date-time
+          description: Point-in-time to restore to (for PITR)
+      required:
+        - backup_id
+        - target_database_id
+
+    Schedule:
+      type: object
+      properties:
+        id:
+          type: string
+          example: sch_123456
+        name:
+          type: string
+          example: Daily PostgreSQL Backup
+        database_id:
+          type: string
+        cron_expression:
+          type: string
+          example: "0 2 * * *"
+        enabled:
+          type: boolean
+        last_run:
+          type: string
+          format: date-time
+        next_run:
+          type: string
+          format: date-time
+      required:
+        - name
+        - database_id
+        - cron_expression
+
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        components:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              status:
+                type: string
+              message:
+                type: string
+              timestamp:
+                type: string
+                format: date-time
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login with email and password
+      description: Authenticate using email and password credentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCredentials'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/oauth2/providers:
+    get:
+      tags:
+        - Authentication
+      summary: List available OAuth2 providers
+      description: Get a list of configured OAuth2 providers
+      responses:
+        '200':
+          description: List of providers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  providers:
+                    type: array
+                    items:
+                      type: string
+                    example: [google, github, microsoft]
+
+  /auth/oauth2/{provider}/login:
+    get:
+      tags:
+        - Authentication
+      summary: Initiate OAuth2 login
+      description: Redirects to the OAuth2 provider's login page
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+          example: google
+      responses:
+        '302':
+          description: Redirect to OAuth2 provider
+        '400':
+          description: Invalid provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/oauth2/callback:
+    get:
+      tags:
+        - Authentication
+      summary: OAuth2 callback endpoint
+      description: Handles the OAuth2 callback and returns JWT token
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: provider
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OAuth2 authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /backups:
+    get:
+      tags:
+        - Backups
+      summary: List all backups
+      description: Retrieve a list of all backups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: database_id
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, in_progress, completed, failed]
+      responses:
+        '200':
+          description: List of backups
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  backups:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Backup'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags:
+        - Backups
+      summary: Create a new backup
+      description: Initiate a new database backup
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BackupRequest'
+      responses:
+        '201':
+          description: Backup created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Backup'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /backups/{id}:
+    get:
+      tags:
+        - Backups
+      summary: Get backup details
+      description: Retrieve detailed information about a specific backup
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Backup details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Backup'
+        '404':
+          description: Backup not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags:
+        - Backups
+      summary: Delete a backup
+      description: Delete a specific backup
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Backup deleted successfully
+        '404':
+          description: Backup not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /restores:
+    post:
+      tags:
+        - Restores
+      summary: Restore from backup
+      description: Initiate a database restore operation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreRequest'
+      responses:
+        '201':
+          description: Restore initiated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restore_id:
+                    type: string
+                  status:
+                    type: string
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /schedules:
+    get:
+      tags:
+        - Schedules
+      summary: List backup schedules
+      description: Retrieve all configured backup schedules
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of schedules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schedules:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Schedule'
+
+    post:
+      tags:
+        - Schedules
+      summary: Create a backup schedule
+      description: Create a new backup schedule
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Schedule'
+      responses:
+        '201':
+          description: Schedule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check endpoint
+      description: Check the health status of the service and its components
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /metrics:
+    get:
+      tags:
+        - Metrics
+      summary: Prometheus metrics
+      description: Retrieve Prometheus-formatted metrics
+      responses:
+        '200':
+          description: Metrics in Prometheus format
+          content:
+            text/plain:
+              schema:
+                type: string
