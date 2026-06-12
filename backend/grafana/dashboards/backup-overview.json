@@ -1,0 +1,558 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "backup-overview",
+    "title": "Backup Overview Dashboard",
+    "tags": ["backup", "overview", "monitoring"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "type": "stat",
+        "title": "Total Backups",
+        "targets": [
+          {
+            "expr": "sum(backup_total_count)",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 2,
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "type": "stat",
+        "title": "Backup Success Rate (24h)",
+        "targets": [
+          {
+            "expr": "100 * sum(rate(backup_success_total[24h])) / sum(rate(backup_total[24h]))",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 90
+                },
+                {
+                  "color": "green",
+                  "value": 98
+                }
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "color": {
+              "mode": "thresholds"
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 3,
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 8
+        },
+        "type": "gauge",
+        "title": "Storage Utilization",
+        "targets": [
+          {
+            "expr": "100 * sum(backup_storage_used_bytes) / sum(backup_storage_total_bytes)",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 70
+                },
+                {
+                  "color": "red",
+                  "value": 90
+                }
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "options": {
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        }
+      },
+      {
+        "id": 4,
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 8,
+          "y": 8
+        },
+        "type": "stat",
+        "title": "Active Databases",
+        "targets": [
+          {
+            "expr": "count(backup_database_status{status=\"active\"})",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "blue",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 5,
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 16,
+          "y": 8
+        },
+        "type": "stat",
+        "title": "Failed Backups (24h)",
+        "targets": [
+          {
+            "expr": "sum(increase(backup_failed_total[24h]))",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 1
+                },
+                {
+                  "color": "red",
+                  "value": 5
+                }
+              ]
+            },
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 6,
+        "gridPos": {
+          "h": 10,
+          "w": 24,
+          "x": 0,
+          "y": 16
+        },
+        "type": "timeseries",
+        "title": "Backup Duration Trends",
+        "targets": [
+          {
+            "expr": "backup_duration_seconds{quantile=\"0.5\"}",
+            "refId": "A",
+            "legendFormat": "p50 - {{database_type}}",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          },
+          {
+            "expr": "backup_duration_seconds{quantile=\"0.95\"}",
+            "refId": "B",
+            "legendFormat": "p95 - {{database_type}}",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          },
+          {
+            "expr": "backup_duration_seconds{quantile=\"0.99\"}",
+            "refId": "C",
+            "legendFormat": "p99 - {{database_type}}",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "gradientMode": "opacity",
+              "showPoints": "never",
+              "spanNulls": true
+            },
+            "unit": "s",
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true,
+            "calcs": ["mean", "max"]
+          }
+        }
+      },
+      {
+        "id": 7,
+        "gridPos": {
+          "h": 10,
+          "w": 12,
+          "x": 0,
+          "y": 26
+        },
+        "type": "timeseries",
+        "title": "Backup Success/Failure Rate",
+        "targets": [
+          {
+            "expr": "rate(backup_success_total[5m])",
+            "refId": "A",
+            "legendFormat": "Success - {{database_name}}",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          },
+          {
+            "expr": "rate(backup_failed_total[5m])",
+            "refId": "B",
+            "legendFormat": "Failed - {{database_name}}",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "gradientMode": "opacity",
+              "showPoints": "never"
+            },
+            "unit": "ops",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byRegexp",
+                "options": "Failed.*"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "mode": "fixed",
+                    "fixedColor": "red"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          }
+        }
+      },
+      {
+        "id": 8,
+        "gridPos": {
+          "h": 10,
+          "w": 12,
+          "x": 12,
+          "y": 26
+        },
+        "type": "timeseries",
+        "title": "Storage Growth Over Time",
+        "targets": [
+          {
+            "expr": "backup_storage_used_bytes",
+            "refId": "A",
+            "legendFormat": "{{storage_provider}} - Used",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          },
+          {
+            "expr": "backup_storage_total_bytes",
+            "refId": "B",
+            "legendFormat": "{{storage_provider}} - Total",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "fillOpacity": 15,
+              "gradientMode": "opacity",
+              "showPoints": "never"
+            },
+            "unit": "bytes",
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          }
+        }
+      },
+      {
+        "id": 9,
+        "gridPos": {
+          "h": 10,
+          "w": 24,
+          "x": 0,
+          "y": 36
+        },
+        "type": "table",
+        "title": "Recent Backup Jobs",
+        "targets": [
+          {
+            "expr": "topk(20, backup_job_status)",
+            "refId": "A",
+            "format": "table",
+            "instant": true,
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "status"
+              },
+              "properties": [
+                {
+                  "id": "custom.displayMode",
+                  "value": "color-background"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": null
+                      },
+                      {
+                        "color": "green",
+                        "value": 1
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": []
+        }
+      }
+    ]
+  }
+}
