@@ -1,0 +1,16 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: db-backup-pod-failure
+  namespace: chaos-testing
+spec:
+  action: pod-failure
+  mode: one
+  duration: '30s'
+  selector:
+    namespaces:
+      - db-backup
+    labelSelectors:
+      'app': 'db-backup-server'
+  scheduler:
+    cron: '@every 2h'
