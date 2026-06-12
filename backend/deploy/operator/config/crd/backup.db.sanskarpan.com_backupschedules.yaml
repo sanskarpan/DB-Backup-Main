@@ -1,0 +1,250 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: backupschedules.backup.db.sanskarpan.com
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.13.0
+spec:
+  group: backup.db.sanskarpan.com
+  names:
+    kind: BackupSchedule
+    listKind: BackupScheduleList
+    plural: backupschedules
+    singular: backupschedule
+    shortNames:
+      - bs
+      - bsched
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: BackupSchedule defines a scheduled backup job
+          type: object
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: BackupScheduleSpec defines the desired state of BackupSchedule
+              type: object
+              required:
+                - schedule
+                - backupPolicyRef
+              properties:
+                schedule:
+                  description: Cron schedule expression
+                  type: string
+                  pattern: '^(@(annually|yearly|monthly|weekly|daily|hourly|reboot))|(@every (\d+(ns|us|µs|ms|s|m|h))+)|((((\d+,)+\d+|(\d+(\/|-)\d+)|\d+|\*) ?){5,7})$'
+                backupPolicyRef:
+                  description: Reference to BackupPolicy
+                  type: object
+                  required:
+                    - name
+                  properties:
+                    name:
+                      description: Name of BackupPolicy
+                      type: string
+                    namespace:
+                      description: Namespace of BackupPolicy
+                      type: string
+                timezone:
+                  description: Timezone for schedule (defaults to UTC)
+                  type: string
+                  default: UTC
+                suspended:
+                  description: Suspend scheduled backups
+                  type: boolean
+                  default: false
+                concurrencyPolicy:
+                  description: How to handle concurrent backups
+                  type: string
+                  enum:
+                    - Allow
+                    - Forbid
+                    - Replace
+                  default: Forbid
+                successfulJobsHistoryLimit:
+                  description: Number of successful jobs to retain
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  default: 3
+                failedJobsHistoryLimit:
+                  description: Number of failed jobs to retain
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  default: 1
+                startingDeadlineSeconds:
+                  description: Deadline for starting job if missed schedule
+                  type: integer
+                  minimum: 0
+                  maximum: 86400
+                backupTemplate:
+                  description: Template for backup job
+                  type: object
+                  properties:
+                    metadata:
+                      description: Metadata for backup job
+                      type: object
+                      properties:
+                        labels:
+                          type: object
+                          additionalProperties:
+                            type: string
+                        annotations:
+                          type: object
+                          additionalProperties:
+                            type: string
+                    spec:
+                      description: Spec overrides from BackupPolicy
+                      type: object
+                      properties:
+                        backupType:
+                          type: string
+                          enum:
+                            - full
+                            - incremental
+                            - differential
+                        tags:
+                          type: object
+                          additionalProperties:
+                            type: string
+                        timeoutSeconds:
+                          type: integer
+                          minimum: 60
+                          maximum: 86400
+                maintenanceWindow:
+                  description: Allowed time window for backups
+                  type: object
+                  properties:
+                    startTime:
+                      description: Start time (HH:MM format)
+                      type: string
+                      pattern: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$'
+                    endTime:
+                      description: End time (HH:MM format)
+                      type: string
+                      pattern: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$'
+                    days:
+                      description: Days of week (0=Sunday, 6=Saturday)
+                      type: array
+                      items:
+                        type: integer
+                        minimum: 0
+                        maximum: 6
+                notifications:
+                  description: Notification settings
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                    webhookURL:
+                      type: string
+                    onSuccess:
+                      type: boolean
+                      default: false
+                    onFailure:
+                      type: boolean
+                      default: true
+                    onMissedSchedule:
+                      type: boolean
+                      default: true
+            status:
+              description: BackupScheduleStatus defines the observed state
+              type: object
+              properties:
+                phase:
+                  description: Current phase
+                  type: string
+                  enum:
+                    - Active
+                    - Suspended
+                    - Failed
+                conditions:
+                  description: Conditions
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                lastScheduleTime:
+                  description: Last time schedule was triggered
+                  type: string
+                  format: date-time
+                nextScheduleTime:
+                  description: Next scheduled time
+                  type: string
+                  format: date-time
+                lastSuccessfulTime:
+                  description: Last successful backup time
+                  type: string
+                  format: date-time
+                activeJobs:
+                  description: Currently running backup jobs
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                      uid:
+                        type: string
+                      startTime:
+                        type: string
+                        format: date-time
+                totalRuns:
+                  description: Total number of backup runs
+                  type: integer
+                successfulRuns:
+                  description: Number of successful runs
+                  type: integer
+                failedRuns:
+                  description: Number of failed runs
+                  type: integer
+                missedRuns:
+                  description: Number of missed schedules
+                  type: integer
+                observedGeneration:
+                  type: integer
+                  format: int64
+      additionalPrinterColumns:
+        - name: Schedule
+          type: string
+          jsonPath: .spec.schedule
+        - name: Policy
+          type: string
+          jsonPath: .spec.backupPolicyRef.name
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Last Run
+          type: date
+          jsonPath: .status.lastScheduleTime
+        - name: Next Run
+          type: date
+          jsonPath: .status.nextScheduleTime
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      subresources:
+        status: {}
