@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generate Extension Icons</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 40px;
+      background: #f9fafb;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 12px;
+    }
+
+    p {
+      color: #6b7280;
+      margin-bottom: 32px;
+    }
+
+    .preview {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+    }
+
+    .icon-preview {
+      text-align: center;
+    }
+
+    .icon-preview canvas {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+
+    .icon-preview label {
+      display: block;
+      font-size: 12px;
+      color: #6b7280;
+      font-weight: 500;
+    }
+
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-right: 12px;
+      margin-bottom: 12px;
+    }
+
+    button:hover {
+      background: #2563eb;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .instructions {
+      background: #f3f4f6;
+      padding: 24px;
+      border-radius: 8px;
+      margin-top: 32px;
+    }
+
+    .instructions h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 12px;
+    }
+
+    .instructions ol {
+      margin-left: 20px;
+      color: #4b5563;
+      line-height: 1.8;
+    }
+
+    .instructions code {
+      background: #e5e7eb;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+    }
+
+    .success {
+      background: #d1fae5;
+      color: #065f46;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      display: none;
+    }
+
+    .success.show {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Generate Extension Icons</h1>
+    <p>Convert the SVG icon to PNG files at different sizes for the browser extension.</p>
+
+    <div class="success" id="successMessage">
+      All icons generated successfully! Click the download buttons below to save them.
+    </div>
+
+    <div class="preview" id="iconPreview">
+      <!-- Icons will be rendered here -->
+    </div>
+
+    <div style="margin-bottom: 24px;">
+      <button onclick="generateAllIcons()">Generate All Icons</button>
+      <button onclick="downloadAllIcons()">Download All Icons</button>
+    </div>
+
+    <div class="instructions">
+      <h2>Instructions</h2>
+      <ol>
+        <li>Open this HTML file in a web browser</li>
+        <li>Click "Generate All Icons" to create PNG files from the SVG</li>
+        <li>Click "Download All Icons" or download each icon individually</li>
+        <li>Move the downloaded PNG files to the <code>extensions/chrome/icons/</code> directory</li>
+        <li>Rename the files to match the required names:
+          <ul style="margin-top: 8px;">
+            <li><code>icon-16.png</code></li>
+            <li><code>icon-32.png</code></li>
+            <li><code>icon-48.png</code></li>
+            <li><code>icon-128.png</code></li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    const SIZES = [16, 32, 48, 128];
+    const canvases = {};
+
+    // Load and parse SVG
+    async function loadSVG() {
+      try {
+        const response = await fetch('icon.svg');
+        const svgText = await response.text();
+        return svgText;
+      } catch (error) {
+        console.error('Failed to load SVG:', error);
+        alert('Failed to load icon.svg. Make sure this HTML file is in the same directory as icon.svg');
+        return null;
+      }
+    }
+
+    // Convert SVG to canvas at specific size
+    function svgToCanvas(svgText, size) {
+      return new Promise((resolve, reject) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, size, size);
+          resolve(canvas);
+        };
+        img.onerror = reject;
+
+        const blob = new Blob([svgText], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        img.src = url;
+      });
+    }
+
+    // Generate all icon sizes
+    async function generateAllIcons() {
+      const svgText = await loadSVG();
+      if (!svgText) return;
+
+      const preview = document.getElementById('iconPreview');
+      preview.innerHTML = '';
+
+      for (const size of SIZES) {
+        try {
+          const canvas = await svgToCanvas(svgText, size);
+          canvases[size] = canvas;
+
+          // Add to preview
+          const previewDiv = document.createElement('div');
+          previewDiv.className = 'icon-preview';
+
+          const displayCanvas = canvas.cloneNode(true);
+          previewDiv.appendChild(displayCanvas);
+
+          const label = document.createElement('label');
+          label.textContent = `${size}x${size}px`;
+          previewDiv.appendChild(label);
+
+          const downloadBtn = document.createElement('button');
+          downloadBtn.textContent = 'Download';
+          downloadBtn.style.marginTop = '8px';
+          downloadBtn.onclick = () => downloadIcon(size);
+          previewDiv.appendChild(downloadBtn);
+
+          preview.appendChild(previewDiv);
+        } catch (error) {
+          console.error(`Failed to generate ${size}x${size} icon:`, error);
+        }
+      }
+
+      document.getElementById('successMessage').classList.add('show');
+    }
+
+    // Download a specific icon
+    function downloadIcon(size) {
+      const canvas = canvases[size];
+      if (!canvas) {
+        alert(`Icon ${size}x${size} not generated yet. Click "Generate All Icons" first.`);
+        return;
+      }
+
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `icon-${size}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    }
+
+    // Download all icons
+    async function downloadAllIcons() {
+      if (Object.keys(canvases).length === 0) {
+        alert('No icons generated yet. Click "Generate All Icons" first.');
+        return;
+      }
+
+      for (const size of SIZES) {
+        if (canvases[size]) {
+          downloadIcon(size);
+          // Add small delay between downloads
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+    }
+
+    // Auto-generate on page load
+    window.addEventListener('load', () => {
+      setTimeout(generateAllIcons, 500);
+    });
+  </script>
+</body>
+</html>
