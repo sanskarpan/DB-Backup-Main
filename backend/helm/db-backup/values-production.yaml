@@ -1,0 +1,168 @@
+# Production values for db-backup Helm chart
+# Override default values for production deployment
+
+# High availability configuration
+replicaCount: 3
+
+# Production image
+image:
+  repository: your-registry.example.com/db-backup
+  tag: "1.0.0"
+  pullPolicy: Always
+
+# Image pull secrets for private registry
+imagePullSecrets:
+  - name: registry-credentials
+
+# Autoscaling for production load
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 60
+  targetMemoryUtilizationPercentage: 70
+
+# Higher resource limits for production
+resources:
+  requests:
+    cpu: 1000m
+    memory: 2Gi
+  limits:
+    cpu: 4000m
+    memory: 8Gi
+
+# Pod disruption budget for availability
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Production persistence
+persistence:
+  enabled: true
+  storageClass: "efs-sc"
+  size: 1Ti
+
+# Production ingress with TLS
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/limit-rps: "200"
+    nginx.ingress.kubernetes.io/proxy-body-size: "500m"
+  hosts:
+    - host: api.backup.production.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: db-backup-tls-prod
+      hosts:
+        - api.backup.production.example.com
+
+# Network policies enabled
+networkPolicy:
+  enabled: true
+
+# CronJobs configured
+cronjobs:
+  cleanup:
+    enabled: true
+    schedule: "0 2 * * *"
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+  verify:
+    enabled: true
+    schedule: "0 */4 * * *"
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+
+# Production configuration
+config:
+  server:
+    logLevel: info
+    enableCors: true
+
+  storage:
+    type: s3
+    region: us-east-1
+    bucket: db-backups-production
+
+  backup:
+    defaultCompression: zstd
+    defaultEncryption: true
+    parallelJobs: 8
+    retention:
+      daily: 30
+      weekly: 12
+      monthly: 24
+      yearly: 7
+
+  monitoring:
+    prometheus:
+      enabled: true
+
+  profiling:
+    enabled: true
+    memory:
+      leakDetection: true
+
+  deduplication:
+    enabled: true
+    chunkSize: 8388608  # 8MB
+
+  deltaBackups:
+    enabled: true
+    maxChainLength: 10
+
+# Istio service mesh for production
+istio:
+  enabled: true
+  virtualService:
+    enabled: true
+  gateway:
+    enabled: true
+  peerAuthentication:
+    enabled: true
+    mtlsMode: STRICT
+  authorizationPolicy:
+    enabled: true
+  telemetry:
+    enabled: true
+    tracingSamplingPercentage: 10.0  # 10% sampling
+
+# Anti-affinity to spread across availability zones
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - db-backup
+        topologyKey: topology.kubernetes.io/zone
+
+# Tolerations for dedicated nodes
+tolerations:
+  - key: "workload"
+    operator: "Equal"
+    value: "backup"
+    effect: "NoSchedule"
+
+# Node selector for dedicated nodes
+nodeSelector:
+  workload: backup
