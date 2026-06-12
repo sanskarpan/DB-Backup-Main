@@ -1,0 +1,176 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: db-backup-operator-manager-role
+rules:
+  # Permissions for BackupPolicies
+  - apiGroups:
+      - backup.db.sanskarpan.com
+    resources:
+      - backuppolicies
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - backup.db.sanskarpan.com
+    resources:
+      - backuppolicies/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - backup.db.sanskarpan.com
+    resources:
+      - backuppolicies/status
+    verbs:
+      - get
+      - patch
+      - update
+
+  # Permissions for RestoreJobs
+  - apiGroups:
+      - backup.db.sanskarpan.com
+    resources:
+      - restorejobs
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - backup.db.sanskarpan.com
+    resources:
+      - restorejobs/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - backup.db.sanskarpan.com
+    resources:
+      - restorejobs/status
+    verbs:
+      - get
+      - patch
+      - update
+
+  # Permissions for BackupSchedules
+  - apiGroups:
+      - backup.db.sanskarpan.com
+    resources:
+      - backupschedules
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - backup.db.sanskarpan.com
+    resources:
+      - backupschedules/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - backup.db.sanskarpan.com
+    resources:
+      - backupschedules/status
+    verbs:
+      - get
+      - patch
+      - update
+
+  # Permissions for Jobs
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+      - cronjobs
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+
+  # Permissions for Pods
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - pods/log
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+
+  # Permissions for Secrets
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+
+  # Permissions for ConfigMaps
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+
+  # Permissions for Events
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+      - update
+
+  # Permissions for PersistentVolumeClaims
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+
+  # Permissions for ServiceAccounts
+  - apiGroups:
+      - ""
+    resources:
+      - serviceaccounts
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch

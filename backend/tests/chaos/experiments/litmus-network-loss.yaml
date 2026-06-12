@@ -1,0 +1,25 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: db-backup-network-loss
+  namespace: db-backup
+spec:
+  appinfo:
+    appns: 'db-backup'
+    applabel: 'app=db-backup-server'
+    appkind: 'deployment'
+  engineState: 'active'
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-network-loss
+      spec:
+        components:
+          env:
+            - name: TOTAL_CHAOS_DURATION
+              value: '60'
+            - name: NETWORK_PACKET_LOSS_PERCENTAGE
+              value: '20'
+            - name: CONTAINER_RUNTIME
+              value: 'docker'
+            - name: SOCKET_PATH
+              value: '/var/run/docker.sock'
