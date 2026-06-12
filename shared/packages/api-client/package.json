@@ -1,0 +1,40 @@
+{
+  "name": "@db-backup/api-client",
+  "version": "1.0.0",
+  "description": "API client for DB Backup platform",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "database",
+    "backup",
+    "api-client",
+    "typescript"
+  ],
+  "author": "DB Backup Team",
+  "license": "MIT",
+  "dependencies": {
+    "@db-backup/types": "^1.0.0",
+    "axios": "^1.13.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "axios-mock-adapter": "^1.22.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  },
+  "files": [
+    "dist"
+  ]
+}
