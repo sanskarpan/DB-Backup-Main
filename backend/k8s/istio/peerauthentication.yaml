@@ -1,0 +1,36 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: db-backup
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+    app.kubernetes.io/component: service-mesh
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: db-backup
+      app.kubernetes.io/component: server
+
+  # Enforce mTLS
+  mtls:
+    mode: STRICT
+
+  # Port-specific mTLS settings
+  portLevelMtls:
+    9090:  # Metrics port - disable mTLS for Prometheus
+      mode: PERMISSIVE
+
+---
+# Namespace-wide mTLS policy
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: db-backup-namespace
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+    app.kubernetes.io/component: service-mesh
+spec:
+  mtls:
+    mode: STRICT
