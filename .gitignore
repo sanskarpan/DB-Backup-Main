@@ -1,0 +1,80 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# Go build artifacts
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.*
+*.coverprofile
+profile.cov
+
+# Configs with secrets
+config.yaml
+config.yml
+.env
+.env.local
+.env.*.local
+helm/*/values-prod.yaml
+helm/*/values-production.yaml
+k8s/secret.yaml
+k8s/secrets.yaml
+k8s/*-secret.yaml
+!k8s/*.example
+
+# Runtime data
+backups/
+*.sql
+*.sql.gz
+*.dump
+*.db
+*.sqlite
+*.sqlite3
+logs/
+*.log
+
+# Temp / session artifacts
+tmp/
+temp/
+cleanup_backup_*/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Go workspace
+go.work
+go.work.sum
+
+# Tauri
+backend/target/
+desktop/src-tauri/target/
+
+# React Native
+mobile/.expo/
+mobile/android/
+mobile/ios/
+
+# Test artifacts
+test-results/
+coverage/
