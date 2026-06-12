@@ -1,0 +1,678 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "cost-analytics",
+    "title": "Cost Analytics Dashboard",
+    "tags": ["cost", "analytics", "budget", "optimization"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "5m",
+    "panels": [
+      {
+        "id": 1,
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 0
+        },
+        "type": "stat",
+        "title": "Total Monthly Cost",
+        "targets": [
+          {
+            "expr": "sum(backup_storage_cost_monthly_usd)",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 1000
+                },
+                {
+                  "color": "red",
+                  "value": 5000
+                }
+              ]
+            },
+            "unit": "currencyUSD",
+            "decimals": 2,
+            "color": {
+              "mode": "thresholds"
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 2,
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 8,
+          "y": 0
+        },
+        "type": "gauge",
+        "title": "Budget Utilization",
+        "targets": [
+          {
+            "expr": "100 * sum(backup_storage_cost_monthly_usd) / scalar(backup_cost_budget_monthly_usd)",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 75
+                },
+                {
+                  "color": "red",
+                  "value": 90
+                }
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "options": {
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        }
+      },
+      {
+        "id": 3,
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 16,
+          "y": 0
+        },
+        "type": "stat",
+        "title": "Cost per GB",
+        "targets": [
+          {
+            "expr": "sum(backup_storage_cost_monthly_usd) / (sum(backup_storage_used_bytes) / 1024 / 1024 / 1024)",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.05
+                },
+                {
+                  "color": "red",
+                  "value": 0.10
+                }
+              ]
+            },
+            "unit": "currencyUSD",
+            "decimals": 4,
+            "color": {
+              "mode": "thresholds"
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 4,
+        "gridPos": {
+          "h": 10,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "type": "timeseries",
+        "title": "Cost Trend by Provider",
+        "targets": [
+          {
+            "expr": "sum by (storage_provider) (backup_storage_cost_monthly_usd)",
+            "refId": "A",
+            "legendFormat": "{{storage_provider}}",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "gradientMode": "opacity",
+              "showPoints": "never",
+              "stacking": {
+                "mode": "normal",
+                "group": "A"
+              }
+            },
+            "unit": "currencyUSD",
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          },
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true,
+            "calcs": ["mean", "last", "max"]
+          }
+        }
+      },
+      {
+        "id": 5,
+        "gridPos": {
+          "h": 10,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "type": "piechart",
+        "title": "Cost Distribution by Provider",
+        "targets": [
+          {
+            "expr": "sum by (storage_provider) (backup_storage_cost_monthly_usd)",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD",
+            "decimals": 2,
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "options": {
+          "displayLabels": ["name", "percent"],
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "showLegend": true,
+            "values": ["value", "percent"]
+          },
+          "pieType": "donut"
+        }
+      },
+      {
+        "id": 6,
+        "gridPos": {
+          "h": 10,
+          "w": 24,
+          "x": 0,
+          "y": 18
+        },
+        "type": "timeseries",
+        "title": "Cost Breakdown by Database",
+        "targets": [
+          {
+            "expr": "sum by (database_name) (backup_storage_cost_monthly_usd)",
+            "refId": "A",
+            "legendFormat": "{{database_name}}",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "bars",
+              "lineInterpolation": "linear",
+              "barAlignment": 0,
+              "lineWidth": 1,
+              "fillOpacity": 80,
+              "gradientMode": "none",
+              "showPoints": "never"
+            },
+            "unit": "currencyUSD",
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          },
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true,
+            "calcs": ["mean", "last"]
+          }
+        }
+      },
+      {
+        "id": 7,
+        "gridPos": {
+          "h": 10,
+          "w": 12,
+          "x": 0,
+          "y": 28
+        },
+        "type": "timeseries",
+        "title": "Storage vs Transfer Costs",
+        "targets": [
+          {
+            "expr": "sum(backup_storage_cost_monthly_usd)",
+            "refId": "A",
+            "legendFormat": "Storage Cost",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          },
+          {
+            "expr": "sum(backup_transfer_cost_monthly_usd)",
+            "refId": "B",
+            "legendFormat": "Transfer Cost",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          },
+          {
+            "expr": "sum(backup_api_cost_monthly_usd)",
+            "refId": "C",
+            "legendFormat": "API Cost",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "fillOpacity": 25,
+              "gradientMode": "opacity",
+              "showPoints": "never",
+              "stacking": {
+                "mode": "normal",
+                "group": "A"
+              }
+            },
+            "unit": "currencyUSD",
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          }
+        }
+      },
+      {
+        "id": 8,
+        "gridPos": {
+          "h": 10,
+          "w": 12,
+          "x": 12,
+          "y": 28
+        },
+        "type": "timeseries",
+        "title": "Projected Monthly Cost",
+        "targets": [
+          {
+            "expr": "predict_linear(backup_storage_cost_monthly_usd[7d], 30*24*3600)",
+            "refId": "A",
+            "legendFormat": "Projected",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          },
+          {
+            "expr": "sum(backup_storage_cost_monthly_usd)",
+            "refId": "B",
+            "legendFormat": "Current",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          },
+          {
+            "expr": "backup_cost_budget_monthly_usd",
+            "refId": "C",
+            "legendFormat": "Budget",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "gradientMode": "opacity",
+              "showPoints": "never"
+            },
+            "unit": "currencyUSD",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Budget"
+              },
+              "properties": [
+                {
+                  "id": "custom.lineStyle",
+                  "value": {
+                    "dash": [10, 10],
+                    "fill": "dash"
+                  }
+                },
+                {
+                  "id": "color",
+                  "value": {
+                    "mode": "fixed",
+                    "fixedColor": "red"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          }
+        }
+      },
+      {
+        "id": 9,
+        "gridPos": {
+          "h": 10,
+          "w": 24,
+          "x": 0,
+          "y": 38
+        },
+        "type": "table",
+        "title": "Cost Optimization Opportunities",
+        "targets": [
+          {
+            "expr": "topk(10, backup_cost_optimization_potential_usd)",
+            "refId": "A",
+            "format": "table",
+            "instant": true,
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "potential_savings"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "currencyUSD"
+                },
+                {
+                  "id": "custom.displayMode",
+                  "value": "color-background"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 100
+                      },
+                      {
+                        "color": "red",
+                        "value": 500
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "potential_savings",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 10,
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 48
+        },
+        "type": "bargauge",
+        "title": "Top 10 Most Expensive Databases",
+        "targets": [
+          {
+            "expr": "topk(10, sum by (database_name) (backup_storage_cost_monthly_usd))",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "percentage",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 60
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "currencyUSD",
+            "color": {
+              "mode": "thresholds"
+            }
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient",
+          "showUnfilled": true
+        }
+      },
+      {
+        "id": 11,
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 48
+        },
+        "type": "stat",
+        "title": "Estimated Annual Cost",
+        "targets": [
+          {
+            "expr": "sum(backup_storage_cost_monthly_usd) * 12",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 10000
+                },
+                {
+                  "color": "red",
+                  "value": 50000
+                }
+              ]
+            },
+            "unit": "currencyUSD",
+            "decimals": 2,
+            "color": {
+              "mode": "thresholds"
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "textMode": "auto"
+        }
+      }
+    ]
+  }
+}
