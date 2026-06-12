@@ -1,0 +1,26 @@
+apiVersion: 1
+
+providers:
+  # Backup System Dashboards
+  - name: 'DB Backup Dashboards'
+    orgId: 1
+    folder: 'DB Backup System'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: false
+
+  # Alerts and SLOs
+  - name: 'DB Backup Alerts'
+    orgId: 1
+    folder: 'Alerts'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 60
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/alerts
+      foldersFromFilesStructure: false
