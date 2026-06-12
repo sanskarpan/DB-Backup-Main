@@ -1,0 +1,54 @@
+import { defineConfig } from 'vitest/config';
+import path from 'path';
+
+export default defineConfig({
+    test: {
+        globals: true,
+        environment: 'jsdom',
+        setupFiles: ['./setup.ts'],
+        coverage: {
+            provider: 'v8',
+            reporter: ['text', 'json', 'html', 'lcov'],
+            exclude: [
+                'node_modules/',
+                'dist/',
+                '**/*.test.ts',
+                '**/*.spec.ts',
+                '**/setup.ts',
+                '**/vitest.config.ts',
+            ],
+            all: true,
+            lines: 90,
+            functions: 90,
+            branches: 85,
+            statements: 90,
+        },
+        include: [
+            '**/*.test.ts',
+            '**/*.spec.ts',
+        ],
+        exclude: [
+            'node_modules',
+            'dist',
+            '.idea',
+            '.git',
+            '.cache',
+        ],
+        testTimeout: 30000,
+        hookTimeout: 30000,
+        teardownTimeout: 10000,
+        isolate: true,
+        threads: true,
+        reporters: ['verbose', 'json', 'html'],
+        outputFile: {
+            json: './reports/test-results.json',
+            html: './reports/test-results.html',
+        },
+    },
+    resolve: {
+        alias: {
+            '@': path.resolve(__dirname, '../'),
+            '@tests': path.resolve(__dirname, './'),
+        },
+    },
+});
