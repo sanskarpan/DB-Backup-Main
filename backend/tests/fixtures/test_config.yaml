@@ -1,0 +1,59 @@
+# Test configuration file for integration and E2E tests
+
+backup:
+  temp_directory: "/tmp/db-backup-test"
+  metadata_directory: "/tmp/db-backup-test/metadata"
+  default_compression: "gzip"
+  parallel_operations: 2
+  retention_days: 7
+
+storage:
+  default_provider: "local"
+
+  local:
+    base_path: "/tmp/db-backup-test/backups"
+
+  s3:
+    region: "us-east-1"
+    bucket: "test-backups"
+    endpoint: "http://localhost:9000"  # MinIO for testing
+    access_key_id: "minioadmin"
+    secret_access_key: "minioadmin"
+
+databases:
+  - id: "test-postgres"
+    name: "Test PostgreSQL"
+    type: "postgres"
+    host: "localhost"
+    port: 5432
+    username: "postgres"
+    password: "postgres"
+    database: "testdb"
+
+  - id: "test-mysql"
+    name: "Test MySQL"
+    type: "mysql"
+    host: "localhost"
+    port: 3306
+    username: "root"
+    password: "root"
+    database: "testdb"
+
+logging:
+  level: "debug"
+  format: "json"
+  output: "/tmp/db-backup-test/test.log"
+
+api:
+  port: 8888
+  jwt_secret: "test-jwt-secret-for-integration-tests"
+  rate_limit: 1000
+  cors_allowed_origins:
+    - "http://localhost:3000"
+
+notifications:
+  enabled: false  # Disable for tests
+
+metrics:
+  enabled: true
+  port: 9090

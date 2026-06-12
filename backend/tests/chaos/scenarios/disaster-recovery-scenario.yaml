@@ -1,0 +1,121 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Workflow
+metadata:
+  name: disaster-recovery-scenario
+  namespace: chaos-testing
+spec:
+  entry: simulate-datacenter-failure
+  templates:
+    - name: simulate-datacenter-failure
+      templateType: Serial
+      deadline: 45m
+      children:
+        - create-baseline-backup
+        - simulate-total-failure
+        - initiate-disaster-recovery
+        - verify-data-integrity
+
+    - name: create-baseline-backup
+      templateType: Task
+      task:
+        container:
+          name: backup
+          image: curlimages/curl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Creating baseline backup before disaster"
+              curl -X POST http://db-backup-server:8080/api/v1/backups \
+                -H "Content-Type: application/json" \
+                -d '{"database":"prod-db","type":"full","tags":["disaster-recovery-test"]}'
+              sleep 30
+
+    - name: simulate-total-failure
+      templateType: Parallel
+      deadline: 5m
+      children:
+        - kill-all-pods
+        - partition-network
+        - corrupt-storage
+
+    - name: kill-all-pods
+      templateType: PodChaos
+      deadline: 1m
+      podChaos:
+        action: pod-kill
+        mode: all
+        selector:
+          namespaces:
+            - db-backup
+          labelSelectors:
+            'app': 'db-backup-server'
+        gracePeriod: 0
+
+    - name: partition-network
+      templateType: NetworkChaos
+      deadline: 3m
+      networkChaos:
+        action: partition
+        mode: all
+        selector:
+          namespaces:
+            - db-backup
+        direction: both
+        duration: '2m'
+
+    - name: corrupt-storage
+      templateType: IOChaos
+      deadline: 2m
+      ioChaos:
+        action: fault
+        mode: one
+        selector:
+          namespaces:
+            - db-backup
+          labelSelectors:
+            'app': 'db-backup-server'
+        volumePath: /var/lib/backup
+        path: /var/lib/backup/data
+        errno: 5  # EIO
+        percent: 50
+        duration: '1m'
+
+    - name: initiate-disaster-recovery
+      templateType: Task
+      task:
+        container:
+          name: recovery
+          image: curlimages/curl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for system recovery..."
+              sleep 120
+              echo "Initiating restore from backup"
+              curl -X POST http://db-backup-server:8080/api/v1/restore \
+                -H "Content-Type: application/json" \
+                -d '{"backup_id":"latest","database":"prod-db-recovery"}'
+
+    - name: verify-data-integrity
+      templateType: Task
+      task:
+        container:
+          name: verify
+          image: curlimages/curl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Verifying data integrity after recovery"
+              for i in $(seq 1 60); do
+                STATUS=$(curl -s http://db-backup-server:8080/api/v1/restore/status)
+                if echo "$STATUS" | grep -q "completed"; then
+                  echo "Recovery completed successfully"
+                  exit 0
+                fi
+                sleep 10
+              done
+              echo "Recovery verification timeout"
+              exit 1

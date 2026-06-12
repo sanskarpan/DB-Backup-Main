@@ -1,0 +1,13 @@
+name: db-backup-aws
+runtime: nodejs
+description: DB Backup AWS infrastructure using Pulumi
+config:
+  aws:region:
+    description: AWS region
+    default: us-east-1
+  db-backup-aws:clusterSize:
+    description: Number of EKS worker nodes
+    default: 3
+  db-backup-aws:instanceType:
+    description: EC2 instance type for EKS nodes
+    default: t3.medium

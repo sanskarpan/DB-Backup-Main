@@ -1,0 +1,223 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      version:
+        description: 'Version/Tag to deploy (leave empty for latest)'
+        required: false
+        type: string
+
+env:
+  DOCKER_REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy-helm:
+    name: Deploy with Helm
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment }}
+      url: https://api-${{ github.event.inputs.environment }}.backup.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.28.0'
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'v3.13.0'
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          case "${{ github.event.inputs.environment }}" in
+            development)
+              echo "${{ secrets.KUBECONFIG_DEVELOPMENT }}" | base64 -d > $HOME/.kube/config
+              ;;
+            staging)
+              echo "${{ secrets.KUBECONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
+              ;;
+            production)
+              echo "${{ secrets.KUBECONFIG_PRODUCTION }}" | base64 -d > $HOME/.kube/config
+              ;;
+          esac
+
+      - name: Determine image tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "tag=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install db-backup ./helm/db-backup \
+            --namespace db-backup \
+            --create-namespace \
+            --values ./helm/db-backup/values-${{ github.event.inputs.environment }}.yaml \
+            --set image.tag=${{ steps.tag.outputs.tag }} \
+            --set image.repository=${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }} \
+            --wait \
+            --timeout 10m
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/db-backup -n db-backup --timeout=5m
+          kubectl get pods -n db-backup -l app.kubernetes.io/name=db-backup
+
+      - name: Run smoke tests
+        run: |
+          kubectl run smoke-test --rm -i --restart=Never \
+            --image=curlimages/curl:latest \
+            --namespace=db-backup \
+            -- curl -f http://db-backup:8080/health
+
+      - name: Notify deployment success
+        if: success()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "✅ Deployment to ${{ github.event.inputs.environment }} succeeded",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Deployment Successful*\n• Environment: `${{ github.event.inputs.environment }}`\n• Version: `${{ steps.tag.outputs.tag }}`\n• Triggered by: @${{ github.actor }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify deployment failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "❌ Deployment to ${{ github.event.inputs.environment }} failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Deployment Failed*\n• Environment: `${{ github.event.inputs.environment }}`\n• Version: `${{ steps.tag.outputs.tag }}`\n• Triggered by: @${{ github.actor }}\n• <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  deploy-canary:
+    name: Canary Deployment
+    runs-on: ubuntu-latest
+    if: github.event.inputs.environment == 'production'
+    environment:
+      name: production-canary
+      url: https://api-canary.backup.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG_PRODUCTION }}" | base64 -d > $HOME/.kube/config
+
+      - name: Deploy canary
+        run: |
+          # Deploy canary with 10% traffic
+          kubectl apply -f k8s/istio/virtualservice-canary.yaml
+
+      - name: Wait for canary health
+        run: |
+          sleep 60
+          kubectl run canary-check --rm -i --restart=Never \
+            --image=curlimages/curl:latest \
+            --namespace=db-backup \
+            -- curl -f http://db-backup-canary:8080/health
+
+      - name: Promote canary
+        if: success()
+        run: |
+          # Gradually increase canary traffic: 10% -> 50% -> 100%
+          for percentage in 50 100; do
+            echo "Increasing canary traffic to ${percentage}%"
+            kubectl patch virtualservice db-backup -n db-backup \
+              --type=json \
+              -p='[{"op": "replace", "path": "/spec/http/0/route/1/weight", "value": '${percentage}'}]'
+            sleep 300  # Wait 5 minutes between increases
+            # Check error rate
+            kubectl run metric-check --rm -i --restart=Never \
+              --image=curlimages/curl:latest \
+              --namespace=db-backup \
+              -- curl -f http://prometheus:9090/api/v1/query?query=error_rate
+          done
+
+      - name: Rollback canary
+        if: failure()
+        run: |
+          echo "Rolling back canary deployment"
+          kubectl apply -f k8s/istio/virtualservice-stable.yaml
+
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    if: github.event.inputs.environment != '' && failure()
+    environment:
+      name: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          case "${{ github.event.inputs.environment }}" in
+            development)
+              echo "${{ secrets.KUBECONFIG_DEVELOPMENT }}" | base64 -d > $HOME/.kube/config
+              ;;
+            staging)
+              echo "${{ secrets.KUBECONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
+              ;;
+            production)
+              echo "${{ secrets.KUBECONFIG_PRODUCTION }}" | base64 -d > $HOME/.kube/config
+              ;;
+          esac
+
+      - name: Rollback Helm release
+        run: |
+          helm rollback db-backup -n db-backup
+
+      - name: Verify rollback
+        run: |
+          kubectl rollout status deployment/db-backup -n db-backup --timeout=5m

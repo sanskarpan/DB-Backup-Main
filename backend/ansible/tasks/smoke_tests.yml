@@ -1,0 +1,109 @@
+---
+# Smoke Tests for DB Backup Application
+# Verifies basic functionality after deployment
+
+- name: Wait for all pods to be ready
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ namespace }}"
+    label_selectors:
+      - "app.kubernetes.io/name={{ app_name }}"
+  register: pods
+  until: >
+    pods.resources | selectattr('status.phase', 'equalto', 'Running') | list | length
+    == pods.resources | length
+  retries: 30
+  delay: 10
+
+- name: Test API health endpoint
+  uri:
+    url: "https://{{ ingress_host }}/health"
+    method: GET
+    validate_certs: no
+    status_code: 200
+  register: health_check
+  retries: 5
+  delay: 10
+
+- name: Display health check result
+  debug:
+    msg: "Health check successful: {{ health_check.json }}"
+
+- name: Test API readiness endpoint
+  uri:
+    url: "https://{{ ingress_host }}/ready"
+    method: GET
+    validate_certs: no
+    status_code: 200
+  register: readiness_check
+
+- name: Test metrics endpoint
+  uri:
+    url: "https://{{ ingress_host }}/metrics"
+    method: GET
+    validate_certs: no
+    status_code: 200
+  register: metrics_check
+  when: enable_monitoring | default(true)
+
+- name: Verify database connectivity
+  kubernetes.core.k8s_exec:
+    namespace: "{{ namespace }}"
+    pod: "{{ pods.resources[0].metadata.name }}"
+    command: /app/db-backup test-connection --type postgres
+  register: db_test
+  failed_when: db_test.rc != 0
+
+- name: Test backup creation (dry run)
+  kubernetes.core.k8s_exec:
+    namespace: "{{ namespace }}"
+    pod: "{{ pods.resources[0].metadata.name }}"
+    command: /app/db-backup backup --dry-run --database test
+  register: backup_test
+  failed_when: backup_test.rc != 0
+
+- name: Verify S3 connectivity
+  kubernetes.core.k8s_exec:
+    namespace: "{{ namespace }}"
+    pod: "{{ pods.resources[0].metadata.name }}"
+    command: aws s3 ls s3://{{ s3_bucket_name }}/
+  register: s3_test
+  failed_when: s3_test.rc != 0
+
+- name: Check persistent volume claim status
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: PersistentVolumeClaim
+    name: "{{ app_name }}-pvc"
+    namespace: "{{ namespace }}"
+  register: pvc
+  failed_when: pvc.resources[0].status.phase != "Bound"
+
+- name: Verify service endpoints
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Endpoints
+    name: "{{ app_name }}"
+    namespace: "{{ namespace }}"
+  register: endpoints
+  failed_when: endpoints.resources[0].subsets | length == 0
+
+- name: Check resource consumption
+  kubernetes.core.k8s_exec:
+    namespace: "{{ namespace }}"
+    pod: "{{ pods.resources[0].metadata.name }}"
+    command: top
+  register: resource_usage
+
+- name: Display smoke test results
+  debug:
+    msg:
+      - "✓ All smoke tests passed"
+      - "✓ {{ pods.resources | length }} pods running"
+      - "✓ Health endpoint: OK"
+      - "✓ Readiness endpoint: OK"
+      - "✓ Database connectivity: OK"
+      - "✓ S3 connectivity: OK"
+      - "✓ PVC status: {{ pvc.resources[0].status.phase }}"
+      - "✓ Endpoints: {{ endpoints.resources[0].subsets | length }}"
