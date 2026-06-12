@@ -1,0 +1,70 @@
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: aws-s3
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+    app.kubernetes.io/component: service-mesh
+spec:
+  hosts:
+    - "*.s3.amazonaws.com"
+    - "*.s3.*.amazonaws.com"
+
+  ports:
+    - number: 443
+      name: https
+      protocol: HTTPS
+
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-databases
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+    app.kubernetes.io/component: service-mesh
+spec:
+  hosts:
+    - external-postgres.example.com
+    - external-mysql.example.com
+    - external-mongodb.example.com
+
+  ports:
+    - number: 5432
+      name: postgres
+      protocol: TCP
+    - number: 3306
+      name: mysql
+      protocol: TCP
+    - number: 27017
+      name: mongodb
+      protocol: TCP
+
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: vault
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+    app.kubernetes.io/component: service-mesh
+spec:
+  hosts:
+    - vault.vault.svc.cluster.local
+
+  ports:
+    - number: 8200
+      name: https
+      protocol: HTTPS
+
+  location: MESH_INTERNAL
+  resolution: DNS
