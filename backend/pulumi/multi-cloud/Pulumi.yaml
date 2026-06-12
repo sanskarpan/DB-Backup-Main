@@ -1,0 +1,21 @@
+name: db-backup-multi-cloud
+runtime: nodejs
+description: DB Backup multi-cloud infrastructure using Pulumi
+config:
+  db-backup-multi-cloud:primaryCloud:
+    description: Primary cloud provider (aws, azure, or gcp)
+    default: aws
+  db-backup-multi-cloud:enableMultiCloud:
+    description: Enable multi-cloud deployment
+    default: false
+  db-backup-multi-cloud:awsRegion:
+    description: AWS region
+    default: us-east-1
+  db-backup-multi-cloud:azureLocation:
+    description: Azure location
+    default: eastus
+  db-backup-multi-cloud:gcpProject:
+    description: GCP project ID
+  db-backup-multi-cloud:gcpRegion:
+    description: GCP region
+    default: us-central1
