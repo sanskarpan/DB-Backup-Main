@@ -1,0 +1,122 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-backup-default-deny
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-backup-allow-ingress
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: db-backup
+      app.kubernetes.io/component: server
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    # Allow from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Allow from prometheus for metrics scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - protocol: TCP
+          port: 9090
+
+    # Allow within namespace
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: db-backup
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-backup-allow-egress
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: db-backup
+      app.kubernetes.io/component: server
+
+  policyTypes:
+    - Egress
+
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+
+    # Allow to databases
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: database
+      ports:
+        - protocol: TCP
+          port: 5432  # PostgreSQL
+        - protocol: TCP
+          port: 3306  # MySQL
+        - protocol: TCP
+          port: 27017  # MongoDB
+
+    # Allow to S3 (AWS endpoints)
+    - to:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+
+    # Allow to Vault
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: vault
+        - podSelector:
+            matchLabels:
+              app: vault
+      ports:
+        - protocol: TCP
+          port: 8200
