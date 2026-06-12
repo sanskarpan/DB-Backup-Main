@@ -1,0 +1,42 @@
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: db-backup
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+    app.kubernetes.io/component: service-mesh
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: db-backup
+
+  # Access logging
+  accessLogging:
+    - providers:
+        - name: envoy
+
+  # Metrics
+  metrics:
+    - providers:
+        - name: prometheus
+      dimensions:
+        backup_operation: request.headers["x-backup-operation"]
+        database_type: request.headers["x-database-type"]
+        backup_size: request.headers["x-backup-size"]
+
+  # Tracing
+  tracing:
+    - providers:
+        - name: jaeger
+      randomSamplingPercentage: 100.0
+      customTags:
+        backup_id:
+          header:
+            name: x-backup-id
+        database:
+          header:
+            name: x-database
+        operation:
+          header:
+            name: x-operation
