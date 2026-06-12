@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-backup-storage
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-sc  # Change to your storage class
+  resources:
+    requests:
+      storage: 100Gi
+
+---
+# Storage Class example for AWS EFS
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: efs-sc
+provisioner: efs.csi.aws.com
+parameters:
+  provisioningMode: efs-ap
+  fileSystemId: fs-EXAMPLE
+  directoryPerms: "700"
+  gidRangeStart: "1000"
+  gidRangeEnd: "2000"
+  basePath: "/backups"
+mountOptions:
+  - tls
+  - iam
