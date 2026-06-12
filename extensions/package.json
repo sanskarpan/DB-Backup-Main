@@ -1,0 +1,31 @@
+{
+  "name": "db-backup-extensions",
+  "version": "1.0.0",
+  "description": "Browser extensions for DB Backup platform (Chrome, Firefox, Edge, Safari)",
+  "private": true,
+  "scripts": {
+    "build:chrome": "cd chrome && npm run build",
+    "build:firefox": "cd firefox && ./build.sh",
+    "build:edge": "cd edge && npm run build",
+    "build:safari": "cd safari && npm run build",
+    "build:all": "./build-all.sh",
+    "package:all": "./package-all.sh",
+    "test": "echo 'Extension tests not yet implemented'",
+    "lint": "eslint shared/**/*.js chrome/**/*.js firefox/**/*.js edge/**/*.js"
+  },
+  "devDependencies": {
+    "eslint": "^8.55.0",
+    "web-ext": "^7.10.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "browser-extension",
+    "chrome-extension",
+    "firefox-addon",
+    "edge-extension",
+    "safari-extension",
+    "database-backup"
+  ]
+}
