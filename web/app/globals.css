@@ -1,0 +1,197 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Modern Cloudflare-inspired color palette */
+    --background: 240 10% 98%;
+    --foreground: 240 10% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 8%;
+
+    /* Orange accent like Cloudflare */
+    --primary: 22 93% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Refined neutrals */
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 10%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 22 93% 55%;
+    --radius: 0.75rem;
+
+    /* Custom gradients */
+    --gradient-orange: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%);
+    --gradient-blue: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --gradient-cyan: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    --gradient-success: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  }
+
+  .dark {
+    /* Dark mode with Cloudflare-esque sophistication */
+    --background: 240 10% 7%;
+    --foreground: 240 5% 96%;
+    --card: 240 8% 10%;
+    --card-foreground: 240 5% 96%;
+    --popover: 240 8% 10%;
+    --popover-foreground: 240 5% 96%;
+
+    --primary: 22 93% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 240 5% 96%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 64%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 240 5% 96%;
+
+    --destructive: 0 63% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 4% 18%;
+    --input: 240 4% 18%;
+    --ring: 22 93% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  /* Glassmorphism effect */
+  .glass {
+    @apply bg-white/80 backdrop-blur-xl border border-white/20 shadow-xl;
+  }
+
+  .glass-dark {
+    @apply dark:bg-gray-900/80 dark:backdrop-blur-xl dark:border-white/10;
+  }
+
+  /* Modern gradient backgrounds */
+  .gradient-orange {
+    background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%);
+  }
+
+  .gradient-blue {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+
+  .gradient-cyan {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  }
+
+  .gradient-success {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  }
+
+  /* Animated gradient text */
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #FF6B35 0%, #F7931E 50%, #FF6B35 100%);
+    background-size: 200% auto;
+    animation: gradient-shift 3s ease infinite;
+  }
+
+  @keyframes gradient-shift {
+    0%, 100% {
+      background-position: 0% center;
+    }
+    50% {
+      background-position: 100% center;
+    }
+  }
+
+  /* Modern card with hover effect */
+  .modern-card {
+    @apply bg-white rounded-2xl border border-gray-200 shadow-sm transition-all duration-300;
+    @apply hover:shadow-lg hover:-translate-y-0.5 hover:border-gray-300;
+  }
+
+  .modern-card-dark {
+    @apply dark:bg-gray-900 dark:border-gray-800 dark:hover:border-gray-700;
+  }
+
+  /* Stats card with gradient accent */
+  .stats-card {
+    @apply relative overflow-hidden bg-white rounded-2xl p-6 border border-gray-200;
+    @apply transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
+  }
+
+  .stats-card::before {
+    content: '';
+    @apply absolute top-0 left-0 w-full h-1;
+    background: linear-gradient(90deg, #FF6B35 0%, #F7931E 100%);
+  }
+
+  /* Button with modern styling */
+  .btn-primary {
+    @apply bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold;
+    @apply px-6 py-3 rounded-xl shadow-lg shadow-orange-500/30;
+    @apply transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/40;
+    @apply hover:-translate-y-0.5 active:translate-y-0;
+  }
+
+  /* Subtle animations */
+  .fade-in {
+    animation: fadeIn 0.5s ease-in;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-gray-100 dark:bg-gray-900;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 dark:bg-gray-700 rounded-full;
+    @apply hover:bg-gray-400 dark:hover:bg-gray-600;
+  }
+}
+
+@layer utilities {
+  /* Text utilities */
+  .text-balance {
+    text-wrap: balance;
+  }
+}

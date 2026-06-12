@@ -1,0 +1,126 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "db-backup.configMapName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "db-backup.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    server:
+      host: {{ .Values.config.server.host | default "0.0.0.0" }}
+      port: {{ .Values.config.server.port | default 8080 }}
+      log_level: {{ .Values.config.server.logLevel | default "info" }}
+      enable_cors: {{ .Values.config.server.enableCors | default true }}
+
+    {{- if .Values.config.storage }}
+    storage:
+      type: {{ .Values.config.storage.type | default "s3" }}
+      {{- if .Values.config.storage.region }}
+      region: {{ .Values.config.storage.region }}
+      {{- end }}
+      {{- if .Values.config.storage.bucket }}
+      bucket: {{ .Values.config.storage.bucket }}
+      {{- end }}
+      {{- if .Values.config.storage.endpoint }}
+      endpoint: {{ .Values.config.storage.endpoint }}
+      {{- end }}
+      {{- if .Values.config.storage.prefix }}
+      prefix: {{ .Values.config.storage.prefix }}
+      {{- end }}
+    {{- end }}
+
+    {{- if .Values.config.backup }}
+    backup:
+      default_compression: {{ .Values.config.backup.defaultCompression | default "zstd" }}
+      default_encryption: {{ .Values.config.backup.defaultEncryption | default true }}
+      parallel_jobs: {{ .Values.config.backup.parallelJobs | default 4 }}
+      {{- if .Values.config.backup.retention }}
+      retention:
+        daily: {{ .Values.config.backup.retention.daily | default 7 }}
+        weekly: {{ .Values.config.backup.retention.weekly | default 4 }}
+        monthly: {{ .Values.config.backup.retention.monthly | default 12 }}
+        yearly: {{ .Values.config.backup.retention.yearly | default 5 }}
+      {{- end }}
+      {{- if .Values.config.backup.verify }}
+      verify:
+        enabled: {{ .Values.config.backup.verify.enabled | default true }}
+        method: {{ .Values.config.backup.verify.method | default "checksum" }}
+      {{- end }}
+    {{- end }}
+
+    {{- if .Values.config.notifications }}
+    notifications:
+      enabled: {{ .Values.config.notifications.enabled | default true }}
+      {{- if .Values.config.notifications.webhook }}
+      webhook:
+        enabled: {{ .Values.config.notifications.webhook.enabled | default true }}
+        {{- if .Values.config.notifications.webhook.url }}
+        url: {{ .Values.config.notifications.webhook.url }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.config.notifications.email }}
+      email:
+        enabled: {{ .Values.config.notifications.email.enabled | default false }}
+        {{- if .Values.config.notifications.email.smtpHost }}
+        smtp_host: {{ .Values.config.notifications.email.smtpHost }}
+        smtp_port: {{ .Values.config.notifications.email.smtpPort }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+
+    {{- if .Values.config.monitoring }}
+    monitoring:
+      {{- if .Values.config.monitoring.prometheus }}
+      prometheus:
+        enabled: {{ .Values.config.monitoring.prometheus.enabled | default true }}
+        port: {{ .Values.config.monitoring.prometheus.port | default 9090 }}
+        path: {{ .Values.config.monitoring.prometheus.path | default "/metrics" }}
+      {{- end }}
+      {{- if .Values.config.monitoring.tracing }}
+      tracing:
+        enabled: {{ .Values.config.monitoring.tracing.enabled | default false }}
+        {{- if .Values.config.monitoring.tracing.endpoint }}
+        endpoint: {{ .Values.config.monitoring.tracing.endpoint }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+
+    {{- if .Values.config.profiling }}
+    profiling:
+      enabled: {{ .Values.config.profiling.enabled | default true }}
+      {{- if .Values.config.profiling.memory }}
+      memory:
+        enabled: {{ .Values.config.profiling.memory.enabled | default true }}
+        interval: {{ .Values.config.profiling.memory.interval | default "30s" }}
+        leak_detection: {{ .Values.config.profiling.memory.leakDetection | default true }}
+      {{- end }}
+    {{- end }}
+
+    {{- if .Values.config.deduplication }}
+    deduplication:
+      enabled: {{ .Values.config.deduplication.enabled | default true }}
+      chunk_size: {{ .Values.config.deduplication.chunkSize | default 4194304 }}
+      cache_size: {{ .Values.config.deduplication.cacheSize | default 1000 }}
+    {{- end }}
+
+    {{- if .Values.config.deltaBackups }}
+    delta_backups:
+      enabled: {{ .Values.config.deltaBackups.enabled | default true }}
+      block_size: {{ .Values.config.deltaBackups.blockSize | default 4096 }}
+      max_chain_length: {{ .Values.config.deltaBackups.maxChainLength | default 10 }}
+    {{- end }}
+
+    {{- if .Values.config.security }}
+    security:
+      {{- if .Values.config.security.encryption }}
+      encryption:
+        enabled: {{ .Values.config.security.encryption.enabled | default true }}
+        algorithm: {{ .Values.config.security.encryption.algorithm | default "aes-256-gcm" }}
+      {{- end }}
+      {{- if .Values.config.security.audit }}
+      audit:
+        enabled: {{ .Values.config.security.audit.enabled | default true }}
+        log_path: {{ .Values.config.security.audit.logPath | default "/var/log/audit" }}
+      {{- end }}
+    {{- end }}

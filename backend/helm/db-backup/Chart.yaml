@@ -1,0 +1,49 @@
+apiVersion: v2
+name: db-backup
+description: Enterprise-grade database backup and restoration utility
+
+# Chart type - application or library
+type: application
+
+# Chart version - increment this on chart changes
+version: 1.0.0
+
+# Application version - the version of the application being deployed
+appVersion: "1.0.0"
+
+# Minimum Kubernetes version
+kubeVersion: ">=1.24.0-0"
+
+# Keywords for searching
+keywords:
+  - backup
+  - database
+  - postgresql
+  - mysql
+  - mongodb
+  - sqlite
+  - disaster-recovery
+
+# Maintainers
+maintainers:
+  - name: Infrastructure Team
+    email: infra@example.com
+    url: https://github.com/your-org/db-backup
+
+# Chart sources
+sources:
+  - https://github.com/your-org/db-backup
+
+# Chart home page
+home: https://backup.example.com
+
+# Chart icon
+icon: https://backup.example.com/icon.png
+
+# Dependencies (if any)
+dependencies: []
+
+# Annotations
+annotations:
+  category: Database
+  licenses: MIT

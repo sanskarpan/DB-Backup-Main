@@ -1,0 +1,428 @@
+# Default values for db-backup Helm chart
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global settings
+global:
+  # Image registry to use
+  imageRegistry: ""
+  # Image pull secrets
+  imagePullSecrets: []
+
+# Number of replicas
+replicaCount: 2
+
+# Image configuration
+image:
+  repository: db-backup
+  pullPolicy: IfNotPresent
+  tag: "1.0.0"
+
+# Image pull secrets
+imagePullSecrets: []
+
+# Override chart name
+nameOverride: ""
+fullnameOverride: ""
+
+# Service account configuration
+serviceAccount:
+  # Create service account
+  create: true
+  # Annotations for service account
+  annotations:
+    # AWS IAM role for service account (IRSA)
+    eks.amazonaws.com/role-arn: ""
+  # Service account name
+  name: ""
+
+# Pod annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+  prometheus.io/path: "/metrics"
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  metricsPort: 9090
+  annotations: {}
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+
+# Headless service for StatefulSet
+headlessService:
+  enabled: false
+
+# External LoadBalancer service
+externalService:
+  enabled: false
+  type: LoadBalancer
+  port: 443
+  annotations: {}
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "20"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+  hosts:
+    - host: api.backup.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: db-backup-tls
+      hosts:
+        - api.backup.example.com
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+# Autoscaling configuration
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  customMetrics:
+    - type: Pods
+      pods:
+        metric:
+          name: backup_queue_length
+        target:
+          type: AverageValue
+          averageValue: "10"
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity and anti-affinity
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - db-backup
+          topologyKey: kubernetes.io/hostname
+
+# Persistent storage
+persistence:
+  enabled: true
+  storageClass: "efs-sc"
+  accessMode: ReadWriteMany
+  size: 100Gi
+  annotations: {}
+
+# Application configuration
+config:
+  server:
+    host: 0.0.0.0
+    port: 8080
+    logLevel: info
+    enableCors: true
+
+  storage:
+    type: s3
+    region: us-east-1
+    bucket: db-backups-production
+
+  backup:
+    defaultCompression: zstd
+    defaultEncryption: true
+    parallelJobs: 4
+    retention:
+      daily: 7
+      weekly: 4
+      monthly: 12
+      yearly: 5
+
+  notifications:
+    enabled: true
+    webhook:
+      enabled: true
+      url: ""
+
+  monitoring:
+    prometheus:
+      enabled: true
+      port: 9090
+      path: /metrics
+
+  profiling:
+    enabled: true
+    memory:
+      enabled: true
+      interval: 30s
+      leakDetection: true
+
+  deduplication:
+    enabled: true
+    chunkSize: 4194304
+    cacheSize: 1000
+
+  deltaBackups:
+    enabled: true
+    blockSize: 4096
+    maxChainLength: 10
+
+# Secrets configuration
+secrets:
+  # Create secrets from values
+  create: true
+  # External secret name (if create is false)
+  externalSecretName: ""
+  # Secret values (will be base64 encoded)
+  jwtSecret: "change-this-to-a-secure-random-string-min-32-chars"
+  awsAccessKeyId: ""
+  awsSecretAccessKey: ""
+  postgresHost: "postgres.database.svc.cluster.local"
+  postgresPort: "5432"
+  postgresUser: "backup_user"
+  postgresPassword: ""
+  mysqlHost: "mysql.database.svc.cluster.local"
+  mysqlPort: "3306"
+  mysqlUser: "backup_user"
+  mysqlPassword: ""
+  mongodbUri: ""
+  encryptionKey: ""
+  webhookSecret: ""
+  vaultAddr: ""
+  vaultToken: ""
+
+# TLS configuration
+tls:
+  enabled: true
+  # Create TLS secret from values
+  create: false
+  # External TLS secret name
+  secretName: "db-backup-tls"
+  # Certificate and key (if create is true)
+  cert: ""
+  key: ""
+
+# Liveness probe
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 3
+
+# Readiness probe
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 3
+
+# Startup probe
+startupProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 30
+
+# CronJobs
+cronjobs:
+  cleanup:
+    enabled: true
+    schedule: "0 2 * * *"
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+  verify:
+    enabled: true
+    schedule: "0 */6 * * *"
+    successfulJobsHistoryLimit: 5
+    failedJobsHistoryLimit: 3
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+
+# Network policies
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: database
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 3306
+        - protocol: TCP
+          port: 27017
+
+# Istio service mesh integration
+istio:
+  enabled: false
+  virtualService:
+    enabled: true
+    hosts:
+      - api.backup.example.com
+    gateways:
+      - db-backup-gateway
+    retries:
+      attempts: 3
+      perTryTimeout: 30s
+    timeout: 60s
+    corsPolicy:
+      allowOrigins:
+        - exact: https://dashboard.example.com
+      allowMethods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      allowCredentials: true
+
+  gateway:
+    enabled: true
+    hosts:
+      - api.backup.example.com
+
+  destinationRule:
+    enabled: true
+    trafficPolicy:
+      connectionPool:
+        tcp:
+          maxConnections: 100
+        http:
+          http1MaxPendingRequests: 100
+          http2MaxRequests: 1000
+      loadBalancer:
+        simple: LEAST_REQUEST
+      outlierDetection:
+        consecutive5xxErrors: 5
+        interval: 30s
+        baseEjectionTime: 30s
+
+  peerAuthentication:
+    enabled: true
+    mtlsMode: STRICT
+
+  authorizationPolicy:
+    enabled: true
+
+  serviceEntry:
+    enabled: true
+
+  telemetry:
+    enabled: true
+    accessLogging: true
+    metrics: true
+    tracing: true
+    tracingSamplingPercentage: 100.0
+
+# RBAC
+rbac:
+  create: true
+
+# Extra environment variables
+extraEnv: []
+
+# Extra volumes
+extraVolumes: []
+
+# Extra volume mounts
+extraVolumeMounts: []
+
+# Init containers
+initContainers: []
+
+# Sidecar containers
+sidecars: []

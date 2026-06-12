@@ -1,0 +1,115 @@
+apiVersion: 1
+
+datasources:
+  # Prometheus for metrics
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      httpMethod: POST
+      timeInterval: 30s
+      queryTimeout: 60s
+      prometheusType: Prometheus
+      prometheusVersion: 2.45.0
+      cacheLevel: 'High'
+      incrementalQuerying: true
+      incrementalQueryOverlapWindow: 10m
+
+  # Loki for logs
+  - name: Loki
+    type: loki
+    uid: loki
+    access: proxy
+    url: http://loki:3100
+    editable: true
+    jsonData:
+      maxLines: 1000
+      derivedFields:
+        - datasourceUid: tempo
+          matcherRegex: "trace_id=(\\w+)"
+          name: TraceID
+          url: '$${__value.raw}'
+
+  # Tempo for traces
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: true
+    jsonData:
+      tracesToLogs:
+        datasourceUid: 'loki'
+        tags: ['job', 'instance', 'pod', 'namespace']
+        mappedTags: [{ key: 'service.name', value: 'service' }]
+        mapTagNamesEnabled: true
+        spanStartTimeShift: '1h'
+        spanEndTimeShift: '1h'
+        filterByTraceID: true
+        filterBySpanID: false
+      tracesToMetrics:
+        datasourceUid: 'prometheus'
+        tags: [{ key: 'service.name', value: 'service' }]
+        queries:
+          - name: 'Request rate'
+            query: 'rate(tempo_request_duration_seconds_count{$$__tags}[5m])'
+      serviceMap:
+        datasourceUid: 'prometheus'
+      nodeGraph:
+        enabled: true
+      search:
+        hide: false
+      lokiSearch:
+        datasourceUid: 'loki'
+
+  # PostgreSQL for application metadata
+  - name: PostgreSQL
+    type: postgres
+    uid: postgres
+    access: proxy
+    url: postgres:5432
+    database: db_backup_metadata
+    user: grafana_reader
+    editable: false
+    secureJsonData:
+      password: ${POSTGRES_GRAFANA_PASSWORD}
+    jsonData:
+      sslmode: 'require'
+      maxOpenConns: 10
+      maxIdleConns: 5
+      connMaxLifetime: 14400
+      postgresVersion: 1500
+      timescaledb: false
+
+  # Datadog (if configured)
+  - name: Datadog
+    type: datadog-datasource
+    uid: datadog
+    access: proxy
+    url: https://api.datadoghq.com
+    editable: true
+    secureJsonData:
+      apiKey: ${DATADOG_API_KEY}
+      appKey: ${DATADOG_APP_KEY}
+    jsonData:
+      site: datadoghq.com
+
+  # New Relic (if configured)
+  - name: NewRelic
+    type: newrelic-newrelic-datasource
+    uid: newrelic
+    access: proxy
+    url: https://api.newrelic.com
+    editable: true
+    secureJsonData:
+      apiKey: ${NEWRELIC_API_KEY}
+    jsonData:
+      accountId: ${NEWRELIC_ACCOUNT_ID}
+
+deleteDatasources:
+  - name: TestData
+    orgId: 1
