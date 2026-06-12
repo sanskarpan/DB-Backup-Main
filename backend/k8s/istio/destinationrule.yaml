@@ -1,0 +1,76 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: db-backup
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+    app.kubernetes.io/component: service-mesh
+spec:
+  host: db-backup.db-backup.svc.cluster.local
+
+  trafficPolicy:
+    # Connection pool settings
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 30s
+        tcpKeepalive:
+          time: 7200s
+          interval: 75s
+      http:
+        http1MaxPendingRequests: 100
+        http2MaxRequests: 1000
+        maxRequestsPerConnection: 2
+        maxRetries: 3
+        idleTimeout: 300s
+
+    # Load balancing
+    loadBalancer:
+      simple: LEAST_REQUEST
+      localityLbSetting:
+        enabled: true
+        distribute:
+          - from: us-east-1a
+            to:
+              "us-east-1a": 80
+              "us-east-1b": 20
+          - from: us-east-1b
+            to:
+              "us-east-1b": 80
+              "us-east-1a": 20
+
+    # Outlier detection (circuit breaking)
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+
+    # TLS settings
+    tls:
+      mode: ISTIO_MUTUAL  # mTLS within mesh
+
+  # Subsets for canary deployments
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+      trafficPolicy:
+        loadBalancer:
+          simple: ROUND_ROBIN
+
+    - name: v2
+      labels:
+        version: v2
+      trafficPolicy:
+        loadBalancer:
+          simple: ROUND_ROBIN
+
+    - name: canary
+      labels:
+        version: canary
+      trafficPolicy:
+        loadBalancer:
+          simple: ROUND_ROBIN

@@ -1,0 +1,31 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: db-backup
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+    app.kubernetes.io/component: availability
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: db-backup
+      app.kubernetes.io/component: server
+
+---
+# Alternative: using maxUnavailable instead of minAvailable
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: db-backup-max-unavailable
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+    app.kubernetes.io/component: availability
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: db-backup
+      app.kubernetes.io/component: server

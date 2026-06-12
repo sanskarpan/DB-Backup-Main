@@ -1,0 +1,699 @@
+#compdef db-backup dbb dbbackup
+# Zsh completion script for db-backup
+# Supports oh-my-zsh and intelligent context-aware suggestions
+
+# ============================================================================
+# Cache Configuration
+# ============================================================================
+
+typeset -g _DB_BACKUP_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/db-backup/completion"
+typeset -g _DB_BACKUP_CACHE_TTL=300
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+_db_backup_cache_file() {
+    echo "${_DB_BACKUP_CACHE_DIR}/$1.cache"
+}
+
+_db_backup_cache_valid() {
+    local cache_file="$1"
+
+    [[ ! -f "$cache_file" ]] && return 1
+
+    local cache_time=$(stat -f %m "$cache_file" 2>/dev/null || stat -c %Y "$cache_file" 2>/dev/null)
+    local current_time=$(date +%s)
+    local age=$((current_time - cache_time))
+
+    [[ $age -gt $_DB_BACKUP_CACHE_TTL ]] && return 1
+
+    return 0
+}
+
+_db_backup_cache_read() {
+    local cache_file="$1"
+
+    if _db_backup_cache_valid "$cache_file"; then
+        cat "$cache_file"
+        return 0
+    fi
+
+    return 1
+}
+
+_db_backup_cache_write() {
+    local key="$1"
+    local data="$2"
+
+    mkdir -p "$_DB_BACKUP_CACHE_DIR"
+    local cache_file=$(_db_backup_cache_file "$key")
+    echo "$data" > "$cache_file"
+}
+
+_db_backup_exec() {
+    local cmd="$1"
+    local cache_key="$2"
+
+    local cache_file=$(_db_backup_cache_file "$cache_key")
+
+    # Try cache first
+    local cached
+    if cached=$(_db_backup_cache_read "$cache_file"); then
+        echo "$cached"
+        return 0
+    fi
+
+    # Execute command
+    local result
+    if result=$(eval "$cmd" 2>/dev/null); then
+        _db_backup_cache_write "$cache_key" "$result"
+        echo "$result"
+        return 0
+    fi
+
+    return 1
+}
+
+# ============================================================================
+# Dynamic Completion Functions
+# ============================================================================
+
+_db_backup_databases() {
+    local databases
+    databases=($(_db_backup_exec "db-backup database list --format=name" "databases"))
+    _describe 'database' databases
+}
+
+_db_backup_backups() {
+    local database="$1"
+    local backups cmd
+
+    if [[ -n "$database" ]]; then
+        cmd="db-backup backup list --database='$database' --format=id"
+        backups=($(_db_backup_exec "$cmd" "backups_$database"))
+    else
+        backups=($(_db_backup_exec "db-backup backup list --format=id" "backups_all"))
+    fi
+
+    _describe 'backup' backups
+}
+
+_db_backup_schedules() {
+    local schedules
+    schedules=($(_db_backup_exec "db-backup schedule list --format=name" "schedules"))
+    _describe 'schedule' schedules
+}
+
+_db_backup_providers() {
+    local providers=(
+        'local:Local filesystem storage'
+        's3:Amazon S3'
+        'gcs:Google Cloud Storage'
+        'azure:Azure Blob Storage'
+        'minio:MinIO object storage'
+        'wasabi:Wasabi cloud storage'
+        'backblaze:Backblaze B2'
+        'digitalocean:DigitalOcean Spaces'
+    )
+    _describe 'provider' providers
+}
+
+_db_backup_database_types() {
+    local types=(
+        'postgres:PostgreSQL database'
+        'mysql:MySQL/MariaDB database'
+        'mongodb:MongoDB database'
+        'redis:Redis key-value store'
+        'sqlite:SQLite database'
+        'cassandra:Apache Cassandra'
+        'dynamodb:AWS DynamoDB'
+        'elasticsearch:Elasticsearch'
+        'influxdb:InfluxDB time-series'
+        'timescaledb:TimescaleDB'
+    )
+    _describe 'database type' types
+}
+
+_db_backup_compression_formats() {
+    local formats=(
+        'gzip:Gzip compression (balanced)'
+        'zstd:Zstandard compression (fast, high ratio)'
+        'lz4:LZ4 compression (very fast)'
+        'none:No compression'
+    )
+    _describe 'compression format' formats
+}
+
+_db_backup_encryption_algorithms() {
+    local algorithms=(
+        'aes256:AES-256 encryption (recommended)'
+        'aes128:AES-128 encryption'
+        'chacha20:ChaCha20-Poly1305 encryption'
+    )
+    _describe 'encryption algorithm' algorithms
+}
+
+_db_backup_retention_policies() {
+    local policies
+    policies=($(_db_backup_exec "db-backup retention list --format=name" "retention_policies"))
+    _describe 'retention policy' policies
+}
+
+_db_backup_compliance_frameworks() {
+    local frameworks=(
+        'gdpr:General Data Protection Regulation'
+        'hipaa:Health Insurance Portability Act'
+        'sox:Sarbanes-Oxley Act'
+        'pci-dss:Payment Card Industry Data Security'
+        'iso27001:ISO 27001 Information Security'
+        'ccpa:California Consumer Privacy Act'
+    )
+    _describe 'compliance framework' frameworks
+}
+
+_db_backup_alerts() {
+    local alerts
+    alerts=($(_db_backup_exec "db-backup monitoring alerts --format=id" "alerts"))
+    _describe 'alert' alerts
+}
+
+_db_backup_tags() {
+    local tags
+    tags=($(_db_backup_exec "db-backup tag list --format=name" "tags"))
+    _describe 'tag' tags
+}
+
+_db_backup_formats() {
+    local formats=(
+        'json:JSON output'
+        'yaml:YAML output'
+        'table:Table output (human-readable)'
+        'csv:CSV output'
+        'id:ID only'
+        'name:Name only'
+    )
+    _describe 'output format' formats
+}
+
+_db_backup_log_levels() {
+    local levels=(
+        'debug:Debug level (verbose)'
+        'info:Info level (default)'
+        'warn:Warning level'
+        'error:Error level only'
+    )
+    _describe 'log level' levels
+}
+
+_db_backup_intervals() {
+    local intervals=(
+        'hourly:Every hour'
+        'daily:Every day'
+        'weekly:Every week'
+        'monthly:Every month'
+    )
+    _describe 'interval' intervals
+}
+
+_db_backup_priorities() {
+    local priorities=(
+        'low:Low priority'
+        'normal:Normal priority'
+        'high:High priority'
+        'critical:Critical priority'
+    )
+    _describe 'priority' priorities
+}
+
+# ============================================================================
+# Main Completion Function
+# ============================================================================
+
+_db-backup() {
+    local curcontext="$curcontext" state line
+    typeset -A opt_args
+
+    _arguments -C \
+        '1: :_db_backup_commands' \
+        '*::arg:->args'
+
+    case $state in
+        args)
+            case $words[1] in
+                backup)
+                    _db_backup_backup
+                    ;;
+                restore)
+                    _db_backup_restore
+                    ;;
+                database)
+                    _db_backup_database
+                    ;;
+                schedule)
+                    _db_backup_schedule
+                    ;;
+                retention)
+                    _db_backup_retention
+                    ;;
+                monitoring)
+                    _db_backup_monitoring
+                    ;;
+                compliance)
+                    _db_backup_compliance
+                    ;;
+                policy)
+                    _db_backup_policy
+                    ;;
+                encryption)
+                    _db_backup_encryption
+                    ;;
+                catalog)
+                    _db_backup_catalog
+                    ;;
+                tag)
+                    _db_backup_tag
+                    ;;
+                export)
+                    _db_backup_export
+                    ;;
+                import)
+                    _db_backup_import
+                    ;;
+                health)
+                    _db_backup_health
+                    ;;
+                version|help)
+                    # No further completion needed
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+# ============================================================================
+# Command Completions
+# ============================================================================
+
+_db_backup_commands() {
+    local commands=(
+        'backup:Backup operations'
+        'restore:Restore operations'
+        'database:Database management'
+        'schedule:Schedule management'
+        'retention:Retention policy management'
+        'monitoring:Monitoring and alerts'
+        'compliance:Compliance scanning and reporting'
+        'policy:Policy management'
+        'encryption:Encryption management'
+        'catalog:Backup catalog operations'
+        'tag:Tag management'
+        'export:Export configurations'
+        'import:Import configurations'
+        'health:Health checks'
+        'version:Show version'
+        'help:Show help'
+    )
+    _describe 'command' commands
+}
+
+_db_backup_backup() {
+    local curcontext="$curcontext" state line
+    typeset -A opt_args
+
+    _arguments -C \
+        '1: :_db_backup_backup_commands' \
+        '*:: :->args'
+
+    case $state in
+        args)
+            _db_backup_backup_args
+            ;;
+    esac
+}
+
+_db_backup_backup_commands() {
+    local commands=(
+        'create:Create a new backup'
+        'list:List backups'
+        'delete:Delete a backup'
+        'download:Download a backup'
+        'restore:Restore from backup'
+        'verify:Verify backup integrity'
+        'info:Show backup information'
+        'cleanup:Cleanup old backups'
+        'stats:Show backup statistics'
+    )
+    _describe 'backup command' commands
+}
+
+_db_backup_backup_args() {
+    _arguments \
+        '--database[Database name]:database:_db_backup_databases' \
+        '--type[Database type]:type:_db_backup_database_types' \
+        '--provider[Storage provider]:provider:_db_backup_providers' \
+        '--compression[Compression format]:compression:_db_backup_compression_formats' \
+        '--encryption[Encryption algorithm]:encryption:_db_backup_encryption_algorithms' \
+        '--retention[Retention policy]:retention:_db_backup_retention_policies' \
+        '--tag[Tag]:tag:_db_backup_tags' \
+        '--description[Description]:description:' \
+        '--full[Full backup]' \
+        '--incremental[Incremental backup]' \
+        '--verify[Verify after backup]' \
+        '--notify[Send notifications]' \
+        '--format[Output format]:format:_db_backup_formats' \
+        '--output[Output file]:file:_files' \
+        '--help[Show help]' \
+        '--verbose[Verbose output]' \
+        '--quiet[Quiet mode]' \
+        '--json[JSON output]' \
+        '--no-color[Disable colors]'
+}
+
+_db_backup_restore() {
+    local curcontext="$curcontext" state line
+    typeset -A opt_args
+
+    _arguments -C \
+        '1: :_db_backup_restore_commands' \
+        '*:: :->args'
+
+    case $state in
+        args)
+            _db_backup_restore_args
+            ;;
+    esac
+}
+
+_db_backup_restore_commands() {
+    local commands=(
+        'full:Full database restore'
+        'incremental:Incremental restore'
+        'point-in-time:Point-in-time recovery'
+        'download:Download backup file'
+        'validate:Validate backup before restore'
+        'test:Test restore without applying'
+    )
+    _describe 'restore command' commands
+}
+
+_db_backup_restore_args() {
+    _arguments \
+        '--backup[Backup ID]:backup:_db_backup_backups' \
+        '--database[Database name]:database:_db_backup_databases' \
+        '--target[Target database]:target:' \
+        '--point-in-time[Timestamp]:timestamp:' \
+        '--verify[Verify after restore]' \
+        '--dry-run[Dry run mode]' \
+        '--overwrite[Overwrite existing]' \
+        '--parallel[Parallel restore]:threads:' \
+        '--help[Show help]' \
+        '--verbose[Verbose output]'
+}
+
+_db_backup_database() {
+    local curcontext="$curcontext" state line
+    typeset -A opt_args
+
+    _arguments -C \
+        '1: :_db_backup_database_commands' \
+        '*:: :->args'
+
+    case $state in
+        args)
+            _db_backup_database_args
+            ;;
+    esac
+}
+
+_db_backup_database_commands() {
+    local commands=(
+        'add:Add a new database'
+        'list:List databases'
+        'remove:Remove a database'
+        'update:Update database configuration'
+        'test:Test database connection'
+        'info:Show database information'
+        'stats:Show database statistics'
+        'migrate:Migrate database'
+    )
+    _describe 'database command' commands
+}
+
+_db_backup_database_args() {
+    _arguments \
+        '--name[Database name]:name:' \
+        '--type[Database type]:type:_db_backup_database_types' \
+        '--host[Database host]:host:' \
+        '--port[Database port]:port:' \
+        '--username[Username]:username:' \
+        '--password[Password]:password:' \
+        '--database[Database name]:database:' \
+        '--ssl[Enable SSL]' \
+        '--connection-string[Connection string]:connection:' \
+        '--test[Test connection]' \
+        '--format[Output format]:format:_db_backup_formats' \
+        '--help[Show help]'
+}
+
+_db_backup_schedule() {
+    local curcontext="$curcontext" state line
+    typeset -A opt_args
+
+    _arguments -C \
+        '1: :_db_backup_schedule_commands' \
+        '*:: :->args'
+
+    case $state in
+        args)
+            _db_backup_schedule_args
+            ;;
+    esac
+}
+
+_db_backup_schedule_commands() {
+    local commands=(
+        'create:Create a schedule'
+        'list:List schedules'
+        'delete:Delete a schedule'
+        'update:Update a schedule'
+        'enable:Enable a schedule'
+        'disable:Disable a schedule'
+        'run:Run a schedule now'
+        'info:Show schedule information'
+    )
+    _describe 'schedule command' commands
+}
+
+_db_backup_schedule_args() {
+    _arguments \
+        '--name[Schedule name]:name:' \
+        '--schedule[Schedule to operate on]:schedule:_db_backup_schedules' \
+        '--database[Database]:database:_db_backup_databases' \
+        '--interval[Backup interval]:interval:_db_backup_intervals' \
+        '--time[Backup time]:time:' \
+        '--retention[Retention policy]:retention:_db_backup_retention_policies' \
+        '--enabled[Enable schedule]' \
+        '--compression[Compression]:compression:_db_backup_compression_formats' \
+        '--encryption[Encryption]:encryption:_db_backup_encryption_algorithms' \
+        '--notify[Send notifications]' \
+        '--tag[Tag]:tag:_db_backup_tags' \
+        '--help[Show help]'
+}
+
+_db_backup_retention() {
+    local curcontext="$curcontext" state line
+    typeset -A opt_args
+
+    _arguments -C \
+        '1: :_db_backup_retention_commands' \
+        '*:: :->args'
+
+    case $state in
+        args)
+            _db_backup_retention_args
+            ;;
+    esac
+}
+
+_db_backup_retention_commands() {
+    local commands=(
+        'create:Create retention policy'
+        'list:List retention policies'
+        'delete:Delete retention policy'
+        'update:Update retention policy'
+        'apply:Apply retention policy'
+        'cleanup:Cleanup old backups'
+        'info:Show policy information'
+    )
+    _describe 'retention command' commands
+}
+
+_db_backup_retention_args() {
+    _arguments \
+        '--name[Policy name]:name:' \
+        '--database[Database]:database:_db_backup_databases' \
+        '--policy[Policy]:policy:_db_backup_retention_policies' \
+        '--keep-daily[Keep daily]:count:' \
+        '--keep-weekly[Keep weekly]:count:' \
+        '--keep-monthly[Keep monthly]:count:' \
+        '--keep-yearly[Keep yearly]:count:' \
+        '--min-backups[Minimum backups]:count:' \
+        '--max-backups[Maximum backups]:count:' \
+        '--dry-run[Dry run mode]' \
+        '--force[Force operation]' \
+        '--help[Show help]'
+}
+
+_db_backup_monitoring() {
+    local curcontext="$curcontext" state line
+    typeset -A opt_args
+
+    _arguments -C \
+        '1: :_db_backup_monitoring_commands' \
+        '*:: :->args'
+
+    case $state in
+        args)
+            _db_backup_monitoring_args
+            ;;
+    esac
+}
+
+_db_backup_monitoring_commands() {
+    local commands=(
+        'status:Show monitoring status'
+        'alerts:Show alerts'
+        'metrics:Show metrics'
+        'dashboard:Open dashboard'
+        'logs:Show logs'
+        'enable:Enable monitoring'
+        'disable:Disable monitoring'
+    )
+    _describe 'monitoring command' commands
+}
+
+_db_backup_monitoring_args() {
+    _arguments \
+        '--alert[Alert ID]:alert:_db_backup_alerts' \
+        '--status[Filter by status]:status:(active resolved acknowledged)' \
+        '--severity[Filter by severity]:severity:(low medium high critical)' \
+        '--from[Start time]:time:' \
+        '--to[End time]:time:' \
+        '--format[Output format]:format:_db_backup_formats' \
+        '--refresh[Auto-refresh]:seconds:' \
+        '--watch[Watch mode]' \
+        '--help[Show help]'
+}
+
+_db_backup_compliance() {
+    local curcontext="$curcontext" state line
+    typeset -A opt_args
+
+    _arguments -C \
+        '1: :_db_backup_compliance_commands' \
+        '*:: :->args'
+
+    case $state in
+        args)
+            _db_backup_compliance_args
+            ;;
+    esac
+}
+
+_db_backup_compliance_commands() {
+    local commands=(
+        'scan:Scan for compliance'
+        'report:Generate compliance report'
+        'frameworks:List frameworks'
+        'violations:List violations'
+        'export:Export compliance data'
+        'audit:Audit trail'
+    )
+    _describe 'compliance command' commands
+}
+
+_db_backup_compliance_args() {
+    _arguments \
+        '--framework[Framework]:framework:_db_backup_compliance_frameworks' \
+        '--database[Database]:database:_db_backup_databases' \
+        '--report[Generate report]' \
+        '--fix[Fix violations]' \
+        '--from[Start time]:time:' \
+        '--to[End time]:time:' \
+        '--format[Output format]:format:_db_backup_formats' \
+        '--output[Output file]:file:_files' \
+        '--help[Show help]'
+}
+
+_db_backup_policy() {
+    _arguments \
+        '1: :(create list delete update validate test export import)' \
+        '--name[Policy name]:name:' \
+        '--type[Policy type]:type:(backup retention encryption compliance)' \
+        '--rules[Policy rules]:rules:' \
+        '--enabled[Enable policy]' \
+        '--validate[Validate policy]' \
+        '--help[Show help]'
+}
+
+_db_backup_encryption() {
+    _arguments \
+        '1: :(enable disable rotate-keys info test algorithms)' \
+        '--database[Database]:database:_db_backup_databases' \
+        '--algorithm[Algorithm]:algorithm:_db_backup_encryption_algorithms' \
+        '--key-file[Key file]:file:_files' \
+        '--rotate[Rotate keys]' \
+        '--verify[Verify encryption]' \
+        '--help[Show help]'
+}
+
+_db_backup_catalog() {
+    _arguments \
+        '1: :(sync rebuild cleanup stats search export import)' \
+        '--database[Database]:database:_db_backup_databases' \
+        '--provider[Provider]:provider:_db_backup_providers' \
+        '--format[Output format]:format:_db_backup_formats' \
+        '--help[Show help]'
+}
+
+_db_backup_tag() {
+    _arguments \
+        '1: :(add list remove search)' \
+        '--name[Tag name]:name:' \
+        '--tag[Tag]:tag:_db_backup_tags' \
+        '--database[Database]:database:_db_backup_databases' \
+        '--backup[Backup]:backup:_db_backup_backups' \
+        '--help[Show help]'
+}
+
+_db_backup_export() {
+    _arguments \
+        '1: :(backups databases schedules config all)' \
+        '--output[Output file]:file:_files' \
+        '--format[Format]:format:(json yaml)' \
+        '--help[Show help]'
+}
+
+_db_backup_import() {
+    _arguments \
+        '1: :(backups databases schedules config)' \
+        '--input[Input file]:file:_files' \
+        '--format[Format]:format:(json yaml)' \
+        '--merge[Merge with existing]' \
+        '--help[Show help]'
+}
+
+_db_backup_health() {
+    _arguments \
+        '1: :(check status components metrics)' \
+        '--format[Output format]:format:_db_backup_formats' \
+        '--detailed[Detailed output]' \
+        '--help[Show help]'
+}
+
+# ============================================================================
+# Initialize Completion
+# ============================================================================
+
+_db-backup "$@"
