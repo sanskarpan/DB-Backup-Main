@@ -1,0 +1,423 @@
+#!/usr/bin/env bash
+# Bash completion script for db-backup
+# Supports intelligent context-aware suggestions and dynamic completion
+
+# ============================================================================
+# Cache Configuration
+# ============================================================================
+
+_DB_BACKUP_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/db-backup/completion"
+_DB_BACKUP_CACHE_TTL=300  # 5 minutes
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+# Get cache file path
+_db_backup_cache_file() {
+    local key="$1"
+    echo "${_DB_BACKUP_CACHE_DIR}/${key}.cache"
+}
+
+# Check if cache is valid
+_db_backup_cache_valid() {
+    local cache_file="$1"
+
+    if [[ ! -f "$cache_file" ]]; then
+        return 1
+    fi
+
+    local cache_time
+    cache_time=$(stat -f %m "$cache_file" 2>/dev/null || stat -c %Y "$cache_file" 2>/dev/null)
+    local current_time
+    current_time=$(date +%s)
+    local age=$((current_time - cache_time))
+
+    if [[ $age -gt $_DB_BACKUP_CACHE_TTL ]]; then
+        return 1
+    fi
+
+    return 0
+}
+
+# Read from cache
+_db_backup_cache_read() {
+    local cache_file="$1"
+
+    if _db_backup_cache_valid "$cache_file"; then
+        cat "$cache_file"
+        return 0
+    fi
+
+    return 1
+}
+
+# Write to cache
+_db_backup_cache_write() {
+    local key="$1"
+    local data="$2"
+
+    mkdir -p "$_DB_BACKUP_CACHE_DIR"
+    local cache_file
+    cache_file=$(_db_backup_cache_file "$key")
+    echo "$data" > "$cache_file"
+}
+
+# Execute db-backup command and cache result
+_db_backup_exec() {
+    local cmd="$1"
+    local cache_key="$2"
+
+    local cache_file
+    cache_file=$(_db_backup_cache_file "$cache_key")
+
+    # Try cache first
+    local cached
+    if cached=$(_db_backup_cache_read "$cache_file"); then
+        echo "$cached"
+        return 0
+    fi
+
+    # Execute command
+    local result
+    if result=$(eval "$cmd" 2>/dev/null); then
+        _db_backup_cache_write "$cache_key" "$result"
+        echo "$result"
+        return 0
+    fi
+
+    return 1
+}
+
+# ============================================================================
+# Dynamic Completion Functions
+# ============================================================================
+
+# Get list of databases
+_db_backup_databases() {
+    _db_backup_exec "db-backup database list --format=name" "databases" | grep -v '^$'
+}
+
+# Get list of backups
+_db_backup_backups() {
+    local database="$1"
+    if [[ -n "$database" ]]; then
+        _db_backup_exec "db-backup backup list --database='$database' --format=id" "backups_$database"
+    else
+        _db_backup_exec "db-backup backup list --format=id" "backups_all"
+    fi
+}
+
+# Get list of schedules
+_db_backup_schedules() {
+    _db_backup_exec "db-backup schedule list --format=name" "schedules" | grep -v '^$'
+}
+
+# Get list of providers
+_db_backup_providers() {
+    echo "local
+s3
+gcs
+azure
+minio
+wasabi
+backblaze
+digitalocean"
+}
+
+# Get list of database types
+_db_backup_database_types() {
+    echo "postgres
+mysql
+mongodb
+redis
+sqlite
+cassandra
+dynamodb
+elasticsearch
+influxdb
+timescaledb"
+}
+
+# Get list of compression formats
+_db_backup_compression_formats() {
+    echo "gzip
+zstd
+lz4
+none"
+}
+
+# Get list of encryption algorithms
+_db_backup_encryption_algorithms() {
+    echo "aes256
+aes128
+chacha20"
+}
+
+# Get list of retention policies
+_db_backup_retention_policies() {
+    _db_backup_exec "db-backup retention list --format=name" "retention_policies" | grep -v '^$'
+}
+
+# Get list of compliance frameworks
+_db_backup_compliance_frameworks() {
+    echo "gdpr
+hipaa
+sox
+pci-dss
+iso27001
+ccpa"
+}
+
+# Get list of monitoring alerts
+_db_backup_alerts() {
+    _db_backup_exec "db-backup monitoring alerts --format=id" "alerts" | grep -v '^$'
+}
+
+# Get list of tags
+_db_backup_tags() {
+    _db_backup_exec "db-backup tag list --format=name" "tags" | grep -v '^$'
+}
+
+# ============================================================================
+# Main Completion Function
+# ============================================================================
+
+_db_backup_completion() {
+    local cur prev words cword
+    _init_completion || return
+
+    # Main commands
+    local commands="backup restore database schedule retention monitoring compliance policy
+                   encryption catalog tag export import health version help"
+
+    # Subcommands for each main command
+    local backup_cmds="create list delete download restore verify info cleanup stats"
+    local restore_cmds="full incremental point-in-time download validate test"
+    local database_cmds="add list remove update test info stats migrate"
+    local schedule_cmds="create list delete update enable disable run info"
+    local retention_cmds="create list delete update apply cleanup info"
+    local monitoring_cmds="status alerts metrics dashboard logs enable disable"
+    local compliance_cmds="scan report frameworks violations export audit"
+    local policy_cmds="create list delete update validate test export import"
+    local encryption_cmds="enable disable rotate-keys info test algorithms"
+    local catalog_cmds="sync rebuild cleanup stats search export import"
+    local tag_cmds="add list remove search"
+    local export_cmds="backups databases schedules config all"
+    local import_cmds="backups databases schedules config"
+    local health_cmds="check status components metrics"
+
+    # Get the main command
+    local main_cmd=""
+    local sub_cmd=""
+    local i
+    for ((i=1; i < cword; i++)); do
+        if [[ " $commands " =~ " ${words[i]} " ]]; then
+            main_cmd="${words[i]}"
+            if [[ $i -lt $((cword - 1)) ]]; then
+                sub_cmd="${words[i+1]}"
+            fi
+            break
+        fi
+    done
+
+    # If no main command yet, complete main commands
+    if [[ -z "$main_cmd" ]]; then
+        COMPREPLY=($(compgen -W "$commands" -- "$cur"))
+        return 0
+    fi
+
+    # Complete subcommands
+    if [[ -z "$sub_cmd" ]] || [[ "$prev" == "$main_cmd" ]]; then
+        local subcmds_var="${main_cmd}_cmds"
+        COMPREPLY=($(compgen -W "${!subcmds_var}" -- "$cur"))
+        return 0
+    fi
+
+    # Complete flags and arguments based on context
+    case "$prev" in
+        --database|-d)
+            COMPREPLY=($(compgen -W "$(_db_backup_databases)" -- "$cur"))
+            return 0
+            ;;
+        --backup|-b|--backup-id)
+            local db=""
+            # Try to find database from previous args
+            for ((i=1; i < cword; i++)); do
+                if [[ "${words[i]}" == "--database" ]] || [[ "${words[i]}" == "-d" ]]; then
+                    db="${words[i+1]}"
+                    break
+                fi
+            done
+            COMPREPLY=($(compgen -W "$(_db_backup_backups "$db")" -- "$cur"))
+            return 0
+            ;;
+        --schedule|-s)
+            COMPREPLY=($(compgen -W "$(_db_backup_schedules)" -- "$cur"))
+            return 0
+            ;;
+        --provider|-p)
+            COMPREPLY=($(compgen -W "$(_db_backup_providers)" -- "$cur"))
+            return 0
+            ;;
+        --type|-t)
+            COMPREPLY=($(compgen -W "$(_db_backup_database_types)" -- "$cur"))
+            return 0
+            ;;
+        --compression|-c)
+            COMPREPLY=($(compgen -W "$(_db_backup_compression_formats)" -- "$cur"))
+            return 0
+            ;;
+        --encryption|-e)
+            COMPREPLY=($(compgen -W "$(_db_backup_encryption_algorithms)" -- "$cur"))
+            return 0
+            ;;
+        --retention)
+            COMPREPLY=($(compgen -W "$(_db_backup_retention_policies)" -- "$cur"))
+            return 0
+            ;;
+        --framework|-f)
+            COMPREPLY=($(compgen -W "$(_db_backup_compliance_frameworks)" -- "$cur"))
+            return 0
+            ;;
+        --alert)
+            COMPREPLY=($(compgen -W "$(_db_backup_alerts)" -- "$cur"))
+            return 0
+            ;;
+        --tag)
+            COMPREPLY=($(compgen -W "$(_db_backup_tags)" -- "$cur"))
+            return 0
+            ;;
+        --format)
+            COMPREPLY=($(compgen -W "json yaml table csv id name" -- "$cur"))
+            return 0
+            ;;
+        --output|-o)
+            _filedir
+            return 0
+            ;;
+        --config)
+            _filedir
+            return 0
+            ;;
+        --log-level)
+            COMPREPLY=($(compgen -W "debug info warn error" -- "$cur"))
+            return 0
+            ;;
+        --interval)
+            COMPREPLY=($(compgen -W "hourly daily weekly monthly" -- "$cur"))
+            return 0
+            ;;
+        --priority)
+            COMPREPLY=($(compgen -W "low normal high critical" -- "$cur"))
+            return 0
+            ;;
+    esac
+
+    # Context-aware flag completion
+    local flags=""
+
+    case "$main_cmd:$sub_cmd" in
+        backup:create)
+            flags="--database --type --provider --compression --encryption --retention
+                   --tag --description --full --incremental --verify --notify"
+            ;;
+        backup:list)
+            flags="--database --provider --status --from --to --limit --format
+                   --tag --sort --order"
+            ;;
+        backup:delete)
+            flags="--backup --force --purge --keep-metadata"
+            ;;
+        backup:restore)
+            flags="--backup --database --target --point-in-time --verify --dry-run"
+            ;;
+        restore:full)
+            flags="--backup --database --target --overwrite --verify --parallel"
+            ;;
+        restore:incremental)
+            flags="--backup --database --target --base-backup --verify"
+            ;;
+        restore:point-in-time)
+            flags="--database --timestamp --target --verify --dry-run"
+            ;;
+        database:add)
+            flags="--name --type --host --port --username --password --database
+                   --ssl --connection-string --test"
+            ;;
+        database:list)
+            flags="--type --status --format --sort --limit"
+            ;;
+        database:update)
+            flags="--database --host --port --username --password --ssl --test"
+            ;;
+        schedule:create)
+            flags="--name --database --interval --time --retention --enabled
+                   --compression --encryption --notify --tag"
+            ;;
+        schedule:list)
+            flags="--status --format --sort"
+            ;;
+        schedule:update)
+            flags="--schedule --interval --time --enabled --retention"
+            ;;
+        retention:create)
+            flags="--name --keep-daily --keep-weekly --keep-monthly --keep-yearly
+                   --min-backups --max-backups"
+            ;;
+        retention:apply)
+            flags="--database --policy --dry-run --force"
+            ;;
+        monitoring:status)
+            flags="--format --refresh --watch"
+            ;;
+        monitoring:alerts)
+            flags="--status --severity --from --to --format"
+            ;;
+        compliance:scan)
+            flags="--framework --database --report --fix --format"
+            ;;
+        compliance:report)
+            flags="--framework --from --to --format --output"
+            ;;
+        encryption:enable)
+            flags="--database --algorithm --key-file --rotate --verify"
+            ;;
+        policy:create)
+            flags="--name --type --rules --enabled --validate"
+            ;;
+        *)
+            flags="--help --version --config --log-level --verbose --quiet --json --no-color"
+            ;;
+    esac
+
+    # Add common flags to all commands
+    flags="$flags --help --verbose --quiet --json --no-color"
+
+    # Filter out already used flags
+    local used_flags=""
+    for ((i=1; i < cword; i++)); do
+        if [[ "${words[i]}" =~ ^-- ]]; then
+            used_flags="$used_flags ${words[i]}"
+        fi
+    done
+
+    local available_flags=""
+    for flag in $flags; do
+        if [[ ! " $used_flags " =~ " $flag " ]]; then
+            available_flags="$available_flags $flag"
+        fi
+    done
+
+    COMPREPLY=($(compgen -W "$available_flags" -- "$cur"))
+}
+
+# ============================================================================
+# Register Completion
+# ============================================================================
+
+complete -F _db_backup_completion db-backup
+
+# Also support common aliases
+complete -F _db_backup_completion dbb
+complete -F _db_backup_completion dbbackup
