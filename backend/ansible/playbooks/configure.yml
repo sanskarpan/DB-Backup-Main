@@ -1,0 +1,227 @@
+---
+# Ansible Playbook for Configuring DB Backup Application
+# Handles post-deployment configuration and tuning
+
+- name: Configure DB Backup Application
+  hosts: kubernetes
+  gather_facts: yes
+  become: no
+
+  vars:
+    app_name: "db-backup"
+    namespace: "{{ app_name }}"
+    environment: "{{ deploy_environment | default('production') }}"
+
+  tasks:
+    - name: Configure database backup schedules
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: batch/v1
+          kind: CronJob
+          metadata:
+            name: "{{ item.name }}"
+            namespace: "{{ namespace }}"
+          spec:
+            schedule: "{{ item.schedule }}"
+            jobTemplate:
+              spec:
+                template:
+                  spec:
+                    serviceAccountName: "{{ app_name }}"
+                    containers:
+                      - name: backup
+                        image: "{{ image_repository }}:{{ image_tag }}"
+                        command:
+                          - /app/db-backup
+                          - backup
+                          - --database={{ item.database }}
+                          - --type={{ item.type }}
+                        env:
+                          - name: DATABASE_HOST
+                            value: "{{ item.host }}"
+                          - name: DATABASE_PORT
+                            value: "{{ item.port }}"
+                          - name: S3_BUCKET
+                            valueFrom:
+                              secretKeyRef:
+                                name: s3-credentials
+                                key: bucket
+                        volumeMounts:
+                          - name: backup-storage
+                            mountPath: /backups
+                    volumes:
+                      - name: backup-storage
+                        persistentVolumeClaim:
+                          claimName: "{{ app_name }}-pvc"
+                    restartPolicy: OnFailure
+      loop: "{{ backup_schedules }}"
+      when: backup_schedules is defined
+
+    - name: Configure monitoring alerts
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: monitoring.coreos.com/v1
+          kind: PrometheusRule
+          metadata:
+            name: "{{ app_name }}-alerts"
+            namespace: "{{ namespace }}"
+          spec:
+            groups:
+              - name: db_backup
+                interval: 30s
+                rules:
+                  - alert: BackupFailure
+                    expr: |
+                      rate(backup_failures_total[5m]) > 0
+                    for: 5m
+                    labels:
+                      severity: critical
+                    annotations:
+                      summary: "Database backup failure detected"
+                      description: "Backup has failed for {{ $labels.database }}"
+
+                  - alert: HighBackupDuration
+                    expr: |
+                      backup_duration_seconds > 3600
+                    for: 10m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: "Backup taking too long"
+                      description: "Backup for {{ $labels.database }} has been running for over 1 hour"
+
+                  - alert: StorageSpaceLow
+                    expr: |
+                      kubelet_volume_stats_available_bytes{persistentvolumeclaim="{{ app_name }}-pvc"}
+                      / kubelet_volume_stats_capacity_bytes{persistentvolumeclaim="{{ app_name }}-pvc"}
+                      < 0.1
+                    for: 10m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: "Low storage space"
+                      description: "Less than 10% storage available"
+      when: enable_monitoring | default(true)
+
+    - name: Configure network policies
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: "{{ app_name }}-network-policy"
+            namespace: "{{ namespace }}"
+          spec:
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: "{{ app_name }}"
+            policyTypes:
+              - Ingress
+              - Egress
+            ingress:
+              - from:
+                  - namespaceSelector:
+                      matchLabels:
+                        name: ingress-nginx
+                ports:
+                  - protocol: TCP
+                    port: 8080
+              - from:
+                  - namespaceSelector:
+                      matchLabels:
+                        name: monitoring
+                ports:
+                  - protocol: TCP
+                    port: 9090
+            egress:
+              - to:
+                  - namespaceSelector: {}
+                ports:
+                  - protocol: TCP
+                    port: 53
+                  - protocol: UDP
+                    port: 53
+              - to:
+                  - namespaceSelector: {}
+                    podSelector:
+                      matchLabels:
+                        app: postgres
+                ports:
+                  - protocol: TCP
+                    port: 5432
+              - to:
+                  - namespaceSelector: {}
+                ports:
+                  - protocol: TCP
+                    port: 443
+
+    - name: Configure PodDisruptionBudget
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: policy/v1
+          kind: PodDisruptionBudget
+          metadata:
+            name: "{{ app_name }}-pdb"
+            namespace: "{{ namespace }}"
+          spec:
+            minAvailable: 1
+            selector:
+              matchLabels:
+                app.kubernetes.io/name: "{{ app_name }}"
+
+    - name: Configure resource quotas
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ResourceQuota
+          metadata:
+            name: "{{ app_name }}-quota"
+            namespace: "{{ namespace }}"
+          spec:
+            hard:
+              requests.cpu: "{{ quota_cpu_request | default('20') }}"
+              requests.memory: "{{ quota_memory_request | default('40Gi') }}"
+              limits.cpu: "{{ quota_cpu_limit | default('40') }}"
+              limits.memory: "{{ quota_memory_limit | default('80Gi') }}"
+              persistentvolumeclaims: "5"
+
+    - name: Configure backup retention policy
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: "{{ app_name }}-retention-policy"
+            namespace: "{{ namespace }}"
+          data:
+            policy.yaml: |
+              daily:
+                retain: {{ daily_retention | default(7) }}
+              weekly:
+                retain: {{ weekly_retention | default(4) }}
+              monthly:
+                retain: {{ monthly_retention | default(12) }}
+              yearly:
+                retain: {{ yearly_retention | default(3) }}
+
+    - name: Verify configuration
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: ConfigMap
+        name: "{{ app_name }}-config"
+        namespace: "{{ namespace }}"
+      register: config
+
+    - name: Display configuration summary
+      debug:
+        msg:
+          - "Configuration completed successfully"
+          - "Environment: {{ environment }}"
+          - "Monitoring enabled: {{ enable_monitoring | default(true) }}"
+          - "Backup schedules: {{ backup_schedules | length if backup_schedules is defined else 0 }}"
