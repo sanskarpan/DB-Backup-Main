@@ -1,0 +1,202 @@
+---
+# Ansible Playbook for Deploying DB Backup Application
+# This playbook handles complete deployment and configuration
+
+- name: Deploy DB Backup Application
+  hosts: kubernetes
+  gather_facts: yes
+  become: no
+
+  vars:
+    app_name: "db-backup"
+    namespace: "{{ app_name }}"
+    helm_chart_path: "../../helm/db-backup"
+    environment: "{{ deploy_environment | default('production') }}"
+
+  pre_tasks:
+    - name: Verify kubectl is installed
+      command: kubectl version --client
+      register: kubectl_version
+      changed_when: false
+
+    - name: Verify helm is installed
+      command: helm version
+      register: helm_version
+      changed_when: false
+
+    - name: Verify AWS CLI is installed
+      command: aws --version
+      register: aws_version
+      changed_when: false
+
+    - name: Display versions
+      debug:
+        msg:
+          - "kubectl: {{ kubectl_version.stdout }}"
+          - "helm: {{ helm_version.stdout }}"
+          - "aws: {{ aws_version.stdout }}"
+
+  tasks:
+    - name: Update kubeconfig for EKS
+      command: >
+        aws eks update-kubeconfig
+        --region {{ aws_region }}
+        --name {{ eks_cluster_name }}
+      changed_when: false
+
+    - name: Verify cluster connectivity
+      command: kubectl cluster-info
+      register: cluster_info
+      changed_when: false
+
+    - name: Create namespace if it doesn't exist
+      kubernetes.core.k8s:
+        name: "{{ namespace }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+
+    - name: Create Kubernetes secrets
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: "{{ item.name }}"
+            namespace: "{{ namespace }}"
+          type: Opaque
+          stringData: "{{ item.data }}"
+      loop:
+        - name: db-credentials
+          data:
+            username: "{{ db_username }}"
+            password: "{{ db_password }}"
+        - name: s3-credentials
+          data:
+            bucket: "{{ s3_bucket_name }}"
+            region: "{{ aws_region }}"
+        - name: encryption-keys
+          data:
+            key: "{{ encryption_key }}"
+      no_log: true
+
+    - name: Create ConfigMap for application configuration
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: "{{ app_name }}-config"
+            namespace: "{{ namespace }}"
+          data:
+            environment: "{{ environment }}"
+            log_level: "{{ log_level | default('info') }}"
+            backup_schedule: "{{ backup_schedule | default('0 2 * * *') }}"
+            retention_days: "{{ retention_days | default('30') }}"
+
+    - name: Deploy application with Helm
+      kubernetes.core.helm:
+        name: "{{ app_name }}"
+        chart_ref: "{{ helm_chart_path }}"
+        namespace: "{{ namespace }}"
+        create_namespace: yes
+        wait: yes
+        timeout: 10m
+        values:
+          image:
+            repository: "{{ image_repository }}"
+            tag: "{{ image_tag }}"
+            pullPolicy: Always
+          replicaCount: "{{ replica_count | default(3) }}"
+          autoscaling:
+            enabled: true
+            minReplicas: "{{ min_replicas | default(3) }}"
+            maxReplicas: "{{ max_replicas | default(20) }}"
+          resources:
+            requests:
+              cpu: "{{ cpu_request | default('500m') }}"
+              memory: "{{ memory_request | default('512Mi') }}"
+            limits:
+              cpu: "{{ cpu_limit | default('2000m') }}"
+              memory: "{{ memory_limit | default('2Gi') }}"
+          persistence:
+            enabled: true
+            storageClass: "{{ storage_class | default('efs-sc') }}"
+            size: "{{ storage_size | default('100Gi') }}"
+          ingress:
+            enabled: "{{ enable_ingress | default(true) }}"
+            className: nginx
+            hosts:
+              - host: "{{ ingress_host }}"
+                paths:
+                  - path: /
+                    pathType: Prefix
+            tls:
+              - secretName: "{{ app_name }}-tls"
+                hosts:
+                  - "{{ ingress_host }}"
+          monitoring:
+            enabled: true
+            serviceMonitor:
+              enabled: true
+          istio:
+            enabled: "{{ enable_istio | default(true) }}"
+
+    - name: Wait for deployment to be ready
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ app_name }}"
+        namespace: "{{ namespace }}"
+      register: deployment
+      until: >
+        deployment.resources[0].status.readyReplicas | default(0)
+        >= (deployment.resources[0].spec.replicas | default(1))
+      retries: 30
+      delay: 10
+
+    - name: Get deployed pods
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: "{{ namespace }}"
+        label_selectors:
+          - "app.kubernetes.io/name={{ app_name }}"
+      register: pods
+
+    - name: Display deployment status
+      debug:
+        msg:
+          - "Deployment successful!"
+          - "Namespace: {{ namespace }}"
+          - "Pods running: {{ pods.resources | length }}"
+          - "Application URL: https://{{ ingress_host }}"
+
+  post_tasks:
+    - name: Run smoke tests
+      include_tasks: ../tasks/smoke_tests.yml
+      when: run_smoke_tests | default(true)
+
+    - name: Send deployment notification
+      uri:
+        url: "{{ slack_webhook_url }}"
+        method: POST
+        body_format: json
+        body:
+          text: "DB Backup deployment completed successfully"
+          attachments:
+            - color: "good"
+              fields:
+                - title: "Environment"
+                  value: "{{ environment }}"
+                  short: true
+                - title: "Version"
+                  value: "{{ image_tag }}"
+                  short: true
+                - title: "Pods"
+                  value: "{{ pods.resources | length }}"
+                  short: true
+      when: slack_webhook_url is defined
+      ignore_errors: yes

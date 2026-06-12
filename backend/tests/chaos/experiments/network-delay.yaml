@@ -1,0 +1,20 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: db-backup-network-delay
+  namespace: chaos-testing
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces:
+      - db-backup
+    labelSelectors:
+      'app': 'db-backup-server'
+  delay:
+    latency: '100ms'
+    correlation: '50'
+    jitter: '10ms'
+  duration: '2m'
+  scheduler:
+    cron: '@every 4h'

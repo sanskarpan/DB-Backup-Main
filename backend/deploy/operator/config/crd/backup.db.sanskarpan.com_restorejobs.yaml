@@ -1,0 +1,289 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: restorejobs.backup.db.sanskarpan.com
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.13.0
+spec:
+  group: backup.db.sanskarpan.com
+  names:
+    kind: RestoreJob
+    listKind: RestoreJobList
+    plural: restorejobs
+    singular: restorejob
+    shortNames:
+      - rj
+      - restore
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: RestoreJob defines a database restore operation
+          type: object
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: RestoreJobSpec defines the desired state of RestoreJob
+              type: object
+              required:
+                - backupID
+                - targetDatabase
+              properties:
+                backupID:
+                  description: ID of backup to restore
+                  type: string
+                backupLocation:
+                  description: Location of backup file
+                  type: object
+                  required:
+                    - provider
+                    - path
+                  properties:
+                    provider:
+                      description: Storage provider (s3, azure, gcp, local)
+                      type: string
+                      enum:
+                        - s3
+                        - azure
+                        - gcp
+                        - local
+                    bucket:
+                      description: Storage bucket name
+                      type: string
+                    region:
+                      description: Storage region
+                      type: string
+                    path:
+                      description: Path to backup file
+                      type: string
+                    secretName:
+                      description: Secret containing storage credentials
+                      type: string
+                targetDatabase:
+                  description: Target database configuration
+                  type: object
+                  required:
+                    - type
+                    - secretName
+                  properties:
+                    type:
+                      description: Database type (postgres, mysql, mongodb, sqlite)
+                      type: string
+                      enum:
+                        - postgres
+                        - mysql
+                        - mongodb
+                        - sqlite
+                    secretName:
+                      description: Secret containing target database credentials
+                      type: string
+                    namespace:
+                      description: Namespace of the secret
+                      type: string
+                    databaseName:
+                      description: Name of target database (overrides backup)
+                      type: string
+                restoreOptions:
+                  description: Restore options
+                  type: object
+                  properties:
+                    pointInTime:
+                      description: Point-in-time for PITR restore
+                      type: string
+                      format: date-time
+                    skipTables:
+                      description: Tables to skip during restore
+                      type: array
+                      items:
+                        type: string
+                    includeTables:
+                      description: Only restore these tables
+                      type: array
+                      items:
+                        type: string
+                    skipSchemas:
+                      description: Schemas to skip during restore
+                      type: array
+                      items:
+                        type: string
+                    includeSchemas:
+                      description: Only restore these schemas
+                      type: array
+                      items:
+                        type: string
+                    dropExisting:
+                      description: Drop existing database before restore
+                      type: boolean
+                      default: false
+                    noOwner:
+                      description: Skip setting object ownership
+                      type: boolean
+                      default: false
+                    noACL:
+                      description: Skip restoring access privileges
+                      type: boolean
+                      default: false
+                    dataOnly:
+                      description: Restore only data, skip schema
+                      type: boolean
+                      default: false
+                    schemaOnly:
+                      description: Restore only schema, skip data
+                      type: boolean
+                      default: false
+                verification:
+                  description: Post-restore verification
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                    validateChecksum:
+                      type: boolean
+                      default: true
+                    validateRowCount:
+                      type: boolean
+                      default: false
+                    customQuery:
+                      description: Custom SQL query for validation
+                      type: string
+                notifications:
+                  description: Notification settings
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                    webhookURL:
+                      type: string
+                    onSuccess:
+                      type: boolean
+                      default: true
+                    onFailure:
+                      type: boolean
+                      default: true
+                timeoutSeconds:
+                  description: Timeout for restore operation
+                  type: integer
+                  minimum: 60
+                  maximum: 86400
+                  default: 7200
+                retryPolicy:
+                  description: Retry policy for failed restores
+                  type: object
+                  properties:
+                    maxAttempts:
+                      type: integer
+                      minimum: 0
+                      maximum: 10
+                      default: 3
+                    backoffSeconds:
+                      type: integer
+                      minimum: 10
+                      maximum: 3600
+                      default: 60
+            status:
+              description: RestoreJobStatus defines the observed state of RestoreJob
+              type: object
+              properties:
+                phase:
+                  description: Current phase of restore
+                  type: string
+                  enum:
+                    - Pending
+                    - Downloading
+                    - Decompressing
+                    - Decrypting
+                    - Restoring
+                    - Verifying
+                    - Completed
+                    - Failed
+                conditions:
+                  description: Conditions of the restore job
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                startTime:
+                  description: Time when restore started
+                  type: string
+                  format: date-time
+                completionTime:
+                  description: Time when restore completed
+                  type: string
+                  format: date-time
+                duration:
+                  description: Duration of restore in seconds
+                  type: number
+                  format: double
+                backupSize:
+                  description: Size of backup being restored
+                  type: integer
+                  format: int64
+                restoredSize:
+                  description: Size of restored data
+                  type: integer
+                  format: int64
+                progress:
+                  description: Restore progress percentage
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                attempts:
+                  description: Number of restore attempts
+                  type: integer
+                lastError:
+                  description: Last error message
+                  type: string
+                verificationResult:
+                  description: Result of verification
+                  type: object
+                  properties:
+                    passed:
+                      type: boolean
+                    checksumValid:
+                      type: boolean
+                    rowCountMatch:
+                      type: boolean
+                    message:
+                      type: string
+                observedGeneration:
+                  type: integer
+                  format: int64
+      additionalPrinterColumns:
+        - name: Backup ID
+          type: string
+          jsonPath: .spec.backupID
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Progress
+          type: integer
+          jsonPath: .status.progress
+        - name: Duration
+          type: number
+          jsonPath: .status.duration
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      subresources:
+        status: {}

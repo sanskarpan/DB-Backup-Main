@@ -1,0 +1,22 @@
+{
+  "name": "db-backup-aws",
+  "version": "1.0.0",
+  "description": "DB Backup AWS infrastructure using Pulumi",
+  "main": "index.ts",
+  "scripts": {
+    "build": "tsc",
+    "pulumi:preview": "pulumi preview",
+    "pulumi:up": "pulumi up",
+    "pulumi:destroy": "pulumi destroy"
+  },
+  "dependencies": {
+    "@pulumi/aws": "^6.0.0",
+    "@pulumi/eks": "^2.0.0",
+    "@pulumi/kubernetes": "^4.0.0",
+    "@pulumi/pulumi": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
