@@ -1,0 +1,269 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: db-backup-daily
+  namespace: db-backup
+  labels:
+    app: db-backup
+    component: cronjob
+spec:
+  schedule: "0 2 * * *" # Daily at 2 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 3600 # 1 hour timeout
+      template:
+        metadata:
+          labels:
+            app: db-backup
+            component: cronjob
+        spec:
+          serviceAccountName: db-backup
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+          - name: db-backup
+            image: db-backup:latest
+            imagePullPolicy: IfNotPresent
+            command:
+            - /usr/local/bin/db-backup
+            - backup
+            - --config=/config/config.yaml
+            - --type=mysql
+            - --host=$(DB_HOST)
+            - --user=$(DB_USER)
+            - --all-databases
+            - --compression=zstd
+            - --encrypt
+            - --storage=s3
+            env:
+            - name: DB_HOST
+              value: "mysql.database.svc.cluster.local"
+            - name: DB_USER
+              value: "backup-user"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-backup-secrets
+                  key: db-password
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: db-backup-secrets
+                  key: encryption-key
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: db-backup-secrets
+                  key: aws-access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: db-backup-secrets
+                  key: aws-secret-access-key
+            volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: backup-data
+              mountPath: /data/backups
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "500m"
+              limits:
+                memory: "2Gi"
+                cpu: "2000m"
+          volumes:
+          - name: config
+            configMap:
+              name: db-backup-config
+          - name: backup-data
+            persistentVolumeClaim:
+              claimName: db-backup-data-pvc
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: db-backup-postgres-daily
+  namespace: db-backup
+  labels:
+    app: db-backup
+    component: cronjob
+spec:
+  schedule: "30 2 * * *" # Daily at 2:30 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels:
+            app: db-backup
+            component: cronjob
+        spec:
+          serviceAccountName: db-backup
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+          - name: db-backup
+            image: db-backup:latest
+            imagePullPolicy: IfNotPresent
+            command:
+            - /usr/local/bin/db-backup
+            - backup
+            - --config=/config/config.yaml
+            - --type=postgres
+            - --host=$(DB_HOST)
+            - --user=$(DB_USER)
+            - --all-databases
+            - --compression=zstd
+            - --encrypt
+            - --storage=s3
+            env:
+            - name: DB_HOST
+              value: "postgres.database.svc.cluster.local"
+            - name: DB_USER
+              value: "backup-user"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-backup-secrets
+                  key: postgres-password
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: db-backup-secrets
+                  key: encryption-key
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: db-backup-secrets
+                  key: aws-access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: db-backup-secrets
+                  key: aws-secret-access-key
+            volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: backup-data
+              mountPath: /data/backups
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "500m"
+              limits:
+                memory: "2Gi"
+                cpu: "2000m"
+          volumes:
+          - name: config
+            configMap:
+              name: db-backup-config
+          - name: backup-data
+            persistentVolumeClaim:
+              claimName: db-backup-data-pvc
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: db-backup-mongodb-daily
+  namespace: db-backup
+  labels:
+    app: db-backup
+    component: cronjob
+spec:
+  schedule: "0 3 * * *" # Daily at 3 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 7200 # 2 hours timeout
+      template:
+        metadata:
+          labels:
+            app: db-backup
+            component: cronjob
+        spec:
+          serviceAccountName: db-backup
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+          - name: db-backup
+            image: db-backup:latest
+            imagePullPolicy: IfNotPresent
+            command:
+            - /usr/local/bin/db-backup
+            - backup
+            - --config=/config/config.yaml
+            - --type=mongodb
+            - --host=$(DB_HOST)
+            - --user=$(DB_USER)
+            - --all-databases
+            - --compression=zstd
+            - --encrypt
+            - --storage=s3
+            env:
+            - name: DB_HOST
+              value: "mongodb.database.svc.cluster.local"
+            - name: DB_USER
+              value: "backup-user"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-backup-secrets
+                  key: mongodb-password
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: db-backup-secrets
+                  key: encryption-key
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: db-backup-secrets
+                  key: aws-access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: db-backup-secrets
+                  key: aws-secret-access-key
+            volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: backup-data
+              mountPath: /data/backups
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "1000m"
+              limits:
+                memory: "4Gi"
+                cpu: "2000m"
+          volumes:
+          - name: config
+            configMap:
+              name: db-backup-config
+          - name: backup-data
+            persistentVolumeClaim:
+              claimName: db-backup-data-pvc
