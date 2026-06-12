@@ -1,0 +1,28 @@
+const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
+
+/**
+ * Metro configuration
+ * https://facebook.github.io/metro/docs/configuration
+ *
+ * @type {import('metro-config').MetroConfig}
+ */
+const config = {
+  transformer: {
+    getTransformOptions: async () => ({
+      transform: {
+        experimentalImportSupport: false,
+        inlineRequires: true,
+      },
+    }),
+  },
+  resolver: {
+    // Support for shared packages
+    extraNodeModules: {
+      '@db-backup/types': '../shared/packages/types',
+      '@db-backup/api-client': '../shared/packages/api-client',
+      '@db-backup/utils': '../shared/packages/utils',
+    },
+  },
+};
+
+module.exports = mergeConfig(getDefaultConfig(__dirname), config);
