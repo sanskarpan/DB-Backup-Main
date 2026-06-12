@@ -1,0 +1,95 @@
+{{- if .Values.service }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "db-backup.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "db-backup.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  {{- if .Values.service.sessionAffinity }}
+  sessionAffinity: {{ .Values.service.sessionAffinity }}
+  {{- if .Values.service.sessionAffinityConfig }}
+  sessionAffinityConfig:
+    {{- toYaml .Values.service.sessionAffinityConfig | nindent 4 }}
+  {{- end }}
+  {{- end }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: {{ .Values.service.metricsPort }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "db-backup.selectorLabels" . | nindent 4 }}
+{{- end }}
+
+---
+
+{{- if .Values.headlessService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "db-backup.fullname" . }}-headless
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "db-backup.labels" . | nindent 4 }}
+    app.kubernetes.io/component: headless
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: {{ .Values.service.metricsPort }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "db-backup.selectorLabels" . | nindent 4 }}
+{{- end }}
+
+---
+
+{{- if .Values.externalService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "db-backup.fullname" . }}-external
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "db-backup.labels" . | nindent 4 }}
+    app.kubernetes.io/component: external
+  {{- with .Values.externalService.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.externalService.type }}
+  {{- if and (eq .Values.externalService.type "LoadBalancer") .Values.externalService.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.externalService.loadBalancerIP }}
+  {{- end }}
+  {{- if .Values.externalService.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- range .Values.externalService.loadBalancerSourceRanges }}
+    - {{ . }}
+    {{- end }}
+  {{- end }}
+  ports:
+    - port: {{ .Values.externalService.port }}
+      targetPort: http
+      protocol: TCP
+      name: https
+  selector:
+    {{- include "db-backup.selectorLabels" . | nindent 4 }}
+{{- end }}

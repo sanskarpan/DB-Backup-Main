@@ -1,0 +1,298 @@
+// Prevents additional console window on Windows in release, DO NOT REMOVE!!
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+use std::sync::Mutex;
+use tauri::{
+    AppHandle, CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu,
+    SystemTrayMenuItem, Window,
+};
+use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
+
+// State management
+struct AppState {
+    api_url: Mutex<String>,
+    api_key: Mutex<Option<String>>,
+    notifications_enabled: Mutex<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct BackupJob {
+    id: String,
+    database_id: String,
+    database_name: String,
+    status: String,
+    created_at: DateTime<Utc>,
+    size: Option<i64>,
+    duration: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct BackupConfig {
+    api_url: String,
+    api_key: String,
+    auto_backup_enabled: bool,
+    backup_interval_hours: i32,
+    notifications_enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct NotificationPayload {
+    title: String,
+    body: String,
+    icon: Option<String>,
+}
+
+// Tauri Commands
+#[tauri::command]
+async fn get_backups(
+    state: tauri::State<'_, AppState>,
+    limit: Option<i32>,
+) -> Result<Vec<BackupJob>, String> {
+    let api_url = state.api_url.lock().unwrap().clone();
+    let api_key = state.api_key.lock().unwrap().clone();
+
+    if api_key.is_none() {
+        return Err("API key not configured".to_string());
+    }
+
+    let client = reqwest::Client::new();
+    let url = format!("{}/api/v1/backups", api_url);
+
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", api_key.unwrap()))
+        .query(&[("limit", limit.unwrap_or(50).to_string())])
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !response.status().is_success() {
+        return Err(format!("API error: {}", response.status()));
+    }
+
+    let backups: Vec<BackupJob> = response.json().await.map_err(|e| e.to_string())?;
+    Ok(backups)
+}
+
+#[tauri::command]
+async fn create_backup(
+    state: tauri::State<'_, AppState>,
+    database_id: String,
+    options: serde_json::Value,
+) -> Result<BackupJob, String> {
+    let api_url = state.api_url.lock().unwrap().clone();
+    let api_key = state.api_key.lock().unwrap().clone();
+
+    if api_key.is_none() {
+        return Err("API key not configured".to_string());
+    }
+
+    let client = reqwest::Client::new();
+    let url = format!("{}/api/v1/backups", api_url);
+
+    let mut payload = serde_json::json!({
+        "database_id": database_id,
+    });
+
+    if let Some(obj) = payload.as_object_mut() {
+        if let Some(opts) = options.as_object() {
+            for (key, value) in opts {
+                obj.insert(key.clone(), value.clone());
+            }
+        }
+    }
+
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", api_key.unwrap()))
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !response.status().is_success() {
+        return Err(format!("API error: {}", response.status()));
+    }
+
+    let backup: BackupJob = response.json().await.map_err(|e| e.to_string())?;
+    Ok(backup)
+}
+
+#[tauri::command]
+async fn get_config(state: tauri::State<'_, AppState>) -> Result<BackupConfig, String> {
+    let api_url = state.api_url.lock().unwrap().clone();
+    let api_key = state.api_key.lock().unwrap().clone();
+    let notifications_enabled = *state.notifications_enabled.lock().unwrap();
+
+    Ok(BackupConfig {
+        api_url,
+        api_key: api_key.unwrap_or_default(),
+        auto_backup_enabled: false,
+        backup_interval_hours: 24,
+        notifications_enabled,
+    })
+}
+
+#[tauri::command]
+async fn update_config(
+    state: tauri::State<'_, AppState>,
+    config: BackupConfig,
+) -> Result<(), String> {
+    *state.api_url.lock().unwrap() = config.api_url;
+    *state.api_key.lock().unwrap() = Some(config.api_key);
+    *state.notifications_enabled.lock().unwrap() = config.notifications_enabled;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn send_notification(
+    app: AppHandle,
+    payload: NotificationPayload,
+) -> Result<(), String> {
+    app.notification()
+        .builder()
+        .title(&payload.title)
+        .body(&payload.body)
+        .show()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn open_logs_directory() -> Result<String, String> {
+    let dirs = directories::ProjectDirs::from("com", "dbbackup", "desktop")
+        .ok_or("Could not determine logs directory")?;
+
+    let log_dir = dirs.data_local_dir();
+    Ok(log_dir.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn check_for_updates(app: AppHandle) -> Result<(), String> {
+    app.updater()
+        .check()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn show_window(window: Window) {
+    window.show().unwrap();
+    window.set_focus().unwrap();
+}
+
+#[tauri::command]
+fn hide_window(window: Window) {
+    window.hide().unwrap();
+}
+
+// System tray menu
+fn create_tray_menu() -> SystemTray {
+    let quit = CustomMenuItem::new("quit".to_string(), "Quit");
+    let show = CustomMenuItem::new("show".to_string(), "Show Window");
+    let hide = CustomMenuItem::new("hide".to_string(), "Hide Window");
+    let backups = CustomMenuItem::new("backups".to_string(), "View Backups");
+    let new_backup = CustomMenuItem::new("new_backup".to_string(), "New Backup");
+
+    let tray_menu = SystemTrayMenu::new()
+        .add_item(show)
+        .add_item(hide)
+        .add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(backups)
+        .add_item(new_backup)
+        .add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(quit);
+
+    SystemTray::new().with_menu(tray_menu)
+}
+
+// System tray event handler
+fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
+    match event {
+        SystemTrayEvent::LeftClick {
+            position: _,
+            size: _,
+            ..
+        } => {
+            let window = app.get_window("main").unwrap();
+            window.show().unwrap();
+            window.set_focus().unwrap();
+        }
+        SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
+            "quit" => {
+                std::process::exit(0);
+            }
+            "show" => {
+                let window = app.get_window("main").unwrap();
+                window.show().unwrap();
+                window.set_focus().unwrap();
+            }
+            "hide" => {
+                let window = app.get_window("main").unwrap();
+                window.hide().unwrap();
+            }
+            "backups" => {
+                let window = app.get_window("main").unwrap();
+                window.show().unwrap();
+                window.set_focus().unwrap();
+                window.eval("window.location.hash = '/backups'").unwrap();
+            }
+            "new_backup" => {
+                let window = app.get_window("main").unwrap();
+                window.show().unwrap();
+                window.set_focus().unwrap();
+                window.eval("window.location.hash = '/backups/new'").unwrap();
+            }
+            _ => {}
+        },
+        _ => {}
+    }
+}
+
+fn main() {
+    env_logger::init();
+
+    let app_state = AppState {
+        api_url: Mutex::new("http://localhost:8080".to_string()),
+        api_key: Mutex::new(None),
+        notifications_enabled: Mutex::new(true),
+    };
+
+    tauri::Builder::default()
+        .manage(app_state)
+        .system_tray(create_tray_menu())
+        .on_system_tray_event(handle_tray_event)
+        .invoke_handler(tauri::generate_handler![
+            get_backups,
+            create_backup,
+            get_config,
+            update_config,
+            send_notification,
+            open_logs_directory,
+            check_for_updates,
+            show_window,
+            hide_window
+        ])
+        .setup(|app| {
+            // Setup notification on app start
+            let app_handle = app.handle();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                let _ = app_handle
+                    .notification()
+                    .builder()
+                    .title("DB Backup Desktop")
+                    .body("Application started successfully!")
+                    .show();
+            });
+
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
