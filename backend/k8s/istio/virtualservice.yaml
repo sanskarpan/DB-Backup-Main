@@ -1,0 +1,79 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: db-backup
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+    app.kubernetes.io/component: service-mesh
+spec:
+  hosts:
+    - db-backup.db-backup.svc.cluster.local
+    - api.backup.example.com
+
+  gateways:
+    - db-backup-gateway
+    - mesh  # Internal mesh traffic
+
+  http:
+    # API routes
+    - match:
+        - uri:
+            prefix: /api/v1
+      route:
+        - destination:
+            host: db-backup.db-backup.svc.cluster.local
+            port:
+              number: 8080
+      retries:
+        attempts: 3
+        perTryTimeout: 30s
+        retryOn: 5xx,reset,connect-failure,refused-stream
+      timeout: 60s
+      corsPolicy:
+        allowOrigins:
+          - exact: https://dashboard.example.com
+        allowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        allowHeaders:
+          - authorization
+          - content-type
+          - x-csrf-token
+        allowCredentials: true
+        maxAge: 24h
+
+    # Health check routes (no retries)
+    - match:
+        - uri:
+            exact: /health
+        - uri:
+            exact: /ready
+      route:
+        - destination:
+            host: db-backup.db-backup.svc.cluster.local
+            port:
+              number: 8080
+      timeout: 5s
+
+    # Metrics endpoint
+    - match:
+        - uri:
+            prefix: /metrics
+      route:
+        - destination:
+            host: db-backup.db-backup.svc.cluster.local
+            port:
+              number: 9090
+      timeout: 10s
+
+    # Default route
+    - route:
+        - destination:
+            host: db-backup.db-backup.svc.cluster.local
+            port:
+              number: 8080
+      timeout: 60s
