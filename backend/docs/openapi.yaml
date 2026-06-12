@@ -1,0 +1,1036 @@
+openapi: 3.0.3
+info:
+  title: Database Backup Utility API
+  description: |
+    Enterprise-grade database backup and restoration utility API.
+
+    This API provides comprehensive backup and restore operations for multiple database types
+    including MySQL, PostgreSQL, MongoDB, and SQLite. It includes support for:
+
+    - Automated backup scheduling
+    - Multiple compression algorithms (gzip, zstd, lz4)
+    - Encryption at rest (AES-256-GCM)
+    - Cloud storage integration (S3, GCS, Azure)
+    - Point-in-time recovery (PITR)
+    - Real-time notifications (Slack, Email, Webhooks)
+    - Comprehensive monitoring and metrics
+
+    ## Authentication
+
+    The API uses JWT (JSON Web Tokens) for authentication. Include the token in the
+    `Authorization` header:
+
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+
+    ## Rate Limiting
+
+    API requests are rate-limited to 100 requests per minute per IP address.
+    Rate limit information is included in response headers:
+
+    - `X-RateLimit-Limit`: Maximum requests per window
+    - `X-RateLimit-Remaining`: Remaining requests in current window
+    - `X-RateLimit-Reset`: Time when the rate limit resets (Unix timestamp)
+
+    ## Security
+
+    All API endpoints enforce:
+    - HTTPS/TLS encryption in transit
+    - CSRF protection (CSRF token required in headers)
+    - Content Security Policy (CSP)
+    - Request size limits (10MB default, 100MB for uploads)
+    - Input validation and sanitization
+
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Development server
+  - url: https://api.backup.example.com/api/v1
+    description: Production server
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Health
+    description: Service health and readiness endpoints
+  - name: Backups
+    description: Backup creation, listing, and management
+  - name: Restores
+    description: Database restore operations
+  - name: Schedules
+    description: Backup schedule management
+  - name: Statistics
+    description: Metrics and statistics
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT authentication token
+
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+        message:
+          type: string
+          description: Detailed error message
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional error details
+      example:
+        error: "Invalid request"
+        message: "Database type is required"
+        details:
+          field: "database_type"
+
+    Success:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+          description: Operation success status
+        data:
+          type: object
+          additionalProperties: true
+          description: Response data
+        message:
+          type: string
+          description: Success message
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - version
+        - uptime
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          description: Overall system health status
+        version:
+          type: string
+          description: Application version
+          example: "1.0.0"
+        uptime:
+          type: integer
+          description: Uptime in seconds
+          example: 3600
+        components:
+          type: object
+          properties:
+            database:
+              type: string
+              enum: [up, down]
+            storage:
+              type: string
+              enum: [up, down]
+            scheduler:
+              type: string
+              enum: [up, down]
+          description: Component health status
+
+    BackupMetadata:
+      type: object
+      required:
+        - id
+        - database_type
+        - database
+        - status
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique backup identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        database_type:
+          type: string
+          enum: [mysql, postgres, mongodb, sqlite]
+          description: Database type
+        database:
+          type: string
+          description: Database name
+          example: "production_db"
+        host:
+          type: string
+          description: Database host
+          example: "db.example.com"
+        port:
+          type: integer
+          description: Database port
+          example: 5432
+        backup_path:
+          type: string
+          description: Path to backup file
+          example: "/backups/production_db_2025-12-30.sql.gz"
+        size:
+          type: integer
+          format: int64
+          description: Backup size in bytes
+          example: 1073741824
+        compressed_size:
+          type: integer
+          format: int64
+          description: Compressed backup size in bytes
+          example: 268435456
+        compression:
+          type: string
+          enum: [none, gzip, zstd, lz4]
+          description: Compression algorithm used
+        encrypted:
+          type: boolean
+          description: Whether backup is encrypted
+        checksum:
+          type: string
+          description: SHA256 checksum of backup file
+          example: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        status:
+          type: string
+          enum: [pending, in_progress, success, failed]
+          description: Backup status
+        duration:
+          type: integer
+          description: Backup duration in milliseconds
+          example: 5000
+        tables:
+          type: array
+          items:
+            $ref: '#/components/schemas/TableInfo'
+        tags:
+          type: object
+          additionalProperties:
+            type: string
+          description: User-defined tags
+          example:
+            environment: "production"
+            team: "backend"
+        created_at:
+          type: string
+          format: date-time
+          description: Backup creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        error:
+          type: string
+          description: Error message if backup failed
+
+    TableInfo:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Table name
+          example: "users"
+        row_count:
+          type: integer
+          format: int64
+          description: Number of rows
+          example: 100000
+        data_size:
+          type: integer
+          format: int64
+          description: Data size in bytes
+          example: 10485760
+        index_size:
+          type: integer
+          format: int64
+          description: Index size in bytes
+          example: 2097152
+
+    CreateBackupRequest:
+      type: object
+      required:
+        - database_type
+        - host
+      properties:
+        database_type:
+          type: string
+          enum: [mysql, postgres, postgresql, mongodb, mongo, sqlite]
+          description: Database type
+          example: "postgres"
+        host:
+          type: string
+          description: Database host
+          example: "localhost"
+        port:
+          type: integer
+          description: Database port (optional, uses default if not specified)
+          example: 5432
+        username:
+          type: string
+          description: Database username
+          example: "postgres"
+        password:
+          type: string
+          format: password
+          description: Database password
+          example: "secret123"
+        database:
+          type: string
+          description: Single database name
+          example: "myapp_production"
+        databases:
+          type: array
+          items:
+            type: string
+          description: Multiple database names
+          example: ["db1", "db2", "db3"]
+        all_databases:
+          type: boolean
+          description: Backup all databases
+          default: false
+        tables:
+          type: array
+          items:
+            type: string
+          description: Specific tables to backup
+          example: ["users", "orders"]
+        exclude_tables:
+          type: array
+          items:
+            type: string
+          description: Tables to exclude from backup
+          example: ["temp_data", "logs"]
+        compression:
+          type: string
+          enum: [none, gzip, zstd, lz4]
+          description: Compression algorithm
+          default: gzip
+        encrypt:
+          type: boolean
+          description: Enable encryption
+          default: false
+        encryption_key:
+          type: string
+          format: password
+          description: Encryption key (required if encrypt is true)
+        storage_type:
+          type: string
+          enum: [local, s3, gcs, azure]
+          description: Storage destination type
+          default: local
+        tags:
+          type: object
+          additionalProperties:
+            type: string
+          description: Custom tags for organization
+          example:
+            environment: "production"
+            project: "ecommerce"
+      example:
+        database_type: "postgres"
+        host: "localhost"
+        port: 5432
+        username: "postgres"
+        password: "secret"
+        database: "production_db"
+        compression: "zstd"
+        encrypt: true
+        tags:
+          environment: "production"
+
+    RestoreBackupRequest:
+      type: object
+      properties:
+        database:
+          type: string
+          description: Target database name (optional, uses original if not specified)
+        point_in_time:
+          type: string
+          format: date-time
+          description: Point-in-time for PITR
+        drop_existing:
+          type: boolean
+          description: Drop existing database before restore
+          default: false
+        tables:
+          type: array
+          items:
+            type: string
+          description: Specific tables to restore
+        skip_validation:
+          type: boolean
+          description: Skip pre-restore validation
+          default: false
+      example:
+        database: "production_db_restored"
+        drop_existing: false
+
+    Schedule:
+      type: object
+      required:
+        - id
+        - name
+        - cron_expression
+        - backup_config
+        - enabled
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Schedule identifier
+        name:
+          type: string
+          description: Schedule name
+          example: "Daily Production Backup"
+        description:
+          type: string
+          description: Schedule description
+          example: "Automated daily backup at 2 AM"
+        cron_expression:
+          type: string
+          description: Cron expression for schedule
+          example: "0 2 * * *"
+        backup_config:
+          $ref: '#/components/schemas/CreateBackupRequest'
+        enabled:
+          type: boolean
+          description: Whether schedule is active
+          default: true
+        last_run:
+          type: string
+          format: date-time
+          description: Last execution timestamp
+        next_run:
+          type: string
+          format: date-time
+          description: Next scheduled execution
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateScheduleRequest:
+      type: object
+      required:
+        - name
+        - cron_expression
+        - backup_config
+      properties:
+        name:
+          type: string
+          description: Schedule name
+          example: "Nightly Backup"
+        description:
+          type: string
+          description: Schedule description
+        cron_expression:
+          type: string
+          description: Cron expression (standard format)
+          example: "0 2 * * *"
+        backup_config:
+          $ref: '#/components/schemas/CreateBackupRequest'
+        enabled:
+          type: boolean
+          description: Enable schedule immediately
+          default: true
+      example:
+        name: "Daily Production Backup"
+        cron_expression: "0 2 * * *"
+        backup_config:
+          database_type: "postgres"
+          host: "localhost"
+          database: "production"
+          compression: "zstd"
+        enabled: true
+
+    Statistics:
+      type: object
+      properties:
+        total_backups:
+          type: integer
+          description: Total number of backups
+          example: 1500
+        total_size:
+          type: integer
+          format: int64
+          description: Total size of all backups in bytes
+          example: 107374182400
+        successful_backups:
+          type: integer
+          description: Number of successful backups
+          example: 1485
+        failed_backups:
+          type: integer
+          description: Number of failed backups
+          example: 15
+        success_rate:
+          type: number
+          format: float
+          description: Success rate percentage
+          example: 99.0
+        average_backup_size:
+          type: integer
+          format: int64
+          description: Average backup size in bytes
+          example: 71582788
+        average_duration:
+          type: integer
+          description: Average backup duration in milliseconds
+          example: 3500
+        by_database_type:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Backup count by database type
+          example:
+            postgres: 800
+            mysql: 500
+            mongodb: 200
+
+    StorageStatistics:
+      type: object
+      properties:
+        total_size:
+          type: integer
+          format: int64
+          description: Total storage used in bytes
+        compressed_size:
+          type: integer
+          format: int64
+          description: Total compressed size in bytes
+        compression_ratio:
+          type: number
+          format: float
+          description: Average compression ratio
+          example: 3.5
+        deduplication_savings:
+          type: integer
+          format: int64
+          description: Space saved by deduplication in bytes
+        by_storage_type:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Storage usage by type
+          example:
+            local: 53687091200
+            s3: 32212254720
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Check if the service is healthy and operational
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /ready:
+    get:
+      tags:
+        - Health
+      summary: Readiness check
+      description: Check if the service is ready to accept requests
+      operationId: getReady
+      security: []
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ready:
+                    type: boolean
+                    example: true
+        '503':
+          description: Service is not ready
+
+  /version:
+    get:
+      tags:
+        - Health
+      summary: Get version
+      description: Get application version and build information
+      operationId: getVersion
+      security: []
+      responses:
+        '200':
+          description: Version information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  build:
+                    type: string
+                    example: "2025-12-30-abc123"
+                  go_version:
+                    type: string
+                    example: "go1.21.5"
+
+  /backups:
+    get:
+      tags:
+        - Backups
+      summary: List backups
+      description: Retrieve a list of backups with optional filtering and sorting
+      operationId: listBackups
+      parameters:
+        - name: database
+          in: query
+          description: Filter by database name
+          schema:
+            type: string
+        - name: type
+          in: query
+          description: Filter by database type
+          schema:
+            type: string
+            enum: [mysql, postgres, mongodb, sqlite]
+        - name: sort_by
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [date, size, database]
+            default: date
+        - name: sort_order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: limit
+          in: query
+          description: Maximum number of results
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+      responses:
+        '200':
+          description: List of backups
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  backups:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BackupMetadata'
+                  total:
+                    type: integer
+                    description: Total number of backups
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags:
+        - Backups
+      summary: Create backup
+      description: Create a new database backup
+      operationId: createBackup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBackupRequest'
+      responses:
+        '201':
+          description: Backup created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupMetadata'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Backup failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /backups/{id}:
+    get:
+      tags:
+        - Backups
+      summary: Get backup
+      description: Retrieve detailed information about a specific backup
+      operationId: getBackup
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Backup ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Backup details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupMetadata'
+        '404':
+          description: Backup not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags:
+        - Backups
+      summary: Delete backup
+      description: Delete a backup and its associated files
+      operationId: deleteBackup
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Backup ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Backup deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Backup deleted successfully"
+        '404':
+          description: Backup not found
+        '500':
+          description: Failed to delete backup
+
+  /backups/{id}/restore:
+    post:
+      tags:
+        - Restores
+      summary: Restore backup
+      description: Restore a database from a backup
+      operationId: restoreBackup
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Backup ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreBackupRequest'
+      responses:
+        '200':
+          description: Restore completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  duration:
+                    type: integer
+                    description: Restore duration in milliseconds
+        '404':
+          description: Backup not found
+        '500':
+          description: Restore failed
+
+  /backups/{id}/download:
+    get:
+      tags:
+        - Backups
+      summary: Download backup
+      description: Download the backup file
+      operationId: downloadBackup
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Backup ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Backup file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Backup not found
+
+  /schedules:
+    get:
+      tags:
+        - Schedules
+      summary: List schedules
+      description: Retrieve all backup schedules
+      operationId: listSchedules
+      responses:
+        '200':
+          description: List of schedules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schedules:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Schedule'
+                  total:
+                    type: integer
+
+    post:
+      tags:
+        - Schedules
+      summary: Create schedule
+      description: Create a new backup schedule
+      operationId: createSchedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScheduleRequest'
+      responses:
+        '201':
+          description: Schedule created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+        '400':
+          description: Invalid request
+
+  /schedules/{id}:
+    get:
+      tags:
+        - Schedules
+      summary: Get schedule
+      description: Retrieve a specific schedule
+      operationId: getSchedule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Schedule ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Schedule details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+        '404':
+          description: Schedule not found
+
+    put:
+      tags:
+        - Schedules
+      summary: Update schedule
+      description: Update an existing schedule
+      operationId: updateSchedule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Schedule ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScheduleRequest'
+      responses:
+        '200':
+          description: Schedule updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+        '404':
+          description: Schedule not found
+
+    delete:
+      tags:
+        - Schedules
+      summary: Delete schedule
+      description: Delete a backup schedule
+      operationId: deleteSchedule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Schedule ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Schedule deleted
+        '404':
+          description: Schedule not found
+
+  /schedules/{id}/enable:
+    post:
+      tags:
+        - Schedules
+      summary: Enable schedule
+      description: Enable a disabled schedule
+      operationId: enableSchedule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Schedule ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Schedule enabled
+        '404':
+          description: Schedule not found
+
+  /schedules/{id}/disable:
+    post:
+      tags:
+        - Schedules
+      summary: Disable schedule
+      description: Disable an active schedule
+      operationId: disableSchedule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Schedule ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Schedule disabled
+        '404':
+          description: Schedule not found
+
+  /schedules/{id}/run:
+    post:
+      tags:
+        - Schedules
+      summary: Run schedule manually
+      description: Trigger a scheduled backup manually
+      operationId: runSchedule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Schedule ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Backup started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupMetadata'
+        '404':
+          description: Schedule not found
+
+  /stats:
+    get:
+      tags:
+        - Statistics
+      summary: Get statistics
+      description: Get overall backup statistics
+      operationId: getStatistics
+      responses:
+        '200':
+          description: Backup statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Statistics'
+
+  /stats/storage:
+    get:
+      tags:
+        - Statistics
+      summary: Get storage statistics
+      description: Get storage usage statistics
+      operationId: getStorageStatistics
+      responses:
+        '200':
+          description: Storage statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorageStatistics'
