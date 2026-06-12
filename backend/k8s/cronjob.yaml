@@ -1,0 +1,136 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: db-backup-cleanup
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+    app.kubernetes.io/component: cleanup
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: db-backup
+        app.kubernetes.io/component: cleanup
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 3600
+
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: db-backup
+            app.kubernetes.io/component: cleanup
+        spec:
+          serviceAccountName: db-backup
+          restartPolicy: OnFailure
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+
+          containers:
+            - name: cleanup
+              image: db-backup:1.0.0
+              command:
+                - /usr/local/bin/db-backup
+                - cleanup
+                - --older-than
+                - 90d
+                - --dry-run=false
+
+              env:
+                - name: CONFIG_PATH
+                  value: /etc/db-backup/config.yaml
+
+              envFrom:
+                - secretRef:
+                    name: db-backup-secrets
+
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "250m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+
+              volumeMounts:
+                - name: config
+                  mountPath: /etc/db-backup
+                  readOnly: true
+
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: true
+
+          volumes:
+            - name: config
+              configMap:
+                name: db-backup-config
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: db-backup-verify
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+    app.kubernetes.io/component: verification
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  concurrencyPolicy: Allow
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: db-backup
+        app.kubernetes.io/component: verification
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: db-backup
+            app.kubernetes.io/component: verification
+        spec:
+          serviceAccountName: db-backup
+          restartPolicy: OnFailure
+
+          containers:
+            - name: verify
+              image: db-backup:1.0.0
+              command:
+                - /usr/local/bin/db-backup
+                - verify
+                - --since
+                - 6h
+                - --parallel
+                - "4"
+
+              envFrom:
+                - secretRef:
+                    name: db-backup-secrets
+
+              resources:
+                requests:
+                  memory: "512Mi"
+                  cpu: "500m"
+                limits:
+                  memory: "1Gi"
+                  cpu: "1000m"
