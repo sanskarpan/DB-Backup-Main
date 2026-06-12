@@ -1,0 +1,33 @@
+# Build outputs
+**/dist/
+**/build/
+**/*.zip
+**/*.xpi
+**/*.crx
+
+# Dependencies
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.log
+
+# Package artifacts
+chrome/package/
+firefox/package/
+edge/package/
+safari/package/
+
+# Web extension artifacts
+web-ext-artifacts/

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DB Backup Manager - Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="container">
+      <div class="header-content">
+        <div class="logo">
+          <img src="../icons/icon-48.png" alt="DB Backup Manager">
+          <h1>DB Backup Manager Settings</h1>
+        </div>
+        <div class="version">Version 1.0.0</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main">
+    <div class="container">
+      <!-- Success Message -->
+      <div id="successMessage" class="message success" style="display: none;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+        <span>Settings saved successfully!</span>
+      </div>
+
+      <!-- Error Message -->
+      <div id="errorMessage" class="message error" style="display: none;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span id="errorText"></span>
+      </div>
+
+      <!-- Settings Form -->
+      <form id="settingsForm" class="settings-form">
+        <!-- API Configuration Section -->
+        <section class="settings-section">
+          <h2 class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            </svg>
+            API Configuration
+          </h2>
+
+          <div class="form-group">
+            <label for="apiUrl">API URL</label>
+            <input
+              type="url"
+              id="apiUrl"
+              name="apiUrl"
+              placeholder="http://localhost:8080"
+              required
+            >
+            <small class="form-help">The base URL of your DB Backup Manager API server</small>
+          </div>
+
+          <div class="form-group">
+            <label for="apiKey">API Key</label>
+            <div class="input-with-button">
+              <input
+                type="password"
+                id="apiKey"
+                name="apiKey"
+                placeholder="Enter your API key"
+                required
+              >
+              <button type="button" id="toggleApiKey" class="btn-icon" title="Show/Hide API Key">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+            </div>
+            <small class="form-help">Your authentication token for the API</small>
+          </div>
+
+          <div class="form-group">
+            <button type="button" id="testConnection" class="btn btn-secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg>
+              Test Connection
+            </button>
+            <span id="connectionStatus" class="connection-status"></span>
+          </div>
+        </section>
+
+        <!-- Sync Settings Section -->
+        <section class="settings-section">
+          <h2 class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            Synchronization
+          </h2>
+
+          <div class="form-group">
+            <label for="syncInterval">Sync Interval (minutes)</label>
+            <div class="slider-group">
+              <input
+                type="range"
+                id="syncInterval"
+                name="syncInterval"
+                min="1"
+                max="60"
+                value="5"
+                step="1"
+              >
+              <span id="syncIntervalValue" class="slider-value">5 minutes</span>
+            </div>
+            <small class="form-help">How often to check for backup updates</small>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="autoSync" name="autoSync" checked>
+              <span>Enable automatic background sync</span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Notifications Section -->
+        <section class="settings-section">
+          <h2 class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+            Notifications
+          </h2>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="notificationsEnabled" name="notificationsEnabled" checked>
+              <span>Enable browser notifications</span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="notifySuccess" name="notifySuccess" checked>
+              <span>Notify on successful backups</span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="notifyFailure" name="notifyFailure" checked>
+              <span>Notify on backup failures</span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="notifyAlerts" name="notifyAlerts" checked>
+              <span>Notify on monitoring alerts</span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Display Settings Section -->
+        <section class="settings-section">
+          <h2 class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            Display
+          </h2>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="badgeEnabled" name="badgeEnabled" checked>
+              <span>Show badge on extension icon</span>
+            </label>
+            <small class="form-help">Display failed backup count on the icon</small>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="contextMenuEnabled" name="contextMenuEnabled" checked>
+              <span>Enable context menu items</span>
+            </label>
+            <small class="form-help">Add quick actions to right-click menu</small>
+          </div>
+
+          <div class="form-group">
+            <label for="theme">Theme</label>
+            <select id="theme" name="theme">
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="auto">Auto (System)</option>
+            </select>
+          </div>
+        </section>
+
+        <!-- Advanced Settings Section -->
+        <section class="settings-section">
+          <h2 class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M12 1v6m0 6v6m8.66-13.66l-5.2 5.2m-2.92 2.92l-5.2 5.2M23 12h-6M7 12H1m21.66 8.66l-5.2-5.2m-2.92-2.92l-5.2-5.2"></path>
+            </svg>
+            Advanced
+          </h2>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="autoBackup" name="autoBackup">
+              <span>Enable automatic backups</span>
+            </label>
+            <small class="form-help">Automatically create backups on a schedule (experimental)</small>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="debugMode" name="debugMode">
+              <span>Enable debug mode</span>
+            </label>
+            <small class="form-help">Show detailed logs in browser console</small>
+          </div>
+        </section>
+
+        <!-- Action Buttons -->
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="saveBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            Save Settings
+          </button>
+
+          <button type="button" class="btn btn-secondary" id="resetBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="1 4 1 10 7 10"></polyline>
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+            </svg>
+            Reset to Defaults
+          </button>
+
+          <button type="button" class="btn btn-danger" id="clearDataBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            Clear All Data
+          </button>
+        </div>
+      </form>
+
+      <!-- Statistics Section -->
+      <section class="settings-section statistics">
+        <h2 class="section-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="20" x2="12" y2="10"></line>
+            <line x1="18" y1="20" x2="18" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="16"></line>
+          </svg>
+          Extension Statistics
+        </h2>
+
+        <div class="stats-grid">
+          <div class="stat-item">
+            <span class="stat-label">Total Backups</span>
+            <span class="stat-value" id="statTotalBackups">--</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Successful</span>
+            <span class="stat-value" id="statSuccessful">--</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Failed</span>
+            <span class="stat-value" id="statFailed">--</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Total Size</span>
+            <span class="stat-value" id="statTotalSize">--</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- About Section -->
+      <section class="settings-section about">
+        <h2 class="section-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          About
+        </h2>
+
+        <div class="about-content">
+          <p>
+            <strong>DB Backup Manager</strong> is an enterprise-grade database backup
+            and recovery management system. This browser extension provides quick access
+            to your backup operations directly from your browser.
+          </p>
+          <p class="about-links">
+            <a href="https://github.com/yourusername/db-backup" target="_blank">Documentation</a>
+            <span>•</span>
+            <a href="https://github.com/yourusername/db-backup/issues" target="_blank">Report Issue</a>
+            <span>•</span>
+            <a href="https://github.com/yourusername/db-backup" target="_blank">Source Code</a>
+          </p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 DB Backup Manager. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="../shared/utils.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
