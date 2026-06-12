@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-backup-config
+  namespace: db-backup
+  labels:
+    app.kubernetes.io/name: db-backup
+    app.kubernetes.io/component: configuration
+data:
+  config.yaml: |
+    # Database Backup Configuration
+    server:
+      host: 0.0.0.0
+      port: 8080
+      log_level: info
+      enable_cors: true
+
+    storage:
+      type: s3
+      region: us-east-1
+      bucket: db-backups-production
+      # Credentials loaded from secrets
+
+    databases:
+      # Database connections configured via secrets
+      connection_timeout: 30s
+      max_connections: 10
+
+    backup:
+      default_compression: zstd
+      default_encryption: true
+      parallel_jobs: 4
+      retention:
+        daily: 7
+        weekly: 4
+        monthly: 12
+        yearly: 5
+
+    notifications:
+      enabled: true
+      slack:
+        enabled: false
+      email:
+        enabled: false
+      webhook:
+        enabled: true
+        url: http://notification-service/webhooks/backup
+
+    monitoring:
+      prometheus:
+        enabled: true
+        port: 9090
+        path: /metrics
+
+    profiling:
+      enabled: true
+      memory:
+        enabled: true
+        interval: 30s
+        leak_detection: true
+
+    deduplication:
+      enabled: true
+      chunk_size: 4194304  # 4MB
+      cache_size: 1000
+
+    delta_backups:
+      enabled: true
+      block_size: 4096
+      max_chain_length: 10
