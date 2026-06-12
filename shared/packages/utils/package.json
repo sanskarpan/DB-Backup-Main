@@ -1,0 +1,38 @@
+{
+  "name": "@db-backup/utils",
+  "version": "1.0.0",
+  "description": "Utility functions for DB Backup platform",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "database",
+    "backup",
+    "utilities",
+    "typescript"
+  ],
+  "author": "DB Backup Team",
+  "license": "MIT",
+  "dependencies": {
+    "@db-backup/types": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  },
+  "files": [
+    "dist"
+  ]
+}
