@@ -1,0 +1,11 @@
+---
+# Ansible Galaxy requirements for db-backup project
+
+collections:
+  - name: kubernetes.core
+    version: ">=2.4.0"
+    source: https://galaxy.ansible.com
+
+  - name: community.general
+    version: ">=7.0.0"
+    source: https://galaxy.ansible.com
