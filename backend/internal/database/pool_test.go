@@ -219,7 +219,8 @@ func TestConnectionPool_HealthCheck(t *testing.T) {
 	defer pool.Close()
 
 	// Wait for health check to run and connections to be replaced
-	time.Sleep(600 * time.Millisecond)
+	// Use a longer sleep to handle race-detector overhead (5-10x slower)
+	time.Sleep(2 * time.Second)
 
 	stats := pool.Stats()
 	assert.Greater(t, stats.MaxLifetimeReached, int64(0), "should have replaced connections")
@@ -264,10 +265,10 @@ func TestConnectionPool_AutoScaleDown(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Create extra connections
+	// Create extra connections (hold lock, use locked variant)
 	pool.mu.Lock()
 	for i := 0; i < 3; i++ {
-		pool.createConnection(ctx)
+		pool.createConnectionLocked(ctx)
 	}
 	pool.mu.Unlock()
 
@@ -485,10 +486,10 @@ func TestConnectionPool_MaxIdleTime(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Create extra connections
+	// Create extra connections (hold lock, use locked variant)
 	pool.mu.Lock()
 	for i := 0; i < 3; i++ {
-		pool.createConnection(ctx)
+		pool.createConnectionLocked(ctx)
 	}
 	pool.mu.Unlock()
 
