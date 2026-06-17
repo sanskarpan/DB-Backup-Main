@@ -268,11 +268,13 @@ func (m *NetworkPolicyManager) EvaluateConnection(ctx context.Context, conn *Con
 		return m.denyConnection(conn, "IP is blacklisted", nil)
 	}
 
-	// Check IP whitelist
+	// Check IP whitelist: deny if a whitelist is configured and IP is not in it;
+	// allow immediately when the IP IS whitelisted (override default-deny).
 	if len(m.config.IPWhitelist) > 0 || len(m.whitelistCIDRs) > 0 {
 		if !m.isIPWhitelisted(conn.SourceIP) {
 			return m.denyConnection(conn, "IP not in whitelist", nil)
 		}
+		return m.allowConnection(conn, "IP is whitelisted", nil)
 	}
 
 	// Check port restrictions
