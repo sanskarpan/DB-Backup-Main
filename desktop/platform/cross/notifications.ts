@@ -262,7 +262,7 @@ class CrossPlatformNotifications {
     try {
       switch (this.platform) {
         case 'windows':
-          await invoke('windows_close_notification', { notificationId });
+          await invoke('windows_close_notification', { notification_id: notificationId });
           break;
         case 'macos':
           await invoke('macos_close_notification', { notificationId });

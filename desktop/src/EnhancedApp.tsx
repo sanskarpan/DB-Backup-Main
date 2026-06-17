@@ -187,7 +187,7 @@ function EnhancedApp() {
     setError(null)
     try {
       await invoke('create_backup', {
-        databaseId: 'default-db',
+        database_id: 'default-db',
         options: {}
       })
       await sendNotification({
@@ -227,7 +227,7 @@ function EnhancedApp() {
   const handlePreviewBackup = async (backup: Backup) => {
     try {
       const preview = await invoke<BackupPreview>('get_backup_preview', {
-        backupId: backup.id
+        backup_id: backup.id
       })
       setPreviewData(preview)
       setSelectedBackup(backup)
