@@ -107,7 +107,9 @@ func (v *VaultClient) authenticate() error {
 		if v.config.Token == "" {
 			return fmt.Errorf("token is required for token auth")
 		}
-		v.client.SetToken(v.config.Token)
+		if v.client != nil {
+			v.client.SetToken(v.config.Token)
+		}
 		return nil
 
 	case "approle":
