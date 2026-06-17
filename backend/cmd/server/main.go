@@ -97,8 +97,9 @@ func main() {
 	// Initialize JWT service
 	jwtSecret := cfg.Security.JWT.Secret
 	if jwtSecret == "" {
-		jwtSecret = "default-development-secret-change-in-production"
-		log.Warn("Using default JWT secret - configure security.jwt.secret in production!")
+		log.Warn("JWT secret is not configured. Set security.jwt.secret (min 32 characters). Refusing to start.")
+		fmt.Fprintln(os.Stderr, "ERROR: JWT secret is required. Configure security.jwt.secret before starting.")
+		os.Exit(1)
 	}
 	jwtExpiration := cfg.Security.JWT.Expiration
 	if jwtExpiration == 0 {
@@ -127,6 +128,7 @@ func main() {
 		EnableCORS:    true,
 		EnableSwagger: true,
 		JWTSecret:     jwtSecret,
+		ScanBaseDir:   os.Getenv("SCAN_BASE_DIR"),
 	}, backupEngine, restoreEngine, sched, healthChecker, detector, searchEngine, jwtService, oauth2Service, oauth2Handler, log)
 
 	// Setup Gin router
