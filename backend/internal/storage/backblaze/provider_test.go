@@ -516,8 +516,8 @@ func TestBackblazeB2Provider_SetLifecycleRules(t *testing.T) {
 	// Create lifecycle rules
 	rules := []b2.LifecycleRule{
 		{
-			DaysFromUploadingToHiding: 30,
-			DaysFromHidingToDeleting:  7,
+			DaysNewUntilHidden:     30,
+			DaysHiddenUntilDeleted: 7,
 			Prefix:                    "test-lifecycle/",
 		},
 	}
