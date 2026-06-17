@@ -3,7 +3,8 @@
  * Manifest V3 compatible
  */
 
-importScripts('../shared/api.js', '../shared/utils.js');
+import { BackupAPI } from '../shared/api.js';
+import { Utils } from '../shared/utils.js';
 
 // Initialize API client
 let api = new BackupAPI();
