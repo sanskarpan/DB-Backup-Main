@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // MigrationJob represents a cloud migration job
@@ -507,7 +509,7 @@ func (fm *FailoverManager) triggerFailover(provider StorageProvider, reason stri
 		if rule.TriggerProvider == provider {
 			// Execute failover
 			event := &FailoverEvent{
-				ID:              fmt.Sprintf("failover-%d", time.Now().UnixNano()),
+				ID:              uid.New("failover"),
 				RuleID:          rule.ID,
 				TriggerProvider: provider,
 				Reason:          reason,
