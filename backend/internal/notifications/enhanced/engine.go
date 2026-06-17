@@ -70,7 +70,7 @@ func NewEngine(config *Config) (*Engine, error) {
 	}
 
 	// Expand home directory
-	if config.DataDir[:2] == "~/" {
+	if len(config.DataDir) >= 2 && config.DataDir[:2] == "~/" {
 		home, _ := os.UserHomeDir()
 		config.DataDir = filepath.Join(home, config.DataDir[2:])
 	}
@@ -205,10 +205,12 @@ func (e *Engine) Send(ctx context.Context, notification *Notification) error {
 	e.notifications[notification.ID] = notification
 	e.mu.Unlock()
 
+	// Set status before queuing to avoid a race with the worker goroutine
+	notification.Status = StatusQueued
+
 	// Queue for delivery
 	select {
 	case e.queue <- notification:
-		notification.Status = StatusQueued
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
@@ -758,12 +760,14 @@ func (e *Engine) saveNotifications() error {
 	// Only save recent notifications (retention policy)
 	cutoff := time.Now().AddDate(0, 0, -e.config.RetentionDays)
 
-	notifications := make([]*Notification, 0)
+	e.mu.RLock()
+	notifications := make([]*Notification, 0, len(e.notifications))
 	for _, notification := range e.notifications {
 		if notification.CreatedAt.After(cutoff) {
 			notifications = append(notifications, notification)
 		}
 	}
+	e.mu.RUnlock()
 
 	data, err := json.MarshalIndent(notifications, "", "  ")
 	if err != nil {
