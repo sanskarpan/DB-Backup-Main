@@ -93,6 +93,10 @@ i18n
     interpolation: {
       escapeValue: false,
     },
+    // Return the key itself when a translation is missing instead of throwing
+    saveMissing: false,
+    missingKeyHandler: false,
+    parseMissingKeyHandler: (key: string) => key,
   });
 
 export default i18n;
