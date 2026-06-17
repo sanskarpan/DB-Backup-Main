@@ -342,7 +342,7 @@ func (d *InfluxDBDriver) backupMetadata(ctx context.Context, backupDir string) e
 	// Export buckets API information
 	bucketsAPI := d.client.BucketsAPI()
 	if bucketsAPI != nil {
-		buckets, err := bucketsAPI.FindBuckets(ctx)
+		buckets, err := bucketsAPI.GetBuckets(ctx)
 		if err == nil && buckets != nil {
 			var bucketList []map[string]interface{}
 			for _, bucket := range *buckets {
@@ -384,7 +384,7 @@ func (d *InfluxDBDriver) getBucketsToBackup(ctx context.Context, opts *database.
 
 	// Otherwise, list all buckets
 	bucketsAPI := d.client.BucketsAPI()
-	buckets, err := bucketsAPI.FindBuckets(ctx)
+	buckets, err := bucketsAPI.GetBuckets(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -506,7 +506,7 @@ func (d *InfluxDBDriver) restoreBucket(ctx context.Context, bucket, inputFile st
 	defer file.Close()
 
 	// Get the write API for this bucket
-	writeAPI := d.client.WriteAPIBlocking(d.config.Organization, bucket)
+	writeAPI := d.client.WriteAPIBlocking(d.organization, bucket)
 
 	// Read and parse NDJSON line by line
 	scanner := bufio.NewScanner(file)
@@ -616,7 +616,7 @@ func (d *InfluxDBDriver) restoreBucket(ctx context.Context, bucket, inputFile st
 // GetDatabases returns the list of databases/buckets
 func (d *InfluxDBDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	bucketsAPI := d.client.BucketsAPI()
-	buckets, err := bucketsAPI.FindBuckets(ctx)
+	buckets, err := bucketsAPI.GetBuckets(ctx)
 	if err != nil {
 		return nil, err
 	}
