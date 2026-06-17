@@ -5,8 +5,25 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 )
+
+// GetDirectorySize calculates the total size of all files in a directory recursively.
+func GetDirectorySize(path string) (int64, error) {
+	var total int64
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			total += info.Size()
+		}
+		return nil
+	})
+	return total, err
+}
 
 // GenerateRestoreID generates a unique ID for restore operations
 func GenerateRestoreID() string {
