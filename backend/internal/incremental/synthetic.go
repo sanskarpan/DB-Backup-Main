@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // SyntheticBackupGenerator generates synthetic full backups
@@ -44,7 +46,7 @@ func (sbg *SyntheticBackupGenerator) GenerateSyntheticFull(latestIncrementalID s
 	}
 
 	// Create temporary restore file
-	tempRestorePath := filepath.Join(sbg.tempDir, fmt.Sprintf("synthetic-restore-%d", time.Now().UnixNano()))
+	tempRestorePath := filepath.Join(sbg.tempDir, fmt.Sprintf("synthetic-restore-%s", uid.Hex(8)))
 	defer os.Remove(tempRestorePath)
 
 	// Restore to temporary location
@@ -61,7 +63,7 @@ func (sbg *SyntheticBackupGenerator) GenerateSyntheticFull(latestIncrementalID s
 
 	// Create synthetic full backup
 	syntheticManifest := &BackupManifest{
-		ID:           fmt.Sprintf("synth-%d", time.Now().UnixNano()),
+		ID:           uid.New("synth"),
 		Type:         BackupTypeSynthetic,
 		DatabaseID:   latestManifest.DatabaseID,
 		DatabaseName: latestManifest.DatabaseName,
@@ -367,7 +369,7 @@ func (sbg *SyntheticBackupGenerator) GetSyntheticBackups() []*BackupManifest {
 // ScheduleSyntheticBackup schedules a synthetic backup to be created
 func (sbg *SyntheticBackupGenerator) ScheduleSyntheticBackup(latestBackupID string, scheduleTime time.Time) (*SyntheticSchedule, error) {
 	schedule := &SyntheticSchedule{
-		ID:               fmt.Sprintf("sched-%d", time.Now().UnixNano()),
+		ID:               uid.New("sched"),
 		LatestBackupID:   latestBackupID,
 		ScheduledTime:    scheduleTime,
 		Status:           "pending",
