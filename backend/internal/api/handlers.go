@@ -11,6 +11,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/sanskarpan/db-backup/internal/restore"
 	"github.com/sanskarpan/db-backup/internal/scheduler"
+	"github.com/sanskarpan/db-backup/pkg/validation"
 )
 
 var (
@@ -102,6 +103,32 @@ func (s *Server) handleCreateBackup(c *gin.Context) {
 	default:
 		s.respondError(c, http.StatusBadRequest, fmt.Errorf("invalid database type"), "Unsupported database type")
 		return
+	}
+
+	// Validate database name to prevent shell injection and SQL injection.
+	if req.Database != "" {
+		if err := validation.ValidateDatabaseName(req.Database); err != nil {
+			s.respondError(c, http.StatusBadRequest, err, "Invalid database name")
+			return
+		}
+	}
+	for _, db := range req.Databases {
+		if err := validation.ValidateDatabaseName(db); err != nil {
+			s.respondError(c, http.StatusBadRequest, err, "Invalid database name in databases list")
+			return
+		}
+	}
+	for _, tbl := range req.Tables {
+		if err := validation.ValidateTableName(tbl); err != nil {
+			s.respondError(c, http.StatusBadRequest, err, "Invalid table name")
+			return
+		}
+	}
+	for _, tbl := range req.ExcludeTables {
+		if err := validation.ValidateTableName(tbl); err != nil {
+			s.respondError(c, http.StatusBadRequest, err, "Invalid table name in exclude_tables list")
+			return
+		}
 	}
 
 	// Create backup options
@@ -475,10 +502,21 @@ func (s *Server) handleScanFile(c *gin.Context) {
 		return
 	}
 
+	// Prevent path traversal: restrict scans to the configured base directory.
+	if s.config.ScanBaseDir == "" {
+		s.respondError(c, http.StatusForbidden, fmt.Errorf("scan base directory not configured"), "Scan endpoint is not available")
+		return
+	}
+	safePath, err := validation.SanitizePath(req.FilePath, s.config.ScanBaseDir)
+	if err != nil {
+		s.respondError(c, http.StatusBadRequest, err, "Invalid file path")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
-	report, err := s.detector.ScanFile(ctx, req.FilePath)
+	report, err := s.detector.ScanFile(ctx, safePath)
 	if err != nil {
 		s.respondError(c, http.StatusInternalServerError, err, "Failed to scan file")
 		return
@@ -495,10 +533,21 @@ func (s *Server) handleScanDirectory(c *gin.Context) {
 		return
 	}
 
+	// Prevent path traversal: restrict scans to the configured base directory.
+	if s.config.ScanBaseDir == "" {
+		s.respondError(c, http.StatusForbidden, fmt.Errorf("scan base directory not configured"), "Scan endpoint is not available")
+		return
+	}
+	safeDir, err := validation.SanitizePath(req.DirectoryPath, s.config.ScanBaseDir)
+	if err != nil {
+		s.respondError(c, http.StatusBadRequest, err, "Invalid directory path")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Minute)
 	defer cancel()
 
-	reports, err := s.detector.ScanDirectory(ctx, req.DirectoryPath)
+	reports, err := s.detector.ScanDirectory(ctx, safeDir)
 	if err != nil {
 		s.respondError(c, http.StatusInternalServerError, err, "Failed to scan directory")
 		return

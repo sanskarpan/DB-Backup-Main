@@ -22,7 +22,7 @@ type Server struct {
 	scheduler     *scheduler.Scheduler
 	healthChecker *health.Checker
 	detector      *ransomware.Detector
-	searchEngine  *catalog.SearchEngine
+	searchEngine  catalog.SearchEngineInterface
 	jwtService    *auth.TokenService
 	oauth2Service *auth.OAuth2Service
 	oauth2Handler *auth.OAuth2Handler
@@ -38,6 +38,9 @@ type Config struct {
 	EnableSwagger bool
 	JWTSecret     string
 	RateLimit     int
+	// ScanBaseDir restricts ransomware scan endpoints to this directory.
+	// If empty, scan endpoints will reject all requests.
+	ScanBaseDir   string
 }
 
 // NewServer creates a new API server
@@ -48,7 +51,7 @@ func NewServer(
 	sched *scheduler.Scheduler,
 	healthChecker *health.Checker,
 	detector *ransomware.Detector,
-	searchEngine *catalog.SearchEngine,
+	searchEngine catalog.SearchEngineInterface,
 	jwtService *auth.TokenService,
 	oauth2Service *auth.OAuth2Service,
 	oauth2Handler *auth.OAuth2Handler,
@@ -79,15 +82,21 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 	// 2. Security headers (apply to all responses)
 	router.Use(middleware.DefaultSecurityHeaders())
 
-	// 3. CORS (if enabled)
+	// 3. CORS (if enabled) — use allowlist-based middleware, not the broken inline version
 	if s.config.EnableCORS {
-		router.Use(s.corsMiddleware())
+		allowedOrigins := []string{"http://localhost:3000", "http://localhost:3001"}
+		router.Use(middleware.CORS(allowedOrigins))
 	}
 
-	// 4. Request size limits (prevent DoS attacks)
+	// 4. Rate limiting on all routes
+	if s.config.RateLimit > 0 {
+		router.Use(middleware.RateLimit(s.config.RateLimit))
+	}
+
+	// 5. Request size limits (prevent DoS attacks)
 	router.Use(middleware.DefaultMaxBodySize())
 
-	// 5. CSRF protection (with exemptions for health/metrics/auth endpoints)
+	// 6. CSRF protection (with exemptions for health/metrics/auth endpoints)
 	exemptPaths := []string{
 		"/health",
 		"/api/v1/health",
@@ -103,30 +112,38 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
-		// Health and readiness
+		// Health and readiness (public)
 		v1.GET("/health", s.handleHealth)
 		v1.GET("/ready", s.handleReady)
 		v1.GET("/version", s.handleVersion)
 
-		// Authentication endpoints
+		// Authentication endpoints (public)
 		if s.jwtService != nil {
-			auth := v1.Group("/auth")
+			authGroup := v1.Group("/auth")
 			{
 				// JWT login (simple username/password for testing)
-				auth.POST("/login", s.handleLogin)
+				authGroup.POST("/login", s.handleLogin)
 
 				// OAuth2 endpoints
 				if s.oauth2Handler != nil {
-					auth.GET("/oauth2/providers", gin.WrapF(s.oauth2Handler.ListProviders))
-					auth.GET("/oauth2/:provider/login", gin.WrapF(s.oauth2Handler.InitiateLogin))
-					auth.GET("/oauth2/callback", gin.WrapF(s.oauth2Handler.HandleCallback))
-					auth.GET("/oauth2/user", gin.WrapF(s.oauth2Handler.GetUserInfo))
+					authGroup.GET("/oauth2/providers", gin.WrapF(s.oauth2Handler.ListProviders))
+					authGroup.GET("/oauth2/:provider/login", gin.WrapF(s.oauth2Handler.InitiateLogin))
+					authGroup.GET("/oauth2/callback", gin.WrapF(s.oauth2Handler.HandleCallback))
+					authGroup.GET("/oauth2/user", gin.WrapF(s.oauth2Handler.GetUserInfo))
 				}
 			}
 		}
 
+		// All routes below require authentication
+		var authMiddleware gin.HandlerFunc
+		if s.jwtService != nil {
+			authMiddleware = middleware.Auth(s.jwtService)
+		} else {
+			authMiddleware = func(c *gin.Context) { c.Next() }
+		}
+
 		// Backup operations
-		backups := v1.Group("/backups")
+		backups := v1.Group("/backups", authMiddleware)
 		{
 			backups.POST("", s.handleCreateBackup)
 			backups.GET("", s.handleListBackups)
@@ -137,7 +154,7 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 		}
 
 		// Schedule management
-		schedules := v1.Group("/schedules")
+		schedules := v1.Group("/schedules", authMiddleware)
 		{
 			schedules.POST("", s.handleCreateSchedule)
 			schedules.GET("", s.handleListSchedules)
@@ -150,11 +167,11 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 		}
 
 		// Statistics and monitoring
-		v1.GET("/stats", s.handleGetStats)
-		v1.GET("/stats/storage", s.handleGetStorageStats)
+		v1.GET("/stats", authMiddleware, s.handleGetStats)
+		v1.GET("/stats/storage", authMiddleware, s.handleGetStorageStats)
 
 		// Security endpoints
-		security := v1.Group("/security")
+		security := v1.Group("/security", authMiddleware)
 		{
 			// Ransomware detection
 			security.POST("/scan/file", s.handleScanFile)
@@ -173,7 +190,7 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 		}
 
 		// Catalog and search endpoints
-		catalogRoutes := v1.Group("/catalog")
+		catalogRoutes := v1.Group("/catalog", authMiddleware)
 		{
 			catalogRoutes.POST("/search", s.handleSearchCatalog)
 			catalogRoutes.GET("/search", s.handleSearchCatalogSimple)
@@ -226,7 +243,7 @@ type SuccessResponse struct {
 
 // Helper methods
 func (s *Server) respondError(c *gin.Context, code int, err error, message string) {
-	if err != nil {
+	if err != nil && s.logger != nil {
 		s.logger.Error("API error", err, map[string]interface{}{
 			"message": message,
 			"path":    c.Request.URL.Path,
