@@ -207,7 +207,7 @@ async function testConnection() {
     }
 
     // Test connection by fetching stats
-    const response = await fetch(`${apiUrl}/api/stats/dashboard`, {
+    const response = await fetch(`${apiUrl}/api/v1/stats/dashboard`, {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
