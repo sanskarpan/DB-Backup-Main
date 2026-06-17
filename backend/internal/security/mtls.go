@@ -109,7 +109,10 @@ func (m *MTLSManager) loadCertificates() error {
 	var certPEMBlock, keyPEMBlock, caPEMBlock []byte
 	var err error
 
-	if m.config.VaultEnabled && m.vault != nil {
+	if m.config.VaultEnabled {
+		if m.vault == nil {
+			return fmt.Errorf("vault client is required when vault_enabled is true")
+		}
 		// Load from Vault
 		certPEMBlock, err = m.loadFromVault(m.config.VaultCertPath)
 		if err != nil {
