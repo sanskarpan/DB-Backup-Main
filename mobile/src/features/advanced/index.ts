@@ -91,10 +91,12 @@ import {
  */
 export async function initializeAdvancedFeatures(): Promise<void> {
   try {
+    // Note: locationService.initialize() is intentionally excluded from startup.
+    // It requests location permission unconditionally, which violates App Store
+    // guidelines. Initialize it lazily when the user enables geofencing in Settings.
     await Promise.all([
       networkPolicyService.initialize(),
       batteryService.initialize(),
-      locationService.initialize(),
       backgroundService.initialize(),
       nfcService.initialize(),
       arService.initialize(),
