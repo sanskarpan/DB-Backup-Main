@@ -3,6 +3,8 @@ package websocket
 import (
 	"fmt"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // BackupProgressTracker tracks and broadcasts backup progress
@@ -248,7 +250,7 @@ func (n *NotificationBroadcaster) RestoreNotification(restoreID, status, message
 
 // generateNotificationID generates a unique notification ID
 func generateNotificationID() string {
-	return fmt.Sprintf("notif_%d", time.Now().UnixNano())
+	return uid.New("notif")
 }
 
 // RestoreProgressTracker tracks and broadcasts restore progress
