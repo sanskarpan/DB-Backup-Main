@@ -54,108 +54,148 @@ class OfflineService {
   }
 
   async saveBackups(backups: any[]) {
-    if (!this.db) await this.initDatabase();
+    try {
+      if (!this.db) await this.initDatabase();
 
-    for (const backup of backups) {
-      await this.db!.executeSql(
-        `INSERT OR REPLACE INTO backups
-         (id, database_id, database_name, status, created_at, size, duration, data)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          backup.id,
-          backup.database_id,
-          backup.database_name,
-          backup.status,
-          backup.created_at,
-          backup.size || 0,
-          backup.duration || 0,
-          JSON.stringify(backup),
-        ],
-      );
+      for (const backup of backups) {
+        await this.db!.executeSql(
+          `INSERT OR REPLACE INTO backups
+           (id, database_id, database_name, status, created_at, size, duration, data)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            backup.id,
+            backup.database_id,
+            backup.database_name,
+            backup.status,
+            backup.created_at,
+            backup.size || 0,
+            backup.duration || 0,
+            JSON.stringify(backup),
+          ],
+        );
+      }
+    } catch (error) {
+      console.error('[OfflineService] saveBackups error:', error);
+      throw new Error(`Storage failure in saveBackups: ${error}`);
     }
   }
 
   async getBackups() {
-    if (!this.db) await this.initDatabase();
+    try {
+      if (!this.db) await this.initDatabase();
 
-    const [results] = await this.db!.executeSql(
-      'SELECT data FROM backups ORDER BY created_at DESC',
-    );
+      const [results] = await this.db!.executeSql(
+        'SELECT data FROM backups ORDER BY created_at DESC',
+      );
 
-    const backups: any[] = [];
-    for (let i = 0; i < results.rows.length; i++) {
-      backups.push(JSON.parse(results.rows.item(i).data));
+      const backups: any[] = [];
+      for (let i = 0; i < results.rows.length; i++) {
+        backups.push(JSON.parse(results.rows.item(i).data));
+      }
+
+      return backups;
+    } catch (error) {
+      console.error('[OfflineService] getBackups error:', error);
+      throw new Error(`Storage failure in getBackups: ${error}`);
     }
-
-    return backups;
   }
 
   async queueBackupRequest(request: any) {
-    if (!this.db) await this.initDatabase();
+    try {
+      if (!this.db) await this.initDatabase();
 
-    await this.db!.executeSql(
-      'INSERT INTO pending_requests (type, data, timestamp) VALUES (?, ?, ?)',
-      ['create_backup', JSON.stringify(request), request.timestamp],
-    );
+      await this.db!.executeSql(
+        'INSERT INTO pending_requests (type, data, timestamp) VALUES (?, ?, ?)',
+        ['create_backup', JSON.stringify(request), request.timestamp],
+      );
+    } catch (error) {
+      console.error('[OfflineService] queueBackupRequest error:', error);
+      throw new Error(`Storage failure in queueBackupRequest: ${error}`);
+    }
   }
 
   async getPendingRequests() {
-    if (!this.db) await this.initDatabase();
+    try {
+      if (!this.db) await this.initDatabase();
 
-    const [results] = await this.db!.executeSql(
-      'SELECT * FROM pending_requests WHERE processed = 0',
-    );
+      const [results] = await this.db!.executeSql(
+        'SELECT * FROM pending_requests WHERE processed = 0',
+      );
 
-    const requests: any[] = [];
-    for (let i = 0; i < results.rows.length; i++) {
-      const row = results.rows.item(i);
-      requests.push({
-        id: row.id,
-        type: row.type,
-        data: JSON.parse(row.data),
-        timestamp: row.timestamp,
-      });
+      const requests: any[] = [];
+      for (let i = 0; i < results.rows.length; i++) {
+        const row = results.rows.item(i);
+        requests.push({
+          id: row.id,
+          type: row.type,
+          data: JSON.parse(row.data),
+          timestamp: row.timestamp,
+        });
+      }
+
+      return requests;
+    } catch (error) {
+      console.error('[OfflineService] getPendingRequests error:', error);
+      throw new Error(`Storage failure in getPendingRequests: ${error}`);
     }
-
-    return requests;
   }
 
   async markRequestProcessed(id: number) {
-    if (!this.db) await this.initDatabase();
+    try {
+      if (!this.db) await this.initDatabase();
 
-    await this.db!.executeSql(
-      'UPDATE pending_requests SET processed = 1 WHERE id = ?',
-      [id],
-    );
+      await this.db!.executeSql(
+        'UPDATE pending_requests SET processed = 1 WHERE id = ?',
+        [id],
+      );
+    } catch (error) {
+      console.error('[OfflineService] markRequestProcessed error:', error);
+      throw new Error(`Storage failure in markRequestProcessed: ${error}`);
+    }
   }
 
   async clearProcessedRequests() {
-    if (!this.db) await this.initDatabase();
+    try {
+      if (!this.db) await this.initDatabase();
 
-    await this.db!.executeSql('DELETE FROM pending_requests WHERE processed = 1');
+      await this.db!.executeSql('DELETE FROM pending_requests WHERE processed = 1');
+    } catch (error) {
+      console.error('[OfflineService] clearProcessedRequests error:', error);
+      throw new Error(`Storage failure in clearProcessedRequests: ${error}`);
+    }
   }
 
   async updateSyncStatus(lastSync: string, pendingCount: number) {
-    if (!this.db) await this.initDatabase();
+    try {
+      if (!this.db) await this.initDatabase();
 
-    await this.db!.executeSql(
-      'INSERT OR REPLACE INTO sync_status (id, last_sync, pending_count) VALUES (1, ?, ?)',
-      [lastSync, pendingCount],
-    );
+      await this.db!.executeSql(
+        'INSERT OR REPLACE INTO sync_status (id, last_sync, pending_count) VALUES (1, ?, ?)',
+        [lastSync, pendingCount],
+      );
+    } catch (error) {
+      console.error('[OfflineService] updateSyncStatus error:', error);
+      throw new Error(`Storage failure in updateSyncStatus: ${error}`);
+    }
   }
 
   async getSyncStatus() {
-    if (!this.db) await this.initDatabase();
+    try {
+      if (!this.db) await this.initDatabase();
 
-    const [results] = await this.db!.executeSql(
-      'SELECT * FROM sync_status WHERE id = 1',
-    );
+      const [results] = await this.db!.executeSql(
+        'SELECT * FROM sync_status WHERE id = 1',
+      );
 
-    if (results.rows.length > 0) {
-      return results.rows.item(0);
+      if (results.rows.length > 0) {
+        return results.rows.item(0);
+      }
+
+      return null;
+    } catch (error) {
+      console.error('[OfflineService] getSyncStatus error:', error);
+      throw new Error(`Storage failure in getSyncStatus: ${error}`);
     }
-
-    return null;
   }
 
   async isOnline(): Promise<boolean> {
@@ -164,11 +204,16 @@ class OfflineService {
   }
 
   async clearCache() {
-    if (!this.db) await this.initDatabase();
+    try {
+      if (!this.db) await this.initDatabase();
 
-    await this.db!.executeSql('DELETE FROM backups');
-    await this.db!.executeSql('DELETE FROM pending_requests');
-    await this.db!.executeSql('DELETE FROM sync_status');
+      await this.db!.executeSql('DELETE FROM backups');
+      await this.db!.executeSql('DELETE FROM pending_requests');
+      await this.db!.executeSql('DELETE FROM sync_status');
+    } catch (error) {
+      console.error('[OfflineService] clearCache error:', error);
+      throw new Error(`Storage failure in clearCache: ${error}`);
+    }
   }
 }
 

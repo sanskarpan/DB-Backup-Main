@@ -62,12 +62,10 @@ class LocationService {
    */
   private async requestLocationPermission(): Promise<boolean> {
     if (Platform.OS === 'ios') {
-      // iOS permissions handled via Info.plist and Geolocation.requestAuthorization
-      return new Promise(resolve => {
-        Geolocation.requestAuthorization('whenInUse', (status) => {
-          resolve(status === 'granted');
-        });
-      });
+      // iOS: request 'always' authorization for background geofencing support.
+      // requestAuthorization returns a Promise<string>.
+      const status = await Geolocation.requestAuthorization('always');
+      return status === 'granted';
     } else {
       // Android permissions
       try {
@@ -81,7 +79,33 @@ class LocationService {
             buttonPositive: 'OK',
           },
         );
-        return granted === PermissionsAndroid.RESULTS.GRANTED;
+
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          return false;
+        }
+
+        // On Android 10+ (API 29+), also request background location
+        if (
+          Platform.Version >= 29 &&
+          PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION
+        ) {
+          const backgroundGranted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
+            {
+              title: 'Background Location Permission',
+              message:
+                'This app needs background location access to trigger geofence events when the app is not in use.',
+              buttonNeutral: 'Ask Me Later',
+              buttonNegative: 'Cancel',
+              buttonPositive: 'OK',
+            },
+          );
+          if (backgroundGranted !== PermissionsAndroid.RESULTS.GRANTED) {
+            console.warn('Background location permission not granted; geofencing may not work in background.');
+          }
+        }
+
+        return true;
       } catch (err) {
         console.error('Location permission error:', err);
         return false;
@@ -120,8 +144,10 @@ class LocationService {
       {
         enableHighAccuracy: true,
         distanceFilter: 50, // Update every 50 meters
-        interval: 5000, // 5 seconds
-        fastestInterval: 2000, // 2 seconds
+        ...(Platform.OS === 'android' ? {
+          interval: 5000, // 5 seconds (Android only)
+          fastestInterval: 2000, // 2 seconds (Android only)
+        } : {}),
       },
     );
   }
@@ -323,7 +349,7 @@ class LocationService {
    * Convert degrees to radians
    */
   private toRad(degrees: number): number {
-    return (degrees * Math.Pi) / 180;
+    return (degrees * Math.PI) / 180;
   }
 
   /**

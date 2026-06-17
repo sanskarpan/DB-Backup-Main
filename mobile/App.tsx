@@ -2,7 +2,7 @@ import React, {useEffect} from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createStackNavigator} from '@react-navigation/stack';
-import {Provider} from 'react-redux';
+import {Provider, useDispatch, useSelector} from 'react-redux';
 import Icon from 'react-native-vector-icons/Ionicons';
 import PushNotification from 'react-native-push-notification';
 import BackgroundFetch from 'react-native-background-fetch';
@@ -13,8 +13,10 @@ import BackupsScreen from './src/screens/BackupsScreen';
 import DatabasesScreen from './src/screens/DatabasesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import BackupDetailScreen from './src/screens/BackupDetailScreen';
+import LoginScreen from './src/screens/LoginScreen';
 
-import {store} from './src/store';
+import {store, RootState, AppDispatch} from './src/store';
+import {loadSettings} from './src/store/settingsSlice';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -53,9 +55,17 @@ function TabNavigator() {
   );
 }
 
-// Main App
-export default function App() {
+// Inner navigator — rendered inside Provider so it can read Redux state
+function AppNavigator() {
+  const dispatch = useDispatch<AppDispatch>();
+  const authToken = useSelector(
+    (state: RootState) => state.settings.authToken,
+  );
+
   useEffect(() => {
+    // Load persisted settings (including auth_token) on mount
+    dispatch(loadSettings());
+
     // Configure push notifications
     PushNotification.configure({
       onRegister: function (token) {
@@ -94,24 +104,43 @@ export default function App() {
     return () => {
       BackgroundFetch.stop();
     };
-  }, []);
+  }, [dispatch]);
 
   return (
-    <Provider store={store}>
-      <NavigationContainer>
-        <Stack.Navigator>
+    <NavigationContainer>
+      <Stack.Navigator>
+        {authToken === null ? (
+          // Not authenticated — show login
           <Stack.Screen
-            name="Main"
-            component={TabNavigator}
+            name="Login"
+            component={LoginScreen}
             options={{headerShown: false}}
           />
-          <Stack.Screen
-            name="BackupDetail"
-            component={BackupDetailScreen}
-            options={{title: 'Backup Details'}}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
+        ) : (
+          // Authenticated — show main app
+          <>
+            <Stack.Screen
+              name="Main"
+              component={TabNavigator}
+              options={{headerShown: false}}
+            />
+            <Stack.Screen
+              name="BackupDetail"
+              component={BackupDetailScreen}
+              options={{title: 'Backup Details'}}
+            />
+          </>
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+// Main App
+export default function App() {
+  return (
+    <Provider store={store}>
+      <AppNavigator />
     </Provider>
   );
 }

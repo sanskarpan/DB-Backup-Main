@@ -25,10 +25,13 @@ export default function HomeScreen({navigation}: any) {
     dispatch(fetchBackups() as any);
   };
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    loadData();
-    setTimeout(() => setRefreshing(false), 1000);
+    try {
+      await dispatch(fetchBackups() as any);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const stats = {
