@@ -85,7 +85,7 @@ export default function NotificationCenter() {
   // WebSocket connection for real-time updates
   useEffect(() => {
     const connectWebSocket = () => {
-      const socket = new WebSocket('ws://localhost:8080/api/notifications/ws')
+      const socket = new WebSocket('ws://localhost:8080/api/v1/notifications/ws')
 
       socket.onopen = () => {
         console.log('WebSocket connected')
