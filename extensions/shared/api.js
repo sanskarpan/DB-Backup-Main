@@ -77,7 +77,7 @@ class BackupAPI {
    */
   async listBackups(params = {}) {
     const queryString = new URLSearchParams(params).toString();
-    const endpoint = `/api/backups${queryString ? '?' + queryString : ''}`;
+    const endpoint = `/api/v1/backups${queryString ? '?' + queryString : ''}`;
     return this.request(endpoint);
   }
 
@@ -85,14 +85,14 @@ class BackupAPI {
    * Get backup details
    */
   async getBackup(id) {
-    return this.request(`/api/backups/${id}`);
+    return this.request(`/api/v1/backups/${id}`);
   }
 
   /**
    * Create a new backup
    */
   async createBackup(data) {
-    return this.request('/api/backups', {
+    return this.request('/api/v1/backups', {
       method: 'POST',
       body: data,
     });
@@ -102,7 +102,7 @@ class BackupAPI {
    * Delete a backup
    */
   async deleteBackup(id) {
-    return this.request(`/api/backups/${id}`, {
+    return this.request(`/api/v1/backups/${id}`, {
       method: 'DELETE',
     });
   }
@@ -111,7 +111,7 @@ class BackupAPI {
    * Download a backup
    */
   async downloadBackup(id) {
-    const url = `${this.baseURL}/api/backups/${id}/download`;
+    const url = `${this.baseURL}/api/v1/backups/${id}/download`;
     return url; // Return URL for download
   }
 
@@ -123,21 +123,21 @@ class BackupAPI {
    * List databases
    */
   async listDatabases() {
-    return this.request('/api/databases');
+    return this.request('/api/v1/databases');
   }
 
   /**
    * Get database details
    */
   async getDatabase(id) {
-    return this.request(`/api/databases/${id}`);
+    return this.request(`/api/v1/databases/${id}`);
   }
 
   /**
    * Test database connection
    */
   async testConnection(id) {
-    return this.request(`/api/databases/${id}/test`, {
+    return this.request(`/api/v1/databases/${id}/test`, {
       method: 'POST',
     });
   }
@@ -150,7 +150,7 @@ class BackupAPI {
    * Get monitoring status
    */
   async getMonitoringStatus() {
-    return this.request('/api/monitoring/status');
+    return this.request('/api/v1/monitoring/status');
   }
 
   /**
@@ -158,7 +158,7 @@ class BackupAPI {
    */
   async getMetrics(params = {}) {
     const queryString = new URLSearchParams(params).toString();
-    const endpoint = `/api/monitoring/metrics${queryString ? '?' + queryString : ''}`;
+    const endpoint = `/api/v1/monitoring/metrics${queryString ? '?' + queryString : ''}`;
     return this.request(endpoint);
   }
 
@@ -166,7 +166,7 @@ class BackupAPI {
    * Get alerts
    */
   async getAlerts() {
-    return this.request('/api/monitoring/alerts');
+    return this.request('/api/v1/monitoring/alerts');
   }
 
   // ============================================================================
@@ -177,14 +177,14 @@ class BackupAPI {
    * List schedules
    */
   async listSchedules() {
-    return this.request('/api/schedules');
+    return this.request('/api/v1/schedules');
   }
 
   /**
    * Create schedule
    */
   async createSchedule(data) {
-    return this.request('/api/schedules', {
+    return this.request('/api/v1/schedules', {
       method: 'POST',
       body: data,
     });
@@ -194,7 +194,7 @@ class BackupAPI {
    * Update schedule
    */
   async updateSchedule(id, data) {
-    return this.request(`/api/schedules/${id}`, {
+    return this.request(`/api/v1/schedules/${id}`, {
       method: 'PUT',
       body: data,
     });
@@ -204,7 +204,7 @@ class BackupAPI {
    * Delete schedule
    */
   async deleteSchedule(id) {
-    return this.request(`/api/schedules/${id}`, {
+    return this.request(`/api/v1/schedules/${id}`, {
       method: 'DELETE',
     });
   }
@@ -217,14 +217,14 @@ class BackupAPI {
    * Get compliance status
    */
   async getComplianceStatus() {
-    return this.request('/api/compliance/status');
+    return this.request('/api/v1/compliance/status');
   }
 
   /**
    * Get compliance reports
    */
   async getComplianceReports() {
-    return this.request('/api/compliance/reports');
+    return this.request('/api/v1/compliance/reports');
   }
 
   // ============================================================================
@@ -235,7 +235,7 @@ class BackupAPI {
    * Get dashboard stats
    */
   async getDashboardStats() {
-    return this.request('/api/stats/dashboard');
+    return this.request('/api/v1/stats/dashboard');
   }
 
   /**
@@ -243,7 +243,7 @@ class BackupAPI {
    */
   async getBackupStats(params = {}) {
     const queryString = new URLSearchParams(params).toString();
-    const endpoint = `/api/stats/backups${queryString ? '?' + queryString : ''}`;
+    const endpoint = `/api/v1/stats/backups${queryString ? '?' + queryString : ''}`;
     return this.request(endpoint);
   }
 }
@@ -252,3 +252,5 @@ class BackupAPI {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = BackupAPI;
 }
+
+export { BackupAPI };

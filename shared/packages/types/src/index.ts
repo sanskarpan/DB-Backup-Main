@@ -14,7 +14,7 @@ export interface Backup {
   database_name?: string;
   filename: string;
   size: number;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
   storage_path: string;
   created_at: string;
   completed_at?: string;
@@ -44,7 +44,8 @@ export type DatabaseType =
   | 'opensearch'
   | 'dynamodb'
   | 'influxdb'
-  | 'timescaledb';
+  | 'timescaledb'
+  | 'sqlite';
 
 export interface Database {
   id: string;

@@ -93,8 +93,15 @@ export class DbBackupApiClient {
     return data;
   }
 
-  async createBackup(databaseId: string): Promise<Backup> {
-    const { data } = await this.client.post<Backup>('/backups', { database_id: databaseId });
+  async createBackup(config: {
+    database_id?: string;
+    database_type?: string;
+    database?: string;
+    host?: string;
+    port?: number;
+    [key: string]: unknown;
+  }): Promise<Backup> {
+    const { data } = await this.client.post<Backup>('/backups', config);
     return data;
   }
 
@@ -117,6 +124,9 @@ export class DbBackupApiClient {
 
   // ====================================
   // Database Operations
+  // NOTE: The /databases endpoints below are not yet implemented in the backend.
+  // The backend currently supports /backups, /schedules, /stats, /security, and /catalog.
+  // These methods are kept here for use by web/mobile clients pending backend implementation.
   // ====================================
 
   async listDatabases(): Promise<Database[]> {
@@ -199,17 +209,17 @@ export class DbBackupApiClient {
   // ====================================
 
   async listStorageProviders(): Promise<StorageProvider[]> {
-    const { data } = await this.client.get<StorageProvider[]>('/storage-providers');
+    const { data } = await this.client.get<StorageProvider[]>('/security/storage/providers');
     return data;
   }
 
   async getStorageProvider(id: string): Promise<StorageProvider> {
-    const { data } = await this.client.get<StorageProvider>(`/storage-providers/${id}`);
+    const { data } = await this.client.get<StorageProvider>(`/security/storage/providers/${id}`);
     return data;
   }
 
   async createStorageProvider(provider: Partial<StorageProvider>): Promise<StorageProvider> {
-    const { data } = await this.client.post<StorageProvider>('/storage-providers', provider);
+    const { data } = await this.client.post<StorageProvider>('/security/storage/providers', provider);
     return data;
   }
 
@@ -217,17 +227,17 @@ export class DbBackupApiClient {
     id: string,
     provider: Partial<StorageProvider>
   ): Promise<StorageProvider> {
-    const { data } = await this.client.put<StorageProvider>(`/storage-providers/${id}`, provider);
+    const { data } = await this.client.put<StorageProvider>(`/security/storage/providers/${id}`, provider);
     return data;
   }
 
   async deleteStorageProvider(id: string): Promise<void> {
-    await this.client.delete(`/storage-providers/${id}`);
+    await this.client.delete(`/security/storage/providers/${id}`);
   }
 
   async testStorageProvider(id: string): Promise<ConnectionTestResponse> {
     const { data } = await this.client.post<ConnectionTestResponse>(
-      `/storage-providers/${id}/test`
+      `/security/storage/providers/${id}/test`
     );
     return data;
   }

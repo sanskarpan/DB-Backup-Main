@@ -3,8 +3,7 @@
  * Manifest V3 compatible
  */
 
-importScripts('../shared/api.js', '../shared/utils.js');
-
+// BackupAPI and Utils are loaded as globals via the manifest "scripts" array
 // Initialize API client
 let api = new BackupAPI();
 
