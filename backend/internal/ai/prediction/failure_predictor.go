@@ -8,6 +8,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // FailurePredictor predicts backup failures using historical analysis
@@ -757,5 +759,5 @@ func (fp *FailurePredictor) GetStatistics() map[string]interface{} {
 // Helper functions
 
 func generatePredictionID() string {
-	return fmt.Sprintf("prediction-%d", time.Now().UnixNano())
+	return uid.New("prediction")
 }

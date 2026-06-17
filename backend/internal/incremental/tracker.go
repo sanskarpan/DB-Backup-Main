@@ -8,6 +8,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // BlockSize represents different block sizes for change tracking
@@ -95,7 +97,7 @@ func (ct *ChangeTracker) CreateSnapshot(filePath string) (*FileSnapshot, error) 
 	totalBlocks := (fileSize + int64(ct.blockSize) - 1) / int64(ct.blockSize)
 
 	snapshot := &FileSnapshot{
-		ID:           fmt.Sprintf("snap-%d", time.Now().UnixNano()),
+		ID:           uid.New("snap"),
 		FilePath:     filePath,
 		FileSize:     fileSize,
 		BlockSize:    ct.blockSize,
@@ -173,7 +175,7 @@ func (ct *ChangeTracker) CompareSnapshots(baseSnapshotID, newSnapshotID string) 
 	}
 
 	changeSet := &ChangeSet{
-		ID:            fmt.Sprintf("changeset-%d", time.Now().UnixNano()),
+		ID:            uid.New("changeset"),
 		BaseSnapshot:  baseSnapshotID,
 		NewSnapshot:   newSnapshotID,
 		ChangedBlocks: make([]*BlockMetadata, 0),

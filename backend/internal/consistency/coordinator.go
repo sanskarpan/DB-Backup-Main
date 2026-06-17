@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // ConsistencyLevel defines the level of consistency required
@@ -103,7 +105,7 @@ func (cc *ConsistencyCoordinator) CreateConsistencyGroup(group *ConsistencyGroup
 	// Generate unique ID if not provided
 	if group.ID == "" {
 		for {
-			group.ID = fmt.Sprintf("cg-%d", time.Now().UnixNano())
+			group.ID = uid.New("cg")
 			if _, exists := cc.groups[group.ID]; !exists {
 				break
 			}
@@ -226,7 +228,7 @@ func (cc *ConsistencyCoordinator) CreateConsistencyPoint(ctx context.Context, gr
 	// Generate unique ID - keep trying until we get a unique one
 	var pointID string
 	for {
-		pointID = fmt.Sprintf("cp-%d", time.Now().UnixNano())
+		pointID = uid.New("cp")
 		if _, exists := cc.consistencyPoints[pointID]; !exists {
 			break
 		}
@@ -266,7 +268,7 @@ func (cc *ConsistencyCoordinator) RecordTransactionLog(pointID string, entry *Tr
 		return fmt.Errorf("consistency point %s not found", pointID)
 	}
 
-	entry.ID = fmt.Sprintf("txlog-%s-%d", entry.DatabaseID, time.Now().UnixNano())
+	entry.ID = fmt.Sprintf("txlog-%s-%s", entry.DatabaseID, uid.Hex(8))
 	entry.Timestamp = time.Now()
 
 	point.Databases[entry.DatabaseID] = entry

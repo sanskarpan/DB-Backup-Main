@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // UniversalBackupFormat defines the cloud-agnostic backup format
@@ -391,5 +393,5 @@ func (r *UniversalBackupReader) VerifyIntegrity() error {
 
 // generateBackupID generates a unique backup ID
 func generateBackupID() string {
-	return fmt.Sprintf("ubf-%d", time.Now().UnixNano())
+	return uid.New("ubf")
 }

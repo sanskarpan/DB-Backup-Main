@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // BackupType represents the type of backup
@@ -79,7 +81,7 @@ func NewIncrementalForeverStrategy(backupDir string, blockSize BlockSize, enable
 // PerformFullBackup performs an initial full backup
 func (ifs *IncrementalForeverStrategy) PerformFullBackup(sourcePath, databaseID, databaseName string) (*BackupManifest, error) {
 	manifest := &BackupManifest{
-		ID:           fmt.Sprintf("full-%d", time.Now().UnixNano()),
+		ID:           uid.New("full"),
 		Type:         BackupTypeFull,
 		DatabaseID:   databaseID,
 		DatabaseName: databaseName,
@@ -156,7 +158,7 @@ func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, data
 	}
 
 	manifest := &BackupManifest{
-		ID:             fmt.Sprintf("incr-%d", time.Now().UnixNano()),
+		ID:             uid.New("incr"),
 		Type:           BackupTypeIncremental,
 		DatabaseID:     databaseID,
 		DatabaseName:   databaseName,

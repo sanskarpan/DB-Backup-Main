@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // ==================== 8. AI Advisor (Conversational Mode) ====================
@@ -822,17 +824,7 @@ func (fpa *FailurePredictionAPI) GetPrediction(ctx context.Context, database str
 
 // generateID generates a unique ID
 func generateID() string {
-	return fmt.Sprintf("%d-%s", time.Now().UnixNano(), randomString(8))
-}
-
-// randomString generates a random string
-func randomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[time.Now().UnixNano()%int64(len(charset))]
-	}
-	return string(b)
+	return uid.New("feat")
 }
 
 // FailurePrediction represents a failure prediction

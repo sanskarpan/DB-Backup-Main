@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sanskarpan/db-backup/internal/notification"
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // TestSchedule represents a DR test schedule
@@ -394,7 +395,7 @@ func calculateNextRun(cronExpr string, from time.Time) (time.Time, error) {
 
 // generateScheduleID generates a unique schedule ID
 func generateScheduleID() string {
-	return fmt.Sprintf("schedule-%d", time.Now().UnixNano())
+	return uid.New("schedule")
 }
 
 // RunTest manually triggers a DR test for a schedule

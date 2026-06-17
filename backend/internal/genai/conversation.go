@@ -5,6 +5,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // ConversationManager manages conversational interactions
@@ -87,7 +89,7 @@ func (cm *ConversationManager) StartSession(userID string) *ConversationSession 
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	sessionID := fmt.Sprintf("sess-%d", time.Now().UnixNano())
+	sessionID := uid.New("sess")
 
 	session := &ConversationSession{
 		ID:             sessionID,
@@ -104,7 +106,7 @@ func (cm *ConversationManager) StartSession(userID string) *ConversationSession 
 
 	// Send welcome message
 	welcomeMsg := &Message{
-		ID:        fmt.Sprintf("msg-%d", time.Now().UnixNano()),
+		ID:        uid.New("msg"),
 		Role:      "assistant",
 		Content:   "Hello! I'm your backup management assistant. How can I help you today?",
 		Timestamp: time.Now(),
@@ -129,7 +131,7 @@ func (cm *ConversationManager) ProcessMessage(sessionID, message string) (*Conve
 
 	// Add user message to history
 	userMsg := &Message{
-		ID:        fmt.Sprintf("msg-%d", time.Now().UnixNano()),
+		ID:        uid.New("msg"),
 		Role:      "user",
 		Content:   message,
 		Timestamp: time.Now(),
@@ -164,7 +166,7 @@ func (cm *ConversationManager) ProcessMessage(sessionID, message string) (*Conve
 
 	// Add assistant response to history
 	assistantMsg := &Message{
-		ID:        fmt.Sprintf("msg-%d", time.Now().UnixNano()),
+		ID:        uid.New("msg"),
 		Role:      "assistant",
 		Content:   response.Message,
 		Timestamp: time.Now(),
@@ -179,7 +181,7 @@ func (cm *ConversationManager) ProcessMessage(sessionID, message string) (*Conve
 		// Create pending action
 		if len(response.APICalls) > 0 {
 			action := &PendingAction{
-				ID:              fmt.Sprintf("action-%d", time.Now().UnixNano()),
+				ID:              uid.New("action"),
 				Action:          string(parsed.Intent),
 				Parameters:      response.APICalls[0].Parameters,
 				RequiresConfirm: true,
