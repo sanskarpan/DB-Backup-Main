@@ -346,8 +346,8 @@ func TestWasabiProvider_GetMetadata(t *testing.T) {
 
 	// Get metadata
 	metadata, err := provider.GetMetadata(ctx, remotePath)
-	assert.NoError(t, err)
-	assert.NotNil(t, metadata)
+	require.NoError(t, err)
+	require.NotNil(t, metadata)
 	assert.Equal(t, remotePath, metadata.Path)
 	assert.Equal(t, int64(len(testContent)), metadata.Size)
 	assert.Equal(t, "text/plain", metadata.ContentType)
@@ -574,6 +574,10 @@ func TestWasabi_DefaultRegion(t *testing.T) {
 // Helper functions
 
 func setupTestProvider(t *testing.T) *WasabiProvider {
+	t.Helper()
+	if os.Getenv("WASABI_ACCESS_KEY") == "" {
+		t.Skip("WASABI_ACCESS_KEY not set; skipping Wasabi integration test")
+	}
 	config := &storage.WasabiConfig{
 		Region:    getEnv("WASABI_REGION", "us-east-1"),
 		AccessKey: getEnv("WASABI_ACCESS_KEY", "test-key"),
