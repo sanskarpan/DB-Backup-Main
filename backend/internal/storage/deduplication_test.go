@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
 
 func TestNewDeduplicationManager(t *testing.T) {
@@ -288,13 +287,19 @@ func TestChunkCache(t *testing.T) {
 		t.Error("Failed to retrieve cached item")
 	}
 
-	// Add third item (should evict oldest)
+	// Add third item — should evict least recently used (hash2, since hash1 was just Get'd)
 	cache.Put("hash3", []byte("data3"))
 
-	// hash2 should still be there (hash1 is oldest)
+	// hash1 should still be there (was recently accessed via Get)
+	data1again := cache.Get("hash1")
+	if data1again == nil {
+		t.Error("hash1 should still be in cache (was recently accessed)")
+	}
+
+	// hash2 should have been evicted (it was least recently used)
 	data2 := cache.Get("hash2")
-	if data2 == nil {
-		t.Error("hash2 should still be in cache")
+	if data2 != nil {
+		t.Error("hash2 should have been evicted (LRU)")
 	}
 
 	// Verify size
@@ -364,9 +369,11 @@ func TestDeleteManifest(t *testing.T) {
 	}
 	defer manager.Close()
 
-	// Create and store a file
+	// Create and store a file with DISTINCT chunks (different content per chunk)
 	testFile := filepath.Join(tempDir, "test.txt")
-	testData := bytes.Repeat([]byte("X"), 200)
+	chunk1 := bytes.Repeat([]byte("A"), 100)
+	chunk2 := bytes.Repeat([]byte("B"), 100)
+	testData := append(chunk1, chunk2...)
 	os.WriteFile(testFile, testData, 0644)
 
 	manifest, err := manager.StoreFile(testFile)
@@ -374,7 +381,11 @@ func TestDeleteManifest(t *testing.T) {
 		t.Fatalf("Failed to store file: %v", err)
 	}
 
-	// Get initial ref counts
+	if len(manifest.Chunks) != 2 {
+		t.Fatalf("Expected 2 distinct chunks, got %d", len(manifest.Chunks))
+	}
+
+	// Get initial ref counts (each distinct chunk should have refCount=1)
 	initialRefCounts := make(map[string]int)
 	manager.mu.RLock()
 	for _, chunk := range manifest.Chunks {
@@ -388,7 +399,7 @@ func TestDeleteManifest(t *testing.T) {
 		t.Fatalf("Failed to delete manifest: %v", err)
 	}
 
-	// Verify ref counts decreased
+	// Verify ref counts decreased by 1 for each distinct chunk
 	manager.mu.RLock()
 	for _, chunk := range manifest.Chunks {
 		newCount := manager.refCount[chunk.Hash]
@@ -516,7 +527,10 @@ func TestCacheMetrics(t *testing.T) {
 	manager.storeChunk(hash1, data1)
 	manager.storeChunk(hash2, data2)
 
-	// First retrieval should be cache miss
+	// Clear cache to force a miss on next retrieval
+	manager.cache.Clear()
+
+	// First retrieval should be cache miss (loads from disk)
 	manager.retrieveChunk(hash1)
 
 	// Second retrieval should be cache hit
