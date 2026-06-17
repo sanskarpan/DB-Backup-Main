@@ -2,6 +2,8 @@ package cassandra
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,6 +18,7 @@ func TestCassandraDriver_Connect(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}
+	skipIfCassandraUnavailable(t)
 
 	driver := NewCassandraDriver()
 	config := &database.ConnectionConfig{
@@ -374,7 +377,20 @@ func TestCassandraDriver_SupportsPITR(t *testing.T) {
 
 // Helper functions
 
+func skipIfCassandraUnavailable(t *testing.T) {
+	t.Helper()
+	host := getEnv("CASSANDRA_HOST", "localhost")
+	port := getEnvInt("CASSANDRA_PORT", 9042)
+	addr := fmt.Sprintf("%s:%d", host, port)
+	conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
+	if err != nil {
+		t.Skipf("Cassandra not available at %s: %v", addr, err)
+	}
+	conn.Close()
+}
+
 func setupTestDriver(t *testing.T) *CassandraDriver {
+	skipIfCassandraUnavailable(t)
 	driver := NewCassandraDriver()
 	config := &database.ConnectionConfig{
 		Host:     getEnv("CASSANDRA_HOST", "localhost"),
