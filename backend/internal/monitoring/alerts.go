@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // AlertSeverity represents the severity of an alert
@@ -58,7 +60,7 @@ func (am *AlertManager) TriggerAlert(alert *Alert) {
 
 	// Generate ID if not provided
 	if alert.ID == "" {
-		alert.ID = fmt.Sprintf("%s-%d", alert.Source, time.Now().UnixNano())
+		alert.ID = fmt.Sprintf("%s-%s", alert.Source, uid.Hex(8))
 	}
 
 	// Store active alert
