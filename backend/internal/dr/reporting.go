@@ -9,6 +9,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // ReportGenerator generates compliance reports for DR tests
@@ -507,7 +509,7 @@ func (rg *ReportGenerator) GetComplianceSummary(days int) map[string]interface{}
 // Helper functions
 
 func generateReportID() string {
-	return fmt.Sprintf("report-%d", time.Now().UnixNano())
+	return uid.New("report")
 }
 
 func formatPeriodLabel(startDate, endDate time.Time) string {
