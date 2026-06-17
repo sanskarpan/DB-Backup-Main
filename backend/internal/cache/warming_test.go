@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -108,9 +109,12 @@ func TestCacheWarmer(t *testing.T) {
 
 	ctx := context.Background()
 
+	var mu sync.Mutex
 	warmCount := 0
 	preloader := func(ctx context.Context) (map[string]interface{}, error) {
+		mu.Lock()
 		warmCount++
+		mu.Unlock()
 		return map[string]interface{}{
 			"key1": "value1",
 		}, nil
@@ -122,20 +126,33 @@ func TestCacheWarmer(t *testing.T) {
 	// Start warmer
 	err := warmer.Start(ctx)
 	require.NoError(t, err)
-	assert.Greater(t, warmCount, 0)
+	mu.Lock()
+	count := warmCount
+	mu.Unlock()
+	assert.Greater(t, count, 0)
 
 	// Wait for periodic warming
+	mu.Lock()
 	initialCount := warmCount
+	mu.Unlock()
 	time.Sleep(250 * time.Millisecond)
-	assert.Greater(t, warmCount, initialCount)
+	mu.Lock()
+	count = warmCount
+	mu.Unlock()
+	assert.Greater(t, count, initialCount)
 
 	// Stop warmer
 	err = warmer.Stop()
 	require.NoError(t, err)
 
 	// Warm manually
+	mu.Lock()
 	warmCount = 0
+	mu.Unlock()
 	err = warmer.WarmNow(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, 1, warmCount)
+	mu.Lock()
+	count = warmCount
+	mu.Unlock()
+	assert.Equal(t, 1, count)
 }
