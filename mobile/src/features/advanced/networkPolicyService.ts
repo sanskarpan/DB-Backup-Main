@@ -88,7 +88,7 @@ class NetworkPolicyService {
     this.currentStatus = {
       type: state.type,
       isConnected: state.isConnected ?? false,
-      isMetered: state.isInternetReachable,
+      isMetered: (state.details as any)?.isConnectionExpensive ?? null,
       isInternetReachable: state.isInternetReachable,
       details: state.details,
     };
