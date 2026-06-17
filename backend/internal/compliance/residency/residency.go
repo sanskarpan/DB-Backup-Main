@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // Region represents a geographic region for data residency
@@ -396,14 +398,5 @@ func (rm *ResidencyManager) GetRegionCompliance(ctx context.Context, region Regi
 
 // generateID generates a unique ID
 func generateID() string {
-	return fmt.Sprintf("%d-%s", time.Now().UnixNano(), randomString(8))
-}
-
-func randomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[time.Now().UnixNano()%int64(len(charset))]
-	}
-	return string(b)
+	return uid.New("res")
 }
