@@ -5,7 +5,22 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
+
+// RestoreStats holds metrics for a restore operation within a DR test
+type RestoreStats struct {
+	Duration  time.Duration
+	SizeBytes int64
+}
+
+// ValidationResult holds the outcome of a single validation step
+type ValidationResult struct {
+	Name    string
+	Success bool
+	Error   string
+}
 
 // TestResult represents the result of a DR test
 type TestResult struct {
@@ -22,8 +37,12 @@ type TestResult struct {
 	RestoreEndTime   time.Time
 	RestoreDuration  time.Duration
 	RestoreSize      int64
+	RestoreStats     *RestoreStats
 
-	// Validation results
+	// Structured validation results
+	Validations []*ValidationResult
+
+	// Legacy validation fields
 	SchemaValid      bool
 	SchemaErrors     []string
 	RowCountValid    bool
@@ -243,7 +262,7 @@ func (te *TestExecutor) executeQuery(ctx context.Context, env *TestEnvironment, 
 
 // generateTestID generates a unique test ID
 func generateTestID() string {
-	return fmt.Sprintf("dr-test-%d", time.Now().UnixNano())
+	return uid.New("dr-test")
 }
 
 // EnvironmentProvisioner provisions test environments
@@ -327,7 +346,7 @@ func (ep *EnvironmentProvisioner) CleanupEnvironment(ctx context.Context, envID 
 
 // generateEnvironmentID generates a unique environment ID
 func generateEnvironmentID() string {
-	return fmt.Sprintf("env-%d", time.Now().UnixNano())
+	return uid.New("env")
 }
 
 // performRollback performs automatic rollback when a test fails
