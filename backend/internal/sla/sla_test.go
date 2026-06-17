@@ -1,6 +1,7 @@
 package sla
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
@@ -499,12 +500,15 @@ func TestResolveViolation(t *testing.T) {
 func TestAlertHandler(t *testing.T) {
 	monitor := NewSLAMonitor()
 
+	var mu sync.Mutex
 	alertCount := 0
 	var lastViolation *SLAViolation
 
 	handler := func(v *SLAViolation) error {
+		mu.Lock()
 		alertCount++
 		lastViolation = v
+		mu.Unlock()
 		return nil
 	}
 
@@ -528,16 +532,21 @@ func TestAlertHandler(t *testing.T) {
 	// Give alert handler time to execute (it runs in goroutine)
 	time.Sleep(100 * time.Millisecond)
 
-	if alertCount == 0 {
+	mu.Lock()
+	count := alertCount
+	last := lastViolation
+	mu.Unlock()
+
+	if count == 0 {
 		t.Error("Expected alert handler to be called")
 	}
 
-	if lastViolation == nil {
+	if last == nil {
 		t.Error("Expected violation to be passed to handler")
 	}
 
-	if lastViolation != nil && lastViolation.DatabaseID != "db-001" {
-		t.Errorf("Expected violation for db-001, got %s", lastViolation.DatabaseID)
+	if last != nil && last.DatabaseID != "db-001" {
+		t.Errorf("Expected violation for db-001, got %s", last.DatabaseID)
 	}
 }
 
