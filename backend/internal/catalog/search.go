@@ -7,6 +7,15 @@ import (
 	"time"
 )
 
+// SearchEngineInterface defines the methods used by API handlers.
+type SearchEngineInterface interface {
+	IsAvailable() bool
+	Search(ctx context.Context, query *SearchQuery) (*SearchResults, error)
+	ParseQueryString(queryString string) (*SearchQuery, error)
+	Suggest(ctx context.Context, prefix string, field string, limit int) ([]string, error)
+	GetStats(ctx context.Context) (*CatalogStats, error)
+}
+
 // SearchEngine provides full-text search capabilities for backups
 type SearchEngine struct {
 	indexer *CatalogIndexer
