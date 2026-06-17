@@ -19,6 +19,7 @@ export interface BackgroundTaskResult {
   taskId: string;
   success: boolean;
   duration: number;
+  executedAt: number;
   error?: string;
 }
 
@@ -53,6 +54,7 @@ class BackgroundService {
 
   async initialize(): Promise<void> {
     await this.loadConfig();
+    await this.loadTaskQueue();
     await this.setupBackgroundFetch();
     this.setupAppStateListener();
   }
@@ -196,6 +198,7 @@ class BackgroundService {
         taskId: task.id,
         success: true,
         duration: Date.now() - startTime,
+        executedAt: Date.now(),
       };
 
       this.executedTasks.push(result);
@@ -207,6 +210,7 @@ class BackgroundService {
         taskId: task.id,
         success: false,
         duration: Date.now() - startTime,
+        executedAt: Date.now(),
         error: error.message,
       };
 
@@ -253,7 +257,7 @@ class BackgroundService {
   private getRecentTasksCount(): number {
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
     return this.executedTasks.filter(
-      t => Date.now() - t.duration < oneHourAgo,
+      t => t.executedAt > oneHourAgo,
     ).length;
   }
 
