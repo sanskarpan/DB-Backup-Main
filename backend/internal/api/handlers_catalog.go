@@ -96,17 +96,9 @@ type SearchResultItem struct {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/catalog/search [post]
 func (s *Server) handleSearchCatalog(c *gin.Context) {
-	// Check if search engine is available
-	if !s.searchEngine.IsAvailable() {
-		s.respondError(c, http.StatusServiceUnavailable,
-			fmt.Errorf("catalog search not available"),
-			"Elasticsearch is not configured")
-		return
-	}
-
 	var req SearchRequest
 
-	// Support both JSON and query parameters
+	// Parse and validate request before checking availability (returns 400 for bad input)
 	if c.Request.Method == http.MethodPost {
 		if err := c.ShouldBindJSON(&req); err != nil {
 			s.respondError(c, http.StatusBadRequest, err, "Invalid request body")
@@ -119,7 +111,7 @@ func (s *Server) handleSearchCatalog(c *gin.Context) {
 		}
 	}
 
-	// Build search query
+	// Build search query (validate dates before checking availability)
 	query := &catalog.SearchQuery{
 		Text:             req.Text,
 		DatabaseNames:    req.DatabaseNames,
@@ -142,7 +134,6 @@ func (s *Server) handleSearchCatalog(c *gin.Context) {
 		MaxDuration:      req.MaxDuration,
 	}
 
-	// Parse date filters
 	if req.DateFrom != "" {
 		dateFrom, err := time.Parse(time.RFC3339, req.DateFrom)
 		if err != nil {
@@ -159,6 +150,14 @@ func (s *Server) handleSearchCatalog(c *gin.Context) {
 			return
 		}
 		query.DateTo = &dateTo
+	}
+
+	// Check if search engine is available
+	if s.searchEngine == nil || !s.searchEngine.IsAvailable() {
+		s.respondError(c, http.StatusServiceUnavailable,
+			fmt.Errorf("catalog search not available"),
+			"Elasticsearch is not configured")
+		return
 	}
 
 	// Execute search
@@ -231,7 +230,7 @@ func (s *Server) handleSearchCatalog(c *gin.Context) {
 // @Router /api/v1/catalog/search [get]
 func (s *Server) handleSearchCatalogSimple(c *gin.Context) {
 	// Check if search engine is available
-	if !s.searchEngine.IsAvailable() {
+	if s.searchEngine == nil || !s.searchEngine.IsAvailable() {
 		s.respondError(c, http.StatusServiceUnavailable,
 			fmt.Errorf("catalog search not available"),
 			"Elasticsearch is not configured")
@@ -277,18 +276,11 @@ func (s *Server) handleSearchCatalogSimple(c *gin.Context) {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/catalog/suggest [get]
 func (s *Server) handleSuggestCatalog(c *gin.Context) {
-	// Check if search engine is available
-	if !s.searchEngine.IsAvailable() {
-		s.respondError(c, http.StatusServiceUnavailable,
-			fmt.Errorf("catalog search not available"),
-			"Elasticsearch is not configured")
-		return
-	}
-
 	field := c.Query("field")
 	prefix := c.Query("prefix")
 	limitStr := c.DefaultQuery("limit", "10")
 
+	// Validate parameters before checking availability (returns 400 for bad input)
 	if field == "" {
 		s.respondError(c, http.StatusBadRequest, nil, "field parameter is required")
 		return
@@ -320,6 +312,14 @@ func (s *Server) handleSuggestCatalog(c *gin.Context) {
 		return
 	}
 
+	// Check if search engine is available
+	if s.searchEngine == nil || !s.searchEngine.IsAvailable() {
+		s.respondError(c, http.StatusServiceUnavailable,
+			fmt.Errorf("catalog search not available"),
+			"Elasticsearch is not configured")
+		return
+	}
+
 	// Get suggestions
 	suggestions, err := s.searchEngine.Suggest(c.Request.Context(), prefix, esField, limit)
 	if err != nil {
@@ -346,7 +346,7 @@ func (s *Server) handleSuggestCatalog(c *gin.Context) {
 // @Router /api/v1/catalog/stats [get]
 func (s *Server) handleGetCatalogStats(c *gin.Context) {
 	// Check if search engine is available
-	if !s.searchEngine.IsAvailable() {
+	if s.searchEngine == nil || !s.searchEngine.IsAvailable() {
 		s.respondError(c, http.StatusServiceUnavailable,
 			fmt.Errorf("catalog search not available"),
 			"Elasticsearch is not configured")

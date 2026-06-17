@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // ChunkManager handles TimescaleDB chunk operations
@@ -129,30 +131,32 @@ func (m *ChunkManager) GetChunksByTimeRange(ctx context.Context, hypertable stri
 
 // DropChunk drops a specific chunk
 func (m *ChunkManager) DropChunk(ctx context.Context, chunkName string) error {
-	query := fmt.Sprintf("SELECT drop_chunks('%s')", chunkName)
+	// Use pgx.Identifier to properly quote the chunk name and prevent SQL injection.
+	query := fmt.Sprintf("SELECT drop_chunks(%s)", pgx.Identifier{chunkName}.Sanitize())
 	_, err := m.driver.pool.Exec(ctx, query)
 	return err
 }
 
 // DropOldChunks drops chunks older than a specific time
 func (m *ChunkManager) DropOldChunks(ctx context.Context, hypertable string, olderThan time.Time) (int, error) {
+	// Use pgx.Identifier to properly quote the hypertable name; pass timestamp as a parameter.
 	query := fmt.Sprintf(
-		"SELECT drop_chunks('%s', older_than => '%s')",
-		hypertable,
-		olderThan.Format(time.RFC3339),
+		"SELECT drop_chunks(%s, older_than => $1::timestamptz)",
+		pgx.Identifier{hypertable}.Sanitize(),
 	)
 
 	var droppedCount int
-	err := m.driver.pool.QueryRow(ctx, query).Scan(&droppedCount)
+	err := m.driver.pool.QueryRow(ctx, query, olderThan).Scan(&droppedCount)
 	return droppedCount, err
 }
 
 // ReorderChunk reorders a chunk to improve compression
 func (m *ChunkManager) ReorderChunk(ctx context.Context, chunkName, indexName string) error {
+	// Use pgx.Identifier to properly quote chunk and index names.
 	query := fmt.Sprintf(
-		"SELECT reorder_chunk('%s', index => '%s')",
-		chunkName,
-		indexName,
+		"SELECT reorder_chunk(%s, index => %s)",
+		pgx.Identifier{chunkName}.Sanitize(),
+		pgx.Identifier{indexName}.Sanitize(),
 	)
 	_, err := m.driver.pool.Exec(ctx, query)
 	return err

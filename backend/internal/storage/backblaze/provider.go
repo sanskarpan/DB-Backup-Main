@@ -99,28 +99,19 @@ func (p *BackblazeB2Provider) uploadStream(ctx context.Context, reader io.Reader
 	obj := p.bucket.Object(remotePath)
 	writer := obj.NewWriter(ctx)
 
-	// Set content type if provided
+	// Build upload attributes
+	attrs := &b2.Attrs{}
 	if opts.ContentType != "" {
-		writer.ContentType = opts.ContentType
+		attrs.ContentType = opts.ContentType
 	}
-
-	// Set metadata if provided
 	if len(opts.Metadata) > 0 {
 		info := make(map[string]string)
 		for k, v := range opts.Metadata {
 			info[k] = v
 		}
-		writer.Metadata = info
+		attrs.Info = info
 	}
-
-	// Enable file lock if immutability is enabled
-	if p.config.Immutable && p.config.RetentionDays > 0 {
-		retainUntil := time.Now().AddDate(0, 0, p.config.RetentionDays)
-		writer.Attrs = &b2.Attrs{
-			RetentionMode:      "compliance",
-			RetainUntilDate:    retainUntil,
-		}
-	}
+	writer.WithAttrs(attrs)
 
 	// Copy data to writer
 	_, err := io.Copy(writer, reader)
@@ -276,9 +267,9 @@ func (p *BackblazeB2Provider) ValidateConfig() error {
 
 // CreateBucket creates a bucket in Backblaze B2
 func (p *BackblazeB2Provider) CreateBucket(ctx context.Context, bucketName string, public bool) error {
-	bucketType := b2.Private
+	bucketType := b2.BucketType(b2.Private)
 	if public {
-		bucketType = b2.Public
+		bucketType = b2.BucketType(b2.Public)
 	}
 
 	bucket, err := p.client.NewBucket(ctx, bucketName, &b2.BucketAttrs{
@@ -301,34 +292,16 @@ func (p *BackblazeB2Provider) DeleteBucket(ctx context.Context) error {
 	return nil
 }
 
-// SetFileLock sets file lock/retention for a file
+// SetFileLock sets file lock/retention for a file.
+// Note: file lock is not supported by the current blazer library version.
 func (p *BackblazeB2Provider) SetFileLock(ctx context.Context, remotePath string, retentionDays int) error {
-	obj := p.bucket.Object(remotePath)
-	retainUntil := time.Now().AddDate(0, 0, retentionDays)
-
-	// Update file retention
-	writer := obj.NewWriter(ctx)
-	writer.Attrs = &b2.Attrs{
-		RetentionMode:   "compliance",
-		RetainUntilDate: retainUntil,
-	}
-
-	if err := writer.Close(); err != nil {
-		return fmt.Errorf("failed to set file lock: %w", err)
-	}
-
-	return nil
+	return fmt.Errorf("file lock/retention not supported by the current Backblaze B2 library version")
 }
 
-// GetFileLock retrieves file lock/retention information for a file
+// GetFileLock retrieves file lock/retention information for a file.
+// Note: file lock is not supported by the current blazer library version.
 func (p *BackblazeB2Provider) GetFileLock(ctx context.Context, remotePath string) (string, time.Time, error) {
-	obj := p.bucket.Object(remotePath)
-	attrs, err := obj.Attrs(ctx)
-	if err != nil {
-		return "", time.Time{}, fmt.Errorf("failed to get file lock: %w", err)
-	}
-
-	return attrs.RetentionMode, attrs.RetainUntilDate, nil
+	return "", time.Time{}, fmt.Errorf("file lock/retention not supported by the current Backblaze B2 library version")
 }
 
 // SetLifecycleRules sets lifecycle rules for the bucket

@@ -1,6 +1,7 @@
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -78,6 +79,35 @@ type BackupPolicySpec struct {
 
 	// Tags to attach to backups
 	Tags map[string]string `json:"tags,omitempty"`
+
+	// Name of the secret containing database credentials, injected into the
+	// backup job via envFrom.
+	DatabaseSecret string `json:"databaseSecret,omitempty"`
+
+	// Container image used to run backup jobs.
+	// +kubebuilder:default="db-backup:latest"
+	Image string `json:"image,omitempty"`
+
+	// DeletionPolicy controls cleanup behavior when the policy is deleted
+	// (Retain or Delete).
+	// +kubebuilder:validation:Enum=Retain;Delete
+	// +kubebuilder:default=Retain
+	DeletionPolicy string `json:"deletionPolicy,omitempty"`
+
+	// Additional labels applied to backup job pods.
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Resource requirements for backup job containers.
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// NodeSelector constrains backup job pods to matching nodes.
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Tolerations applied to backup job pods.
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Affinity rules applied to backup job pods.
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 }
 
 // DatabaseReference references database credentials
@@ -131,6 +161,10 @@ type StorageConfig struct {
 
 	// Secret containing storage credentials
 	SecretName string `json:"secretName,omitempty"`
+
+	// CredentialsSecret containing storage credentials, injected into the
+	// backup job via envFrom.
+	CredentialsSecret string `json:"credentialsSecret,omitempty"`
 }
 
 // CompressionConfig defines compression settings
@@ -277,6 +311,34 @@ type RestoreJobSpec struct {
 
 	// Retry policy for failed restores
 	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
+
+	// PointInTime restores the database to a specific timestamp (PITR).
+	PointInTime *metav1.Time `json:"pointInTime,omitempty"`
+
+	// Container image used to run the restore job.
+	// +kubebuilder:default="db-backup:latest"
+	Image string `json:"image,omitempty"`
+
+	// Additional labels applied to the restore job pod.
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Resource requirements for the restore job container.
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// NodeSelector constrains the restore job pod to matching nodes.
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Tolerations applied to the restore job pod.
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Affinity rules applied to the restore job pod.
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// VolumeMounts attached to the restore job container.
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// TTLSecondsAfterFinished controls automatic cleanup of the finished job.
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
 }
 
 // BackupLocation defines backup file location
@@ -298,6 +360,10 @@ type BackupLocation struct {
 
 	// Secret containing storage credentials
 	SecretName string `json:"secretName,omitempty"`
+
+	// CredentialsSecret containing storage credentials, injected into the
+	// restore job via envFrom.
+	CredentialsSecret string `json:"credentialsSecret,omitempty"`
 }
 
 // TargetDatabase defines target database configuration
@@ -489,13 +555,13 @@ type BackupScheduleSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=100
 	// +kubebuilder:default=3
-	SuccessfulJobsHistoryLimit int `json:"successfulJobsHistoryLimit,omitempty"`
+	SuccessfulJobsHistoryLimit *int `json:"successfulJobsHistoryLimit,omitempty"`
 
 	// Number of failed jobs to retain
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=100
 	// +kubebuilder:default=1
-	FailedJobsHistoryLimit int `json:"failedJobsHistoryLimit,omitempty"`
+	FailedJobsHistoryLimit *int `json:"failedJobsHistoryLimit,omitempty"`
 
 	// Deadline for starting job if missed schedule
 	// +kubebuilder:validation:Minimum=0
@@ -510,6 +576,10 @@ type BackupScheduleSpec struct {
 
 	// Notification settings
 	Notifications *ScheduleNotificationConfig `json:"notifications,omitempty"`
+
+	// CleanupOnDelete removes generated backup jobs when the schedule is deleted.
+	// +kubebuilder:default=false
+	CleanupOnDelete bool `json:"cleanupOnDelete,omitempty"`
 }
 
 // BackupPolicyReference references a BackupPolicy

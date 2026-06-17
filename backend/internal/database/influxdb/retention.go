@@ -24,9 +24,13 @@ type RetentionPolicyManager struct {
 
 // NewRetentionPolicyManager creates a new retention policy manager
 func NewRetentionPolicyManager(driver *InfluxDBDriver) *RetentionPolicyManager {
+	url := fmt.Sprintf("http://%s:%d", driver.config.Host, driver.config.Port)
+	if driver.config.SSLMode == "enable" || driver.config.SSLMode == "require" {
+		url = fmt.Sprintf("https://%s:%d", driver.config.Host, driver.config.Port)
+	}
 	return &RetentionPolicyManager{
 		driver:   driver,
-		URL:      driver.config.URL,
+		URL:      url,
 		Username: driver.config.Username,
 		Password: driver.config.Password,
 	}
@@ -59,11 +63,6 @@ type Task struct {
 
 // BackupRetentionPolicies backs up all retention policies for a database
 func (m *RetentionPolicyManager) BackupRetentionPolicies(ctx context.Context, database, outputDir string) error {
-	// For InfluxDB v1.x, query retention policies
-	query := fmt.Sprintf("SHOW RETENTION POLICIES ON %s", database)
-
-	// This would use the v1 HTTP API or influx CLI
-	// For simplicity, we'll create a placeholder file
 	rpFile := filepath.Join(outputDir, fmt.Sprintf("%s_retention_policies.json", database))
 	file, err := os.Create(rpFile)
 	if err != nil {
@@ -71,7 +70,6 @@ func (m *RetentionPolicyManager) BackupRetentionPolicies(ctx context.Context, da
 	}
 	defer file.Close()
 
-	// Query retention policies using SHOW RETENTION POLICIES
 	query := fmt.Sprintf("SHOW RETENTION POLICIES ON %q", database)
 
 	// Execute query using HTTP client
@@ -85,9 +83,6 @@ func (m *RetentionPolicyManager) BackupRetentionPolicies(ctx context.Context, da
 
 // BackupContinuousQueries backs up all continuous queries for a database
 func (m *RetentionPolicyManager) BackupContinuousQueries(ctx context.Context, database, outputDir string) error {
-	// For InfluxDB v1.x, query continuous queries
-	query := fmt.Sprintf("SHOW CONTINUOUS QUERIES")
-
 	cqFile := filepath.Join(outputDir, fmt.Sprintf("%s_continuous_queries.json", database))
 	file, err := os.Create(cqFile)
 	if err != nil {
@@ -123,12 +118,24 @@ func (m *RetentionPolicyManager) BackupTasks(ctx context.Context, outputDir stri
 	// Convert to our Task struct
 	var taskList []Task
 	for _, task := range tasks {
+		every := ""
+		if task.Every != nil {
+			every = *task.Every
+		}
+		cron := ""
+		if task.Cron != nil {
+			cron = *task.Cron
+		}
+		status := ""
+		if task.Status != nil {
+			status = string(*task.Status)
+		}
 		t := Task{
 			Name:   task.Name,
 			Flux:   task.Flux,
-			Every:  task.Every,
-			Cron:   task.Cron,
-			Status: string(task.Status),
+			Every:  every,
+			Cron:   cron,
+			Status: status,
 		}
 		taskList = append(taskList, t)
 	}
@@ -280,63 +287,44 @@ func (m *RetentionPolicyManager) RestoreTasks(ctx context.Context, backupDir str
 	}
 
 	tasksAPI := m.driver.client.TasksAPI()
-	orgID := m.driver.config.Organization // Get organization from config
+	orgID := m.driver.organization
 
 	for _, task := range tasks {
-		// Create task request
-		taskReq := &domain.TaskCreateRequest{
-			Org:    &orgID,
-			OrgID:  &orgID,
-			Name:   task.Name,
-			Flux:   task.Flux,
-			Status: domain.TaskStatusType(task.Status),
-		}
+		var createdTask *domain.Task
+		var createErr error
 
-		// Set schedule based on every or cron
-		if task.Every != "" {
-			taskReq.Every = &task.Every
-		}
 		if task.Cron != "" {
-			taskReq.Cron = &task.Cron
+			createdTask, createErr = tasksAPI.CreateTaskWithCron(ctx, task.Name, task.Flux, task.Cron, orgID)
+		} else if task.Every != "" {
+			createdTask, createErr = tasksAPI.CreateTaskWithEvery(ctx, task.Name, task.Flux, task.Every, orgID)
+		} else {
+			createdTask, createErr = tasksAPI.CreateTaskByFlux(ctx, task.Flux, orgID)
 		}
 
-		// Create the task
-		createdTask, err := tasksAPI.CreateTaskWithCron(ctx, taskReq)
-		if err != nil {
-			// If task already exists with same name, try to update it
-			// First, find the existing task
+		if createErr != nil {
 			existingTasks, listErr := tasksAPI.FindTasks(ctx, &api.TaskFilter{
-				Name: &task.Name,
-				Org:  &orgID,
+				Name:    task.Name,
+				OrgName: orgID,
 			})
 			if listErr != nil {
-				return fmt.Errorf("failed to create task %s: %w (list also failed: %v)", task.Name, err, listErr)
+				return fmt.Errorf("failed to create task %s: %w (list also failed: %v)", task.Name, createErr, listErr)
 			}
 
-			// If found, update the first matching task
 			if len(existingTasks) > 0 {
 				existingTask := existingTasks[0]
-
-				// Create update request
-				updateReq := &domain.TaskUpdateRequest{
-					Flux: &task.Flux,
-				}
-
+				existingTask.Flux = task.Flux
 				if task.Status != "" {
 					status := domain.TaskStatusType(task.Status)
-					updateReq.Status = &status
+					existingTask.Status = &status
 				}
-
-				// Update the task
-				if _, updateErr := tasksAPI.UpdateTask(ctx, existingTask, updateReq); updateErr != nil {
-					return fmt.Errorf("failed to create or update task %s: create error: %w, update error: %v", task.Name, err, updateErr)
+				if _, updateErr := tasksAPI.UpdateTask(ctx, &existingTask); updateErr != nil {
+					return fmt.Errorf("failed to create or update task %s: create error: %w, update error: %v", task.Name, createErr, updateErr)
 				}
 			} else {
-				return fmt.Errorf("failed to create task %s: %w", task.Name, err)
+				return fmt.Errorf("failed to create task %s: %w", task.Name, createErr)
 			}
-		} else if createdTask != nil {
-			// Task created successfully
-			_ = createdTask // Use variable to avoid unused warning
+		} else {
+			_ = createdTask
 		}
 	}
 

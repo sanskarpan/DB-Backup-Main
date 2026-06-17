@@ -25,6 +25,7 @@ type BackupMetadata struct {
 	Duration        time.Duration            `json:"duration"`
 	Status          database.BackupStatus    `json:"status"`
 	Tags            map[string]string        `json:"tags,omitempty"`
+	Metadata        map[string]interface{}   `json:"metadata,omitempty"`
 	StorageLocation string                   `json:"storage_location"`
 	BackupPath      string                   `json:"backup_path"`
 }

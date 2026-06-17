@@ -10,6 +10,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/backup"
 	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/sanskarpan/db-backup/internal/repository"
+	"github.com/sanskarpan/db-backup/pkg/validation"
 )
 
 type BackupHandler struct {
@@ -64,6 +65,32 @@ func (h *BackupHandler) HandleCreateBackup(c *gin.Context) {
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported database type"})
 		return
+	}
+
+	// Validate database name to prevent shell injection and SQL injection.
+	if req.Database != "" {
+		if err := validation.ValidateDatabaseName(req.Database); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database name", "details": err.Error()})
+			return
+		}
+	}
+	for _, db := range req.Databases {
+		if err := validation.ValidateDatabaseName(db); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database name in databases list", "details": err.Error()})
+			return
+		}
+	}
+	for _, tbl := range req.Tables {
+		if err := validation.ValidateTableName(tbl); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid table name", "details": err.Error()})
+			return
+		}
+	}
+	for _, tbl := range req.ExcludeTables {
+		if err := validation.ValidateTableName(tbl); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid table name in exclude_tables list", "details": err.Error()})
+			return
+		}
 	}
 
 	// Parse compression

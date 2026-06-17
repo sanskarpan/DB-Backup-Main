@@ -8,8 +8,8 @@ import (
 	"runtime"
 
 	"github.com/spf13/cobra"
+	"github.com/sanskarpan/db-backup/internal/config"
 	"github.com/sanskarpan/db-backup/internal/repository"
-	"github.com/sanskarpan/db-backup/internal/models"
 )
 
 // completionCmd represents the completion command
@@ -124,7 +124,6 @@ func generateCompletionToFile(cmd *cobra.Command, shell, output string) error {
 
 func installCompletion(shell string) error {
 	var installPath string
-	var content []byte
 
 	switch shell {
 	case "bash":
@@ -286,40 +285,7 @@ func getPowerShellCompletionPath() string {
 // These functions are called by Cobra's completion system
 
 func init() {
-	// Register custom completion functions for flags
-
-	// Database completion
-	registerDatabaseCompletion := func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		databases, err := getDatabases(cmd.Context())
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
-		return databases, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	// Backup completion
-	registerBackupCompletion := func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		backups, err := getBackups(cmd.Context(), "")
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
-		return backups, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	// Provider completion
-	registerProviderCompletion := func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		providers := []string{"local", "s3", "gcs", "azure", "minio", "wasabi", "backblaze", "digitalocean"}
-		return providers, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	// Database type completion
-	registerTypeCompletion := func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		types := []string{"postgres", "mysql", "mongodb", "redis", "sqlite", "cassandra", "dynamodb", "elasticsearch", "influxdb", "timescaledb"}
-		return types, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	// Register these completions for relevant commands
-	// This will be done in each command's init function
+	// Custom completion functions are registered per-command in each command's init function.
 }
 
 // Helper functions to get dynamic data
@@ -549,7 +515,7 @@ func getTags(ctx context.Context) ([]string, error) {
 // getRepository creates a repository instance using configuration
 func getRepository() (*repository.FileRepository, error) {
 	// Try to load configuration
-	cfg, err := LoadConfig()
+	loadedCfg, err := config.Load("")
 	if err != nil {
 		// Fall back to default metadata directory
 		homeDir, err := os.UserHomeDir()
@@ -561,5 +527,5 @@ func getRepository() (*repository.FileRepository, error) {
 	}
 
 	// Use configured metadata directory
-	return repository.NewFileRepository(cfg.Backup.MetadataDirectory)
+	return repository.NewFileRepository(loadedCfg.Backup.MetadataDirectory)
 }

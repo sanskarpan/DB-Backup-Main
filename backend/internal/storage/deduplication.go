@@ -336,8 +336,10 @@ func (m *DeduplicationManager) storeChunk(hash string, data []byte) error {
 	m.metrics.UniqueBytes += int64(len(data))
 	m.metrics.mu.Unlock()
 
-	// Cache the chunk
-	m.cache.Put(hash, data)
+	// Cache the chunk — copy data so callers can safely reuse the source buffer
+	dataCopy := make([]byte, len(data))
+	copy(dataCopy, data)
+	m.cache.Put(hash, dataCopy)
 
 	return nil
 }

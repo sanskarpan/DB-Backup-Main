@@ -38,6 +38,14 @@ func GenerateBackupID() string {
 	)
 }
 
+// GenerateRestoreID generates a unique restore operation ID with timestamp
+func GenerateRestoreID() string {
+	return fmt.Sprintf("restore-%s-%d",
+		time.Now().Format("20060102-150405"),
+		time.Now().UnixNano()%1000000,
+	)
+}
+
 // Truncate truncates a string to a maximum length
 func Truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {

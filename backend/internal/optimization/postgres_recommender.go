@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/validation"
 )
 
 // PostgreSQLIndexRecommender implements IndexRecommender for PostgreSQL
@@ -276,7 +278,15 @@ func (pir *PostgreSQLIndexRecommender) estimateSelectivity(ctx context.Context, 
 		return 0, fmt.Errorf("no columns specified")
 	}
 
-	// Simple selectivity estimation
+	// Validate table and column names to prevent SQL injection via identifier interpolation.
+	if err := validation.ValidateTableName(table); err != nil {
+		return 0, fmt.Errorf("invalid table name: %w", err)
+	}
+	if err := validation.ValidateTableName(columns[0]); err != nil {
+		return 0, fmt.Errorf("invalid column name: %w", err)
+	}
+
+	// Simple selectivity estimation — identifiers are validated above.
 	query := fmt.Sprintf("SELECT COUNT(DISTINCT %s)::float / COUNT(*)::float FROM %s", columns[0], table)
 
 	var selectivity float64
