@@ -64,7 +64,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       return
     }
 
-    const ws = new WebSocket('ws://localhost:8080/api/notifications/ws')
+    const ws = new WebSocket('ws://localhost:8080/api/v1/notifications/ws')
 
     ws.onopen = () => {
       console.log('WebSocket connected')
