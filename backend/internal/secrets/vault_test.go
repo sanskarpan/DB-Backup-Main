@@ -2,9 +2,19 @@ package secrets
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
 )
+
+func skipIfVaultUnavailable(t *testing.T) {
+	t.Helper()
+	conn, err := net.DialTimeout("tcp", "localhost:8200", 2*time.Second)
+	if err != nil {
+		t.Skip("Vault not available:", err)
+	}
+	conn.Close()
+}
 
 func TestVaultConfig(t *testing.T) {
 	tests := []struct {
@@ -153,6 +163,7 @@ func TestVaultIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}
+	skipIfVaultUnavailable(t)
 
 	config := &VaultConfig{
 		Address:    "http://localhost:8200",
