@@ -3,9 +3,10 @@ package ceph
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"time"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -188,7 +189,7 @@ func (p *CephProvider) Exists(ctx context.Context, remotePath string) (bool, err
 	if err != nil {
 		// Check if error is NotFound
 		var notFound *types.NotFound
-		if aws.ToError(err, &notFound) {
+		if errors.As(err, &notFound) {
 			return false, nil
 		}
 		return false, &storage.ProviderError{
@@ -274,7 +275,7 @@ func (p *CephProvider) CreateBucket(ctx context.Context) error {
 	if err != nil {
 		// Check if bucket already exists
 		var bucketExists *types.BucketAlreadyOwnedByYou
-		if aws.ToError(err, &bucketExists) {
+		if errors.As(err, &bucketExists) {
 			return nil // Bucket already exists, not an error
 		}
 		return &storage.ProviderError{
@@ -403,7 +404,6 @@ func openFile(path string) (io.ReadCloser, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func createFile(path string) (io.WriterAt, error) {
-	// Placeholder - implement file creation
-	return nil, fmt.Errorf("not implemented")
+func createFile(path string) (*os.File, error) {
+	return os.Create(path)
 }
