@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // BudgetManager manages budgets and alerts
@@ -579,9 +581,9 @@ type BudgetSummary struct {
 // Helper functions
 
 func generateBudgetID() string {
-	return fmt.Sprintf("budget-%d", time.Now().UnixNano())
+	return uid.New("budget")
 }
 
 func generateAlertID() string {
-	return fmt.Sprintf("alert-%d", time.Now().UnixNano())
+	return uid.New("alert")
 }
