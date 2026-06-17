@@ -2,18 +2,32 @@ package redis
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func skipIfRedisUnavailable(t *testing.T) {
+	t.Helper()
+	host := getEnv("REDIS_HOST", "localhost")
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:6379", host), 2*time.Second)
+	if err != nil {
+		t.Skip("Redis not available:", err)
+	}
+	conn.Close()
+}
+
 func TestRedisDriver_Connect(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}
+	skipIfRedisUnavailable(t)
 
 	driver := NewRedisDriver()
 	config := &database.ConnectionConfig{
@@ -51,6 +65,11 @@ func TestRedisDriver_BackupRDB(t *testing.T) {
 	driver := setupTestDriver(t)
 	defer driver.Disconnect()
 
+	// Skip if Redis RDB dump file doesn't exist at the default path
+	if _, err := os.Stat("/data/dump.rdb"); err != nil {
+		t.Skip("Redis RDB file not available at /data/dump.rdb")
+	}
+
 	// Create test directory
 	tmpDir := t.TempDir()
 
@@ -77,6 +96,10 @@ func TestRedisDriver_BackupAOF(t *testing.T) {
 	driver := setupTestDriver(t)
 	defer driver.Disconnect()
 
+	if _, err := os.Stat("/data/appendonly.aof"); err != nil {
+		t.Skip("Redis AOF file not available at /data/appendonly.aof")
+	}
+
 	tmpDir := t.TempDir()
 
 	ctx := context.Background()
@@ -101,6 +124,10 @@ func TestRedisDriver_BackupBoth(t *testing.T) {
 	driver := setupTestDriver(t)
 	defer driver.Disconnect()
 
+	if _, err := os.Stat("/data/dump.rdb"); err != nil {
+		t.Skip("Redis data files not available at /data/")
+	}
+
 	tmpDir := t.TempDir()
 
 	ctx := context.Background()
@@ -122,6 +149,10 @@ func TestRedisDriver_Restore(t *testing.T) {
 
 	driver := setupTestDriver(t)
 	defer driver.Disconnect()
+
+	if _, err := os.Stat("/data/dump.rdb"); err != nil {
+		t.Skip("Redis data files not available at /data/")
+	}
 
 	// First, create a backup
 	tmpDir := t.TempDir()
@@ -196,6 +227,10 @@ func TestPITRManager_CreateCheckpoint(t *testing.T) {
 	driver := setupTestDriver(t)
 	defer driver.Disconnect()
 
+	if _, err := os.Stat("/data/appendonly.aof"); err != nil {
+		t.Skip("Redis AOF file not available at /data/appendonly.aof")
+	}
+
 	tmpDir := t.TempDir()
 	ctx := context.Background()
 
@@ -253,6 +288,7 @@ func TestClusterDriver_BackupCluster(t *testing.T) {
 // Helper functions
 
 func setupTestDriver(t *testing.T) *RedisDriver {
+	skipIfRedisUnavailable(t)
 	driver := NewRedisDriver()
 	config := &database.ConnectionConfig{
 		Host:     getEnv("REDIS_HOST", "localhost"),
