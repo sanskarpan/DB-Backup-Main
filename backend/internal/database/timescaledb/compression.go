@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // CompressionManager handles TimescaleDB compression policies
@@ -186,14 +188,16 @@ func (m *CompressionManager) GetCompressedChunks(ctx context.Context, hypertable
 
 // CompressChunk manually compresses a specific chunk
 func (m *CompressionManager) CompressChunk(ctx context.Context, chunkName string) error {
-	query := fmt.Sprintf("SELECT compress_chunk('%s')", chunkName)
+	// Use pgx.Identifier to properly quote the chunk name and prevent SQL injection.
+	query := fmt.Sprintf("SELECT compress_chunk(%s)", pgx.Identifier{chunkName}.Sanitize())
 	_, err := m.driver.pool.Exec(ctx, query)
 	return err
 }
 
 // DecompressChunk manually decompresses a specific chunk
 func (m *CompressionManager) DecompressChunk(ctx context.Context, chunkName string) error {
-	query := fmt.Sprintf("SELECT decompress_chunk('%s')", chunkName)
+	// Use pgx.Identifier to properly quote the chunk name and prevent SQL injection.
+	query := fmt.Sprintf("SELECT decompress_chunk(%s)", pgx.Identifier{chunkName}.Sanitize())
 	_, err := m.driver.pool.Exec(ctx, query)
 	return err
 }
