@@ -2,6 +2,7 @@ package dr
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -13,7 +14,7 @@ func TestNewScheduler(t *testing.T) {
 	provisioner := NewEnvironmentProvisioner()
 	validator := NewValidator()
 	executor := NewTestExecutor(provisioner, validator)
-	scheduler := NewScheduler(executor)
+	scheduler := NewScheduler(executor, nil)
 
 	assert.NotNil(t, scheduler)
 	assert.NotNil(t, scheduler.schedules)
@@ -26,7 +27,7 @@ func TestScheduler_AddSchedule(t *testing.T) {
 	provisioner := NewEnvironmentProvisioner()
 	validator := NewValidator()
 	executor := NewTestExecutor(provisioner, validator)
-	scheduler := NewScheduler(executor)
+	scheduler := NewScheduler(executor, nil)
 
 	schedule := &TestSchedule{
 		Name:           "Weekly DR Test",
@@ -46,7 +47,7 @@ func TestScheduler_AddScheduleInvalidCron(t *testing.T) {
 	provisioner := NewEnvironmentProvisioner()
 	validator := NewValidator()
 	executor := NewTestExecutor(provisioner, validator)
-	scheduler := NewScheduler(executor)
+	scheduler := NewScheduler(executor, nil)
 
 	schedule := &TestSchedule{
 		Name:           "Invalid Schedule",
@@ -65,7 +66,7 @@ func TestScheduler_RemoveSchedule(t *testing.T) {
 	provisioner := NewEnvironmentProvisioner()
 	validator := NewValidator()
 	executor := NewTestExecutor(provisioner, validator)
-	scheduler := NewScheduler(executor)
+	scheduler := NewScheduler(executor, nil)
 
 	schedule := &TestSchedule{
 		Name:           "Test Schedule",
@@ -91,7 +92,7 @@ func TestScheduler_RemoveNonExistentSchedule(t *testing.T) {
 	provisioner := NewEnvironmentProvisioner()
 	validator := NewValidator()
 	executor := NewTestExecutor(provisioner, validator)
-	scheduler := NewScheduler(executor)
+	scheduler := NewScheduler(executor, nil)
 
 	err := scheduler.RemoveSchedule("non-existent-id")
 	assert.Error(t, err)
@@ -102,7 +103,7 @@ func TestScheduler_GetSchedule(t *testing.T) {
 	provisioner := NewEnvironmentProvisioner()
 	validator := NewValidator()
 	executor := NewTestExecutor(provisioner, validator)
-	scheduler := NewScheduler(executor)
+	scheduler := NewScheduler(executor, nil)
 
 	schedule := &TestSchedule{
 		Name:           "Test Schedule",
@@ -126,7 +127,7 @@ func TestScheduler_GetNonExistentSchedule(t *testing.T) {
 	provisioner := NewEnvironmentProvisioner()
 	validator := NewValidator()
 	executor := NewTestExecutor(provisioner, validator)
-	scheduler := NewScheduler(executor)
+	scheduler := NewScheduler(executor, nil)
 
 	_, err := scheduler.GetSchedule("non-existent-id")
 	assert.Error(t, err)
@@ -137,11 +138,12 @@ func TestScheduler_ListSchedules(t *testing.T) {
 	provisioner := NewEnvironmentProvisioner()
 	validator := NewValidator()
 	executor := NewTestExecutor(provisioner, validator)
-	scheduler := NewScheduler(executor)
+	scheduler := NewScheduler(executor, nil)
 
-	// Add multiple schedules
+	// Add multiple schedules with explicit IDs to avoid nanosecond collision
 	for i := 0; i < 3; i++ {
 		schedule := &TestSchedule{
+			ID:             fmt.Sprintf("schedule-test-%d", i),
 			Name:           "Test Schedule",
 			DatabaseName:   "test-db",
 			Enabled:        true,
@@ -160,7 +162,7 @@ func TestScheduler_ListSchedulesEmpty(t *testing.T) {
 	provisioner := NewEnvironmentProvisioner()
 	validator := NewValidator()
 	executor := NewTestExecutor(provisioner, validator)
-	scheduler := NewScheduler(executor)
+	scheduler := NewScheduler(executor, nil)
 
 	schedules := scheduler.ListSchedules()
 	assert.Empty(t, schedules)
@@ -170,7 +172,7 @@ func TestScheduler_StartStop(t *testing.T) {
 	provisioner := NewEnvironmentProvisioner()
 	validator := NewValidator()
 	executor := NewTestExecutor(provisioner, validator)
-	scheduler := NewScheduler(executor)
+	scheduler := NewScheduler(executor, nil)
 
 	ctx := context.Background()
 
@@ -197,7 +199,7 @@ func TestScheduler_RunTest(t *testing.T) {
 	provisioner := NewEnvironmentProvisioner()
 	validator := NewValidator()
 	executor := NewTestExecutor(provisioner, validator)
-	scheduler := NewScheduler(executor)
+	scheduler := NewScheduler(executor, nil)
 
 	schedule := &TestSchedule{
 		Name:           "Manual Test",
@@ -223,7 +225,7 @@ func TestScheduler_RunTestNonExistent(t *testing.T) {
 	provisioner := NewEnvironmentProvisioner()
 	validator := NewValidator()
 	executor := NewTestExecutor(provisioner, validator)
-	scheduler := NewScheduler(executor)
+	scheduler := NewScheduler(executor, nil)
 
 	ctx := context.Background()
 
