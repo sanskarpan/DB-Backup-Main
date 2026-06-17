@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // Command whitelist for security - only these commands are allowed
@@ -209,7 +211,7 @@ func (hm *HookManager) RegisterHook(hook *Hook) error {
 	}
 
 	if hook.ID == "" {
-		hook.ID = fmt.Sprintf("%s-%d", hook.Type, time.Now().UnixNano())
+		hook.ID = fmt.Sprintf("%s-%s", hook.Type, uid.Hex(8))
 	}
 
 	if hook.Command == "" {
