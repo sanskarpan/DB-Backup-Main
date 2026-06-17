@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // SLALevel represents the criticality level of an SLA
@@ -103,13 +105,14 @@ type SLAViolation struct {
 
 // SLAMonitor monitors and tracks SLA compliance
 type SLAMonitor struct {
-	mu            sync.RWMutex
-	definitions   map[string]*SLADefinition
-	metrics       map[string]*SLAMetrics
-	rtoMetrics    map[string]*RTOMetrics
-	rpoMetrics    map[string]*RPOMetrics
-	violations    []*SLAViolation
-	alertHandlers []AlertHandler
+	mu               sync.RWMutex
+	definitions      map[string]*SLADefinition
+	metrics          map[string]*SLAMetrics
+	rtoMetrics       map[string]*RTOMetrics
+	rpoMetrics       map[string]*RPOMetrics
+	violations       []*SLAViolation
+	alertHandlers    []AlertHandler
+	violationCounter int64
 }
 
 // AlertHandler is a function that handles SLA violations
@@ -143,7 +146,7 @@ func (sm *SLAMonitor) AddSLADefinition(def *SLADefinition) error {
 	}
 
 	if def.ID == "" {
-		def.ID = fmt.Sprintf("sla-%s-%d", def.DatabaseID, time.Now().UnixNano())
+		def.ID = fmt.Sprintf("sla-%s-%s", def.DatabaseID, uid.Hex(8))
 	}
 
 	def.CreatedAt = time.Now()
@@ -348,8 +351,9 @@ func (sm *SLAMonitor) checkViolations(databaseID string) {
 func (sm *SLAMonitor) recordViolation(databaseID, violationType, severity, description string) {
 	def := sm.definitions[databaseID]
 
+	sm.violationCounter++
 	violation := &SLAViolation{
-		ID:            fmt.Sprintf("viol-%d", time.Now().UnixNano()),
+		ID:            fmt.Sprintf("viol-%d", sm.violationCounter),
 		DatabaseID:    databaseID,
 		DatabaseName:  def.DatabaseName,
 		ViolationType: violationType,
