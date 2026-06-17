@@ -2,6 +2,7 @@ package influxdb
 
 import (
 	"context"
+	"net"
 	"os"
 	"testing"
 	"time"
@@ -11,10 +12,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func skipIfInfluxDBUnavailable(t *testing.T) {
+	t.Helper()
+	host := getEnv("INFLUXDB_HOST", "localhost")
+	port := getEnv("INFLUXDB_PORT", "8086")
+	conn, err := net.DialTimeout("tcp", host+":"+port, 2*time.Second)
+	if err != nil {
+		t.Skip("InfluxDB not available:", err)
+	}
+	conn.Close()
+}
+
 func TestInfluxDBDriver_Connect(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}
+	skipIfInfluxDBUnavailable(t)
 
 	driver := NewInfluxDBDriver()
 	config := &database.ConnectionConfig{
@@ -559,6 +572,7 @@ func TestInfluxDB_GetBackupSize(t *testing.T) {
 // Helper functions
 
 func setupTestDriver(t *testing.T) *InfluxDBDriver {
+	skipIfInfluxDBUnavailable(t)
 	driver := NewInfluxDBDriver()
 	config := &database.ConnectionConfig{
 		Host:     getEnv("INFLUXDB_HOST", "localhost"),
