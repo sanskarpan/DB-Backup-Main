@@ -529,10 +529,12 @@ func (p *MemoryProfiler) ForceGC() (before, after *MemorySnapshot) {
 
 // GetMemoryGrowth returns memory growth since baseline
 func (p *MemoryProfiler) GetMemoryGrowth() (heapGrowth int64, goroutineGrowth int, duration time.Duration) {
+	// takeSnapshot acquires mu.Lock internally, so snapshot must be taken before acquiring RLock
+	current := p.takeSnapshot()
+
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	current := p.takeSnapshot()
 	heapGrowth = int64(current.HeapAlloc) - int64(p.baselineHeap)
 	goroutineGrowth = current.NumGoroutine - p.baselineGoroutines
 	duration = time.Since(p.baselineTimestamp)
