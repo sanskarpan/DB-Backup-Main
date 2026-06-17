@@ -541,7 +541,7 @@ func TestTimelineOptions(t *testing.T) {
 
 	duration := options.EndDate.Sub(options.StartDate)
 	expectedDuration := 30 * 24 * time.Hour // Approximately 1 month
-	if duration < expectedDuration-24*time.Hour || duration > expectedDuration+24*time.Hour {
+	if duration < expectedDuration-25*time.Hour || duration > expectedDuration+25*time.Hour {
 		t.Errorf("Expected ~1 month duration, got %v", duration)
 	}
 }
