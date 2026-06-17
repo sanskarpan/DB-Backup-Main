@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -554,9 +555,12 @@ func (m *Manager) processDelivery(task *DeliveryTask) {
 
 // deliver sends the webhook HTTP request
 func (m *Manager) deliver(sub *Subscription, payload []byte) error {
-	// Create HTTP client with timeout
+	// Create HTTP client with timeout; disable redirects to prevent SSRF
 	client := &http.Client{
 		Timeout: sub.RetryConfig.Timeout,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
 
 	// Create request
@@ -635,7 +639,7 @@ func (m *Manager) GetAnalytics() *Analytics {
 // Helper functions
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[:len(substr)] == substr
+	return strings.Contains(s, substr)
 }
 
 func pow(base, exp float64) float64 {
