@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // AirGapManager manages air-gapped backup copies
@@ -398,7 +400,7 @@ func (mas *MockAirGapStorage) List(ctx context.Context) ([]*AirGapBackup, error)
 // Helper functions
 
 func generateAirGapID() string {
-	return fmt.Sprintf("airgap-%d", time.Now().UnixNano())
+	return uid.New("airgap")
 }
 
 func calculateChecksum(data []byte) string {

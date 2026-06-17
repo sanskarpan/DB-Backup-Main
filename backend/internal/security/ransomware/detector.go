@@ -395,6 +395,11 @@ func (d *Detector) hasSuspiciousExtension(filePath string) bool {
 // checkSignatures checks for known ransomware signatures
 // This is a simplified implementation - in production, use a comprehensive signature database
 func (d *Detector) checkSignatures(file *os.File, fileSize int64) string {
+	// Ensure we start reading from the beginning of the file
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return ""
+	}
+
 	// Read first 1KB for header signature matching
 	headerSize := int64(1024)
 	if fileSize < headerSize {
