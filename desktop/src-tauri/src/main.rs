@@ -529,8 +529,17 @@ fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
                 window.eval("window.location.hash = '/backups/new'").unwrap();
             }
             "toggle_theme" => {
-                let window = app.get_window("main").unwrap();
-                window.eval("window.__TAURI__.invoke('toggle_theme')").unwrap();
+                // Mutate theme state in Rust and emit event to frontend.
+                // Do NOT use window.eval with window.__TAURI__ — withGlobalTauri
+                // is false in tauri.conf.json so that object is not injected.
+                let state: tauri::State<AppState> = app.state();
+                let new_theme = {
+                    let mut theme = state.theme.lock().unwrap();
+                    let next = if *theme == "dark" { "light" } else { "dark" };
+                    *theme = next.to_string();
+                    next.to_string()
+                };
+                let _ = app.emit_all("theme-changed", new_theme);
             }
             _ => {}
         },
