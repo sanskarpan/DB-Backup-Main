@@ -7,6 +7,8 @@ import (
 	"math"
 	"sync"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // AnomalyType represents the type of anomaly detected
@@ -429,5 +431,5 @@ func (d *Detector) calculateScore(deviation float64) float64 {
 
 // generateAnomalyID generates a unique ID for an anomaly
 func generateAnomalyID() string {
-	return fmt.Sprintf("anomaly-%d", time.Now().UnixNano())
+	return uid.New("anomaly")
 }
