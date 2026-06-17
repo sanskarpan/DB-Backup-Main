@@ -199,9 +199,9 @@ func (p *ConnectionPool) Get(ctx context.Context) (*sql.DB, error) {
 		conn.mu.Unlock()
 	}
 
-	// No idle connection available - try to create new one
+	// No idle connection available - try to create new one (already holding p.mu)
 	if len(p.connections) < p.config.MaxConnections {
-		if err := p.createConnection(ctx); err == nil {
+		if err := p.createConnectionLocked(ctx); err == nil {
 			// Retry getting the newly created connection
 			conn := p.connections[len(p.connections)-1]
 			conn.mu.Lock()
@@ -284,9 +284,9 @@ func (p *ConnectionPool) Stats() PoolStats {
 // Close closes all connections in the pool
 func (p *ConnectionPool) Close() error {
 	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	if p.closed {
+		p.mu.Unlock()
 		return nil
 	}
 
@@ -301,10 +301,16 @@ func (p *ConnectionPool) Close() error {
 		p.scaleTicker.Stop()
 	}
 
-	// Wait for background workers to finish
+	// Release lock before waiting so background goroutines can finish
+	p.mu.Unlock()
+
+	// Wait for background workers to finish (without holding the lock)
 	p.wg.Wait()
 
 	// Close all connections
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	var errs []error
 	for _, conn := range p.connections {
 		if err := conn.db.Close(); err != nil {
@@ -321,18 +327,45 @@ func (p *ConnectionPool) Close() error {
 	return nil
 }
 
-// createConnection creates a new connection and adds it to the pool
-func (p *ConnectionPool) createConnection(ctx context.Context) error {
+// dialConnection dials a new DB connection without modifying the pool slice.
+// The caller is responsible for appending the result under p.mu.
+func (p *ConnectionPool) dialConnection(ctx context.Context) (*pooledConnection, error) {
 	db, err := p.connFunc(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	conn := &pooledConnection{
+	return &pooledConnection{
 		db:        db,
 		createdAt: time.Now(),
 		lastUsed:  time.Now(),
 		healthy:   true,
+	}, nil
+}
+
+// createConnection dials and appends a new connection; must NOT hold p.mu.
+func (p *ConnectionPool) createConnection(ctx context.Context) error {
+	conn, err := p.dialConnection(ctx)
+	if err != nil {
+		return err
+	}
+
+	p.mu.Lock()
+	p.connections = append(p.connections, conn)
+	p.mu.Unlock()
+
+	p.updateStats(func(s *PoolStats) {
+		atomic.AddInt64(&s.TotalConnections, 1)
+		atomic.AddInt64(&s.IdleConnections, 1)
+	})
+
+	return nil
+}
+
+// createConnectionLocked dials and appends a new connection; caller must hold p.mu.Lock().
+func (p *ConnectionPool) createConnectionLocked(ctx context.Context) error {
+	conn, err := p.dialConnection(ctx)
+	if err != nil {
+		return err
 	}
 
 	p.connections = append(p.connections, conn)
@@ -598,10 +631,10 @@ func (p *ConnectionPool) autoScale() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// Scale up if utilization is high
+	// Scale up if utilization is high (already holding p.mu)
 	if utilization >= p.config.ScaleUpThreshold && len(p.connections) < p.config.MaxConnections {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		p.createConnection(ctx)
+		p.createConnectionLocked(ctx)
 		cancel()
 	}
 
