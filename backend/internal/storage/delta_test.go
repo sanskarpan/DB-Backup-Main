@@ -39,7 +39,7 @@ func TestCreateAndApplyDelta(t *testing.T) {
 		DeltaStorePath: filepath.Join(tempDir, "deltas"),
 		MetadataPath:   filepath.Join(tempDir, "metadata"),
 		BlockSize:      512, // Smaller for testing
-		MinFileSize:    0,   // Allow small files for testing
+		MinFileSize:    1, // Minimum 1 byte, allowing small test files
 	}
 
 	manager, err := NewDeltaManager(config)
@@ -109,7 +109,7 @@ func TestDeltaWithIdenticalFiles(t *testing.T) {
 		Enabled:        true,
 		DeltaStorePath: filepath.Join(tempDir, "deltas"),
 		MetadataPath:   filepath.Join(tempDir, "metadata"),
-		MinFileSize:    0,
+		MinFileSize:    1,
 	}
 
 	manager, err := NewDeltaManager(config)
@@ -150,7 +150,7 @@ func TestDeltaWithCompression(t *testing.T) {
 		DeltaStorePath: filepath.Join(tempDir, "deltas"),
 		MetadataPath:   filepath.Join(tempDir, "metadata"),
 		Compression:    true,
-		MinFileSize:    0,
+		MinFileSize:    1,
 	}
 
 	manager, err := NewDeltaManager(config)
@@ -205,7 +205,7 @@ func TestBackupChain(t *testing.T) {
 		MetadataPath:   filepath.Join(tempDir, "metadata"),
 		BlockSize:      512,
 		MaxChainLength: 3,
-		MinFileSize:    0,
+		MinFileSize:    1,
 	}
 
 	manager, err := NewDeltaManager(config)
@@ -259,7 +259,7 @@ func TestRestoreFromChain(t *testing.T) {
 		DeltaStorePath: filepath.Join(tempDir, "deltas"),
 		MetadataPath:   filepath.Join(tempDir, "metadata"),
 		BlockSize:      256,
-		MinFileSize:    0,
+		MinFileSize:    1,
 	}
 
 	manager, err := NewDeltaManager(config)
@@ -318,7 +318,7 @@ func TestHashVerification(t *testing.T) {
 		Enabled:        true,
 		DeltaStorePath: filepath.Join(tempDir, "deltas"),
 		MetadataPath:   filepath.Join(tempDir, "metadata"),
-		MinFileSize:    0,
+		MinFileSize:    1,
 	}
 
 	manager, err := NewDeltaManager(config)
@@ -363,7 +363,7 @@ func TestDeltaMetrics(t *testing.T) {
 		Enabled:        true,
 		DeltaStorePath: filepath.Join(tempDir, "deltas"),
 		MetadataPath:   filepath.Join(tempDir, "metadata"),
-		MinFileSize:    0,
+		MinFileSize:    1,
 	}
 
 	manager, err := NewDeltaManager(config)
@@ -410,7 +410,7 @@ func TestListChains(t *testing.T) {
 		Enabled:        true,
 		DeltaStorePath: filepath.Join(tempDir, "deltas"),
 		MetadataPath:   filepath.Join(tempDir, "metadata"),
-		MinFileSize:    0,
+		MinFileSize:    1,
 	}
 
 	manager, err := NewDeltaManager(config)
@@ -534,7 +534,7 @@ func BenchmarkCreateDelta(b *testing.B) {
 		Enabled:        true,
 		DeltaStorePath: filepath.Join(tempDir, "deltas"),
 		MetadataPath:   filepath.Join(tempDir, "metadata"),
-		MinFileSize:    0,
+		MinFileSize:    1,
 	}
 
 	manager, _ := NewDeltaManager(config)
@@ -562,7 +562,7 @@ func BenchmarkApplyDelta(b *testing.B) {
 		Enabled:        true,
 		DeltaStorePath: filepath.Join(tempDir, "deltas"),
 		MetadataPath:   filepath.Join(tempDir, "metadata"),
-		MinFileSize:    0,
+		MinFileSize:    1,
 	}
 
 	manager, _ := NewDeltaManager(config)
