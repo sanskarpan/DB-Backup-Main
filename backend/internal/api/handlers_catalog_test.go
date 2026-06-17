@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -15,12 +16,17 @@ import (
 	"github.com/sanskarpan/db-backup/internal/catalog"
 )
 
-// MockSearchEngine is a mock implementation of the search engine
+// MockSearchEngine is a mock implementation of catalog.SearchEngineInterface
 type MockSearchEngine struct {
 	mock.Mock
 }
 
-func (m *MockSearchEngine) Search(ctx interface{}, query *catalog.SearchQuery) (*catalog.SearchResults, error) {
+func (m *MockSearchEngine) IsAvailable() bool {
+	args := m.Called()
+	return args.Bool(0)
+}
+
+func (m *MockSearchEngine) Search(ctx context.Context, query *catalog.SearchQuery) (*catalog.SearchResults, error) {
 	args := m.Called(ctx, query)
 	if result := args.Get(0); result != nil {
 		return result.(*catalog.SearchResults), args.Error(1)
@@ -36,7 +42,7 @@ func (m *MockSearchEngine) ParseQueryString(queryString string) (*catalog.Search
 	return nil, args.Error(1)
 }
 
-func (m *MockSearchEngine) Suggest(ctx interface{}, prefix string, field string, limit int) ([]string, error) {
+func (m *MockSearchEngine) Suggest(ctx context.Context, prefix string, field string, limit int) ([]string, error) {
 	args := m.Called(ctx, prefix, field, limit)
 	if result := args.Get(0); result != nil {
 		return result.([]string), args.Error(1)
@@ -44,7 +50,7 @@ func (m *MockSearchEngine) Suggest(ctx interface{}, prefix string, field string,
 	return nil, args.Error(1)
 }
 
-func (m *MockSearchEngine) GetStats(ctx interface{}) (*catalog.CatalogStats, error) {
+func (m *MockSearchEngine) GetStats(ctx context.Context) (*catalog.CatalogStats, error) {
 	args := m.Called(ctx)
 	if result := args.Get(0); result != nil {
 		return result.(*catalog.CatalogStats), args.Error(1)
@@ -57,6 +63,7 @@ func TestHandleSearchCatalog(t *testing.T) {
 
 	t.Run("successful search with filters", func(t *testing.T) {
 		mockEngine := new(MockSearchEngine)
+		mockEngine.On("IsAvailable").Return(true)
 		server := &Server{searchEngine: mockEngine}
 
 		// Setup mock expectations
@@ -64,7 +71,7 @@ func TestHandleSearchCatalog(t *testing.T) {
 			Results: []*catalog.SearchResult{
 				{
 					Backup: &catalog.BackupDocument{
-						BackupID:        "backup-1",
+						ID:              "backup-1",
 						DatabaseName:    "production",
 						DatabaseType:    "postgres",
 						BackupType:      "full",
@@ -124,6 +131,7 @@ func TestHandleSearchCatalog(t *testing.T) {
 
 	t.Run("search with date filters", func(t *testing.T) {
 		mockEngine := new(MockSearchEngine)
+		mockEngine.On("IsAvailable").Return(true)
 		server := &Server{searchEngine: mockEngine}
 
 		dateFrom := time.Now().Add(-7 * 24 * time.Hour)
@@ -159,6 +167,7 @@ func TestHandleSearchCatalog(t *testing.T) {
 
 	t.Run("search with size filters", func(t *testing.T) {
 		mockEngine := new(MockSearchEngine)
+		mockEngine.On("IsAvailable").Return(true)
 		server := &Server{searchEngine: mockEngine}
 
 		minSize := int64(1024 * 1024 * 100)  // 100MB
@@ -195,6 +204,7 @@ func TestHandleSearchCatalog(t *testing.T) {
 
 	t.Run("pagination with has_more", func(t *testing.T) {
 		mockEngine := new(MockSearchEngine)
+		mockEngine.On("IsAvailable").Return(true)
 		server := &Server{searchEngine: mockEngine}
 
 		mockResults := &catalog.SearchResults{
@@ -207,7 +217,7 @@ func TestHandleSearchCatalog(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			mockResults.Results[i] = &catalog.SearchResult{
 				Backup: &catalog.BackupDocument{
-					BackupID: "backup-" + string(rune(i)),
+					ID: "backup-" + string(rune(i)),
 				},
 			}
 		}
@@ -278,6 +288,7 @@ func TestHandleSearchCatalogSimple(t *testing.T) {
 
 	t.Run("natural language query", func(t *testing.T) {
 		mockEngine := new(MockSearchEngine)
+		mockEngine.On("IsAvailable").Return(true)
 		server := &Server{searchEngine: mockEngine}
 
 		// Mock ParseQueryString
@@ -315,6 +326,7 @@ func TestHandleSuggestCatalog(t *testing.T) {
 
 	t.Run("successful autocomplete", func(t *testing.T) {
 		mockEngine := new(MockSearchEngine)
+		mockEngine.On("IsAvailable").Return(true)
 		server := &Server{searchEngine: mockEngine}
 
 		mockSuggestions := []string{"production", "prod-replica", "prod-archive"}
@@ -382,6 +394,7 @@ func TestHandleSuggestCatalog(t *testing.T) {
 
 	t.Run("default limit", func(t *testing.T) {
 		mockEngine := new(MockSearchEngine)
+		mockEngine.On("IsAvailable").Return(true)
 		server := &Server{searchEngine: mockEngine}
 
 		mockSuggestions := []string{"postgres", "postgresql"}
@@ -405,6 +418,7 @@ func TestHandleGetCatalogStats(t *testing.T) {
 
 	t.Run("successful stats retrieval", func(t *testing.T) {
 		mockEngine := new(MockSearchEngine)
+		mockEngine.On("IsAvailable").Return(true)
 		server := &Server{searchEngine: mockEngine}
 
 		mockStats := &catalog.CatalogStats{
@@ -505,6 +519,7 @@ func TestSearchRequestValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockEngine := new(MockSearchEngine)
+			mockEngine.On("IsAvailable").Return(true)
 			server := &Server{searchEngine: mockEngine}
 
 			mockResults := &catalog.SearchResults{
