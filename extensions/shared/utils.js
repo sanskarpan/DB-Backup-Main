@@ -343,3 +343,5 @@ const Utils = {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = Utils;
 }
+
+export { Utils };
