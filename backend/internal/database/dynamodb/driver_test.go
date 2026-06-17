@@ -11,10 +11,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func skipIfAWSUnavailable(t *testing.T) {
+	t.Helper()
+	if os.Getenv("AWS_ACCESS_KEY_ID") == "" && os.Getenv("AWS_PROFILE") == "" {
+		t.Skip("AWS credentials not available (set AWS_ACCESS_KEY_ID or AWS_PROFILE)")
+	}
+}
+
 func TestDynamoDBDriver_Connect(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}
+	skipIfAWSUnavailable(t)
 
 	driver := NewDynamoDBDriver()
 	config := &database.ConnectionConfig{
@@ -480,6 +488,7 @@ func TestDynamoDB_BackupWithNoTables(t *testing.T) {
 // Helper functions
 
 func setupTestDriver(t *testing.T) *DynamoDBDriver {
+	skipIfAWSUnavailable(t)
 	driver := NewDynamoDBDriver()
 	config := &database.ConnectionConfig{
 		Host: getEnv("AWS_REGION", "us-east-1"),
