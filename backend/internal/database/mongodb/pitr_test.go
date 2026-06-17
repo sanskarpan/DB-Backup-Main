@@ -3,6 +3,8 @@ package mongodb
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"os"
 	"testing"
 	"time"
@@ -12,6 +14,19 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+func skipIfMongoDBUnavailable(t *testing.T) {
+	t.Helper()
+	host := os.Getenv("MONGODB_TEST_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:27017", host), 2*time.Second)
+	if err != nil {
+		t.Skip("MongoDB not available:", err)
+	}
+	conn.Close()
+}
 
 func TestMongoDBPITR_BackupOplog(t *testing.T) {
 	if testing.Short() {
@@ -223,6 +238,7 @@ func TestBackupWithOplog(t *testing.T) {
 
 // Helper function to setup test MongoDB connection
 func setupTestMongoDB(t *testing.T) *MongoDBDriver {
+	skipIfMongoDBUnavailable(t)
 	host := os.Getenv("MONGODB_TEST_HOST")
 	if host == "" {
 		host = "localhost"
