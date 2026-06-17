@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/sanskarpan/db-backup/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,13 +23,13 @@ func TestFileRepository_Save(t *testing.T) {
 	require.NoError(t, err)
 
 	metadata := &models.BackupMetadata{
-		ID:           "test-backup-001",
+		ID:           "backup-2024-01-15-10-00-01-aabbcc01",
 		Name:         "test-backup",
 		DatabaseType: "mysql",
 		Database:     "testdb",
 		Size:         1024,
 		StartTime:    time.Now(),
-		Status:       models.BackupStatusCompleted,
+		Status:       database.BackupStatusCompleted,
 	}
 
 	// Test Save
@@ -36,7 +37,7 @@ func TestFileRepository_Save(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify file exists
-	metadataPath := filepath.Join(tempDir, "test-backup-001.json")
+	metadataPath := filepath.Join(tempDir, "backup-2024-01-15-10-00-01-aabbcc01.json")
 	_, err = os.Stat(metadataPath)
 	assert.NoError(t, err)
 }
@@ -50,13 +51,13 @@ func TestFileRepository_Get(t *testing.T) {
 	require.NoError(t, err)
 
 	originalMetadata := &models.BackupMetadata{
-		ID:           "test-backup-002",
+		ID:           "backup-2024-01-15-10-00-02-aabbcc02",
 		Name:         "test-backup-2",
 		DatabaseType: database.DatabaseTypePostgreSQL,
 		Database:     "testdb",
 		Size:         2048,
 		StartTime:    time.Now(),
-		Status:       models.BackupStatusCompleted,
+		Status:       database.BackupStatusCompleted,
 		Tags:         map[string]string{"env": "test"},
 	}
 
@@ -65,7 +66,7 @@ func TestFileRepository_Get(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test Get
-	retrievedMetadata, err := repo.Get(context.Background(), "test-backup-002")
+	retrievedMetadata, err := repo.Get(context.Background(), "backup-2024-01-15-10-00-02-aabbcc02")
 	assert.NoError(t, err)
 	assert.Equal(t, originalMetadata.ID, retrievedMetadata.ID)
 	assert.Equal(t, originalMetadata.Name, retrievedMetadata.Name)
@@ -99,33 +100,33 @@ func TestFileRepository_List(t *testing.T) {
 	// Create multiple backups
 	backups := []*models.BackupMetadata{
 		{
-			ID:           "backup-001",
+			ID:           "backup-2024-01-15-10-01-01-aabbcc11",
 			Name:         "mysql-backup",
 			DatabaseType: "mysql",
 			Database:     "mydb",
 			Size:         1000,
 			StartTime:    time.Now().Add(-2 * time.Hour),
-			Status:       models.BackupStatusCompleted,
+			Status:       database.BackupStatusCompleted,
 			Tags:         map[string]string{"env": "prod"},
 		},
 		{
-			ID:           "backup-002",
+			ID:           "backup-2024-01-15-10-01-02-aabbcc12",
 			Name:         "postgres-backup",
 			DatabaseType: database.DatabaseTypePostgreSQL,
 			Database:     "pgdb",
 			Size:         2000,
 			StartTime:    time.Now().Add(-1 * time.Hour),
-			Status:       models.BackupStatusCompleted,
+			Status:       database.BackupStatusCompleted,
 			Tags:         map[string]string{"env": "dev"},
 		},
 		{
-			ID:           "backup-003",
+			ID:           "backup-2024-01-15-10-01-03-aabbcc13",
 			Name:         "mongo-backup",
 			DatabaseType: database.DatabaseTypeMongoDB,
 			Database:     "mongodb",
 			Size:         3000,
 			StartTime:    time.Now(),
-			Status:       models.BackupStatusCompleted,
+			Status:       database.BackupStatusCompleted,
 			Tags:         map[string]string{"env": "prod"},
 		},
 	}
@@ -178,13 +179,13 @@ func TestFileRepository_Delete(t *testing.T) {
 	require.NoError(t, err)
 
 	metadata := &models.BackupMetadata{
-		ID:           "test-backup-delete",
+		ID:           "backup-2024-01-15-10-02-01-ddee0001",
 		Name:         "delete-test",
 		DatabaseType: "mysql",
 		Database:     "testdb",
 		Size:         1024,
 		StartTime:    time.Now(),
-		Status:       models.BackupStatusCompleted,
+		Status:       database.BackupStatusCompleted,
 	}
 
 	// Save first
@@ -193,11 +194,11 @@ func TestFileRepository_Delete(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test Delete
-	err = repo.Delete(ctx, "test-backup-delete")
+	err = repo.Delete(ctx, "backup-2024-01-15-10-02-01-ddee0001")
 	assert.NoError(t, err)
 
 	// Verify it's deleted
-	_, err = repo.Get(ctx, "test-backup-delete")
+	_, err = repo.Get(ctx, "backup-2024-01-15-10-02-01-ddee0001")
 	assert.Error(t, err)
 }
 
@@ -210,7 +211,7 @@ func TestFileRepository_Update(t *testing.T) {
 	require.NoError(t, err)
 
 	metadata := &models.BackupMetadata{
-		ID:           "test-backup-update",
+		ID:           "backup-2024-01-15-10-03-01-ffee0001",
 		Name:         "update-test",
 		DatabaseType: "mysql",
 		Database:     "testdb",
@@ -224,14 +225,14 @@ func TestFileRepository_Update(t *testing.T) {
 	require.NoError(t, err)
 
 	// Update status
-	metadata.Status = models.BackupStatusCompleted
+	metadata.Status = database.BackupStatusCompleted
 	metadata.EndTime = time.Now()
 
 	err = repo.Update(ctx, metadata)
 	assert.NoError(t, err)
 
 	// Verify update
-	updated, err := repo.Get(ctx, "test-backup-update")
+	updated, err := repo.Get(ctx, "backup-2024-01-15-10-03-01-ffee0001")
 	require.NoError(t, err)
-	assert.Equal(t, models.BackupStatusCompleted, updated.Status)
+	assert.Equal(t, database.BackupStatusCompleted, updated.Status)
 }

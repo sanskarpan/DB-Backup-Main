@@ -29,7 +29,7 @@ func TestMTLSConfig(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "vault-based config",
+			name: "vault-based config without vault client",
 			config: &MTLSConfig{
 				VaultEnabled:  true,
 				VaultCertPath: "pki/cert/server",
@@ -37,7 +37,7 @@ func TestMTLSConfig(t *testing.T) {
 				VaultCAPath:   "pki/ca",
 				MinVersion:    tls.VersionTLS12,
 			},
-			wantErr: false,
+			wantErr: true, // vault client is nil, so this must fail
 		},
 	}
 

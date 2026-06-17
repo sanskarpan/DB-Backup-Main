@@ -27,7 +27,7 @@ func setupSecurityTestServer(t *testing.T) (*Server, *gin.Engine) {
 	detector := ransomware.NewDetector(ransomware.DefaultDetectorConfig())
 
 	server := &Server{
-		config:   &Config{},
+		config:   &Config{ScanBaseDir: os.TempDir()},
 		detector: detector,
 		logger:   log,
 	}
@@ -120,8 +120,9 @@ func TestHandleScanFile_FileNotFound(t *testing.T) {
 	server, router := setupSecurityTestServer(t)
 	router.POST("/security/scan/file", server.handleScanFile)
 
+	// Use a path within ScanBaseDir (os.TempDir()) that does not exist
 	requestBody := ScanFileRequest{
-		FilePath: "/nonexistent/file.txt",
+		FilePath: filepath.Join(os.TempDir(), "nonexistent-file-xyz.txt"),
 	}
 	bodyBytes, _ := json.Marshal(requestBody)
 
