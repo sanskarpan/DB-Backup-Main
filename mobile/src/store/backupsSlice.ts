@@ -19,6 +19,7 @@ interface BackupsState {
   error: string | null;
   syncing: boolean;
   lastSync: string | null;
+  isCachedData: boolean;
 }
 
 const initialState: BackupsState = {
@@ -27,6 +28,7 @@ const initialState: BackupsState = {
   error: null,
   syncing: false,
   lastSync: null,
+  isCachedData: false,
 };
 
 // Async thunks
@@ -38,24 +40,30 @@ export const fetchBackups = createAsyncThunk(
       const response = await apiService.getBackups();
 
       // Save to local storage for offline access
-      await AsyncStorage.setItem(
-        'backups',
-        JSON.stringify(response.data),
-      );
-      await offlineService.saveBackups(response.data);
+      try {
+        await AsyncStorage.setItem('backups', JSON.stringify(response.data));
+        await offlineService.saveBackups(response.data);
+      } catch (storageError) {
+        console.warn('[fetchBackups] Failed to persist backups locally:', storageError);
+      }
 
-      return response.data;
-    } catch (error) {
-      // If offline, load from local storage
+      return {data: response.data, isCachedData: false};
+    } catch (error: any) {
+      // Auth errors should not fall back to cache
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        return rejectWithValue('Unauthorized: please log in again');
+      }
+
+      // For other errors (network, 5xx), fall back to cache
       const cachedBackups = await AsyncStorage.getItem('backups');
       if (cachedBackups) {
-        return JSON.parse(cachedBackups);
+        return {data: JSON.parse(cachedBackups), isCachedData: true};
       }
 
       // Try loading from SQLite
       const offlineBackups = await offlineService.getBackups();
       if (offlineBackups.length > 0) {
-        return offlineBackups;
+        return {data: offlineBackups, isCachedData: true};
       }
 
       return rejectWithValue('Failed to load backups');
@@ -93,11 +101,19 @@ export const syncOfflineData = createAsyncThunk(
 
       for (const request of pendingRequests) {
         if (request.type === 'create_backup') {
-          await apiService.createBackup(
-            request.data.databaseId,
-            request.data.options,
-          );
-          await offlineService.markRequestProcessed(request.id);
+          try {
+            await apiService.createBackup(
+              request.data.databaseId,
+              request.data.options,
+            );
+            await offlineService.markRequestProcessed(request.id);
+          } catch (requestError) {
+            console.error(
+              `[syncOfflineData] Failed to sync request ${request.id}:`,
+              requestError,
+            );
+            // Continue processing remaining requests
+          }
         }
       }
 
@@ -106,6 +122,7 @@ export const syncOfflineData = createAsyncThunk(
 
       return {success: true};
     } catch (error) {
+      console.error('[syncOfflineData] Sync failed:', error);
       throw error;
     }
   },
@@ -137,7 +154,8 @@ const backupsSlice = createSlice({
     });
     builder.addCase(fetchBackups.fulfilled, (state, action) => {
       state.loading = false;
-      state.backups = action.payload;
+      state.backups = action.payload.data;
+      state.isCachedData = action.payload.isCachedData;
       state.lastSync = new Date().toISOString();
     });
     builder.addCase(fetchBackups.rejected, (state, action) => {
