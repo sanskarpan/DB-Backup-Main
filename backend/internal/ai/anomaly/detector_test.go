@@ -2,6 +2,7 @@ package anomaly
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -193,12 +194,15 @@ func TestDetector_NoBaselineNoDetection(t *testing.T) {
 func TestDetector_RegisterAlertCallback(t *testing.T) {
 	detector, _ := setupTestDetector(t)
 
+	var mu sync.Mutex
 	callbackCalled := false
 	var receivedAnomaly AnomalyReport
 
 	detector.RegisterAlertCallback(func(anomaly AnomalyReport) {
+		mu.Lock()
 		callbackCalled = true
 		receivedAnomaly = anomaly
+		mu.Unlock()
 	})
 
 	// Trigger anomaly
@@ -218,9 +222,14 @@ func TestDetector_RegisterAlertCallback(t *testing.T) {
 	// Wait for callback (it's async)
 	time.Sleep(100 * time.Millisecond)
 
-	assert.True(t, callbackCalled, "Callback should be called")
-	assert.NotEmpty(t, receivedAnomaly.ID)
-	assert.Equal(t, "test-db", receivedAnomaly.DatabaseName)
+	mu.Lock()
+	called := callbackCalled
+	anomaly := receivedAnomaly
+	mu.Unlock()
+
+	assert.True(t, called, "Callback should be called")
+	assert.NotEmpty(t, anomaly.ID)
+	assert.Equal(t, "test-db", anomaly.DatabaseName)
 }
 
 func TestDetector_GetAnomalyHistory(t *testing.T) {
