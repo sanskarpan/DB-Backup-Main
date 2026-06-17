@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // ReportFormat represents the format of a compliance report
@@ -116,7 +118,7 @@ func (cr *ComplianceReporter) GenerateReport(reportType ReportType, format Repor
 	}
 
 	report := &ComplianceReport{
-		ID:                fmt.Sprintf("report-%d", time.Now().UnixNano()),
+		ID:                uid.New("report"),
 		Type:              reportType,
 		Format:            format,
 		GeneratedAt:       time.Now(),
