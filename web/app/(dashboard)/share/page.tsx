@@ -70,7 +70,7 @@ export default function SharePage() {
       // Store in offline DB
       await db.addToQueue({
         id: `share-${Date.now()}`,
-        url: '/api/backups/import',
+        url: '/api/v1/backups/import',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: sharedData,

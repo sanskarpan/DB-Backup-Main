@@ -52,11 +52,13 @@ interface LoadTestResult {
 export default function TestingPage() {
   const [selectedTab, setSelectedTab] = useState<'chaos' | 'load' | 'contract' | 'mutation'>('chaos')
 
+  const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1'
+
   // Fetch test runs
   const { data: testRuns } = useQuery<TestRun[]>({
     queryKey: ['test-runs'],
     queryFn: async () => {
-      const res = await fetch('/api/testing/runs')
+      const res = await fetch(`${BACKEND_URL}/testing/runs`)
       if (!res.ok) throw new Error('Failed to fetch test runs')
       return res.json()
     },
@@ -67,7 +69,7 @@ export default function TestingPage() {
   const { data: chaosExperiments } = useQuery<ChaosExperiment[]>({
     queryKey: ['chaos-experiments'],
     queryFn: async () => {
-      const res = await fetch('/api/testing/chaos/experiments')
+      const res = await fetch(`${BACKEND_URL}/testing/chaos/experiments`)
       if (!res.ok) throw new Error('Failed to fetch chaos experiments')
       return res.json()
     },
@@ -77,7 +79,7 @@ export default function TestingPage() {
   const { data: loadTestResults } = useQuery<LoadTestResult[]>({
     queryKey: ['load-test-results'],
     queryFn: async () => {
-      const res = await fetch('/api/testing/load/results')
+      const res = await fetch(`${BACKEND_URL}/testing/load/results`)
       if (!res.ok) throw new Error('Failed to fetch load test results')
       return res.json()
     },

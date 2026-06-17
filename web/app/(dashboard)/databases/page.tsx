@@ -16,6 +16,7 @@ import {
   Shield,
   Activity,
   Loader2,
+  AlertCircle,
 } from 'lucide-react'
 
 export default function DatabasesPage() {
@@ -25,7 +26,9 @@ export default function DatabasesPage() {
 
   const queryClient = useQueryClient()
 
-  const { data: databases, isLoading } = useQuery({
+  const [mutationError, setMutationError] = useState<string | null>(null)
+
+  const { data: databases, isLoading, isError, error } = useQuery({
     queryKey: ['databases'],
     queryFn: () => api.listDatabases(),
   })
@@ -36,6 +39,10 @@ export default function DatabasesPage() {
       queryClient.invalidateQueries({ queryKey: ['databases'] })
       setShowModal(false)
       setEditingDatabase(null)
+      setMutationError(null)
+    },
+    onError: (err: unknown) => {
+      setMutationError(err instanceof Error ? err.message : 'Failed to create database')
     },
   })
 
@@ -46,6 +53,10 @@ export default function DatabasesPage() {
       queryClient.invalidateQueries({ queryKey: ['databases'] })
       setShowModal(false)
       setEditingDatabase(null)
+      setMutationError(null)
+    },
+    onError: (err: unknown) => {
+      setMutationError(err instanceof Error ? err.message : 'Failed to update database')
     },
   })
 
@@ -53,6 +64,10 @@ export default function DatabasesPage() {
     mutationFn: (id: string) => api.deleteDatabase(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['databases'] })
+      setMutationError(null)
+    },
+    onError: (err: unknown) => {
+      setMutationError(err instanceof Error ? err.message : 'Failed to delete database')
     },
   })
 
@@ -68,6 +83,12 @@ export default function DatabasesPage() {
         })
       }, 5000)
     },
+    onError: (err: unknown, id) => {
+      setTestResults((prev) => ({
+        ...prev,
+        [id]: { success: false, message: err instanceof Error ? err.message : 'Connection test failed' },
+      }))
+    },
   })
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -79,6 +100,7 @@ export default function DatabasesPage() {
       host: formData.get('host') as string,
       port: parseInt(formData.get('port') as string),
       username: formData.get('username') as string,
+      password: formData.get('password') as string,
     }
 
     if (editingDatabase) {
@@ -162,6 +184,21 @@ export default function DatabasesPage() {
             </div>
           </div>
         </div>
+
+        {/* Error Alerts */}
+        {(isError || mutationError) && (
+          <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-800 dark:text-red-300">
+                {isError ? 'Failed to load databases' : 'Action failed'}
+              </p>
+              <p className="text-sm text-red-700 dark:text-red-400">
+                {isError ? (error instanceof Error ? error.message : 'An error occurred') : mutationError}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -447,6 +484,18 @@ export default function DatabasesPage() {
                     defaultValue={editingDatabase?.username}
                     className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all font-mono"
                     placeholder="postgres"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    name="password"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all font-mono"
+                    placeholder="••••••••"
                   />
                 </div>
               </div>

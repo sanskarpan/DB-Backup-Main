@@ -16,9 +16,12 @@ import {
 } from 'lucide-react'
 import { PWASettings } from '@/components/pwa/pwa-settings'
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1'
+
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('storage')
   const [saveStatus, setSaveStatus] = useState<{ success: boolean; message: string } | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   const tabs = [
     { id: 'storage', name: 'Storage', icon: HardDrive },
@@ -28,10 +31,43 @@ export default function SettingsPage() {
     { id: 'pwa', name: 'Progressive Web App', icon: Smartphone },
   ]
 
-  const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setSaveStatus({ success: true, message: 'Settings saved successfully!' })
-    setTimeout(() => setSaveStatus(null), 3000)
+    setIsSaving(true)
+    setSaveStatus(null)
+
+    const formData = new FormData(e.currentTarget)
+    const payload: Record<string, unknown> = {}
+    formData.forEach((value, key) => {
+      payload[key] = value
+    })
+
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+      const res = await fetch(`${API_BASE_URL}/settings/${activeTab}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({}))
+        throw new Error(errorBody.message || `Request failed with status ${res.status}`)
+      }
+
+      setSaveStatus({ success: true, message: 'Settings saved successfully!' })
+      setTimeout(() => setSaveStatus(null), 3000)
+    } catch (error) {
+      setSaveStatus({
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to save settings',
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -90,7 +126,7 @@ export default function SettingsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Storage Provider
                 </label>
-                <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                <select name="provider" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                   <option value="local">Local Filesystem</option>
                   <option value="s3">Amazon S3</option>
                   <option value="gcs">Google Cloud Storage</option>
@@ -104,6 +140,7 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="text"
+                  name="storage_path"
                   defaultValue="/var/backups/db"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="/var/backups/db"
@@ -116,6 +153,7 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="number"
+                  name="retention_days"
                   defaultValue="30"
                   min="1"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -126,6 +164,7 @@ export default function SettingsPage() {
                 <label className="flex items-center">
                   <input
                     type="checkbox"
+                    name="compression_enabled"
                     defaultChecked
                     className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
                   />
@@ -139,6 +178,7 @@ export default function SettingsPage() {
                 <label className="flex items-center">
                   <input
                     type="checkbox"
+                    name="encryption_enabled"
                     defaultChecked
                     className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
                   />
@@ -150,10 +190,11 @@ export default function SettingsPage() {
 
               <button
                 type="submit"
-                className="flex items-center px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                disabled={isSaving}
+                className="flex items-center px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className="w-5 h-5 mr-2" />
-                Save Changes
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </button>
             </form>
           )}
@@ -254,10 +295,11 @@ export default function SettingsPage() {
 
               <button
                 type="submit"
-                className="flex items-center px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                disabled={isSaving}
+                className="flex items-center px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className="w-5 h-5 mr-2" />
-                Save Changes
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </button>
             </form>
           )}
@@ -345,10 +387,11 @@ export default function SettingsPage() {
 
               <button
                 type="submit"
-                className="flex items-center px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                disabled={isSaving}
+                className="flex items-center px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className="w-5 h-5 mr-2" />
-                Save Changes
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </button>
             </form>
           )}
@@ -427,10 +470,11 @@ export default function SettingsPage() {
 
               <button
                 type="submit"
-                className="flex items-center px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                disabled={isSaving}
+                className="flex items-center px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className="w-5 h-5 mr-2" />
-                Save Changes
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </button>
             </form>
           )}

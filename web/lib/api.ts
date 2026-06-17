@@ -9,7 +9,7 @@ import { createApiClient } from '@db-backup/api-client';
 
 // Create API client instance with web-specific configuration
 export const apiClient = createApiClient({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1',
   timeout: 30000,
   getAuthToken: () => {
     // Get token from localStorage (browser only)

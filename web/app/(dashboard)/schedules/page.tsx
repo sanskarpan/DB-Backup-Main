@@ -24,7 +24,9 @@ export default function SchedulesPage() {
 
   const queryClient = useQueryClient()
 
-  const { data: schedules, isLoading } = useQuery({
+  const [mutationError, setMutationError] = useState<string | null>(null)
+
+  const { data: schedules, isLoading, isError, error } = useQuery({
     queryKey: ['schedules'],
     queryFn: () => api.listSchedules(),
   })
@@ -40,6 +42,10 @@ export default function SchedulesPage() {
       queryClient.invalidateQueries({ queryKey: ['schedules'] })
       setShowModal(false)
       setEditingSchedule(null)
+      setMutationError(null)
+    },
+    onError: (err: unknown) => {
+      setMutationError(err instanceof Error ? err.message : 'Failed to create schedule')
     },
   })
 
@@ -50,6 +56,10 @@ export default function SchedulesPage() {
       queryClient.invalidateQueries({ queryKey: ['schedules'] })
       setShowModal(false)
       setEditingSchedule(null)
+      setMutationError(null)
+    },
+    onError: (err: unknown) => {
+      setMutationError(err instanceof Error ? err.message : 'Failed to update schedule')
     },
   })
 
@@ -57,6 +67,10 @@ export default function SchedulesPage() {
     mutationFn: (id: string) => api.deleteSchedule(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['schedules'] })
+      setMutationError(null)
+    },
+    onError: (err: unknown) => {
+      setMutationError(err instanceof Error ? err.message : 'Failed to delete schedule')
     },
   })
 
@@ -65,6 +79,10 @@ export default function SchedulesPage() {
       api.updateSchedule(id, { enabled }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['schedules'] })
+      setMutationError(null)
+    },
+    onError: (err: unknown) => {
+      setMutationError(err instanceof Error ? err.message : 'Failed to toggle schedule')
     },
   })
 
@@ -146,6 +164,21 @@ export default function SchedulesPage() {
             </div>
           </div>
         </div>
+
+        {/* Error Alerts */}
+        {(isError || mutationError) && (
+          <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-800 dark:text-red-300">
+                {isError ? 'Failed to load schedules' : 'Action failed'}
+              </p>
+              <p className="text-sm text-red-700 dark:text-red-400">
+                {isError ? (error instanceof Error ? error.message : 'An error occurred') : mutationError}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

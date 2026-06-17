@@ -3,8 +3,6 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { QueryProvider } from '@/components/providers/query-provider'
 import { PWAProvider } from '@/components/providers/pwa-provider'
-import { Sidebar } from '@/components/layout/sidebar'
-import { Header } from '@/components/layout/header'
 import { InstallPrompt } from '@/components/pwa/install-prompt'
 import { OfflineIndicator } from '@/components/pwa/offline-indicator'
 import { UpdateNotification } from '@/components/pwa/update-notification'
@@ -58,15 +56,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <QueryProvider>
           <PWAProvider>
-            <div className="flex h-screen overflow-hidden">
-              <Sidebar />
-              <div className="flex-1 flex flex-col overflow-hidden">
-                <Header />
-                <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
-                  {children}
-                </main>
-              </div>
-            </div>
+            {children}
 
             {/* PWA Components */}
             <InstallPrompt />

@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, StorageProvider, StorageProviderType } from '@/lib/api'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Trash2, Edit, TestTube2, CheckCircle, XCircle, HardDrive, Cloud, Database, Lock } from 'lucide-react'
 
 export default function StorageProvidersPage() {
@@ -137,6 +137,20 @@ export default function StorageProvidersPage() {
     setSelectedType('s3')
     setShowModal(true)
   }
+
+  const closeModal = () => {
+    setShowModal(false)
+    setEditingProvider(null)
+  }
+
+  useEffect(() => {
+    if (!showModal) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [showModal])
 
   const getProviderIcon = (type: StorageProviderType) => {
     switch (type) {
@@ -316,8 +330,8 @@ export default function StorageProvidersPage() {
 
       {/* Create/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl my-8 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto" onClick={closeModal}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl my-8 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               {editingProvider ? 'Edit Storage Provider' : 'Add New Storage Provider'}
             </h3>

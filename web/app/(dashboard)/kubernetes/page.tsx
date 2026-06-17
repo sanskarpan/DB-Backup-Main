@@ -7,57 +7,29 @@ import {
   AlertCircle, Clock, Package, Server, Database, Calendar
 } from 'lucide-react'
 
-// Mock API - replace with actual API calls
-const mockApi = {
-  getOperatorStatus: async () => ({
-    installed: true,
-    version: 'v1.0.0',
-    namespace: 'db-backup-system',
-    replicas: 1,
-    ready: 1,
-    status: 'running' as const,
-  }),
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1'
 
-  listBackupPolicies: async () => ([
-    {
-      id: '1',
-      name: 'postgres-daily',
-      namespace: 'default',
-      databaseType: 'postgres',
-      schedule: '0 2 * * *',
-      retention: { daily: 7, weekly: 4, monthly: 3 },
-      enabled: true,
-      lastBackup: '2026-01-08T02:00:00Z',
-      status: 'active',
-    },
-  ]),
-
-  listBackupSchedules: async () => ([
-    {
-      id: '1',
-      name: 'mysql-hourly',
-      namespace: 'default',
-      databaseType: 'mysql',
-      schedule: '0 * * * *',
-      enabled: true,
-      nextRun: '2026-01-08T15:00:00Z',
-      lastRun: '2026-01-08T14:00:00Z',
-      status: 'scheduled',
-    },
-  ]),
-
-  listRestoreJobs: async () => ([
-    {
-      id: '1',
-      name: 'restore-postgres-20260108',
-      namespace: 'default',
-      backupName: 'postgres-backup-20260108',
-      targetDatabase: 'postgres-prod',
-      status: 'completed',
-      startTime: '2026-01-08T10:00:00Z',
-      completionTime: '2026-01-08T10:15:00Z',
-    },
-  ]),
+const k8sApi = {
+  getOperatorStatus: async () => {
+    const res = await fetch(`${BACKEND_URL}/kubernetes/operator/status`)
+    if (!res.ok) throw new Error('Failed to fetch operator status')
+    return res.json()
+  },
+  listBackupPolicies: async () => {
+    const res = await fetch(`${BACKEND_URL}/kubernetes/backup-policies`)
+    if (!res.ok) throw new Error('Failed to fetch backup policies')
+    return res.json()
+  },
+  listBackupSchedules: async () => {
+    const res = await fetch(`${BACKEND_URL}/kubernetes/backup-schedules`)
+    if (!res.ok) throw new Error('Failed to fetch backup schedules')
+    return res.json()
+  },
+  listRestoreJobs: async () => {
+    const res = await fetch(`${BACKEND_URL}/kubernetes/restore-jobs`)
+    if (!res.ok) throw new Error('Failed to fetch restore jobs')
+    return res.json()
+  },
 }
 
 type OperatorStatus = {
@@ -120,23 +92,23 @@ export default function KubernetesPage() {
   // Queries
   const { data: operatorStatus } = useQuery({
     queryKey: ['operator-status'],
-    queryFn: mockApi.getOperatorStatus,
+    queryFn: k8sApi.getOperatorStatus,
     refetchInterval: 10000, // Refresh every 10 seconds
   })
 
   const { data: backupPolicies } = useQuery({
     queryKey: ['backup-policies'],
-    queryFn: mockApi.listBackupPolicies,
+    queryFn: k8sApi.listBackupPolicies,
   })
 
   const { data: backupSchedules } = useQuery({
     queryKey: ['backup-schedules'],
-    queryFn: mockApi.listBackupSchedules,
+    queryFn: k8sApi.listBackupSchedules,
   })
 
   const { data: restoreJobs } = useQuery({
     queryKey: ['restore-jobs'],
-    queryFn: mockApi.listRestoreJobs,
+    queryFn: k8sApi.listRestoreJobs,
   })
 
   const getStatusBadge = (status: string) => {
@@ -299,7 +271,7 @@ export default function KubernetesPage() {
 
           <div className="grid grid-cols-1 gap-4">
             {backupPolicies && backupPolicies.length > 0 ? (
-              backupPolicies.map((policy) => (
+              backupPolicies.map((policy: any) => (
                 <div key={policy.id} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center space-x-3">
@@ -381,7 +353,7 @@ export default function KubernetesPage() {
 
           <div className="grid grid-cols-1 gap-4">
             {backupSchedules && backupSchedules.length > 0 ? (
-              backupSchedules.map((schedule) => (
+              backupSchedules.map((schedule: any) => (
                 <div key={schedule.id} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center space-x-3">
@@ -466,7 +438,7 @@ export default function KubernetesPage() {
 
           <div className="grid grid-cols-1 gap-4">
             {restoreJobs && restoreJobs.length > 0 ? (
-              restoreJobs.map((job) => (
+              restoreJobs.map((job: any) => (
                 <div key={job.id} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center space-x-3">
@@ -531,15 +503,57 @@ export default function KubernetesPage() {
         </div>
       )}
 
-      {/* Modals placeholders */}
+      {/* Policy Modal */}
       {showPolicyModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowPolicyModal(false)}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Create Backup Policy</h3>
             <p className="text-gray-600 mb-4">Policy creation form will go here</p>
             <div className="flex justify-end space-x-3">
               <button
                 onClick={() => setShowPolicyModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowScheduleModal(false)}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Create Backup Schedule</h3>
+            <p className="text-gray-600 mb-4">Schedule creation form will go here</p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowScheduleModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restore Job Modal */}
+      {showRestoreModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowRestoreModal(false)}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Create Restore Job</h3>
+            <p className="text-gray-600 mb-4">Restore job creation form will go here</p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowRestoreModal(false)}
                 className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 Cancel

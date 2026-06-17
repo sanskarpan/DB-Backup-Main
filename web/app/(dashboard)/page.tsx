@@ -6,8 +6,11 @@ import { StatsCard } from '@/components/dashboard/stats-card'
 import { RecentBackups } from '@/components/dashboard/recent-backups'
 import { StorageChart } from '@/components/dashboard/storage-chart'
 import { Database, HardDrive, Activity, CheckCircle2, TrendingUp, Shield, Zap } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 export default function DashboardPage() {
+  const router = useRouter()
+
   const { data: stats } = useQuery({
     queryKey: ['stats'],
     queryFn: () => api.getStats(),
@@ -40,7 +43,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="hidden lg:flex items-center gap-3">
-              <button className="btn-primary flex items-center gap-2">
+              <button className="btn-primary flex items-center gap-2" onClick={() => router.push('/backups')}>
                 <Zap className="w-5 h-5" />
                 New Backup
               </button>
@@ -133,7 +136,7 @@ export default function DashboardPage() {
       <div className="modern-card modern-card-dark p-6">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
         <div className="grid gap-4 md:grid-cols-3">
-          <button className="p-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-orange-500 dark:hover:border-orange-500 transition-colors group">
+          <button onClick={() => router.push('/backups')} className="p-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-orange-500 dark:hover:border-orange-500 transition-colors group">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors">
                 <Database className="w-5 h-5 text-orange-600 dark:text-orange-400" />
@@ -145,7 +148,7 @@ export default function DashboardPage() {
             </div>
           </button>
 
-          <button className="p-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-colors group">
+          <button onClick={() => router.push('/schedules')} className="p-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-colors group">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
                 <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -157,7 +160,7 @@ export default function DashboardPage() {
             </div>
           </button>
 
-          <button className="p-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-green-500 dark:hover:border-green-500 transition-colors group">
+          <button onClick={() => router.push('/security')} className="p-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-green-500 dark:hover:border-green-500 transition-colors group">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
                 <Shield className="w-5 h-5 text-green-600 dark:text-green-400" />
