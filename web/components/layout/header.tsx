@@ -1,14 +1,30 @@
 'use client'
 
 import { Bell, User, Search, Command, Moon, Sun, Zap, ChevronDown, Settings as SettingsIcon } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 
 export function Header() {
-  const [isDark, setIsDark] = useState(false)
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('dark')
+    }
+    return false
+  })
   const [showNotifications, setShowNotifications] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const pathname = usePathname()
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme')
+    if (savedTheme === 'dark') {
+      setIsDark(true)
+      document.documentElement.classList.add('dark')
+    } else if (savedTheme === 'light') {
+      setIsDark(false)
+      document.documentElement.classList.remove('dark')
+    }
+  }, [])
 
   const getBreadcrumb = () => {
     const path = pathname.split('/').filter(Boolean)
@@ -64,7 +80,12 @@ export function Header() {
 
         {/* Dark Mode Toggle */}
         <button
-          onClick={() => setIsDark(!isDark)}
+          onClick={() => {
+            const newDark = !isDark
+            setIsDark(newDark)
+            document.documentElement.classList.toggle('dark', newDark)
+            localStorage.setItem('theme', newDark ? 'dark' : 'light')
+          }}
           className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all"
           title="Toggle theme"
         >
