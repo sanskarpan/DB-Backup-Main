@@ -215,7 +215,7 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 				{Pattern: []byte("DECRYPT_INSTRUCTION"), Offset: -1, Description: "CryptoWall marker"},
 				{Pattern: []byte("CryptoWall"), Offset: -1, Description: "CryptoWall identifier"},
 			},
-			ExtensionPatterns: []string{".encrypted", ".cryptowall", ".crypto"},
+			ExtensionPatterns: []string{".cryptowall", ".crypto"},
 			FilenamePatterns:  []string{"DECRYPT_INSTRUCTION.html", "DECRYPT_INSTRUCTION.txt", "DECRYPT_INSTRUCTION.url"},
 			RansomNotePatterns: []string{
 				"What happened to your files?",
@@ -311,7 +311,7 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("MAZE"), Offset: -1, Description: "Maze marker"},
 			},
-			ExtensionPatterns: []string{".maze", ".encrypted"},
+			ExtensionPatterns: []string{".maze"},
 			FilenamePatterns:  []string{"DECRYPT-FILES.txt", "DECRYPT-FILES.html"},
 			RansomNotePatterns: []string{
 				"Your files have been encrypted",
@@ -1108,8 +1108,8 @@ func (pe *PatternEngine) fuzzyMatch(data, pattern []byte) bool {
 		return false
 	}
 
-	// Simple fuzzy matching: allow some byte differences
-	threshold := (len(pattern) * pe.config.FuzzyMatchThreshold) / 100
+	// Simple fuzzy matching: allow some byte differences (use ceiling to avoid false positives on short patterns)
+	threshold := (len(pattern)*pe.config.FuzzyMatchThreshold + 99) / 100
 
 	for i := 0; i <= len(data)-len(pattern); i++ {
 		matches := 0
