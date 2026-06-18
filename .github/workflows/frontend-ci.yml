@@ -89,14 +89,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Typecheck shared/types
+      - name: Build shared/types (generates dist/ for api-client)
         run: |
           npm install --no-fund --ignore-scripts
-          npx tsc --noEmit
+          npx tsc
+        working-directory: shared/packages/types
+      - name: Typecheck shared/types
+        run: npx tsc --noEmit
         working-directory: shared/packages/types
       - name: Typecheck shared/api-client
         run: |
           npm install --no-fund --ignore-scripts
+          mkdir -p node_modules/@db-backup
+          ln -sf "$(cd ../types && pwd)" node_modules/@db-backup/types
           npx tsc --noEmit
         working-directory: shared/packages/api-client
 
