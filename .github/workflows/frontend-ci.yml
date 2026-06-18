@@ -23,9 +23,6 @@ jobs:
   web:
     name: Web — Typecheck & Lint & Build
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,10 +30,25 @@ jobs:
           node-version: '20'
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - run: npm ci
-      - run: npm run type-check
-      - run: npm run lint
-      - run: npm run build
+      # Install shared packages so tsconfig paths resolve at typecheck time
+      - name: Install shared/types
+        run: npm install --no-fund --ignore-scripts
+        working-directory: shared/packages/types
+      - name: Install shared/api-client
+        run: npm install --no-fund --ignore-scripts
+        working-directory: shared/packages/api-client
+      - name: Install web deps
+        run: npm ci
+        working-directory: web
+      - name: Typecheck
+        run: npm run type-check
+        working-directory: web
+      - name: Lint
+        run: npm run lint
+        working-directory: web
+      - name: Build
+        run: npm run build
+        working-directory: web
 
   mobile:
     name: Mobile — Typecheck & Lint
@@ -49,13 +61,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
-      - run: npm ci
+      # No package-lock.json committed — use npm install
+      - run: npm install --no-fund
       - run: npm run lint
 
   desktop:
-    name: Desktop — Typecheck & Build (TS only)
+    name: Desktop — Typecheck
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -65,26 +76,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
-          cache-dependency-path: desktop/package-lock.json
-      - run: npm ci
+      # package-lock.json may be out of sync with workspace deps — use npm install
+      - run: npm install --no-fund
       - run: npx tsc --noEmit
 
   shared:
     name: Shared Packages — Typecheck
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: shared/packages/api-client
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
-          cache-dependency-path: shared/packages/api-client/package-lock.json
-      - run: npm ci
-      - run: npx tsc --noEmit
+      - name: Typecheck shared/types
+        run: |
+          npm install --no-fund --ignore-scripts
+          npx tsc --noEmit
+        working-directory: shared/packages/types
+      - name: Typecheck shared/api-client
+        run: |
+          npm install --no-fund --ignore-scripts
+          npx tsc --noEmit
+        working-directory: shared/packages/api-client
 
   extensions:
     name: Extensions — Lint
