@@ -1,0 +1,64 @@
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  title:
+    name: Conventional Commit Title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            test
+            chore
+            perf
+            ci
+            build
+            revert
+          requireScope: false
+          subjectPattern: ^[A-Z].+$
+          subjectPatternError: >
+            The subject must start with an uppercase letter.
+            E.g. "fix: Resolve nil pointer in vault client"
+
+  size:
+    name: PR Size Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check diff size
+        run: |
+          LINES=$(git diff --stat origin/${{ github.base_ref }}...HEAD | tail -1 | grep -oP '\d+ insertion' | grep -oP '\d+' || echo 0)
+          echo "Lines changed: $LINES"
+          if [ "$LINES" -gt 2000 ]; then
+            echo "::warning::This PR changes $LINES lines. Consider splitting into smaller PRs for easier review."
+          fi
+
+  no-fixup:
+    name: No WIP / Fixup Commits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check for WIP commits
+        run: |
+          MSGS=$(git log --format="%s" origin/${{ github.base_ref }}..HEAD)
+          if echo "$MSGS" | grep -iE "^(wip|fixup!|squash!|tmp|temp|do not merge)"; then
+            echo "::error::Found WIP/fixup commit messages. Clean up before merging."
+            exit 1
+          fi
+          echo "All commit messages look clean."

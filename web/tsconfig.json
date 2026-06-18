@@ -23,7 +23,10 @@
       "@/*": ["./*"],
       "@/components/*": ["./components/*"],
       "@/lib/*": ["./lib/*"],
-      "@/types/*": ["./types/*"]
+      "@/types/*": ["./types/*"],
+      "@db-backup/api-client": ["../shared/packages/api-client/src/index.ts"],
+      "@db-backup/types": ["../shared/packages/types/src/index.ts"],
+      "@db-backup/utils": ["../shared/packages/utils/src/index.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

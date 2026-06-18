@@ -73,7 +73,7 @@ export default function DatabasesPage() {
 
   const testConnectionMutation = useMutation({
     mutationFn: (id: string) => api.testConnection(id),
-    onSuccess: (data, id) => {
+    onSuccess: (data: { success: boolean; message: string }, id) => {
       setTestResults((prev) => ({ ...prev, [id]: data }))
       setTimeout(() => {
         setTestResults((prev) => {

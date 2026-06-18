@@ -218,13 +218,21 @@ func TestConnectionPool_HealthCheck(t *testing.T) {
 	pool := createTestPool(t, config)
 	defer pool.Close()
 
-	// Wait for health check to run and connections to be replaced
-	// Use a longer sleep to handle race-detector overhead (5-10x slower)
-	time.Sleep(2 * time.Second)
+	// Poll until connections have been recycled and replenished.
+	// A fixed sleep is unreliable under the race detector (goroutines run
+	// significantly slower), so we poll with a generous deadline instead.
+	var stats PoolStats
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		stats = pool.Stats()
+		if stats.MaxLifetimeReached > 0 && stats.TotalConnections >= int64(config.MinConnections) {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 
-	stats := pool.Stats()
 	assert.Greater(t, stats.MaxLifetimeReached, int64(0), "should have replaced connections")
-	assert.GreaterOrEqual(t, stats.TotalConnections, int64(2), "should maintain at least min connections")
+	assert.GreaterOrEqual(t, stats.TotalConnections, int64(config.MinConnections), "should maintain at least min connections")
 }
 
 func TestConnectionPool_AutoScaleUp(t *testing.T) {

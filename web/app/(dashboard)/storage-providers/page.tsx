@@ -46,7 +46,7 @@ export default function StorageProvidersPage() {
 
   const testConnectionMutation = useMutation({
     mutationFn: (id: string) => api.testStorageProvider(id),
-    onSuccess: (data, id) => {
+    onSuccess: (data: { success: boolean; message: string }, id) => {
       setTestResults((prev) => ({ ...prev, [id]: data }))
       setTimeout(() => {
         setTestResults((prev) => {
