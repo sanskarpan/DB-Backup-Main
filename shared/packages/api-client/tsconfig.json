@@ -2,7 +2,11 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "paths": {
+      "@db-backup/types": ["../types/src/index.ts"],
+      "@db-backup/types/*": ["../types/src/*"]
+    }
   },
   "include": [
     "src/**/*"

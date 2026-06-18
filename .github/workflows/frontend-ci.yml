@@ -94,15 +94,9 @@ jobs:
           npm install --no-fund --ignore-scripts
           npx tsc --noEmit
         working-directory: shared/packages/types
-      - name: Link shared/types for api-client
-        run: |
-          npm install --no-fund --ignore-scripts
-          npm link
-        working-directory: shared/packages/types
       - name: Typecheck shared/api-client
         run: |
           npm install --no-fund --ignore-scripts
-          npm link @db-backup/types
           npx tsc --noEmit
         working-directory: shared/packages/api-client
 

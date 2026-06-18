@@ -22,6 +22,7 @@ jobs:
         with:
           work-dir: backend
           go-package: ./...
+          go-flags: -scan module
 
   npm-audit:
     name: npm Audit
