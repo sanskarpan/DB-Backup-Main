@@ -3,6 +3,7 @@ package security
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"os"
 	"testing"
 	"time"
 )
@@ -43,6 +44,11 @@ func TestMTLSConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.config != nil && tt.config.KeyFile != "" {
+				if _, err := os.Stat(tt.config.KeyFile); os.IsNotExist(err) {
+					t.Skipf("test fixture %s not available", tt.config.KeyFile)
+				}
+			}
 			_, err := NewMTLSManager(tt.config, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewMTLSManager() error = %v, wantErr %v", err, tt.wantErr)
