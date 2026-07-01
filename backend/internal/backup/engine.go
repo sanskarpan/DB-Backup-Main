@@ -2,6 +2,7 @@
 package backup
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -10,17 +11,20 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/sanskarpan/db-backup/internal/models"
+	"github.com/sanskarpan/db-backup/internal/storage"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 	"github.com/sanskarpan/db-backup/pkg/utils"
 )
 
 // Engine orchestrates backup operations
 type Engine struct {
-	config *Config
+	config   *Config
+	provider storage.Provider
 }
 
 // Config holds backup engine configuration
@@ -30,6 +34,11 @@ type Config struct {
 	DefaultCompression string
 	EnableEncryption   bool
 	EncryptionKey      string
+
+	// StorageProvider is the optional remote storage backend. When set, backups
+	// are uploaded here after being dumped locally. When nil, backups remain in
+	// the local temp directory.
+	StorageProvider storage.Provider
 }
 
 // CreateOptions holds options for creating a backup
@@ -74,8 +83,20 @@ type Progress struct {
 // NewEngine creates a new backup engine
 func NewEngine(config *Config) *Engine {
 	return &Engine{
-		config: config,
+		config:   config,
+		provider: config.StorageProvider,
 	}
+}
+
+// SetStorageProvider injects (or replaces) the storage provider used for
+// uploading backups. Passing nil disables remote uploads.
+func (e *Engine) SetStorageProvider(provider storage.Provider) {
+	e.provider = provider
+}
+
+// remoteBackupPath returns the deterministic remote path for a backup artifact.
+func remoteBackupPath(backupID, fileName string) string {
+	return fmt.Sprintf("backups/%s/%s", backupID, fileName)
 }
 
 // CreateBackup creates a new backup
@@ -210,6 +231,53 @@ func (e *Engine) CreateBackup(ctx context.Context, opts *CreateOptions) (*models
 	}
 	metadata.Checksum = checksum
 
+	// Upload the backup artifact to the configured storage provider. If no
+	// provider is configured the backup stays in the local temp directory and
+	// the storage location is recorded explicitly.
+	if e.provider != nil {
+		if opts.ProgressCallback != nil {
+			opts.ProgressCallback(Progress{
+				Stage:      "uploading",
+				Percentage: 80,
+				Message:    "Uploading backup to storage...",
+			})
+		}
+
+		remotePath := remoteBackupPath(backupID, backupFileName)
+		uploadOpts := &storage.UploadOptions{
+			ContentType: "application/octet-stream",
+			Checksum:    checksum,
+			Metadata: map[string]string{
+				"backup_id": backupID,
+				"database":  opts.Database,
+			},
+		}
+		if opts.ProgressCallback != nil {
+			uploadOpts.ProgressCallback = func(uploaded, total int64) {
+				opts.ProgressCallback(Progress{
+					Stage:       "uploading",
+					Percentage:  80,
+					Message:     "Uploading backup to storage...",
+					BytesTotal:  total,
+					BytesCopied: uploaded,
+				})
+			}
+		}
+
+		if err := e.provider.Upload(ctx, backupPath, remotePath, uploadOpts); err != nil {
+			// Never report success for a backup that was not durably stored.
+			metadata.Status = database.BackupStatusFailed
+			return metadata, pkgErrors.ErrStorageUpload(err)
+		}
+
+		// Record provider type + remote path. BackupPath keeps pointing at the
+		// local temp copy so callers can still read it before cleanup.
+		metadata.StorageLocation = fmt.Sprintf("%s://%s", e.provider.GetType(), remotePath)
+	} else {
+		// Explicit local-temp behavior.
+		metadata.StorageLocation = backupPath
+	}
+
 	if opts.ProgressCallback != nil {
 		opts.ProgressCallback(Progress{
 			Stage:      "finalizing",
@@ -218,16 +286,31 @@ func (e *Engine) CreateBackup(ctx context.Context, opts *CreateOptions) (*models
 		})
 	}
 
-	// Save metadata
+	// Complete
+	metadata.EndTime = time.Now()
+	metadata.Duration = metadata.EndTime.Sub(metadata.StartTime)
+	metadata.Status = database.BackupStatusSuccess
+
+	// Save metadata locally (reflects the final, successful state).
 	if err := e.saveMetadata(metadata); err != nil {
 		metadata.Status = database.BackupStatusFailed
 		return metadata, err
 	}
 
-	// Complete
-	metadata.EndTime = time.Now()
-	metadata.Duration = metadata.EndTime.Sub(metadata.StartTime)
-	metadata.Status = database.BackupStatusSuccess
+	// Upload the metadata JSON alongside the backup so a remote store is
+	// self-describing. A failure here fails the backup as well.
+	if e.provider != nil {
+		metadataJSON, err := json.MarshalIndent(metadata, "", "  ")
+		if err != nil {
+			metadata.Status = database.BackupStatusFailed
+			return metadata, err
+		}
+		metaRemotePath := remoteBackupPath(backupID, "metadata.json")
+		if err := e.provider.UploadStream(ctx, bytes.NewReader(metadataJSON), metaRemotePath, &storage.UploadOptions{ContentType: "application/json"}); err != nil {
+			metadata.Status = database.BackupStatusFailed
+			return metadata, pkgErrors.ErrStorageUpload(err)
+		}
+	}
 
 	if opts.ProgressCallback != nil {
 		opts.ProgressCallback(Progress{
@@ -248,22 +331,45 @@ func (e *Engine) ValidateBackup(ctx context.Context, backupID string) error {
 		return err
 	}
 
-	// Check if backup file exists
-	if _, err := os.Stat(metadata.BackupPath); os.IsNotExist(err) {
-		return pkgErrors.ErrValidationFailed(fmt.Sprintf("backup file not found: %s", metadata.BackupPath))
+	// If a local copy exists, verify its checksum directly.
+	if _, statErr := os.Stat(metadata.BackupPath); statErr == nil {
+		checksum, err := e.calculateChecksum(metadata.BackupPath)
+		if err != nil {
+			return err
+		}
+		if checksum != metadata.Checksum {
+			return pkgErrors.ErrValidationFailed("checksum mismatch")
+		}
+		return nil
 	}
 
-	// Verify checksum
-	checksum, err := e.calculateChecksum(metadata.BackupPath)
-	if err != nil {
-		return err
+	// No local copy: confirm the artifact exists in remote storage.
+	if e.provider != nil {
+		remotePath, ok := parseRemotePath(metadata.StorageLocation)
+		if ok {
+			exists, err := e.provider.Exists(ctx, remotePath)
+			if err != nil {
+				return err
+			}
+			if !exists {
+				return pkgErrors.ErrValidationFailed(fmt.Sprintf("backup artifact not found in storage: %s", remotePath))
+			}
+			return nil
+		}
 	}
 
-	if checksum != metadata.Checksum {
-		return pkgErrors.ErrValidationFailed("checksum mismatch")
-	}
+	return pkgErrors.ErrValidationFailed(fmt.Sprintf("backup file not found: %s", metadata.BackupPath))
+}
 
-	return nil
+// parseRemotePath extracts the remote object path from a "<type>://<path>"
+// storage location. Returns false when the location is not a remote reference.
+func parseRemotePath(storageLocation string) (string, bool) {
+	const sep = "://"
+	idx := strings.Index(storageLocation, sep)
+	if idx < 0 {
+		return "", false
+	}
+	return storageLocation[idx+len(sep):], true
 }
 
 // ListBackups lists all available backups

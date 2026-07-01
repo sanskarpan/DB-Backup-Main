@@ -23,6 +23,11 @@ import (
 	"github.com/sanskarpan/db-backup/internal/logger"
 	"github.com/sanskarpan/db-backup/internal/restore"
 	"github.com/sanskarpan/db-backup/internal/security/ransomware"
+	"github.com/sanskarpan/db-backup/internal/storage"
+	storageAzure "github.com/sanskarpan/db-backup/internal/storage/azure"
+	storageGCS "github.com/sanskarpan/db-backup/internal/storage/gcs"
+	storageLocal "github.com/sanskarpan/db-backup/internal/storage/local"
+	storageS3 "github.com/sanskarpan/db-backup/internal/storage/s3"
 
 	// Register database drivers
 	_ "github.com/sanskarpan/db-backup/internal/database/mongodb"
@@ -54,6 +59,19 @@ func main() {
 		"commit":     GitCommit,
 	})
 
+	// Construct the storage provider used for durable backup storage. When no
+	// remote provider is enabled we fall back to a local provider rooted under
+	// the temp/data directory so the backup->store->restore loop works out of
+	// the box.
+	storageProvider, err := buildStorageProvider(cfg)
+	if err != nil {
+		log.Error("Failed to initialize storage provider", err)
+		os.Exit(1)
+	}
+	log.Info("Storage provider initialized", map[string]interface{}{
+		"type": string(storageProvider.GetType()),
+	})
+
 	// Initialize components
 	backupEngine := backup.NewEngine(&backup.Config{
 		TempDirectory:      cfg.Backup.TempDirectory,
@@ -61,11 +79,13 @@ func main() {
 		DefaultCompression: cfg.Backup.DefaultCompression,
 		EnableEncryption:   cfg.Backup.Encryption.Enabled,
 		EncryptionKey:      "",
+		StorageProvider:    storageProvider,
 	})
 
 	restoreEngine := restore.NewEngine(&restore.Config{
-		TempDirectory: cfg.Backup.TempDirectory,
-		ValidateFirst: true,
+		TempDirectory:   cfg.Backup.TempDirectory,
+		ValidateFirst:   true,
+		StorageProvider: storageProvider,
 	})
 
 	sched, err := scheduler.NewScheduler(backupEngine, log, nil)
@@ -199,4 +219,53 @@ func main() {
 	}
 
 	log.Info("Server exited")
+}
+
+// buildStorageProvider constructs a storage provider from the configuration.
+// It honours cfg.Storage.DefaultProvider when the corresponding provider is
+// enabled; otherwise it falls back to a local filesystem provider rooted under
+// the temp/data directory so backups are always durably stored.
+func buildStorageProvider(cfg *config.Config) (storage.Provider, error) {
+	sc := cfg.Storage
+
+	switch storage.ProviderType(sc.DefaultProvider) {
+	case storage.ProviderTypeS3:
+		if sc.Providers.S3.Enabled {
+			return storageS3.NewS3Provider(&storage.S3Config{
+				Region:       sc.Providers.S3.Region,
+				Bucket:       sc.Providers.S3.Bucket,
+				AccessKey:    sc.Providers.S3.AccessKey,
+				SecretKey:    sc.Providers.S3.SecretKey,
+				Endpoint:     sc.Providers.S3.Endpoint,
+				UsePathStyle: sc.Providers.S3.UsePathStyle,
+			})
+		}
+	case storage.ProviderTypeGCS:
+		if sc.Providers.GCS.Enabled {
+			return storageGCS.NewGCSProvider(&storage.GCSConfig{
+				Project:         sc.Providers.GCS.Project,
+				Bucket:          sc.Providers.GCS.Bucket,
+				CredentialsFile: sc.Providers.GCS.CredentialsFile,
+			})
+		}
+	case storage.ProviderTypeAzure:
+		if sc.Providers.Azure.Enabled {
+			return storageAzure.NewAzureProvider(&storage.AzureConfig{
+				AccountName: sc.Providers.Azure.AccountName,
+				AccountKey:  sc.Providers.Azure.AccountKey,
+				Container:   sc.Providers.Azure.Container,
+			})
+		}
+	case storage.ProviderTypeLocal:
+		if sc.Providers.Local.Enabled && sc.Providers.Local.Path != "" {
+			return storageLocal.NewLocalProvider(&storage.LocalConfig{Path: sc.Providers.Local.Path})
+		}
+	}
+
+	// Fallback: local provider rooted under the temp/data directory.
+	base := cfg.Backup.TempDirectory
+	if base == "" {
+		base = "./data"
+	}
+	return storageLocal.NewLocalProvider(&storage.LocalConfig{Path: filepath.Join(base, "backups")})
 }
