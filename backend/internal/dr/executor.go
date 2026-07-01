@@ -3,7 +3,9 @@ package dr
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/sanskarpan/db-backup/pkg/uid"
@@ -24,13 +26,13 @@ type ValidationResult struct {
 
 // TestResult represents the result of a DR test
 type TestResult struct {
-	TestID           string
-	DatabaseName     string
-	StartTime        time.Time
-	EndTime          time.Time
-	Duration         time.Duration
-	Success          bool
-	Error            error
+	TestID       string
+	DatabaseName string
+	StartTime    time.Time
+	EndTime      time.Time
+	Duration     time.Duration
+	Success      bool
+	Error        error
 
 	// Restoration metrics
 	RestoreStartTime time.Time
@@ -51,12 +53,12 @@ type TestResult struct {
 	SampleDataErrors []string
 
 	// Performance metrics
-	RTO              time.Duration // Actual recovery time
-	RPO              time.Duration // Actual data loss window
-	RTOThreshold     time.Duration
-	RPOThreshold     time.Duration
-	RTOMet           bool
-	RPOMet           bool
+	RTO          time.Duration // Actual recovery time
+	RPO          time.Duration // Actual data loss window
+	RTOThreshold time.Duration
+	RPOThreshold time.Duration
+	RTOMet       bool
+	RPOMet       bool
 
 	// Smoke test results
 	SmokeTestsPassed int
@@ -116,11 +118,22 @@ func (te *TestExecutor) ExecuteTest(ctx context.Context, databaseName string, co
 	testCtx, cancel := context.WithTimeout(ctx, config.MaxTestDuration)
 	defer cancel()
 
+	// A real DR test requires a real target to restore into and validate.
+	if config.Target == nil {
+		err := fmt.Errorf("DR test aborted: no test target configured (TestConfig.Target is nil)")
+		result.Success = false
+		result.Error = err
+		result.EndTime = time.Now()
+		result.Duration = result.EndTime.Sub(result.StartTime)
+		return result, err
+	}
+
 	// Step 1: Provision test environment
 	env, err := te.provisioner.ProvisionEnvironment(testCtx, &ProvisionConfig{
 		DatabaseName:      databaseName,
 		IsolatedNetwork:   config.IsolatedNetwork,
 		EphemeralDatabase: config.EphemeralDatabase,
+		Target:            config.Target,
 	})
 	if err != nil {
 		result.Success = false
@@ -131,20 +144,27 @@ func (te *TestExecutor) ExecuteTest(ctx context.Context, databaseName string, co
 	}
 	result.TestEnvironmentID = env.ID
 
-	// Ensure cleanup
+	// Ensure cleanup. If a rollback already tore the environment down this is
+	// a no-op and CleanedUp is left as set by the rollback.
 	defer func() {
-		if config.AutoCleanup {
-			cleanupErr := te.provisioner.CleanupEnvironment(context.Background(), env.ID)
-			result.CleanedUp = (cleanupErr == nil)
+		if !config.AutoCleanup || result.CleanedUp {
+			return
 		}
+		cleanupErr := te.provisioner.CleanupEnvironment(context.Background(), env.ID)
+		result.CleanedUp = (cleanupErr == nil)
 	}()
 
 	// Step 2: Perform restoration
 	result.RestoreStartTime = time.Now()
-	restoreErr := te.performRestore(testCtx, env, databaseName)
+	restoreSize, restoreErr := te.performRestore(testCtx, env, config)
 	result.RestoreEndTime = time.Now()
 	result.RestoreDuration = result.RestoreEndTime.Sub(result.RestoreStartTime)
 	result.RTO = result.RestoreDuration
+	result.RestoreSize = restoreSize
+	result.RestoreStats = &RestoreStats{
+		Duration:  result.RestoreDuration,
+		SizeBytes: restoreSize,
+	}
 
 	if restoreErr != nil {
 		result.Success = false
@@ -186,9 +206,20 @@ func (te *TestExecutor) ExecuteTest(ctx context.Context, databaseName string, co
 		result.SmokeTestErrors = smokeErrs
 	}
 
-	// Calculate RPO (simulated - in production, compare timestamps)
-	result.RPO = 1 * time.Minute // Placeholder
-	result.RPOMet = result.RPO <= config.MaxDataLoss
+	// Calculate RPO from real timestamps: the data-loss window is the gap
+	// between when the backup was taken and when the restore completed. If no
+	// backup timestamp is available the RPO cannot be verified and is treated
+	// as unmet.
+	if !config.Target.BackupTime.IsZero() {
+		result.RPO = result.RestoreEndTime.Sub(config.Target.BackupTime)
+		if result.RPO < 0 {
+			result.RPO = 0
+		}
+		result.RPOMet = result.RPO <= config.MaxDataLoss
+	} else {
+		result.RPO = 0
+		result.RPOMet = false
+	}
 
 	// Determine overall success
 	result.Success = result.RTOMet &&
@@ -219,25 +250,46 @@ func (te *TestExecutor) ExecuteTest(ctx context.Context, databaseName string, co
 	return result, nil
 }
 
-// performRestore performs the actual database restore
-func (te *TestExecutor) performRestore(ctx context.Context, env *TestEnvironment, databaseName string) error {
-	// Simulate restore operation
-	// In production, this would:
-	// 1. Get latest backup
-	// 2. Restore to test environment
-	// 3. Verify connectivity
-	time.Sleep(100 * time.Millisecond) // Simulate restore time
-	return nil
-}
-
-// runSmokeTests executes smoke tests
-func (te *TestExecutor) runSmokeTests(ctx context.Context, env *TestEnvironment, customQueries []string) (passed, failed int, errors []string) {
-	// Default smoke tests
-	smokeTests := []string{
-		"SELECT 1", // Connectivity test
-		"SELECT COUNT(*) FROM information_schema.tables", // Schema test
+// performRestore performs a real database restore into the provisioned test
+// target by applying the backup artifact referenced by the config. It returns
+// the size, in bytes, of the restored backup. If no restorable backup is
+// configured it returns a real error -- it never simulates success.
+func (te *TestExecutor) performRestore(ctx context.Context, env *TestEnvironment, config *TestConfig) (int64, error) {
+	if env.db == nil {
+		return 0, fmt.Errorf("restore aborted: no live connection to test target")
 	}
 
+	target := config.Target
+	if target == nil || target.BackupPath == "" {
+		return 0, fmt.Errorf("restore aborted: no backup path configured for target")
+	}
+
+	info, err := os.Stat(target.BackupPath)
+	if err != nil {
+		return 0, fmt.Errorf("restore aborted: cannot access backup %q: %w", target.BackupPath, err)
+	}
+
+	script, err := os.ReadFile(target.BackupPath)
+	if err != nil {
+		return 0, fmt.Errorf("restore aborted: cannot read backup %q: %w", target.BackupPath, err)
+	}
+
+	applied, err := applySQLScript(ctx, env.db, string(script))
+	if err != nil {
+		return info.Size(), fmt.Errorf("restore failed after %d statement(s): %w", applied, err)
+	}
+
+	// Verify connectivity to the freshly restored database.
+	if err := env.db.PingContext(ctx); err != nil {
+		return info.Size(), fmt.Errorf("restore verification failed: %w", err)
+	}
+
+	return info.Size(), nil
+}
+
+// runSmokeTests executes real smoke-test queries against the restored target.
+func (te *TestExecutor) runSmokeTests(ctx context.Context, env *TestEnvironment, customQueries []string) (passed, failed int, errors []string) {
+	smokeTests := defaultSmokeQueries(env.driver)
 	smokeTests = append(smokeTests, customQueries...)
 
 	for _, query := range smokeTests {
@@ -253,11 +305,40 @@ func (te *TestExecutor) runSmokeTests(ctx context.Context, env *TestEnvironment,
 	return passed, failed, errors
 }
 
-// executeQuery executes a query in the test environment
+// defaultSmokeQueries returns driver-appropriate default smoke tests: a
+// connectivity probe plus a schema-visibility probe.
+func defaultSmokeQueries(driver string) []string {
+	switch normalizeDriver(driver) {
+	case "sqlite3":
+		return []string{
+			"SELECT 1",
+			"SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'",
+		}
+	default: // postgres, mysql and other information_schema databases
+		return []string{
+			"SELECT 1",
+			"SELECT COUNT(*) FROM information_schema.tables",
+		}
+	}
+}
+
+// executeQuery executes a real query against the test target and consumes any
+// result set, returning an error if the query fails.
 func (te *TestExecutor) executeQuery(ctx context.Context, env *TestEnvironment, query string) error {
-	// Simulate query execution
-	// In production, execute actual query
-	return nil
+	if env.db == nil {
+		return fmt.Errorf("no live connection to test target")
+	}
+
+	rows, err := env.db.QueryContext(ctx, query)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	// Drain the result set so drivers report any deferred errors.
+	for rows.Next() {
+	}
+	return rows.Err()
 }
 
 // generateTestID generates a unique test ID
@@ -286,6 +367,12 @@ type TestEnvironment struct {
 	EphemeralDatabase bool
 	CreatedAt         time.Time
 	Status            string // "provisioning", "ready", "cleaning_up", "destroyed"
+
+	// Real connection to the test target. These are populated during
+	// provisioning and used for the restore and all validation queries.
+	db     *sql.DB
+	driver string
+	target *TargetConfig
 }
 
 // ProvisionConfig represents environment provisioning configuration
@@ -293,27 +380,46 @@ type ProvisionConfig struct {
 	DatabaseName      string
 	IsolatedNetwork   bool
 	EphemeralDatabase bool
+
+	// Target is the real database the drill restores into. Required: full
+	// ephemeral provisioning (spinning up a throwaway instance) is out of
+	// scope, so a reachable target MUST be supplied.
+	Target *TargetConfig
 }
 
-// ProvisionEnvironment provisions a new test environment
+// ProvisionEnvironment provisions a new test environment by establishing a
+// real, verified connection to the configured target. It does NOT simulate:
+// if no target is configured, or the target is unreachable, it returns an
+// error.
 func (ep *EnvironmentProvisioner) ProvisionEnvironment(ctx context.Context, config *ProvisionConfig) (*TestEnvironment, error) {
+	if config.Target == nil {
+		return nil, fmt.Errorf("cannot provision DR test environment: no test target configured")
+	}
+
+	driver := normalizeDriver(config.Target.Driver)
+	dsn, err := buildDSN(config.Target)
+	if err != nil {
+		return nil, fmt.Errorf("provision environment: %w", err)
+	}
+
 	env := &TestEnvironment{
 		ID:                generateEnvironmentID(),
-		DatabaseName:      config.DatabaseName + "-test",
-		ConnectionString:  fmt.Sprintf("postgresql://localhost:5432/%s-test", config.DatabaseName),
+		DatabaseName:      config.DatabaseName,
+		ConnectionString:  dsn,
 		IsolatedNetwork:   config.IsolatedNetwork,
 		EphemeralDatabase: config.EphemeralDatabase,
 		CreatedAt:         time.Now(),
 		Status:            "provisioning",
+		driver:            driver,
+		target:            config.Target,
 	}
 
-	// Simulate provisioning
-	// In production:
-	// 1. Create isolated network if required
-	// 2. Spin up ephemeral database instance
-	// 3. Configure firewall rules
-	// 4. Wait for database ready
-	time.Sleep(50 * time.Millisecond)
+	// Open and verify real connectivity to the target.
+	db, err := openTarget(ctx, config.Target)
+	if err != nil {
+		return nil, fmt.Errorf("provision environment: %w", err)
+	}
+	env.db = db
 
 	env.Status = "ready"
 	ep.environments[env.ID] = env
@@ -321,7 +427,8 @@ func (ep *EnvironmentProvisioner) ProvisionEnvironment(ctx context.Context, conf
 	return env, nil
 }
 
-// CleanupEnvironment cleans up a test environment
+// CleanupEnvironment cleans up a test environment by scrubbing every object
+// that the restore created in the target and closing the connection.
 func (ep *EnvironmentProvisioner) CleanupEnvironment(ctx context.Context, envID string) error {
 	env, exists := ep.environments[envID]
 	if !exists {
@@ -330,17 +437,22 @@ func (ep *EnvironmentProvisioner) CleanupEnvironment(ctx context.Context, envID 
 
 	env.Status = "cleaning_up"
 
-	// Simulate cleanup
-	// In production:
-	// 1. Stop database
-	// 2. Delete database files
-	// 3. Remove network isolation
-	// 4. Clean up resources
-	time.Sleep(30 * time.Millisecond)
+	var scrubErr error
+	if env.db != nil {
+		// Drop all restored tables so the target is left clean for the next drill.
+		scrubErr = dropAllTables(ctx, env.db, env.driver, env.DatabaseName)
+		if closeErr := env.db.Close(); closeErr != nil && scrubErr == nil {
+			scrubErr = closeErr
+		}
+		env.db = nil
+	}
 
 	env.Status = "destroyed"
 	delete(ep.environments, envID)
 
+	if scrubErr != nil {
+		return fmt.Errorf("cleanup environment %s: %w", envID, scrubErr)
+	}
 	return nil
 }
 
@@ -349,20 +461,11 @@ func generateEnvironmentID() string {
 	return uid.New("env")
 }
 
-// performRollback performs automatic rollback when a test fails
+// performRollback performs a real rollback when a test fails: it scrubs the
+// restored objects from the test target and tears down the environment so no
+// partial/failed restore is left behind.
 func (te *TestExecutor) performRollback(ctx context.Context, env *TestEnvironment, result *TestResult) error {
-	// In production, this would:
-	// 1. Stop any running operations in the test environment
-	// 2. Capture diagnostic logs
-	// 3. Take a snapshot of the failed state (for debugging)
-	// 4. Clean up the test environment
-	// 5. Restore the production environment if needed
-	// 6. Send alerts to operations team
-
-	// Simulate rollback steps
-	time.Sleep(10 * time.Millisecond)
-
-	// Cleanup the test environment
+	// CleanupEnvironment drops every restored table and closes the connection.
 	cleanupErr := te.provisioner.CleanupEnvironment(ctx, env.ID)
 	if cleanupErr != nil {
 		return fmt.Errorf("rollback cleanup failed: %w", cleanupErr)
