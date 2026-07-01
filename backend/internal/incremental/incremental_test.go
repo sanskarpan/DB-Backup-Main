@@ -664,3 +664,216 @@ func TestChainManagerGetStatistics(t *testing.T) {
 		t.Errorf("Expected max chain length 10, got %d", policyStats["max_chain_length"].(int))
 	}
 }
+
+// TestSnapshotPersistenceSurvivesRestart proves that block snapshots created by a
+// persistent ChangeTracker are reloaded by a fresh tracker pointed at the same
+// directory (i.e. they survive a simulated process restart).
+func TestSnapshotPersistenceSurvivesRestart(t *testing.T) {
+	tmpDir := t.TempDir()
+	snapDir := filepath.Join(tmpDir, "snapshots")
+
+	testFile := filepath.Join(tmpDir, "test.dat")
+	if err := os.WriteFile(testFile, []byte("durable snapshot content"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// First "process" creates a snapshot and persists it.
+	tracker1, err := NewChangeTrackerWithDir(BlockSize4KB, snapDir)
+	if err != nil {
+		t.Fatalf("Failed to create tracker: %v", err)
+	}
+	snap, err := tracker1.CreateSnapshot(testFile)
+	if err != nil {
+		t.Fatalf("Failed to create snapshot: %v", err)
+	}
+
+	// Verify it was written to disk.
+	snapPath := filepath.Join(snapDir, snap.ID+snapshotFileSuffix)
+	if _, err := os.Stat(snapPath); err != nil {
+		t.Fatalf("Snapshot file was not persisted: %v", err)
+	}
+
+	// Second "process" (fresh tracker, same dir) must load the prior snapshot.
+	tracker2, err := NewChangeTrackerWithDir(BlockSize4KB, snapDir)
+	if err != nil {
+		t.Fatalf("Failed to create second tracker: %v", err)
+	}
+	loaded, exists := tracker2.GetSnapshot(snap.ID)
+	if !exists {
+		t.Fatal("Snapshot did not survive restart")
+	}
+	if loaded.Checksum != snap.Checksum {
+		t.Errorf("Loaded checksum %s != original %s", loaded.Checksum, snap.Checksum)
+	}
+	if len(loaded.Blocks) != len(snap.Blocks) {
+		t.Errorf("Loaded block count %d != original %d", len(loaded.Blocks), len(snap.Blocks))
+	}
+}
+
+// TestStrategyStateSurvivesRestart proves that both manifests and the base
+// snapshot are reloaded by a fresh strategy pointed at the same backup dir, and
+// that an incremental backup can be taken against a base created before the
+// restart (the bug that previously failed with "base snapshot not found").
+func TestStrategyStateSurvivesRestart(t *testing.T) {
+	tmpDir := t.TempDir()
+	backupDir := filepath.Join(tmpDir, "backups")
+
+	testFile := filepath.Join(tmpDir, "database.db")
+	if err := os.WriteFile(testFile, []byte("initial content before restart"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// First "process": full backup, then discard the strategy.
+	strategy1 := NewIncrementalForeverStrategy(backupDir, BlockSize4KB, false)
+	fullManifest, err := strategy1.PerformFullBackup(testFile, "db-001", "Test DB")
+	if err != nil {
+		t.Fatalf("Failed to perform full backup: %v", err)
+	}
+
+	// Second "process": fresh strategy, same dir.
+	strategy2 := NewIncrementalForeverStrategy(backupDir, BlockSize4KB, false)
+
+	// Manifest must be reloaded.
+	if _, exists := strategy2.GetManifest(fullManifest.ID); !exists {
+		t.Fatal("Manifest did not survive restart")
+	}
+
+	// Base snapshot must be reloaded so an incremental can be taken.
+	time.Sleep(10 * time.Millisecond)
+	if err := os.WriteFile(testFile, []byte("changed content after the simulated restart event"), 0644); err != nil {
+		t.Fatalf("Failed to modify test file: %v", err)
+	}
+
+	incrManifest, err := strategy2.PerformIncrementalBackup(testFile, "db-001", "Test DB", fullManifest.ID)
+	if err != nil {
+		t.Fatalf("Incremental after restart failed (base snapshot not loaded?): %v", err)
+	}
+	if incrManifest.ParentBackupID != fullManifest.ID {
+		t.Errorf("Expected parent %s, got %s", fullManifest.ID, incrManifest.ParentBackupID)
+	}
+
+	// Restore through the chain must work across the restart boundary.
+	restorePath := filepath.Join(tmpDir, "restored.db")
+	if err := strategy2.RestoreFromBackup(incrManifest.ID, restorePath); err != nil {
+		t.Fatalf("Restore after restart failed: %v", err)
+	}
+}
+
+// TestRemoveBackupDeletesFiles proves removeBackup actually deletes on-disk
+// artifacts and the in-memory entry, and that ApplyRetentionPolicy only reports
+// backups it really removed.
+func TestRemoveBackupDeletesFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	backupDir := filepath.Join(tmpDir, "backups")
+	tempDir := filepath.Join(tmpDir, "temp")
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+
+	testFile := filepath.Join(tmpDir, "database.db")
+	if err := os.WriteFile(testFile, []byte("backup to be removed"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	strategy := NewIncrementalForeverStrategy(backupDir, BlockSize4KB, false)
+	manifest, err := strategy.PerformFullBackup(testFile, "db-001", "Test DB")
+	if err != nil {
+		t.Fatalf("Failed to perform full backup: %v", err)
+	}
+
+	backupPath := manifest.BackupPath
+	manifestPath := filepath.Join(backupDir, manifest.ID+"-manifest.json")
+	snapPath := filepath.Join(backupDir, snapshotsSubdir, manifest.SnapshotID+snapshotFileSuffix)
+
+	for _, p := range []string{backupPath, manifestPath, snapPath} {
+		if _, err := os.Stat(p); err != nil {
+			t.Fatalf("Expected artifact %s to exist before removal: %v", p, err)
+		}
+	}
+
+	if err := strategy.RemoveBackup(manifest.ID); err != nil {
+		t.Fatalf("RemoveBackup failed: %v", err)
+	}
+
+	for _, p := range []string{backupPath, manifestPath, snapPath} {
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Errorf("Expected artifact %s to be deleted, stat err: %v", p, err)
+		}
+	}
+	if _, exists := strategy.GetManifest(manifest.ID); exists {
+		t.Error("Manifest still present in memory after removal")
+	}
+
+	// Removing a non-existent backup must return a real error.
+	if err := strategy.RemoveBackup("does-not-exist"); err == nil {
+		t.Error("Expected error removing non-existent backup, got nil")
+	}
+}
+
+// TestApplyRetentionPolicyDeletesOldBackups proves the retention policy actually
+// deletes the artifacts of pruned backups (not just reporting them).
+func TestApplyRetentionPolicyDeletesOldBackups(t *testing.T) {
+	tmpDir := t.TempDir()
+	backupDir := filepath.Join(tmpDir, "backups")
+	tempDir := filepath.Join(tmpDir, "temp")
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+
+	testFile := filepath.Join(tmpDir, "database.db")
+	if err := os.WriteFile(testFile, []byte("old chain data"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	strategy := NewIncrementalForeverStrategy(backupDir, BlockSize4KB, false)
+	syntheticGen := NewSyntheticBackupGenerator(strategy, tempDir)
+	policy := DefaultChainPolicy()
+	chainMgr := NewBackupChainManager(strategy, syntheticGen, policy)
+
+	// An old, standalone full backup for db-001 that is not part of the latest chain.
+	oldFull, err := strategy.PerformFullBackup(testFile, "db-001", "Test DB")
+	if err != nil {
+		t.Fatalf("Failed to perform old full backup: %v", err)
+	}
+	// Age it past the retention window.
+	oldFull.CreatedAt = time.Now().AddDate(0, 0, -policy.RetentionDays-1)
+
+	// A newer full backup that forms the latest chain to be retained.
+	time.Sleep(10 * time.Millisecond)
+	if err := os.WriteFile(testFile, []byte("new chain data"), 0644); err != nil {
+		t.Fatalf("Failed to modify test file: %v", err)
+	}
+	newFull, err := strategy.PerformFullBackup(testFile, "db-001", "Test DB")
+	if err != nil {
+		t.Fatalf("Failed to perform new full backup: %v", err)
+	}
+
+	oldBackupPath := oldFull.BackupPath
+
+	removed, err := chainMgr.ApplyRetentionPolicy()
+	if err != nil {
+		t.Fatalf("ApplyRetentionPolicy failed: %v", err)
+	}
+
+	found := false
+	for _, id := range removed {
+		if id == oldFull.ID {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("Expected old backup %s to be reported removed, got %v", oldFull.ID, removed)
+	}
+
+	// The reported removal must correspond to an actual on-disk deletion.
+	if _, err := os.Stat(oldBackupPath); !os.IsNotExist(err) {
+		t.Errorf("Old backup file still exists after retention: %v", err)
+	}
+	if _, exists := strategy.GetManifest(oldFull.ID); exists {
+		t.Error("Old manifest still in memory after retention")
+	}
+	// The retained chain must remain intact.
+	if _, exists := strategy.GetManifest(newFull.ID); !exists {
+		t.Error("Newest backup was unexpectedly removed")
+	}
+}

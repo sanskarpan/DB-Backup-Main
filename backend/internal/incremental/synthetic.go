@@ -369,11 +369,11 @@ func (sbg *SyntheticBackupGenerator) GetSyntheticBackups() []*BackupManifest {
 // ScheduleSyntheticBackup schedules a synthetic backup to be created
 func (sbg *SyntheticBackupGenerator) ScheduleSyntheticBackup(latestBackupID string, scheduleTime time.Time) (*SyntheticSchedule, error) {
 	schedule := &SyntheticSchedule{
-		ID:               uid.New("sched"),
-		LatestBackupID:   latestBackupID,
-		ScheduledTime:    scheduleTime,
-		Status:           "pending",
-		CreatedAt:        time.Now(),
+		ID:             uid.New("sched"),
+		LatestBackupID: latestBackupID,
+		ScheduledTime:  scheduleTime,
+		Status:         "pending",
+		CreatedAt:      time.Now(),
 	}
 
 	return schedule, nil

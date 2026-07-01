@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,29 +25,29 @@ const (
 
 // BackupManifest represents metadata for a backup
 type BackupManifest struct {
-	ID                string
-	Type              BackupType
-	DatabaseID        string
-	DatabaseName      string
-	SourcePath        string
-	BackupPath        string
-	ParentBackupID    string // ID of parent backup (for incrementals)
-	BaseBackupID      string // ID of the base full backup
-	SnapshotID        string // ID of the snapshot used
-	ChangeSetID       string // ID of the change set (for incrementals)
-	FileSize          int64
-	CompressedSize    int64
-	BlockSize         BlockSize
-	TotalBlocks       int64
-	ChangedBlocks     int64
-	Compression       string
-	Checksum          string
-	CreatedAt         time.Time
-	CompletedAt       time.Time
-	Duration          time.Duration
-	Status            string // "pending", "in_progress", "completed", "failed"
-	Error             string
-	Metadata          map[string]interface{}
+	ID             string
+	Type           BackupType
+	DatabaseID     string
+	DatabaseName   string
+	SourcePath     string
+	BackupPath     string
+	ParentBackupID string // ID of parent backup (for incrementals)
+	BaseBackupID   string // ID of the base full backup
+	SnapshotID     string // ID of the snapshot used
+	ChangeSetID    string // ID of the change set (for incrementals)
+	FileSize       int64
+	CompressedSize int64
+	BlockSize      BlockSize
+	TotalBlocks    int64
+	ChangedBlocks  int64
+	Compression    string
+	Checksum       string
+	CreatedAt      time.Time
+	CompletedAt    time.Time
+	Duration       time.Duration
+	Status         string // "pending", "in_progress", "completed", "failed"
+	Error          string
+	Metadata       map[string]interface{}
 }
 
 // BackupBlock represents a backed up block with its data
@@ -59,23 +60,116 @@ type BackupBlock struct {
 
 // IncrementalForeverStrategy implements the incremental forever backup strategy
 type IncrementalForeverStrategy struct {
-	mu              sync.RWMutex
-	tracker         *ChangeTracker
-	manifests       map[string]*BackupManifest
-	backupDir       string
+	mu                 sync.RWMutex
+	tracker            *ChangeTracker
+	manifests          map[string]*BackupManifest
+	backupDir          string
 	compressionEnabled bool
-	blockSize       BlockSize
+	blockSize          BlockSize
 }
 
-// NewIncrementalForeverStrategy creates a new incremental forever strategy
+// snapshotsSubdir is the sub-directory under backupDir where block snapshots are
+// persisted. Keeping snapshots in their own directory keeps them from colliding
+// with the "*-manifest.json" / "*.backup" files in backupDir.
+const snapshotsSubdir = "snapshots"
+
+// NewIncrementalForeverStrategy creates a new incremental forever strategy.
+//
+// State is durable: block snapshots are persisted under backupDir/snapshots and
+// backup manifests under backupDir. Any previously persisted snapshots and
+// manifests are loaded on construction so that incremental chains, retention and
+// restore survive process restarts.
 func NewIncrementalForeverStrategy(backupDir string, blockSize BlockSize, enableCompression bool) *IncrementalForeverStrategy {
-	return &IncrementalForeverStrategy{
-		tracker:         NewChangeTracker(blockSize),
-		manifests:       make(map[string]*BackupManifest),
-		backupDir:       backupDir,
-		compressionEnabled: enableCompression,
-		blockSize:       blockSize,
+	snapshotDir := filepath.Join(backupDir, snapshotsSubdir)
+
+	tracker, err := NewChangeTrackerWithDir(blockSize, snapshotDir)
+	if err != nil {
+		// If persistence cannot be set up (e.g. unwritable path) fall back to an
+		// in-memory tracker rather than failing construction.
+		tracker = NewChangeTracker(blockSize)
 	}
+
+	ifs := &IncrementalForeverStrategy{
+		tracker:            tracker,
+		manifests:          make(map[string]*BackupManifest),
+		backupDir:          backupDir,
+		compressionEnabled: enableCompression,
+		blockSize:          blockSize,
+	}
+
+	// Reload persisted manifests so the in-memory map reflects prior runs.
+	ifs.loadManifests()
+
+	return ifs
+}
+
+// loadManifests scans backupDir for persisted manifest files and loads them into
+// the in-memory map by actually calling LoadManifest. Corrupt or unreadable
+// manifest files are skipped so a single bad file does not block startup.
+func (ifs *IncrementalForeverStrategy) loadManifests() {
+	entries, err := os.ReadDir(ifs.backupDir)
+	if err != nil {
+		return
+	}
+
+	ifs.mu.Lock()
+	defer ifs.mu.Unlock()
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), "-manifest.json") {
+			continue
+		}
+
+		manifest, err := ifs.LoadManifest(filepath.Join(ifs.backupDir, entry.Name()))
+		if err != nil {
+			continue
+		}
+
+		ifs.manifests[manifest.ID] = manifest
+	}
+}
+
+// RemoveBackup deletes a backup's persisted artifacts (data file, manifest file
+// and associated snapshot) as well as its in-memory entry. It returns a real
+// error if any artifact cannot be removed so callers never treat a failed
+// deletion as success.
+func (ifs *IncrementalForeverStrategy) RemoveBackup(backupID string) error {
+	ifs.mu.Lock()
+	manifest, exists := ifs.manifests[backupID]
+	if !exists {
+		ifs.mu.Unlock()
+		return fmt.Errorf("backup %s not found", backupID)
+	}
+	backupPath := manifest.BackupPath
+	snapshotID := manifest.SnapshotID
+	ifs.mu.Unlock()
+
+	// Remove backup data file.
+	if backupPath != "" {
+		if err := os.Remove(backupPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to remove backup file %s: %w", backupPath, err)
+		}
+	}
+
+	// Remove manifest file.
+	manifestPath := filepath.Join(ifs.backupDir, fmt.Sprintf("%s-manifest.json", backupID))
+	if err := os.Remove(manifestPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove manifest file %s: %w", manifestPath, err)
+	}
+
+	// Remove the associated snapshot artifact.
+	if snapshotID != "" {
+		if err := ifs.tracker.RemoveSnapshot(snapshotID); err != nil {
+			return err
+		}
+	}
+
+	// Only drop the in-memory entry once on-disk artifacts are gone.
+	ifs.mu.Lock()
+	delete(ifs.manifests, backupID)
+	ifs.mu.Unlock()
+
+	return nil
 }
 
 // PerformFullBackup performs an initial full backup
@@ -523,13 +617,7 @@ func (ifs *IncrementalForeverStrategy) extractWithDecompression(sourcePath, dest
 func (ifs *IncrementalForeverStrategy) saveManifest(manifest *BackupManifest) error {
 	manifestPath := filepath.Join(ifs.backupDir, fmt.Sprintf("%s-manifest.json", manifest.ID))
 
-	data, err := json.MarshalIndent(manifest, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal manifest: %w", err)
-	}
-
-	err = os.WriteFile(manifestPath, data, 0644)
-	if err != nil {
+	if err := writeJSONAtomic(manifestPath, manifest); err != nil {
 		return fmt.Errorf("failed to write manifest: %w", err)
 	}
 
@@ -625,13 +713,13 @@ func (ifs *IncrementalForeverStrategy) GetStatistics() map[string]interface{} {
 	}
 
 	stats := map[string]interface{}{
-		"total_backups":        len(ifs.manifests),
-		"full_backups":         fullCount,
-		"incremental_backups":  incrCount,
-		"total_size":           totalSize,
-		"compressed_size":      compressedSize,
-		"block_size":           ifs.blockSize,
-		"compression_enabled":  ifs.compressionEnabled,
+		"total_backups":       len(ifs.manifests),
+		"full_backups":        fullCount,
+		"incremental_backups": incrCount,
+		"total_size":          totalSize,
+		"compressed_size":     compressedSize,
+		"block_size":          ifs.blockSize,
+		"compression_enabled": ifs.compressionEnabled,
 	}
 
 	if totalSize > 0 {
