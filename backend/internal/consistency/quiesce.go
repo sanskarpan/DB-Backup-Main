@@ -154,12 +154,16 @@ func (pq *PostgreSQLQuiescer) Resume(ctx context.Context) error {
 // Close closes the PostgreSQL connection
 func (pq *PostgreSQLQuiescer) Close() error {
 	// Ensure the backup session is ended and the pinned connection released.
+	var resumeErr error
 	if pq.conn != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_ = pq.Resume(ctx)
+		resumeErr = pq.Resume(ctx)
 	}
-	return pq.db.Close()
+	if err := pq.db.Close(); err != nil {
+		return err
+	}
+	return resumeErr
 }
 
 // MySQLQuiescer handles MySQL quiesce operations

@@ -158,8 +158,8 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 		}
 
 		// Database registry (the set of databases to back up)
-		databases := v1.Group("/databases", authMiddleware)
 		{
+			databases := v1.Group("/databases", authMiddleware)
 			databases.GET("", s.handleListDatabases)
 			databases.GET("/:id", s.handleGetDatabase)
 			databases.POST("", s.handleCreateDatabase)

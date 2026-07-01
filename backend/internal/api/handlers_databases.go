@@ -176,7 +176,11 @@ func (s *Server) testConnection(ctx context.Context, db *dbregistry.Database) db
 		}
 	}
 	latency := float64(time.Since(start).Microseconds()) / 1000.0
-	_ = driver.Disconnect()
+	// Best-effort cleanup; the connection already succeeded so a disconnect
+	// error does not change the test result, but we surface it if we can.
+	if derr := driver.Disconnect(); derr != nil && s.logger != nil {
+		s.logger.Warn("failed to disconnect after connection test", map[string]interface{}{"error": derr.Error()})
+	}
 
 	return dbregistry.ConnectionTestResponse{
 		Success: true,

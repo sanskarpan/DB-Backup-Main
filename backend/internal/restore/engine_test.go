@@ -1,6 +1,7 @@
 package restore
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -32,7 +33,7 @@ func newLocalProvider(t *testing.T, dir string) stor.Provider {
 func uploadArtifact(t *testing.T, provider stor.Provider, remotePath string, content []byte) string {
 	t.Helper()
 	tmp := filepath.Join(t.TempDir(), "src")
-	if err := os.WriteFile(tmp, content, 0600); err != nil {
+	if err := os.WriteFile(tmp, content, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := provider.Upload(context.Background(), tmp, remotePath, nil); err != nil {
@@ -71,7 +72,7 @@ func TestDownloadBackup_RemoteRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read downloaded: %v", err)
 	}
-	if string(got) != string(content) {
+	if !bytes.Equal(got, content) {
 		t.Errorf("content mismatch: got %q", string(got))
 	}
 }
@@ -104,7 +105,7 @@ func TestDownloadBackup_ChecksumMismatch(t *testing.T) {
 func TestValidateBackup_LocalChecksumMismatch(t *testing.T) {
 	root := t.TempDir()
 	localPath := filepath.Join(root, "b.sql")
-	if err := os.WriteFile(localPath, []byte("data"), 0600); err != nil {
+	if err := os.WriteFile(localPath, []byte("data"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	meta := &models.BackupMetadata{Checksum: "wrongsum"}
@@ -140,7 +141,7 @@ func TestDownloadBackup_LocalNilProvider(t *testing.T) {
 	root := t.TempDir()
 	src := filepath.Join(root, "local.sql")
 	content := []byte("local-only-backup")
-	if err := os.WriteFile(src, content, 0600); err != nil {
+	if err := os.WriteFile(src, content, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	meta := &models.BackupMetadata{
@@ -155,7 +156,7 @@ func TestDownloadBackup_LocalNilProvider(t *testing.T) {
 		t.Fatalf("DownloadBackup: %v", err)
 	}
 	got, _ := os.ReadFile(dest)
-	if string(got) != string(content) {
+	if !bytes.Equal(got, content) {
 		t.Errorf("content mismatch")
 	}
 }

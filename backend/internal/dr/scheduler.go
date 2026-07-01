@@ -40,9 +40,10 @@ type TargetConfig struct {
 	// DSN is built from the fields below.
 	DSN string
 
-	// Connection parameters used to build a DSN when DSN is empty.
+	// Connection parameters used to build a DSN when DSN is empty. Port is
+	// placed with the other non-pointer field at the end of the struct to keep
+	// the pointer-bearing fields contiguous (fieldalignment).
 	Host     string
-	Port     int
 	User     string
 	Password string
 	Database string
@@ -62,6 +63,9 @@ type TargetConfig struct {
 	ExpectedTables []string         // schema validation: these tables must exist post-restore
 	MinRowCounts   map[string]int64 // row-count validation: table -> minimum acceptable rows
 	SampleTables   []string         // sample-data validation: tables to read sample rows from
+
+	// Port is the TCP port for the target (used when building a DSN).
+	Port int
 }
 
 // TestConfig represents configuration for a DR test
@@ -337,7 +341,8 @@ func (s *Scheduler) sendNotification(schedule *TestSchedule, result *TestResult,
 	// Build fields for structured display
 	var fields []*notification.Field
 	if result != nil {
-		fields = append(fields,
+		fields = append(
+			fields,
 			&notification.Field{
 				Title: "Database",
 				Value: schedule.DatabaseName,
@@ -361,7 +366,8 @@ func (s *Scheduler) sendNotification(schedule *TestSchedule, result *TestResult,
 		)
 
 		if result.RestoreStats != nil {
-			fields = append(fields,
+			fields = append(
+				fields,
 				&notification.Field{
 					Title: "Restore Duration",
 					Value: fmt.Sprintf("%.2f seconds", result.RestoreStats.Duration.Seconds()),

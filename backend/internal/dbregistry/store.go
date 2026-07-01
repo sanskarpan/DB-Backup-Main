@@ -25,15 +25,15 @@ type storedRecord struct {
 	Name      string            `json:"name"`
 	Type      string            `json:"type"`
 	Host      string            `json:"host"`
-	Port      int               `json:"port"`
 	Username  string            `json:"username"`
-	Password  string            `json:"password"`  // encrypted when Encrypted is true
-	Encrypted bool              `json:"encrypted"` // whether Password is AES-encrypted (hex)
+	Password  string            `json:"password"` // encrypted when Encrypted is true
 	Database  string            `json:"database,omitempty"`
 	SSLMode   string            `json:"ssl_mode,omitempty"`
 	Options   map[string]string `json:"options,omitempty"`
 	CreatedAt time.Time         `json:"created_at"`
 	UpdatedAt time.Time         `json:"updated_at"`
+	Port      int               `json:"port"`
+	Encrypted bool              `json:"encrypted"` // whether Password is AES-encrypted (hex)
 }
 
 // Store persists registered databases to a JSON file on disk. It is safe for
@@ -45,16 +45,16 @@ type storedRecord struct {
 // plaintext on disk — but in either case it is NEVER returned in an API
 // response, because the Database type tags credential fields json:"-".
 type Store struct {
-	mu        sync.RWMutex
-	dir       string
 	records   map[string]*storedRecord
 	encryptor *encryption.AESEncryptor
+	dir       string
+	mu        sync.RWMutex
 }
 
 // NewStore creates a Store rooted at dir, creating the directory if needed and
 // loading any previously persisted records. If encryptionKey is non-empty,
 // passwords are encrypted at rest.
-func NewStore(dir string, encryptionKey string) (*Store, error) {
+func NewStore(dir, encryptionKey string) (*Store, error) {
 	if dir == "" {
 		return nil, fmt.Errorf("dbregistry: store directory is required")
 	}

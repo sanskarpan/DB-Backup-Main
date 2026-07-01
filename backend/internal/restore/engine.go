@@ -143,7 +143,7 @@ func (e *Engine) RestoreBackup(ctx context.Context, backupMetadata *models.Backu
 			})
 		}
 
-		if err := e.validateBackup(ctx, backupMetadata, localPath); err != nil {
+		if err = e.validateBackup(ctx, backupMetadata, localPath); err != nil {
 			result.Status = database.RestoreStatusFailed
 			result.Error = err
 			return result, err
@@ -283,46 +283,58 @@ func (e *Engine) RestorePointInTime(ctx context.Context, backupMetadata *models.
 func (e *Engine) validateBackup(ctx context.Context, metadata *models.BackupMetadata, localPath string) error {
 	// Prefer verifying a local copy when we have one.
 	if localPath != "" {
-		info, err := os.Stat(localPath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return pkgErrors.ErrValidationFailed(fmt.Sprintf("backup file not found: %s", localPath))
-			}
-			return err
-		}
+		return e.validateLocalBackup(metadata, localPath)
+	}
+	// No local copy: confirm the artifact exists in remote storage.
+	return e.validateRemoteBackup(ctx, metadata)
+}
 
-		// Size sanity check against recorded compressed/raw size.
-		if metadata.CompressedSize > 0 && info.Size() != metadata.CompressedSize {
-			return pkgErrors.ErrValidationFailed(fmt.Sprintf("backup size mismatch: expected %d bytes, got %d", metadata.CompressedSize, info.Size()))
+// validateLocalBackup verifies an on-disk backup's size and checksum against
+// the recorded metadata.
+func (e *Engine) validateLocalBackup(metadata *models.BackupMetadata, localPath string) error {
+	info, err := os.Stat(localPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return pkgErrors.ErrValidationFailed(fmt.Sprintf("backup file not found: %s", localPath))
 		}
+		return err
+	}
 
-		if metadata.Checksum != "" {
-			checksum, err := calculateChecksum(localPath)
-			if err != nil {
-				return err
-			}
-			if checksum != metadata.Checksum {
-				return pkgErrors.ErrValidationFailed("checksum mismatch")
-			}
-		}
+	// Size sanity check against recorded compressed/raw size.
+	if metadata.CompressedSize > 0 && info.Size() != metadata.CompressedSize {
+		return pkgErrors.ErrValidationFailed(fmt.Sprintf("backup size mismatch: expected %d bytes, got %d", metadata.CompressedSize, info.Size()))
+	}
+
+	if metadata.Checksum == "" {
 		return nil
 	}
-
-	// No local copy: confirm the artifact exists in remote storage.
-	if e.provider != nil {
-		if remotePath, ok := parseRemotePath(metadata.StorageLocation); ok {
-			exists, err := e.provider.Exists(ctx, remotePath)
-			if err != nil {
-				return err
-			}
-			if !exists {
-				return pkgErrors.ErrValidationFailed(fmt.Sprintf("backup artifact not found in storage: %s", remotePath))
-			}
-			return nil
-		}
+	checksum, err := calculateChecksum(localPath)
+	if err != nil {
+		return err
 	}
+	if checksum != metadata.Checksum {
+		return pkgErrors.ErrValidationFailed("checksum mismatch")
+	}
+	return nil
+}
 
-	return pkgErrors.ErrValidationFailed("backup artifact is not available locally or in storage")
+// validateRemoteBackup confirms the artifact exists in remote storage.
+func (e *Engine) validateRemoteBackup(ctx context.Context, metadata *models.BackupMetadata) error {
+	if e.provider == nil {
+		return pkgErrors.ErrValidationFailed("backup artifact is not available locally or in storage")
+	}
+	remotePath, ok := parseRemotePath(metadata.StorageLocation)
+	if !ok {
+		return pkgErrors.ErrValidationFailed("backup artifact is not available locally or in storage")
+	}
+	exists, err := e.provider.Exists(ctx, remotePath)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return pkgErrors.ErrValidationFailed(fmt.Sprintf("backup artifact not found in storage: %s", remotePath))
+	}
+	return nil
 }
 
 // verifyRestore verifies the restore was successful
@@ -370,7 +382,7 @@ func (e *Engine) DownloadBackup(ctx context.Context, backupMetadata *models.Back
 		if e.provider == nil {
 			return pkgErrors.ErrValidationFailed("backup is stored remotely but no storage provider is configured")
 		}
-		if err := os.MkdirAll(filepath.Dir(destinationPath), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(destinationPath), 0o700); err != nil {
 			return err
 		}
 		if err := e.provider.Download(ctx, remotePath, destinationPath); err != nil {
@@ -423,7 +435,7 @@ func (e *Engine) ensureLocalBackup(ctx context.Context, metadata *models.BackupM
 		if e.provider == nil {
 			return "", pkgErrors.ErrValidationFailed("backup is stored remotely but no storage provider is configured")
 		}
-		if err := os.MkdirAll(filepath.Dir(dest), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(dest), 0o700); err != nil {
 			return "", err
 		}
 		if err := e.provider.Download(ctx, remotePath, dest); err != nil {
@@ -480,7 +492,7 @@ func calculateChecksum(filePath string) (string, error) {
 
 // copyFile copies a file from src to dst.
 func copyFile(src, dst string) error {
-	if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
 		return err
 	}
 	in, err := os.Open(src)

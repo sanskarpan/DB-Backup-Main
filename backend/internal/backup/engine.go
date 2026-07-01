@@ -172,7 +172,7 @@ func (e *Engine) CreateBackup(ctx context.Context, opts *CreateOptions) (*models
 	metadata.DatabaseVersion = version
 
 	// Ensure temp directory exists
-	if err := os.MkdirAll(e.config.TempDirectory, 0700); err != nil {
+	if err := os.MkdirAll(e.config.TempDirectory, 0o700); err != nil {
 		metadata.Status = database.BackupStatusFailed
 		return metadata, err
 	}
@@ -449,7 +449,7 @@ func (e *Engine) calculateChecksum(filePath string) (string, error) {
 // saveMetadata saves backup metadata to disk
 func (e *Engine) saveMetadata(metadata *models.BackupMetadata) error {
 	metadataDir := filepath.Join(e.config.TempDirectory, "metadata")
-	if err := os.MkdirAll(metadataDir, 0700); err != nil {
+	if err := os.MkdirAll(metadataDir, 0o700); err != nil {
 		return err
 	}
 
@@ -460,7 +460,7 @@ func (e *Engine) saveMetadata(metadata *models.BackupMetadata) error {
 		return err
 	}
 
-	return os.WriteFile(metadataPath, data, 0600)
+	return os.WriteFile(metadataPath, data, 0o600)
 }
 
 // loadMetadata loads backup metadata from disk

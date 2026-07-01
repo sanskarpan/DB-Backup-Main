@@ -37,7 +37,6 @@ type Database struct {
 	Name      string    `json:"name"`
 	Type      string    `json:"type"`
 	Host      string    `json:"host"`
-	Port      int       `json:"port"`
 	Username  string    `json:"username"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -47,6 +46,8 @@ type Database struct {
 	Database string            `json:"-"`
 	SSLMode  string            `json:"-"`
 	Options  map[string]string `json:"-"`
+
+	Port int `json:"port"`
 }
 
 // CreateRequest is the body accepted by POST /api/v1/databases.
@@ -54,12 +55,12 @@ type CreateRequest struct {
 	Name     string            `json:"name"`
 	Type     string            `json:"type"`
 	Host     string            `json:"host"`
-	Port     int               `json:"port"`
 	Username string            `json:"username"`
 	Password string            `json:"password"`
 	Database string            `json:"database"`
 	SSLMode  string            `json:"ssl_mode"`
 	Options  map[string]string `json:"options"`
+	Port     int               `json:"port"`
 }
 
 // UpdateRequest is the body accepted by PUT /api/v1/databases/:id.
@@ -69,19 +70,19 @@ type UpdateRequest struct {
 	Name     string            `json:"name"`
 	Type     string            `json:"type"`
 	Host     string            `json:"host"`
-	Port     int               `json:"port"`
 	Username string            `json:"username"`
 	Password string            `json:"password"`
 	Database string            `json:"database"`
 	SSLMode  string            `json:"ssl_mode"`
 	Options  map[string]string `json:"options"`
+	Port     int               `json:"port"`
 }
 
 // ConnectionTestResponse is returned by POST /api/v1/databases/:id/test.
 type ConnectionTestResponse struct {
-	Success bool    `json:"success"`
 	Message string  `json:"message"`
 	Latency float64 `json:"latency,omitempty"` // milliseconds
+	Success bool    `json:"success"`
 }
 
 // ValidationError describes an invalid field in a create/update request.

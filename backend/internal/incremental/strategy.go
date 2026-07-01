@@ -408,7 +408,7 @@ func (ifs *IncrementalForeverStrategy) applyIncrementalBackup(filePath string, m
 	}
 
 	// Open target file for writing
-	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0644)
+	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to open target file: %w", err)
 	}

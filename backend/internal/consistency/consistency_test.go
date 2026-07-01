@@ -189,7 +189,7 @@ func TestHookManager_LoadFromDirectory(t *testing.T) {
 	for _, script := range scripts {
 		path := filepath.Join(tmpDir, script)
 		content := "#!/bin/bash\necho 'test'\n"
-		if err := os.WriteFile(path, []byte(content), 0755); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
 			t.Fatalf("Failed to create test script: %v", err)
 		}
 	}
@@ -676,14 +676,13 @@ func TestConsistencyCoordinator_GetStatistics(t *testing.T) {
 // backup flow freezes the database, records its log position, and always
 // resumes it.
 type fakeQuiescer struct {
-	dbType     string
-	metadata   map[string]interface{}
 	quiesceErr error
 	resumeErr  error
-
-	quiesceN int32
-	resumeN  int32
-	closeN   int32
+	metadata   map[string]interface{}
+	dbType     string
+	quiesceN   int32
+	resumeN    int32
+	closeN     int32
 }
 
 func (f *fakeQuiescer) Quiesce(ctx context.Context) (*QuiesceOperation, error) {

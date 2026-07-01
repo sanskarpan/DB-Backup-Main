@@ -21,16 +21,23 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// Driver names as registered with database/sql.
+const (
+	driverSQLite   = "sqlite3"
+	driverPostgres = "postgres"
+	driverMySQL    = "mysql"
+)
+
 // normalizeDriver maps user-facing driver aliases to the database/sql driver
 // name that is actually registered.
 func normalizeDriver(driver string) string {
 	switch strings.ToLower(strings.TrimSpace(driver)) {
-	case "sqlite", "sqlite3":
-		return "sqlite3"
-	case "postgres", "postgresql", "pgx", "pg":
-		return "postgres"
-	case "mysql", "mariadb":
-		return "mysql"
+	case "sqlite", driverSQLite:
+		return driverSQLite
+	case driverPostgres, "postgresql", "pgx", "pg":
+		return driverPostgres
+	case driverMySQL, "mariadb":
+		return driverMySQL
 	default:
 		return strings.ToLower(strings.TrimSpace(driver))
 	}
@@ -48,9 +55,9 @@ func buildDSN(target *TargetConfig) (string, error) {
 
 	driver := normalizeDriver(target.Driver)
 	switch driver {
-	case "sqlite3":
+	case driverSQLite:
 		return "", fmt.Errorf("sqlite target requires an explicit DSN (database file path or :memory:)")
-	case "postgres":
+	case driverPostgres:
 		sslMode := target.SSLMode
 		if sslMode == "" {
 			sslMode = "disable"
@@ -59,7 +66,7 @@ func buildDSN(target *TargetConfig) (string, error) {
 			"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 			target.Host, target.Port, target.User, target.Password, target.Database, sslMode,
 		), nil
-	case "mysql":
+	case driverMySQL:
 		return fmt.Sprintf(
 			"%s:%s@tcp(%s:%d)/%s?multiStatements=true&parseTime=true",
 			target.User, target.Password, target.Host, target.Port, target.Database,
@@ -90,7 +97,7 @@ func openTarget(ctx context.Context, target *TargetConfig) (*sql.DB, error) {
 	// SQLite in-memory / file databases only retain state on a single
 	// underlying connection, so pin the pool to one connection to make the
 	// restore visible to subsequent validation queries.
-	if driver == "sqlite3" {
+	if driver == driverSQLite {
 		db.SetMaxOpenConns(1)
 	}
 
@@ -108,7 +115,7 @@ func openTarget(ctx context.Context, target *TargetConfig) (*sql.DB, error) {
 // closing quote character to guard against injection through object names.
 func quoteIdent(driver, name string) string {
 	switch normalizeDriver(driver) {
-	case "mysql":
+	case driverMySQL:
 		return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 	default: // postgres, sqlite3 and the SQL standard use double quotes
 		return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
@@ -124,33 +131,24 @@ func splitSQLStatements(script string) []string {
 	var (
 		statements []string
 		current    strings.Builder
-		inSingle   bool
-		inDouble   bool
-		inLineComm bool
+		state      sqlScanState
 	)
 
 	runes := []rune(script)
 	for i := 0; i < len(runes); i++ {
 		c := runes[i]
 
-		if inLineComm {
+		if state.inLineComm {
 			current.WriteRune(c)
 			if c == '\n' {
-				inLineComm = false
+				state.inLineComm = false
 			}
 			continue
 		}
 
-		switch {
-		case c == '\'' && !inDouble:
-			inSingle = !inSingle
-		case c == '"' && !inSingle:
-			inDouble = !inDouble
-		case c == '-' && !inSingle && !inDouble && i+1 < len(runes) && runes[i+1] == '-':
-			inLineComm = true
-		}
+		state.update(runes, i)
 
-		if c == ';' && !inSingle && !inDouble {
+		if c == ';' && !state.inSingle && !state.inDouble {
 			stmt := strings.TrimSpace(current.String())
 			if stmt != "" {
 				statements = append(statements, stmt)
@@ -169,6 +167,29 @@ func splitSQLStatements(script string) []string {
 	return statements
 }
 
+// sqlScanState tracks the quoting/comment context while scanning a SQL script
+// so that semicolons inside string literals, quoted identifiers or line
+// comments are not treated as statement terminators.
+type sqlScanState struct {
+	inSingle   bool
+	inDouble   bool
+	inLineComm bool
+}
+
+// update advances the scan state for the rune at runes[i], toggling
+// single-quote, double-quote or line-comment context as appropriate.
+func (s *sqlScanState) update(runes []rune, i int) {
+	c := runes[i]
+	switch {
+	case c == '\'' && !s.inDouble:
+		s.inSingle = !s.inSingle
+	case c == '"' && !s.inSingle:
+		s.inDouble = !s.inDouble
+	case c == '-' && !s.inSingle && !s.inDouble && i+1 < len(runes) && runes[i+1] == '-':
+		s.inLineComm = true
+	}
+}
+
 // listTables returns the base tables that exist in the connected database,
 // using a driver-appropriate metadata query.
 func listTables(ctx context.Context, db *sql.DB, driver, database string) ([]string, error) {
@@ -178,14 +199,14 @@ func listTables(ctx context.Context, db *sql.DB, driver, database string) ([]str
 	)
 
 	switch normalizeDriver(driver) {
-	case "sqlite3":
+	case driverSQLite:
 		query = `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`
-	case "postgres":
+	case driverPostgres:
 		query = `SELECT table_name FROM information_schema.tables
 			WHERE table_type = 'BASE TABLE'
 			AND table_schema NOT IN ('pg_catalog', 'information_schema')
 			ORDER BY table_name`
-	case "mysql":
+	case driverMySQL:
 		query = `SELECT table_name FROM information_schema.tables
 			WHERE table_type = 'BASE TABLE' AND table_schema = ?
 			ORDER BY table_name`
@@ -242,7 +263,9 @@ func applySQLScript(ctx context.Context, db *sql.DB, script string) (int, error)
 	applied := 0
 	for _, stmt := range statements {
 		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			_ = tx.Rollback()
+			if rbErr := tx.Rollback(); rbErr != nil {
+				return applied, fmt.Errorf("apply statement %d: %w (rollback failed: %v)", applied+1, err, rbErr)
+			}
 			return applied, fmt.Errorf("apply statement %d: %w", applied+1, err)
 		}
 		applied++
@@ -266,18 +289,22 @@ func dropAllTables(ctx context.Context, db *sql.DB, driver, database string) err
 		return nil
 	}
 
+	var firstErr error
+
 	// MySQL/PostgreSQL may have FK constraints; disable checks where possible.
-	switch normalizeDriver(driver) {
-	case "mysql":
+	if normalizeDriver(driver) == driverMySQL {
 		if _, err := db.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 0"); err == nil {
-			defer func() { _, _ = db.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 1") }()
+			defer func() {
+				if _, rerr := db.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 1"); rerr != nil && firstErr == nil {
+					firstErr = fmt.Errorf("re-enable foreign key checks: %w", rerr)
+				}
+			}()
 		}
 	}
 
-	var firstErr error
 	for _, table := range tables {
 		stmt := "DROP TABLE IF EXISTS " + quoteIdent(driver, table)
-		if normalizeDriver(driver) == "postgres" {
+		if normalizeDriver(driver) == driverPostgres {
 			stmt += " CASCADE"
 		}
 		if _, err := db.ExecContext(ctx, stmt); err != nil && firstErr == nil {

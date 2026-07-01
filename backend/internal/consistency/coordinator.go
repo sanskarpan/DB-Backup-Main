@@ -377,7 +377,10 @@ func (cc *ConsistencyCoordinator) ExecuteConsistentBackup(ctx context.Context, g
 	for stepNum, databases := range order.Sequence {
 		// Backup databases in this step (can be done in parallel)
 		var wg sync.WaitGroup
-		errChan := make(chan error, len(databases))
+		// Each goroutine may report both a backup failure and a resume
+		// failure, so size the buffer to hold two errors per database to
+		// guarantee sends never block before wg.Wait drains the channel.
+		errChan := make(chan error, len(databases)*2)
 
 		for _, dbID := range databases {
 			wg.Add(1)
@@ -412,10 +415,12 @@ func (cc *ConsistencyCoordinator) ExecuteConsistentBackup(ctx context.Context, g
 					resume := func() {
 						resumeOnce.Do(func() {
 							// Fresh context so resume still runs even if
-							// timeoutCtx is already cancelled/expired.
+							// timeoutCtx is already canceled/expired.
 							rctx, rcancel := context.WithTimeout(context.Background(), 30*time.Second)
 							defer rcancel()
-							_ = cc.quiesceManager.ResumeDatabase(rctx, quiescer, database)
+							if rerr := cc.quiesceManager.ResumeDatabase(rctx, quiescer, database); rerr != nil {
+								errChan <- fmt.Errorf("failed to resume %s: %w", database, rerr)
+							}
 						})
 					}
 					defer resume()
@@ -454,7 +459,6 @@ func (cc *ConsistencyCoordinator) ExecuteConsistentBackup(ctx context.Context, g
 					}
 					_, _ = cc.hookManager.ExecuteHooks(timeoutCtx, HookTypePostQuiesce, metadata)
 				}
-
 			}(dbID)
 		}
 

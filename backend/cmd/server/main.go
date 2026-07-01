@@ -222,7 +222,7 @@ func main() {
 }
 
 // buildStorageProvider constructs a storage provider from the configuration.
-// It honours cfg.Storage.DefaultProvider when the corresponding provider is
+// It honors cfg.Storage.DefaultProvider when the corresponding provider is
 // enabled; otherwise it falls back to a local filesystem provider rooted under
 // the temp/data directory so backups are always durably stored.
 func buildStorageProvider(cfg *config.Config) (storage.Provider, error) {

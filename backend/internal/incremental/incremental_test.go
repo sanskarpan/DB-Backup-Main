@@ -30,7 +30,7 @@ func TestCreateSnapshot(t *testing.T) {
 
 	// Write test data
 	testData := []byte("Hello, World! This is test data for snapshot testing.")
-	err := os.WriteFile(testFile, testData, 0644)
+	err := os.WriteFile(testFile, testData, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestCompareSnapshots(t *testing.T) {
 
 	// Create initial file
 	initialData := []byte("Initial data content")
-	err := os.WriteFile(testFile, initialData, 0644)
+	err := os.WriteFile(testFile, initialData, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestCompareSnapshots(t *testing.T) {
 	// Modify file
 	time.Sleep(10 * time.Millisecond) // Ensure different timestamp
 	modifiedData := []byte("Modified data content with additional text")
-	err = os.WriteFile(testFile, modifiedData, 0644)
+	err = os.WriteFile(testFile, modifiedData, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to modify test file: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestCompareSnapshots(t *testing.T) {
 func TestIncrementalForeverStrategy_FullBackup(t *testing.T) {
 	tmpDir := t.TempDir()
 	backupDir := filepath.Join(tmpDir, "backups")
-	err := os.MkdirAll(backupDir, 0755)
+	err := os.MkdirAll(backupDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create backup directory: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestIncrementalForeverStrategy_FullBackup(t *testing.T) {
 	// Create test file
 	testFile := filepath.Join(tmpDir, "database.db")
 	testData := []byte("Database content for full backup test")
-	err = os.WriteFile(testFile, testData, 0644)
+	err = os.WriteFile(testFile, testData, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestIncrementalForeverStrategy_FullBackup(t *testing.T) {
 func TestIncrementalForeverStrategy_IncrementalBackup(t *testing.T) {
 	tmpDir := t.TempDir()
 	backupDir := filepath.Join(tmpDir, "backups")
-	err := os.MkdirAll(backupDir, 0755)
+	err := os.MkdirAll(backupDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create backup directory: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestIncrementalForeverStrategy_IncrementalBackup(t *testing.T) {
 	// Create test file
 	testFile := filepath.Join(tmpDir, "database.db")
 	initialData := []byte("Initial database content")
-	err = os.WriteFile(testFile, initialData, 0644)
+	err = os.WriteFile(testFile, initialData, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestIncrementalForeverStrategy_IncrementalBackup(t *testing.T) {
 	// Modify file
 	time.Sleep(10 * time.Millisecond)
 	modifiedData := []byte("Modified database content with changes")
-	err = os.WriteFile(testFile, modifiedData, 0644)
+	err = os.WriteFile(testFile, modifiedData, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to modify test file: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestIncrementalForeverStrategy_IncrementalBackup(t *testing.T) {
 func TestIncrementalForeverStrategy_RestoreFromBackup(t *testing.T) {
 	tmpDir := t.TempDir()
 	backupDir := filepath.Join(tmpDir, "backups")
-	err := os.MkdirAll(backupDir, 0755)
+	err := os.MkdirAll(backupDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create backup directory: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestIncrementalForeverStrategy_RestoreFromBackup(t *testing.T) {
 	// Create test file
 	testFile := filepath.Join(tmpDir, "database.db")
 	originalData := []byte("Original database content for restore test")
-	err = os.WriteFile(testFile, originalData, 0644)
+	err = os.WriteFile(testFile, originalData, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestIncrementalForeverStrategy_RestoreFromBackup(t *testing.T) {
 	// Modify file (make it longer than original to avoid truncation issues)
 	time.Sleep(10 * time.Millisecond)
 	modifiedData := []byte("Modified content after full backup - this is the new data that should be restored correctly")
-	err = os.WriteFile(testFile, modifiedData, 0644)
+	err = os.WriteFile(testFile, modifiedData, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to modify test file: %v", err)
 	}
@@ -266,13 +266,13 @@ func TestIncrementalForeverStrategy_RestoreFromBackup(t *testing.T) {
 func TestGetBackupChain(t *testing.T) {
 	tmpDir := t.TempDir()
 	backupDir := filepath.Join(tmpDir, "backups")
-	err := os.MkdirAll(backupDir, 0755)
+	err := os.MkdirAll(backupDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create backup directory: %v", err)
 	}
 
 	testFile := filepath.Join(tmpDir, "database.db")
-	err = os.WriteFile(testFile, []byte("Initial data"), 0644)
+	err = os.WriteFile(testFile, []byte("Initial data"), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -290,7 +290,7 @@ func TestGetBackupChain(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		time.Sleep(10 * time.Millisecond)
 		data := []byte("Modified data iteration " + string(rune(i+'0')))
-		err = os.WriteFile(testFile, data, 0644)
+		err = os.WriteFile(testFile, data, 0o644)
 		if err != nil {
 			t.Fatalf("Failed to modify test file: %v", err)
 		}
@@ -334,18 +334,18 @@ func TestSyntheticBackupGenerator_GenerateSyntheticFull(t *testing.T) {
 	backupDir := filepath.Join(tmpDir, "backups")
 	tempDir := filepath.Join(tmpDir, "temp")
 
-	err := os.MkdirAll(backupDir, 0755)
+	err := os.MkdirAll(backupDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create backup directory: %v", err)
 	}
 
-	err = os.MkdirAll(tempDir, 0755)
+	err = os.MkdirAll(tempDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
 
 	testFile := filepath.Join(tmpDir, "database.db")
-	err = os.WriteFile(testFile, []byte("Initial database"), 0644)
+	err = os.WriteFile(testFile, []byte("Initial database"), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -361,7 +361,7 @@ func TestSyntheticBackupGenerator_GenerateSyntheticFull(t *testing.T) {
 
 	// Create an incremental
 	time.Sleep(10 * time.Millisecond)
-	err = os.WriteFile(testFile, []byte("Modified database content"), 0644)
+	err = os.WriteFile(testFile, []byte("Modified database content"), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to modify test file: %v", err)
 	}
@@ -396,18 +396,18 @@ func TestSyntheticBackupGenerator_ShouldGenerateSynthetic(t *testing.T) {
 	backupDir := filepath.Join(tmpDir, "backups")
 	tempDir := filepath.Join(tmpDir, "temp")
 
-	err := os.MkdirAll(backupDir, 0755)
+	err := os.MkdirAll(backupDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create backup directory: %v", err)
 	}
 
-	err = os.MkdirAll(tempDir, 0755)
+	err = os.MkdirAll(tempDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
 
 	testFile := filepath.Join(tmpDir, "database.db")
-	err = os.WriteFile(testFile, []byte("Database"), 0644)
+	err = os.WriteFile(testFile, []byte("Database"), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -426,7 +426,7 @@ func TestSyntheticBackupGenerator_ShouldGenerateSynthetic(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		time.Sleep(10 * time.Millisecond)
 		data := []byte("Data " + string(rune(i+'0')))
-		err = os.WriteFile(testFile, data, 0644)
+		err = os.WriteFile(testFile, data, 0o644)
 		if err != nil {
 			t.Fatalf("Failed to modify test file: %v", err)
 		}
@@ -465,12 +465,12 @@ func TestBackupChainManager_DetermineBackupType(t *testing.T) {
 	backupDir := filepath.Join(tmpDir, "backups")
 	tempDir := filepath.Join(tmpDir, "temp")
 
-	err := os.MkdirAll(backupDir, 0755)
+	err := os.MkdirAll(backupDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create backup directory: %v", err)
 	}
 
-	err = os.MkdirAll(tempDir, 0755)
+	err = os.MkdirAll(tempDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
@@ -496,18 +496,18 @@ func TestBackupChainManager_ValidateChain(t *testing.T) {
 	backupDir := filepath.Join(tmpDir, "backups")
 	tempDir := filepath.Join(tmpDir, "temp")
 
-	err := os.MkdirAll(backupDir, 0755)
+	err := os.MkdirAll(backupDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create backup directory: %v", err)
 	}
 
-	err = os.MkdirAll(tempDir, 0755)
+	err = os.MkdirAll(tempDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
 
 	testFile := filepath.Join(tmpDir, "database.db")
-	err = os.WriteFile(testFile, []byte("Database"), 0644)
+	err = os.WriteFile(testFile, []byte("Database"), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -576,7 +576,7 @@ func TestChangeTrackerGetStatistics(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.dat")
 
-	err := os.WriteFile(testFile, []byte("Test data"), 0644)
+	err := os.WriteFile(testFile, []byte("Test data"), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -603,13 +603,13 @@ func TestChangeTrackerGetStatistics(t *testing.T) {
 func TestStrategyGetStatistics(t *testing.T) {
 	tmpDir := t.TempDir()
 	backupDir := filepath.Join(tmpDir, "backups")
-	err := os.MkdirAll(backupDir, 0755)
+	err := os.MkdirAll(backupDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create backup directory: %v", err)
 	}
 
 	testFile := filepath.Join(tmpDir, "database.db")
-	err = os.WriteFile(testFile, []byte("Database"), 0644)
+	err = os.WriteFile(testFile, []byte("Database"), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -638,12 +638,12 @@ func TestChainManagerGetStatistics(t *testing.T) {
 	backupDir := filepath.Join(tmpDir, "backups")
 	tempDir := filepath.Join(tmpDir, "temp")
 
-	err := os.MkdirAll(backupDir, 0755)
+	err := os.MkdirAll(backupDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create backup directory: %v", err)
 	}
 
-	err = os.MkdirAll(tempDir, 0755)
+	err = os.MkdirAll(tempDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
@@ -673,7 +673,7 @@ func TestSnapshotPersistenceSurvivesRestart(t *testing.T) {
 	snapDir := filepath.Join(tmpDir, "snapshots")
 
 	testFile := filepath.Join(tmpDir, "test.dat")
-	if err := os.WriteFile(testFile, []byte("durable snapshot content"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("durable snapshot content"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -689,7 +689,7 @@ func TestSnapshotPersistenceSurvivesRestart(t *testing.T) {
 
 	// Verify it was written to disk.
 	snapPath := filepath.Join(snapDir, snap.ID+snapshotFileSuffix)
-	if _, err := os.Stat(snapPath); err != nil {
+	if _, err = os.Stat(snapPath); err != nil {
 		t.Fatalf("Snapshot file was not persisted: %v", err)
 	}
 
@@ -719,7 +719,7 @@ func TestStrategyStateSurvivesRestart(t *testing.T) {
 	backupDir := filepath.Join(tmpDir, "backups")
 
 	testFile := filepath.Join(tmpDir, "database.db")
-	if err := os.WriteFile(testFile, []byte("initial content before restart"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("initial content before restart"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -740,7 +740,7 @@ func TestStrategyStateSurvivesRestart(t *testing.T) {
 
 	// Base snapshot must be reloaded so an incremental can be taken.
 	time.Sleep(10 * time.Millisecond)
-	if err := os.WriteFile(testFile, []byte("changed content after the simulated restart event"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("changed content after the simulated restart event"), 0o644); err != nil {
 		t.Fatalf("Failed to modify test file: %v", err)
 	}
 
@@ -766,12 +766,12 @@ func TestRemoveBackupDeletesFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 	backupDir := filepath.Join(tmpDir, "backups")
 	tempDir := filepath.Join(tmpDir, "temp")
-	if err := os.MkdirAll(tempDir, 0755); err != nil {
+	if err := os.MkdirAll(tempDir, 0o755); err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
 
 	testFile := filepath.Join(tmpDir, "database.db")
-	if err := os.WriteFile(testFile, []byte("backup to be removed"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("backup to be removed"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -816,12 +816,12 @@ func TestApplyRetentionPolicyDeletesOldBackups(t *testing.T) {
 	tmpDir := t.TempDir()
 	backupDir := filepath.Join(tmpDir, "backups")
 	tempDir := filepath.Join(tmpDir, "temp")
-	if err := os.MkdirAll(tempDir, 0755); err != nil {
+	if err := os.MkdirAll(tempDir, 0o755); err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
 
 	testFile := filepath.Join(tmpDir, "database.db")
-	if err := os.WriteFile(testFile, []byte("old chain data"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("old chain data"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -840,7 +840,7 @@ func TestApplyRetentionPolicyDeletesOldBackups(t *testing.T) {
 
 	// A newer full backup that forms the latest chain to be retained.
 	time.Sleep(10 * time.Millisecond)
-	if err := os.WriteFile(testFile, []byte("new chain data"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("new chain data"), 0o644); err != nil {
 		t.Fatalf("Failed to modify test file: %v", err)
 	}
 	newFull, err := strategy.PerformFullBackup(testFile, "db-001", "Test DB")

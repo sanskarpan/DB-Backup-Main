@@ -51,18 +51,23 @@ func (m *mockDynamoAPI) RestoreTableFromBackup(ctx context.Context, params *dyna
 func (m *mockDynamoAPI) ListTables(context.Context, *dynamodb.ListTablesInput, ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error) {
 	return &dynamodb.ListTablesOutput{}, nil
 }
+
 func (m *mockDynamoAPI) CreateBackup(context.Context, *dynamodb.CreateBackupInput, ...func(*dynamodb.Options)) (*dynamodb.CreateBackupOutput, error) {
 	return &dynamodb.CreateBackupOutput{}, nil
 }
+
 func (m *mockDynamoAPI) RestoreTableToPointInTime(context.Context, *dynamodb.RestoreTableToPointInTimeInput, ...func(*dynamodb.Options)) (*dynamodb.RestoreTableToPointInTimeOutput, error) {
 	return &dynamodb.RestoreTableToPointInTimeOutput{}, nil
 }
+
 func (m *mockDynamoAPI) UpdateContinuousBackups(context.Context, *dynamodb.UpdateContinuousBackupsInput, ...func(*dynamodb.Options)) (*dynamodb.UpdateContinuousBackupsOutput, error) {
 	return &dynamodb.UpdateContinuousBackupsOutput{}, nil
 }
+
 func (m *mockDynamoAPI) DescribeContinuousBackups(context.Context, *dynamodb.DescribeContinuousBackupsInput, ...func(*dynamodb.Options)) (*dynamodb.DescribeContinuousBackupsOutput, error) {
 	return &dynamodb.DescribeContinuousBackupsOutput{}, nil
 }
+
 func (m *mockDynamoAPI) ExportTableToPointInTime(context.Context, *dynamodb.ExportTableToPointInTimeInput, ...func(*dynamodb.Options)) (*dynamodb.ExportTableToPointInTimeOutput, error) {
 	return &dynamodb.ExportTableToPointInTimeOutput{}, nil
 }
@@ -82,17 +87,67 @@ func describeTableActive(name string) *dynamodb.DescribeTableOutput {
 	}
 }
 
+// newActiveAfterCreatingMock returns a mock whose DescribeTable first reports
+// the target absent (existence pre-check), then CREATING, then ACTIVE, so a
+// restore into a pinned target must poll until the table becomes ACTIVE.
+func newActiveAfterCreatingMock() *mockDynamoAPI {
+	calls := 0
+	return &mockDynamoAPI{
+		describeTableFunc: func(_ context.Context, _ *dynamodb.DescribeTableInput) (*dynamodb.DescribeTableOutput, error) {
+			calls++
+			switch calls {
+			case 1:
+				// existence pre-check: target does not exist yet.
+				return nil, notFoundErr()
+			case 2:
+				// first poll: still creating.
+				return &dynamodb.DescribeTableOutput{
+					Table: &types.TableDescription{TableStatus: types.TableStatusCreating},
+				}, nil
+			default:
+				return describeTableActive("orders_restored"), nil
+			}
+		},
+	}
+}
+
+// newDerivedTargetMock returns a mock for restoring into a name derived from
+// the backup's source table: the derived target is absent then ACTIVE, and
+// DescribeBackup reports the source table name.
+func newDerivedTargetMock() *mockDynamoAPI {
+	calls := 0
+	return &mockDynamoAPI{
+		describeTableFunc: func(_ context.Context, _ *dynamodb.DescribeTableInput) (*dynamodb.DescribeTableOutput, error) {
+			calls++
+			if calls == 1 {
+				// existence pre-check on the derived name: not present.
+				return nil, notFoundErr()
+			}
+			return describeTableActive("orders_restored"), nil
+		},
+		describeBackupFunc: func(_ context.Context, _ *dynamodb.DescribeBackupInput) (*dynamodb.DescribeBackupOutput, error) {
+			return &dynamodb.DescribeBackupOutput{
+				BackupDescription: &types.BackupDescription{
+					SourceTableDetails: &types.SourceTableDetails{
+						TableName: aws.String("orders"),
+					},
+				},
+			}, nil
+		},
+	}
+}
+
 func TestDynamoDBDriver_Restore_NonPITR(t *testing.T) {
 	const backupARN = "arn:aws:dynamodb:us-east-1:123456789012:table/orders/backup/01234567890123-abcd1234"
 
 	tests := []struct {
-		name           string
 		opts           *database.RestoreOptions
 		mock           *mockDynamoAPI
+		name           string
 		wantStatus     database.RestoreStatus
-		wantErr        bool
 		wantErrSubstr  string
 		wantRestored   []string
+		wantErr        bool
 		wantRestoreRun bool
 	}{
 		{
@@ -116,28 +171,9 @@ func TestDynamoDBDriver_Restore_NonPITR(t *testing.T) {
 			wantErrSubstr: "already exists",
 		},
 		{
-			name: "successful restore into pinned target waits for ACTIVE",
-			opts: &database.RestoreOptions{SourceBackup: backupARN, Database: "orders_restored"},
-			mock: func() *mockDynamoAPI {
-				calls := 0
-				return &mockDynamoAPI{
-					describeTableFunc: func(_ context.Context, _ *dynamodb.DescribeTableInput) (*dynamodb.DescribeTableOutput, error) {
-						calls++
-						switch calls {
-						case 1:
-							// existence pre-check: target does not exist yet.
-							return nil, notFoundErr()
-						case 2:
-							// first poll: still creating.
-							return &dynamodb.DescribeTableOutput{
-								Table: &types.TableDescription{TableStatus: types.TableStatusCreating},
-							}, nil
-						default:
-							return describeTableActive("orders_restored"), nil
-						}
-					},
-				}
-			}(),
+			name:           "successful restore into pinned target waits for ACTIVE",
+			opts:           &database.RestoreOptions{SourceBackup: backupARN, Database: "orders_restored"},
+			mock:           newActiveAfterCreatingMock(),
 			wantStatus:     database.RestoreStatusCompleted,
 			wantRestored:   []string{"orders_restored"},
 			wantRestoreRun: true,
@@ -159,30 +195,9 @@ func TestDynamoDBDriver_Restore_NonPITR(t *testing.T) {
 			wantRestoreRun: true,
 		},
 		{
-			name: "target derived from backup source table when unspecified",
-			opts: &database.RestoreOptions{SourceBackup: backupARN},
-			mock: func() *mockDynamoAPI {
-				calls := 0
-				return &mockDynamoAPI{
-					describeTableFunc: func(_ context.Context, _ *dynamodb.DescribeTableInput) (*dynamodb.DescribeTableOutput, error) {
-						calls++
-						if calls == 1 {
-							// existence pre-check on the derived name: not present.
-							return nil, notFoundErr()
-						}
-						return describeTableActive("orders_restored"), nil
-					},
-					describeBackupFunc: func(_ context.Context, _ *dynamodb.DescribeBackupInput) (*dynamodb.DescribeBackupOutput, error) {
-						return &dynamodb.DescribeBackupOutput{
-							BackupDescription: &types.BackupDescription{
-								SourceTableDetails: &types.SourceTableDetails{
-									TableName: aws.String("orders"),
-								},
-							},
-						}, nil
-					},
-				}
-			}(),
+			name:           "target derived from backup source table when unspecified",
+			opts:           &database.RestoreOptions{SourceBackup: backupARN},
+			mock:           newDerivedTargetMock(),
 			wantStatus:     database.RestoreStatusCompleted,
 			wantRestoreRun: true,
 		},

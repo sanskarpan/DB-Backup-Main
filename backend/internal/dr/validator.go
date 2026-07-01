@@ -142,7 +142,7 @@ func (v *Validator) ValidateSampleData(ctx context.Context, env *TestEnvironment
 		return false, errors
 	}
 
-	tables := []string(nil)
+	var tables []string
 	if env.target != nil && len(env.target.SampleTables) > 0 {
 		tables = env.target.SampleTables
 	} else {
@@ -181,7 +181,9 @@ func (v *Validator) ValidateSampleData(ctx context.Context, env *TestEnvironment
 // SampleDataRecords with per-row checksums. This proves the restored data is
 // actually readable, not just that the schema exists.
 func (v *Validator) sampleTable(ctx context.Context, db *sql.DB, driver, table string, limit int) ([]SampleDataRecord, error) {
-	query := fmt.Sprintf("SELECT * FROM %s LIMIT %d", quoteIdent(driver, table), limit)
+	// The table name is quoted/escaped via quoteIdent and limit is an int, so
+	// the formatted query cannot carry SQL injection.
+	query := fmt.Sprintf("SELECT * FROM %s LIMIT %d", quoteIdent(driver, table), limit) // #nosec G201 -- identifier is validated/quoted
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err

@@ -169,11 +169,11 @@ func TestValidateBackup_ChecksumMismatch(t *testing.T) {
 	engine := NewEngine(&Config{TempDirectory: tempDir})
 
 	// Write a backup file and matching-but-wrong metadata checksum.
-	if err := os.MkdirAll(tempDir, 0700); err != nil {
+	if err := os.MkdirAll(tempDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	backupPath := filepath.Join(tempDir, "b1.sql")
-	if err := os.WriteFile(backupPath, []byte("hello world"), 0600); err != nil {
+	if err := os.WriteFile(backupPath, []byte("hello world"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	meta := &models.BackupMetadata{

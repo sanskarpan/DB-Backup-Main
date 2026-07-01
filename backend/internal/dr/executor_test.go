@@ -201,11 +201,27 @@ func TestTestResult_Fields(t *testing.T) {
 	}
 
 	assert.Equal(t, "dr-test-123", result.TestID)
+	assert.Equal(t, "prod-db", result.DatabaseName)
+	assert.Equal(t, now, result.StartTime)
+	assert.Equal(t, now.Add(5*time.Minute), result.EndTime)
+	assert.Equal(t, 5*time.Minute, result.Duration)
 	assert.True(t, result.Success)
+	assert.Equal(t, now.Add(1*time.Minute), result.RestoreStartTime)
+	assert.Equal(t, now.Add(4*time.Minute), result.RestoreEndTime)
+	assert.Equal(t, 3*time.Minute, result.RestoreDuration)
 	assert.Equal(t, int64(1000000000), result.RestoreSize)
+	assert.True(t, result.SchemaValid)
+	assert.True(t, result.RowCountValid)
+	assert.True(t, result.SampleDataValid)
+	assert.Equal(t, 3*time.Minute, result.RTO)
+	assert.Equal(t, 1*time.Minute, result.RPO)
+	assert.Equal(t, 5*time.Minute, result.RTOThreshold)
+	assert.Equal(t, 2*time.Minute, result.RPOThreshold)
 	assert.True(t, result.RTOMet)
 	assert.True(t, result.RPOMet)
 	assert.Equal(t, 5, result.SmokeTestsPassed)
+	assert.Equal(t, 0, result.SmokeTestsFailed)
+	assert.Equal(t, "env-123", result.TestEnvironmentID)
 	assert.True(t, result.CleanedUp)
 }
 

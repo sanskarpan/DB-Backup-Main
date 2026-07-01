@@ -358,11 +358,11 @@ func TestProcessErasureRequest_ErasesAllSources(t *testing.T) {
 	// Bypass the grace period so erasure runs now.
 	req.RequestedAt = time.Now().Add(-48 * time.Hour)
 	req.RetentionDays = 1
-	if err := store.Update(ctx, req); err != nil {
+	if err = store.Update(ctx, req); err != nil {
 		t.Fatalf("update request: %v", err)
 	}
 
-	if err := em.ProcessErasureRequest(ctx, req.ID, "admin"); err != nil {
+	if err = em.ProcessErasureRequest(ctx, req.ID, "admin"); err != nil {
 		t.Fatalf("process request: %v", err)
 	}
 

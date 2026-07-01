@@ -101,7 +101,7 @@ func validateCommand(command string, args []string) error {
 	}
 
 	// Check if executable
-	if info.Mode().Perm()&0111 == 0 {
+	if info.Mode().Perm()&0o111 == 0 {
 		return fmt.Errorf("command is not executable: %s", absCommand)
 	}
 

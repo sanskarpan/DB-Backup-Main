@@ -231,7 +231,7 @@ type BackupDataEraser struct {
 // store is required: it is the catalog/repository the eraser deletes records
 // from. baseDir is optional; when non-empty, the physical artifact referenced by
 // each record's Location is also deleted from disk, but only if it resolves to a
-// path inside baseDir (defence against path traversal).
+// path inside baseDir (defense against path traversal).
 func NewBackupDataEraser(store BackupArtifactStore, baseDir string) *BackupDataEraser {
 	return &BackupDataEraser{store: store, baseDir: baseDir}
 }

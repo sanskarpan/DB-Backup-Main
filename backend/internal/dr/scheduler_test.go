@@ -295,6 +295,7 @@ func TestTestSchedule_Fields(t *testing.T) {
 	assert.Equal(t, "0 2 * * 0", schedule.CronExpression)
 	assert.NotNil(t, schedule.LastRun)
 	assert.NotNil(t, schedule.NextRun)
+	assert.NotNil(t, schedule.TestConfig)
 	assert.True(t, schedule.NotifyOnSuccess)
 	assert.True(t, schedule.NotifyOnFailure)
 	assert.Len(t, schedule.NotificationEmails, 1)

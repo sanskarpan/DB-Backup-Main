@@ -309,7 +309,7 @@ func (te *TestExecutor) runSmokeTests(ctx context.Context, env *TestEnvironment,
 // connectivity probe plus a schema-visibility probe.
 func defaultSmokeQueries(driver string) []string {
 	switch normalizeDriver(driver) {
-	case "sqlite3":
+	case driverSQLite:
 		return []string{
 			"SELECT 1",
 			"SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'",
