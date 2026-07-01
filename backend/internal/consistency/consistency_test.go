@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -668,6 +669,180 @@ func TestConsistencyCoordinator_GetStatistics(t *testing.T) {
 
 	if stats["total_databases"] != 3 {
 		t.Errorf("Expected 3 unique databases, got %v", stats["total_databases"])
+	}
+}
+
+// fakeQuiescer is an in-memory Quiescer used to prove that the consistent
+// backup flow freezes the database, records its log position, and always
+// resumes it.
+type fakeQuiescer struct {
+	dbType     string
+	metadata   map[string]interface{}
+	quiesceErr error
+	resumeErr  error
+
+	quiesceN int32
+	resumeN  int32
+	closeN   int32
+}
+
+func (f *fakeQuiescer) Quiesce(ctx context.Context) (*QuiesceOperation, error) {
+	atomic.AddInt32(&f.quiesceN, 1)
+	if f.quiesceErr != nil {
+		return &QuiesceOperation{State: StateFailed, Error: f.quiesceErr}, f.quiesceErr
+	}
+	md := make(map[string]interface{})
+	for k, v := range f.metadata {
+		md[k] = v
+	}
+	return &QuiesceOperation{
+		DatabaseType: f.dbType,
+		State:        StateQuiesced,
+		StartTime:    time.Now(),
+		QuiesceTime:  time.Now(),
+		Metadata:     md,
+	}, nil
+}
+
+func (f *fakeQuiescer) Resume(ctx context.Context) error {
+	atomic.AddInt32(&f.resumeN, 1)
+	return f.resumeErr
+}
+
+func (f *fakeQuiescer) Close() error {
+	atomic.AddInt32(&f.closeN, 1)
+	return nil
+}
+
+func TestExecuteConsistentBackup_QuiescesAndRecordsLog(t *testing.T) {
+	qm := NewQuiesceManager()
+	cc := NewConsistencyCoordinator(nil, qm)
+
+	fq := &fakeQuiescer{
+		dbType:   "postgresql",
+		metadata: map[string]interface{}{"checkpoint_lsn": "0/ABCDEF12"},
+	}
+	cc.RegisterQuiescer("db1", fq)
+
+	group := &ConsistencyGroup{
+		Name:      "g",
+		Databases: []string{"db1"},
+		Level:     ConsistencyTransactional,
+	}
+	if err := cc.CreateConsistencyGroup(group); err != nil {
+		t.Fatalf("Failed to create group: %v", err)
+	}
+
+	backupCalled := int32(0)
+	err := cc.ExecuteConsistentBackup(context.Background(), group.ID, func(ctx context.Context, db string) error {
+		atomic.AddInt32(&backupCalled, 1)
+		// While the backup runs the database must be frozen.
+		if atomic.LoadInt32(&fq.quiesceN) != 1 {
+			t.Errorf("database not quiesced before backup ran")
+		}
+		if atomic.LoadInt32(&fq.resumeN) != 0 {
+			t.Errorf("database resumed before backup completed")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("ExecuteConsistentBackup failed: %v", err)
+	}
+
+	if atomic.LoadInt32(&backupCalled) != 1 {
+		t.Errorf("backupFunc should be called once, got %d", backupCalled)
+	}
+	if got := atomic.LoadInt32(&fq.quiesceN); got != 1 {
+		t.Errorf("QuiesceDatabase should be invoked once, got %d", got)
+	}
+	if got := atomic.LoadInt32(&fq.resumeN); got != 1 {
+		t.Errorf("ResumeDatabase should be invoked once, got %d", got)
+	}
+
+	// The consistency point must capture the real LSN, not an empty map.
+	points := cc.ListConsistencyPoints(group.ID)
+	if len(points) != 1 {
+		t.Fatalf("expected 1 consistency point, got %d", len(points))
+	}
+	entry, ok := points[0].Databases["db1"]
+	if !ok {
+		t.Fatalf("transaction log entry for db1 not recorded")
+	}
+	if entry.LSN != "0/ABCDEF12" {
+		t.Errorf("expected LSN 0/ABCDEF12 recorded, got %q", entry.LSN)
+	}
+}
+
+func TestExecuteConsistentBackup_ResumesOnBackupError(t *testing.T) {
+	qm := NewQuiesceManager()
+	cc := NewConsistencyCoordinator(nil, qm)
+
+	fq := &fakeQuiescer{
+		dbType:   "mysql",
+		metadata: map[string]interface{}{"binlog_file": "bin.000001", "binlog_position": int64(120)},
+	}
+	cc.RegisterQuiescer("db1", fq)
+
+	group := &ConsistencyGroup{
+		Name:      "g",
+		Databases: []string{"db1"},
+		Level:     ConsistencyTransactional,
+	}
+	if err := cc.CreateConsistencyGroup(group); err != nil {
+		t.Fatalf("Failed to create group: %v", err)
+	}
+
+	err := cc.ExecuteConsistentBackup(context.Background(), group.ID, func(ctx context.Context, db string) error {
+		return fmt.Errorf("backup boom")
+	})
+	if err == nil {
+		t.Fatal("expected backup error to propagate")
+	}
+
+	// Even though the backup failed, the database MUST be unfrozen.
+	if got := atomic.LoadInt32(&fq.quiesceN); got != 1 {
+		t.Errorf("QuiesceDatabase should be invoked once, got %d", got)
+	}
+	if got := atomic.LoadInt32(&fq.resumeN); got != 1 {
+		t.Errorf("ResumeDatabase must run even on backup error, got %d", got)
+	}
+}
+
+func TestExecuteConsistentBackup_QuiesceFailureAbortsBackup(t *testing.T) {
+	qm := NewQuiesceManager()
+	cc := NewConsistencyCoordinator(nil, qm)
+
+	fq := &fakeQuiescer{
+		dbType:     "postgresql",
+		quiesceErr: fmt.Errorf("freeze failed"),
+	}
+	cc.RegisterQuiescer("db1", fq)
+
+	group := &ConsistencyGroup{
+		Name:      "g",
+		Databases: []string{"db1"},
+		Level:     ConsistencyTransactional,
+	}
+	if err := cc.CreateConsistencyGroup(group); err != nil {
+		t.Fatalf("Failed to create group: %v", err)
+	}
+
+	backupCalled := int32(0)
+	err := cc.ExecuteConsistentBackup(context.Background(), group.ID, func(ctx context.Context, db string) error {
+		atomic.AddInt32(&backupCalled, 1)
+		return nil
+	})
+	if err == nil {
+		t.Fatal("expected error when quiesce fails")
+	}
+	if atomic.LoadInt32(&backupCalled) != 0 {
+		t.Errorf("backup must not run when quiesce fails")
+	}
+
+	// No consistency point should report a captured database.
+	points := cc.ListConsistencyPoints(group.ID)
+	if len(points) == 1 && len(points[0].Databases) != 0 {
+		t.Errorf("no transaction log should be recorded on quiesce failure, got %d", len(points[0].Databases))
 	}
 }
 

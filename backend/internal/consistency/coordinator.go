@@ -13,11 +13,11 @@ import (
 type ConsistencyLevel string
 
 const (
-	ConsistencyNone       ConsistencyLevel = "none"       // No consistency guarantees
-	ConsistencyDatabase   ConsistencyLevel = "database"   // Single database consistency
-	ConsistencyLevelGroup ConsistencyLevel = "group"      // Consistency group
-	ConsistencyGlobal     ConsistencyLevel = "global"     // Global consistency across all databases
-	ConsistencyCrashSafe  ConsistencyLevel = "crash-safe" // Crash-consistent (file system level)
+	ConsistencyNone          ConsistencyLevel = "none"          // No consistency guarantees
+	ConsistencyDatabase      ConsistencyLevel = "database"      // Single database consistency
+	ConsistencyLevelGroup    ConsistencyLevel = "group"         // Consistency group
+	ConsistencyGlobal        ConsistencyLevel = "global"        // Global consistency across all databases
+	ConsistencyCrashSafe     ConsistencyLevel = "crash-safe"    // Crash-consistent (file system level)
 	ConsistencyTransactional ConsistencyLevel = "transactional" // Transaction-consistent
 )
 
@@ -51,16 +51,16 @@ type BackupOrder struct {
 
 // TransactionLogEntry represents a transaction log entry
 type TransactionLogEntry struct {
-	ID           string
-	DatabaseID   string
-	DatabaseType string
-	Timestamp    time.Time
-	LSN          string // Log Sequence Number (PostgreSQL)
-	BinlogFile   string // Binlog file (MySQL)
-	BinlogPos    int64  // Binlog position (MySQL)
-	OplogTime    int64  // Oplog timestamp (MongoDB)
+	ID            string
+	DatabaseID    string
+	DatabaseType  string
+	Timestamp     time.Time
+	LSN           string // Log Sequence Number (PostgreSQL)
+	BinlogFile    string // Binlog file (MySQL)
+	BinlogPos     int64  // Binlog position (MySQL)
+	OplogTime     int64  // Oplog timestamp (MongoDB)
 	TransactionID string
-	Metadata     map[string]interface{}
+	Metadata      map[string]interface{}
 }
 
 // ConsistencyPoint represents a point in time for consistency
@@ -80,6 +80,7 @@ type ConsistencyCoordinator struct {
 	dependencies      []*DatabaseDependency
 	hookManager       *HookManager
 	quiesceManager    *QuiesceManager
+	quiescers         map[string]Quiescer
 }
 
 // NewConsistencyCoordinator creates a new consistency coordinator
@@ -90,7 +91,64 @@ func NewConsistencyCoordinator(hookManager *HookManager, quiesceManager *Quiesce
 		dependencies:      make([]*DatabaseDependency, 0),
 		hookManager:       hookManager,
 		quiesceManager:    quiesceManager,
+		quiescers:         make(map[string]Quiescer),
 	}
+}
+
+// RegisterQuiescer associates a database with the Quiescer used to freeze it
+// for a consistency point. When a Quiescer is registered for a database (and a
+// QuiesceManager is configured), ExecuteConsistentBackup will freeze that
+// database, capture its transaction-log position, run the backup, and always
+// resume (unfreeze) it afterwards.
+func (cc *ConsistencyCoordinator) RegisterQuiescer(database string, quiescer Quiescer) {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+	cc.quiescers[database] = quiescer
+}
+
+// getQuiescer returns the registered Quiescer for a database, if any.
+func (cc *ConsistencyCoordinator) getQuiescer(database string) Quiescer {
+	cc.mu.RLock()
+	defer cc.mu.RUnlock()
+	return cc.quiescers[database]
+}
+
+// transactionLogEntryFromOperation builds a TransactionLogEntry capturing the
+// real LSN / binlog / oplog position recorded by a quiesce operation so the
+// consistency point reflects an actual point in time rather than an empty map.
+func transactionLogEntryFromOperation(database string, op *QuiesceOperation) *TransactionLogEntry {
+	entry := &TransactionLogEntry{
+		DatabaseID:   database,
+		DatabaseType: op.DatabaseType,
+		Metadata:     make(map[string]interface{}),
+	}
+
+	if op.Metadata != nil {
+		switch op.DatabaseType {
+		case "postgresql":
+			if lsn, ok := op.Metadata["checkpoint_lsn"].(string); ok {
+				entry.LSN = lsn
+			}
+		case "mysql":
+			if f, ok := op.Metadata["binlog_file"].(string); ok {
+				entry.BinlogFile = f
+			}
+			if p, ok := op.Metadata["binlog_position"].(int64); ok {
+				entry.BinlogPos = p
+			}
+		case "mongodb":
+			if t, ok := op.Metadata["oplog_time"].(int64); ok {
+				entry.OplogTime = t
+			}
+		}
+
+		// Preserve the full quiesce metadata for forensics/PITR.
+		for k, v := range op.Metadata {
+			entry.Metadata[k] = v
+		}
+	}
+
+	return entry
 }
 
 // CreateConsistencyGroup creates a new consistency group
@@ -336,11 +394,55 @@ func (cc *ConsistencyCoordinator) ExecuteConsistentBackup(ctx context.Context, g
 					_, _ = cc.hookManager.ExecuteHooks(timeoutCtx, HookTypePreQuiesce, metadata)
 				}
 
-				// Perform backup
-				err := backupFunc(timeoutCtx, database)
-				if err != nil {
-					errChan <- fmt.Errorf("backup failed for %s: %w", database, err)
-					return
+				// Freeze the database so the backup is captured at a single,
+				// transaction-consistent point. The quiescer is resumed via
+				// resume() below so the database is ALWAYS unfrozen, even on
+				// an error or panic before the explicit resume.
+				quiescer := cc.getQuiescer(database)
+				if quiescer != nil && cc.quiesceManager != nil {
+					op, qerr := cc.quiesceManager.QuiesceDatabase(timeoutCtx, quiescer, database)
+					if qerr != nil {
+						errChan <- fmt.Errorf("failed to quiesce %s: %w", database, qerr)
+						return
+					}
+
+					// Guarantee the database is resumed exactly once, even on
+					// an early return or panic.
+					var resumeOnce sync.Once
+					resume := func() {
+						resumeOnce.Do(func() {
+							// Fresh context so resume still runs even if
+							// timeoutCtx is already cancelled/expired.
+							rctx, rcancel := context.WithTimeout(context.Background(), 30*time.Second)
+							defer rcancel()
+							_ = cc.quiesceManager.ResumeDatabase(rctx, quiescer, database)
+						})
+					}
+					defer resume()
+
+					// Capture the real LSN/binlog/oplog position into the
+					// consistency point. If this fails the point is not
+					// consistent, so treat it as a backup failure.
+					entry := transactionLogEntryFromOperation(database, op)
+					if rerr := cc.RecordTransactionLog(point.ID, entry); rerr != nil {
+						errChan <- fmt.Errorf("failed to record transaction log for %s: %w", database, rerr)
+						return
+					}
+
+					// Perform backup while the database is frozen.
+					if err := backupFunc(timeoutCtx, database); err != nil {
+						errChan <- fmt.Errorf("backup failed for %s: %w", database, err)
+						return
+					}
+
+					// Unfreeze before running post-quiesce hooks.
+					resume()
+				} else {
+					// No quiescer registered; back up without an explicit freeze.
+					if err := backupFunc(timeoutCtx, database); err != nil {
+						errChan <- fmt.Errorf("backup failed for %s: %w", database, err)
+						return
+					}
 				}
 
 				// Execute post-quiesce hooks
@@ -374,8 +476,8 @@ func (cc *ConsistencyCoordinator) ExecuteConsistentBackup(ctx context.Context, g
 	// Execute post-backup hooks
 	if cc.hookManager != nil {
 		metadata := map[string]string{
-			"group_id":         groupID,
-			"group_name":       group.Name,
+			"group_id":          groupID,
+			"group_name":        group.Name,
 			"consistency_point": point.ID,
 		}
 
@@ -541,8 +643,8 @@ func (cc *ConsistencyCoordinator) GetStatistics() map[string]interface{} {
 	defer cc.mu.RUnlock()
 
 	stats := map[string]interface{}{
-		"total_groups":            len(cc.groups),
-		"total_dependencies":      len(cc.dependencies),
+		"total_groups":             len(cc.groups),
+		"total_dependencies":       len(cc.dependencies),
 		"total_consistency_points": len(cc.consistencyPoints),
 	}
 
