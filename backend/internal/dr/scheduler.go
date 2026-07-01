@@ -7,33 +7,77 @@ import (
 	"sync"
 	"time"
 
+	"github.com/robfig/cron/v3"
 	"github.com/sanskarpan/db-backup/internal/notification"
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
 // TestSchedule represents a DR test schedule
 type TestSchedule struct {
-	ID               string
-	Name             string
-	DatabaseName     string
-	Enabled          bool
-	CronExpression   string // e.g., "0 2 * * 0" for every Sunday at 2 AM
-	LastRun          *time.Time
-	NextRun          *time.Time
-	TestConfig       *TestConfig
-	NotifyOnSuccess  bool
-	NotifyOnFailure  bool
-	NotificationEmails []string
+	ID                       string
+	Name                     string
+	DatabaseName             string
+	Enabled                  bool
+	CronExpression           string // e.g., "0 2 * * 0" for every Sunday at 2 AM
+	LastRun                  *time.Time
+	NextRun                  *time.Time
+	TestConfig               *TestConfig
+	NotifyOnSuccess          bool
+	NotifyOnFailure          bool
+	NotificationEmails       []string
 	NotificationSlackWebhook string
+}
+
+// TargetConfig describes the real database that a DR drill restores a backup
+// into and then validates. A DR test is meaningless without one: if it is nil
+// the executor returns a real error instead of simulating success.
+type TargetConfig struct {
+	// Driver is the database/sql driver name for the target ("sqlite3",
+	// "postgres" or "mysql"; common aliases are also accepted).
+	Driver string
+
+	// DSN, when set, is used verbatim to open the connection. Otherwise the
+	// DSN is built from the fields below.
+	DSN string
+
+	// Connection parameters used to build a DSN when DSN is empty. Port is
+	// placed with the other non-pointer field at the end of the struct to keep
+	// the pointer-bearing fields contiguous (fieldalignment).
+	Host     string
+	User     string
+	Password string
+	Database string
+	SSLMode  string
+
+	// BackupPath is the filesystem path to the backup artifact (a logical SQL
+	// dump) that will be restored into the target.
+	BackupPath string
+
+	// BackupTime is the wall-clock time the backup was taken. It is used to
+	// compute the real RPO (data-loss window) as restore-completion minus
+	// BackupTime.
+	BackupTime time.Time
+
+	// Expectations that turn the generic validators into meaningful checks
+	// for this database. All are optional.
+	ExpectedTables []string         // schema validation: these tables must exist post-restore
+	MinRowCounts   map[string]int64 // row-count validation: table -> minimum acceptable rows
+	SampleTables   []string         // sample-data validation: tables to read sample rows from
+
+	// Port is the TCP port for the target (used when building a DSN).
+	Port int
 }
 
 // TestConfig represents configuration for a DR test
 type TestConfig struct {
+	// Target is the real database to restore into and validate. Required.
+	Target *TargetConfig
+
 	// Environment settings
-	IsolatedNetwork    bool
-	EphemeralDatabase  bool
-	AutoCleanup        bool
-	MaxTestDuration    time.Duration
+	IsolatedNetwork   bool
+	EphemeralDatabase bool
+	AutoCleanup       bool
+	MaxTestDuration   time.Duration
 
 	// Validation settings
 	ValidateSchema     bool
@@ -42,12 +86,12 @@ type TestConfig struct {
 	SampleDataPercent  float64 // 0-100
 
 	// Performance thresholds
-	MaxRestoreTime     time.Duration // RTO
-	MaxDataLoss        time.Duration // RPO
+	MaxRestoreTime time.Duration // RTO
+	MaxDataLoss    time.Duration // RPO
 
 	// Smoke tests
-	RunSmokeTests      bool
-	CustomQueries      []string
+	RunSmokeTests bool
+	CustomQueries []string
 }
 
 // DefaultTestConfig returns default DR test configuration
@@ -70,11 +114,11 @@ func DefaultTestConfig() *TestConfig {
 
 // Scheduler manages DR test schedules
 type Scheduler struct {
-	mu                sync.RWMutex
-	schedules         map[string]*TestSchedule
-	executor          *TestExecutor
-	running           bool
-	stopChan          chan struct{}
+	mu                 sync.RWMutex
+	schedules          map[string]*TestSchedule
+	executor           *TestExecutor
+	running            bool
+	stopChan           chan struct{}
 	notificationRouter *notification.Router
 }
 
@@ -86,9 +130,9 @@ func NewScheduler(executor *TestExecutor, notificationRouter *notification.Route
 
 	return &Scheduler{
 		notificationRouter: notificationRouter,
-		schedules: make(map[string]*TestSchedule),
-		executor:  executor,
-		stopChan:  make(chan struct{}),
+		schedules:          make(map[string]*TestSchedule),
+		executor:           executor,
+		stopChan:           make(chan struct{}),
 	}
 }
 
@@ -297,7 +341,8 @@ func (s *Scheduler) sendNotification(schedule *TestSchedule, result *TestResult,
 	// Build fields for structured display
 	var fields []*notification.Field
 	if result != nil {
-		fields = append(fields,
+		fields = append(
+			fields,
 			&notification.Field{
 				Title: "Database",
 				Value: schedule.DatabaseName,
@@ -321,7 +366,8 @@ func (s *Scheduler) sendNotification(schedule *TestSchedule, result *TestResult,
 		)
 
 		if result.RestoreStats != nil {
-			fields = append(fields,
+			fields = append(
+				fields,
 				&notification.Field{
 					Title: "Restore Duration",
 					Value: fmt.Sprintf("%.2f seconds", result.RestoreStats.Duration.Seconds()),
@@ -385,12 +431,15 @@ func (s *Scheduler) sendNotification(schedule *TestSchedule, result *TestResult,
 	}
 }
 
-// calculateNextRun calculates the next run time based on cron expression
-// Simplified cron parser - in production, use a proper cron library
+// calculateNextRun calculates the next run time based on a standard 5-field
+// cron expression (minute hour day-of-month month day-of-week), using the
+// robfig/cron parser -- the same library used by internal/scheduler.
 func calculateNextRun(cronExpr string, from time.Time) (time.Time, error) {
-	// Simplified implementation - add 1 week by default
-	// In production, use github.com/robfig/cron or similar
-	return from.Add(7 * 24 * time.Hour), nil
+	schedule, err := cron.ParseStandard(cronExpr)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid cron expression %q: %w", cronExpr, err)
+	}
+	return schedule.Next(from), nil
 }
 
 // generateScheduleID generates a unique schedule ID

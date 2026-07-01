@@ -101,7 +101,7 @@ func validateCommand(command string, args []string) error {
 	}
 
 	// Check if executable
-	if info.Mode().Perm()&0111 == 0 {
+	if info.Mode().Perm()&0o111 == 0 {
 		return fmt.Errorf("command is not executable: %s", absCommand)
 	}
 
@@ -112,14 +112,14 @@ func validateCommand(command string, args []string) error {
 type HookType string
 
 const (
-	HookTypePreBackup      HookType = "pre-backup"
-	HookTypePostBackup     HookType = "post-backup"
-	HookTypePreQuiesce     HookType = "pre-quiesce"
-	HookTypePostQuiesce    HookType = "post-quiesce"
-	HookTypePreRestore     HookType = "pre-restore"
-	HookTypePostRestore    HookType = "post-restore"
-	HookTypeOnFailure      HookType = "on-failure"
-	HookTypeOnSuccess      HookType = "on-success"
+	HookTypePreBackup   HookType = "pre-backup"
+	HookTypePostBackup  HookType = "post-backup"
+	HookTypePreQuiesce  HookType = "pre-quiesce"
+	HookTypePostQuiesce HookType = "post-quiesce"
+	HookTypePreRestore  HookType = "pre-restore"
+	HookTypePostRestore HookType = "post-restore"
+	HookTypeOnFailure   HookType = "on-failure"
+	HookTypeOnSuccess   HookType = "on-success"
 )
 
 // HookExecutionMode defines how hooks should be executed
@@ -153,28 +153,28 @@ type Hook struct {
 
 // HookResult represents the result of hook execution
 type HookResult struct {
-	HookID      string
-	Type        HookType
-	Success     bool
-	ExitCode    int
-	Stdout      string
-	Stderr      string
-	Duration    time.Duration
-	StartTime   time.Time
-	EndTime     time.Time
-	Error       error
-	Retries     int
+	HookID    string
+	Type      HookType
+	Success   bool
+	ExitCode  int
+	Stdout    string
+	Stderr    string
+	Duration  time.Duration
+	StartTime time.Time
+	EndTime   time.Time
+	Error     error
+	Retries   int
 }
 
 // HookManager manages backup hooks lifecycle
 type HookManager struct {
-	mu             sync.RWMutex
-	hooks          map[HookType][]*Hook
-	results        []*HookResult
-	executionMode  HookExecutionMode
-	globalTimeout  time.Duration
-	maxConcurrent  int
-	semaphore      chan struct{}
+	mu            sync.RWMutex
+	hooks         map[HookType][]*Hook
+	results       []*HookResult
+	executionMode HookExecutionMode
+	globalTimeout time.Duration
+	maxConcurrent int
+	semaphore     chan struct{}
 }
 
 // HookConfig represents hook configuration

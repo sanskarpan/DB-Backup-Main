@@ -4,20 +4,23 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
 // ErasureRequest represents a user's request to be forgotten
 type ErasureRequest struct {
-	ID            string              `json:"id"`
-	UserID        string              `json:"user_id"`
-	RequestedAt   time.Time           `json:"requested_at"`
-	CompletedAt   *time.Time          `json:"completed_at,omitempty"`
-	Status        ErasureStatus       `json:"status"`
-	Reason        string              `json:"reason,omitempty"`
-	VerifiedBy    string              `json:"verified_by,omitempty"`
-	DataTypes     []string            `json:"data_types"` // backups, logs, metadata, etc.
-	RetentionDays int                 `json:"retention_days"` // grace period before actual deletion
+	ID            string                 `json:"id"`
+	UserID        string                 `json:"user_id"`
+	RequestedAt   time.Time              `json:"requested_at"`
+	CompletedAt   *time.Time             `json:"completed_at,omitempty"`
+	Status        ErasureStatus          `json:"status"`
+	Reason        string                 `json:"reason,omitempty"`
+	VerifiedBy    string                 `json:"verified_by,omitempty"`
+	DataTypes     []string               `json:"data_types"`     // backups, logs, metadata, etc.
+	RetentionDays int                    `json:"retention_days"` // grace period before actual deletion
 	Results       map[string]EraseResult `json:"results,omitempty"`
 }
 
@@ -35,7 +38,7 @@ const (
 
 // EraseResult represents the result of erasing data from a specific source
 type EraseResult struct {
-	Source    string    `json:"source"`    // database, storage, logs, etc.
+	Source    string    `json:"source"` // database, storage, logs, etc.
 	Success   bool      `json:"success"`
 	DeletedAt time.Time `json:"deleted_at"`
 	Error     string    `json:"error,omitempty"`
@@ -198,41 +201,201 @@ func (em *ErasureManager) GetUserErasureRequests(ctx context.Context, userID str
 	return em.store.GetByUserID(ctx, userID)
 }
 
-// BackupDataEraser erases user backup data
-type BackupDataEraser struct{}
+// BackupRecord is the minimal description of a backup artifact that the
+// BackupDataEraser needs in order to erase it on behalf of a data subject.
+type BackupRecord struct {
+	ID       string // catalog / repository identifier of the backup record
+	UserID   string // owning data subject
+	Location string // filesystem path of the physical artifact (optional)
+}
+
+// BackupArtifactStore is the catalog / repository the BackupDataEraser deletes
+// backup records from. A concrete implementation is provided by the server
+// (e.g. backed by internal/repository), but any store satisfying this contract
+// works. It is intentionally narrow so the eraser only depends on what it uses.
+type BackupArtifactStore interface {
+	// ListByUser returns every backup record owned by the given data subject.
+	ListByUser(ctx context.Context, userID string) ([]BackupRecord, error)
+	// Delete removes the backup record identified by id from the store.
+	Delete(ctx context.Context, id string) error
+}
+
+// BackupDataEraser erases a data subject's backup artifacts and catalog records.
+type BackupDataEraser struct {
+	store   BackupArtifactStore
+	baseDir string // optional root for physical artifacts; when set, files are removed too
+}
+
+// NewBackupDataEraser creates a BackupDataEraser.
+//
+// store is required: it is the catalog/repository the eraser deletes records
+// from. baseDir is optional; when non-empty, the physical artifact referenced by
+// each record's Location is also deleted from disk, but only if it resolves to a
+// path inside baseDir (defense against path traversal).
+func NewBackupDataEraser(store BackupArtifactStore, baseDir string) *BackupDataEraser {
+	return &BackupDataEraser{store: store, baseDir: baseDir}
+}
 
 func (b *BackupDataEraser) Name() string {
 	return "backups"
 }
 
+// EraseUserData deletes every backup record owned by userID, removing the
+// underlying artifact file from disk when a baseDir is configured. It returns
+// the number of backup records actually deleted from the store.
 func (b *BackupDataEraser) EraseUserData(ctx context.Context, userID string) (int, error) {
-	// Implementation would delete all backups owned by the user
-	// This is a placeholder
-	return 0, nil
+	if b.store == nil {
+		return 0, errors.New("backup eraser: no backup artifact store configured")
+	}
+
+	records, err := b.store.ListByUser(ctx, userID)
+	if err != nil {
+		return 0, fmt.Errorf("backup eraser: list backups for user %q: %w", userID, err)
+	}
+
+	deleted := 0
+	var errs []string
+	for _, rec := range records {
+		// Remove the physical artifact first so we never leave dangling data
+		// after the record (the index pointing at it) is gone.
+		if b.baseDir != "" && rec.Location != "" {
+			if err := removeFileWithinBase(b.baseDir, rec.Location); err != nil {
+				errs = append(errs, fmt.Sprintf("artifact %s: %v", rec.ID, err))
+				continue
+			}
+		}
+
+		if err := b.store.Delete(ctx, rec.ID); err != nil {
+			errs = append(errs, fmt.Sprintf("record %s: %v", rec.ID, err))
+			continue
+		}
+		deleted++
+	}
+
+	if len(errs) > 0 {
+		return deleted, fmt.Errorf("backup eraser: %d of %d records erased, errors: %s",
+			deleted, len(records), strings.Join(errs, "; "))
+	}
+	return deleted, nil
 }
 
-// LogDataEraser erases user log data
-type LogDataEraser struct{}
+// LogEntry is the minimal description of a log record referencing a data subject.
+type LogEntry struct {
+	ID     string
+	UserID string
+}
+
+// LogStore is the audit/activity log backend the LogDataEraser removes entries
+// from. The server supplies a concrete implementation; the eraser only needs to
+// enumerate and delete a subject's entries.
+type LogStore interface {
+	// ListByUser returns every log entry referencing the given data subject.
+	ListByUser(ctx context.Context, userID string) ([]LogEntry, error)
+	// Delete removes the log entry identified by id.
+	Delete(ctx context.Context, id string) error
+}
+
+// LogDataEraser erases (deletes) log entries referencing a data subject.
+type LogDataEraser struct {
+	store LogStore
+}
+
+// NewLogDataEraser creates a LogDataEraser backed by the given log store.
+func NewLogDataEraser(store LogStore) *LogDataEraser {
+	return &LogDataEraser{store: store}
+}
 
 func (l *LogDataEraser) Name() string {
 	return "logs"
 }
 
+// EraseUserData deletes every log entry referencing userID and returns the
+// number of entries actually removed.
 func (l *LogDataEraser) EraseUserData(ctx context.Context, userID string) (int, error) {
-	// Implementation would delete all logs related to the user
-	// This is a placeholder
-	return 0, nil
+	if l.store == nil {
+		return 0, errors.New("log eraser: no log store configured")
+	}
+
+	entries, err := l.store.ListByUser(ctx, userID)
+	if err != nil {
+		return 0, fmt.Errorf("log eraser: list logs for user %q: %w", userID, err)
+	}
+
+	deleted := 0
+	var errs []string
+	for _, e := range entries {
+		if err := l.store.Delete(ctx, e.ID); err != nil {
+			errs = append(errs, fmt.Sprintf("entry %s: %v", e.ID, err))
+			continue
+		}
+		deleted++
+	}
+
+	if len(errs) > 0 {
+		return deleted, fmt.Errorf("log eraser: %d of %d entries erased, errors: %s",
+			deleted, len(entries), strings.Join(errs, "; "))
+	}
+	return deleted, nil
 }
 
-// MetadataEraser erases user metadata
-type MetadataEraser struct{}
+// MetadataStore is the metadata backend the MetadataEraser removes records from.
+type MetadataStore interface {
+	// DeleteByUser removes all metadata records for the given data subject and
+	// returns the number of records deleted.
+	DeleteByUser(ctx context.Context, userID string) (int, error)
+}
+
+// MetadataEraser erases metadata records associated with a data subject.
+type MetadataEraser struct {
+	store MetadataStore
+}
+
+// NewMetadataEraser creates a MetadataEraser backed by the given metadata store.
+func NewMetadataEraser(store MetadataStore) *MetadataEraser {
+	return &MetadataEraser{store: store}
+}
 
 func (m *MetadataEraser) Name() string {
 	return "metadata"
 }
 
+// EraseUserData deletes all metadata records for userID and returns the number
+// of records actually deleted by the store.
 func (m *MetadataEraser) EraseUserData(ctx context.Context, userID string) (int, error) {
-	// Implementation would delete all metadata related to the user
-	// This is a placeholder
-	return 0, nil
+	if m.store == nil {
+		return 0, errors.New("metadata eraser: no metadata store configured")
+	}
+
+	deleted, err := m.store.DeleteByUser(ctx, userID)
+	if err != nil {
+		return deleted, fmt.Errorf("metadata eraser: delete metadata for user %q: %w", userID, err)
+	}
+	return deleted, nil
+}
+
+// removeFileWithinBase deletes target only if it resolves to a path inside
+// baseDir, guarding against path-traversal so erasure can never reach outside
+// the configured artifact root. A missing file is treated as already erased.
+func removeFileWithinBase(baseDir, target string) error {
+	absBase, err := filepath.Abs(baseDir)
+	if err != nil {
+		return fmt.Errorf("resolve base dir: %w", err)
+	}
+	absTarget, err := filepath.Abs(target)
+	if err != nil {
+		return fmt.Errorf("resolve target: %w", err)
+	}
+
+	rel, err := filepath.Rel(absBase, absTarget)
+	if err != nil {
+		return fmt.Errorf("relativise target: %w", err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return fmt.Errorf("refusing to delete %q: outside artifact root %q", target, baseDir)
+	}
+
+	if err := os.Remove(absTarget); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove artifact: %w", err)
+	}
+	return nil
 }

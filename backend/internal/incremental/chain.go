@@ -33,23 +33,23 @@ func DefaultChainPolicy() *ChainPolicy {
 
 // ChainHealth represents the health status of a backup chain
 type ChainHealth struct {
-	ChainID          string
-	Status           string // "healthy", "warning", "critical"
-	ChainLength      int
-	ChainAge         time.Duration
-	Issues           []string
-	Recommendations  []string
-	LastChecked      time.Time
+	ChainID         string
+	Status          string // "healthy", "warning", "critical"
+	ChainLength     int
+	ChainAge        time.Duration
+	Issues          []string
+	Recommendations []string
+	LastChecked     time.Time
 }
 
 // BackupChainManager manages backup chains
 type BackupChainManager struct {
-	mu                sync.RWMutex
-	strategy          *IncrementalForeverStrategy
-	syntheticGen      *SyntheticBackupGenerator
-	policy            *ChainPolicy
-	chainHealth       map[string]*ChainHealth
-	lastFullBackups   map[string]time.Time // Track last full backup per database
+	mu              sync.RWMutex
+	strategy        *IncrementalForeverStrategy
+	syntheticGen    *SyntheticBackupGenerator
+	policy          *ChainPolicy
+	chainHealth     map[string]*ChainHealth
+	lastFullBackups map[string]time.Time // Track last full backup per database
 }
 
 // NewBackupChainManager creates a new backup chain manager
@@ -358,11 +358,14 @@ func (bcm *BackupChainManager) getBackupsForDatabase(databaseID string) []*Backu
 	return dbBackups
 }
 
-// removeBackup removes a backup and its files
+// removeBackup removes a backup and its persisted artifacts (data file, manifest
+// file and snapshot) via the strategy. It returns a real error on failure so the
+// retention policy never counts a backup as removed unless it actually was.
 func (bcm *BackupChainManager) removeBackup(manifest *BackupManifest) error {
-	// This would be implemented to remove backup files
-	// For now, just a placeholder
-	return nil
+	if manifest == nil {
+		return fmt.Errorf("cannot remove nil manifest")
+	}
+	return bcm.strategy.RemoveBackup(manifest.ID)
 }
 
 // RecordFullBackup records when a full backup was performed
@@ -421,11 +424,11 @@ func (bcm *BackupChainManager) GetStatistics() map[string]interface{} {
 		"warning_chains":  warningChains,
 		"critical_chains": criticalChains,
 		"policy": map[string]interface{}{
-			"max_chain_length":        bcm.policy.MaxChainLength,
-			"max_chain_age":           bcm.policy.MaxChainAge,
-			"retention_days":          bcm.policy.RetentionDays,
-			"auto_synthetic_enabled":  bcm.policy.AutoSyntheticEnabled,
-			"auto_cleanup_enabled":    bcm.policy.AutoCleanupEnabled,
+			"max_chain_length":       bcm.policy.MaxChainLength,
+			"max_chain_age":          bcm.policy.MaxChainAge,
+			"retention_days":         bcm.policy.RetentionDays,
+			"auto_synthetic_enabled": bcm.policy.AutoSyntheticEnabled,
+			"auto_cleanup_enabled":   bcm.policy.AutoCleanupEnabled,
 		},
 	}
 
@@ -444,12 +447,12 @@ func (bcm *BackupChainManager) PerformHealthCheck() (map[string]interface{}, err
 	}
 
 	result := map[string]interface{}{
-		"timestamp":      time.Now(),
-		"total_chains":   len(healthReports),
-		"healthy":        0,
-		"warning":        0,
-		"critical":       0,
-		"chains":         healthReports,
+		"timestamp":    time.Now(),
+		"total_chains": len(healthReports),
+		"healthy":      0,
+		"warning":      0,
+		"critical":     0,
+		"chains":       healthReports,
 	}
 
 	for _, health := range healthReports {

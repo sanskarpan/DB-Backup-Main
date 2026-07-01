@@ -51,8 +51,9 @@ func NewQuiesceManager() *QuiesceManager {
 
 // PostgreSQLQuiescer handles PostgreSQL quiesce operations
 type PostgreSQLQuiescer struct {
-	db           *sql.DB
-	backupLabel  string
+	db            *sql.DB
+	conn          *sql.Conn // pinned connection for the non-exclusive backup session
+	backupLabel   string
 	checkpointLSN string
 }
 
@@ -78,17 +79,31 @@ func (pq *PostgreSQLQuiescer) Quiesce(ctx context.Context) (*QuiesceOperation, e
 		Metadata:     make(map[string]interface{}),
 	}
 
+	// Pin a dedicated connection. A non-exclusive pg_start_backup session is
+	// tied to the backend that started it: pg_stop_backup MUST be issued on the
+	// SAME physical connection, otherwise the backup is never finalized. Using
+	// the pooled *sql.DB would let stop land on a different backend and silently
+	// fail to honor the session.
+	conn, err := pq.db.Conn(ctx)
+	if err != nil {
+		op.State = StateFailed
+		op.Error = fmt.Errorf("failed to acquire pinned connection: %w", err)
+		return op, op.Error
+	}
+
 	// Execute pg_start_backup
 	// This function ensures that the database is in a consistent state for backup
 	var lsn string
 	query := "SELECT pg_start_backup($1, false, false)"
-	err := pq.db.QueryRowContext(ctx, query, pq.backupLabel).Scan(&lsn)
+	err = conn.QueryRowContext(ctx, query, pq.backupLabel).Scan(&lsn)
 	if err != nil {
+		_ = conn.Close()
 		op.State = StateFailed
 		op.Error = fmt.Errorf("pg_start_backup failed: %w", err)
 		return op, op.Error
 	}
 
+	pq.conn = conn
 	pq.checkpointLSN = lsn
 	op.QuiesceTime = time.Now()
 	op.State = StateQuiesced
@@ -96,31 +111,41 @@ func (pq *PostgreSQLQuiescer) Quiesce(ctx context.Context) (*QuiesceOperation, e
 	op.Metadata["checkpoint_lsn"] = lsn
 	op.Metadata["quiesce_duration_ms"] = op.QuiesceTime.Sub(op.StartTime).Milliseconds()
 
-	// Get current database size
+	// Get current database size (same pinned connection)
 	var dbSize int64
 	sizeQuery := "SELECT pg_database_size(current_database())"
-	if err := pq.db.QueryRowContext(ctx, sizeQuery).Scan(&dbSize); err == nil {
+	if err := conn.QueryRowContext(ctx, sizeQuery).Scan(&dbSize); err == nil {
 		op.Metadata["database_size_bytes"] = dbSize
 	}
 
-	// Get WAL information
+	// Get WAL information (same pinned connection)
 	var walFile string
 	walQuery := "SELECT pg_walfile_name(pg_current_wal_lsn())"
-	if err := pq.db.QueryRowContext(ctx, walQuery).Scan(&walFile); err == nil {
+	if err := conn.QueryRowContext(ctx, walQuery).Scan(&walFile); err == nil {
 		op.Metadata["current_wal_file"] = walFile
 	}
 
 	return op, nil
 }
 
-// Resume ends the PostgreSQL backup session
+// Resume ends the PostgreSQL backup session on the pinned connection.
 func (pq *PostgreSQLQuiescer) Resume(ctx context.Context) error {
-	// Execute pg_stop_backup
+	if pq.conn == nil {
+		return nil
+	}
+
+	// Execute pg_stop_backup on the SAME connection that started the backup,
+	// then release the pinned connection back to the pool.
 	var lsn string
 	query := "SELECT pg_stop_backup(false, true)"
-	err := pq.db.QueryRowContext(ctx, query).Scan(&lsn)
+	err := pq.conn.QueryRowContext(ctx, query).Scan(&lsn)
+	closeErr := pq.conn.Close()
+	pq.conn = nil
 	if err != nil {
 		return fmt.Errorf("pg_stop_backup failed: %w", err)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("failed to release pinned connection: %w", closeErr)
 	}
 
 	return nil
@@ -128,12 +153,23 @@ func (pq *PostgreSQLQuiescer) Resume(ctx context.Context) error {
 
 // Close closes the PostgreSQL connection
 func (pq *PostgreSQLQuiescer) Close() error {
-	return pq.db.Close()
+	// Ensure the backup session is ended and the pinned connection released.
+	var resumeErr error
+	if pq.conn != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		resumeErr = pq.Resume(ctx)
+	}
+	if err := pq.db.Close(); err != nil {
+		return err
+	}
+	return resumeErr
 }
 
 // MySQLQuiescer handles MySQL quiesce operations
 type MySQLQuiescer struct {
 	db               *sql.DB
+	conn             *sql.Conn // pinned connection holding the read lock
 	tablesLocked     bool
 	lockTimeout      time.Duration
 	originalReadOnly bool
@@ -165,75 +201,102 @@ func (mq *MySQLQuiescer) Quiesce(ctx context.Context) (*QuiesceOperation, error)
 		Metadata:     make(map[string]interface{}),
 	}
 
+	// Pin a dedicated connection. FLUSH TABLES WITH READ LOCK is session-scoped:
+	// the lock is held only by the connection that issued it and is released by
+	// UNLOCK TABLES (or disconnect) on that SAME connection. Issuing lock/unlock
+	// over the pooled *sql.DB could land UNLOCK on a different physical
+	// connection, leaving the database silently frozen.
+	conn, err := mq.db.Conn(ctx)
+	if err != nil {
+		op.State = StateFailed
+		op.Error = fmt.Errorf("failed to acquire pinned connection: %w", err)
+		return op, op.Error
+	}
+
 	// Check current read_only status
 	var readOnlyVar, readOnlyValue string
-	err := mq.db.QueryRowContext(ctx, "SHOW VARIABLES LIKE 'read_only'").Scan(&readOnlyVar, &readOnlyValue)
-	if err == nil {
+	if rerr := conn.QueryRowContext(ctx, "SHOW VARIABLES LIKE 'read_only'").Scan(&readOnlyVar, &readOnlyValue); rerr == nil {
 		mq.originalReadOnly = (readOnlyValue == "ON")
 		op.Metadata["original_read_only"] = mq.originalReadOnly
 	}
 
-	// Set lock wait timeout
-	_, err = mq.db.ExecContext(ctx, fmt.Sprintf("SET SESSION lock_wait_timeout = %d", int(mq.lockTimeout.Seconds())))
+	// Set lock wait timeout on the pinned connection
+	_, err = conn.ExecContext(ctx, fmt.Sprintf("SET SESSION lock_wait_timeout = %d", int(mq.lockTimeout.Seconds())))
 	if err != nil {
+		_ = conn.Close()
 		op.State = StateFailed
 		op.Error = fmt.Errorf("failed to set lock timeout: %w", err)
 		return op, op.Error
 	}
 
-	// Execute FLUSH TABLES WITH READ LOCK
+	// Execute FLUSH TABLES WITH READ LOCK on the pinned connection
 	// This ensures all tables are flushed to disk and locked for reading
-	_, err = mq.db.ExecContext(ctx, "FLUSH TABLES WITH READ LOCK")
+	_, err = conn.ExecContext(ctx, "FLUSH TABLES WITH READ LOCK")
 	if err != nil {
+		_ = conn.Close()
 		op.State = StateFailed
 		op.Error = fmt.Errorf("FLUSH TABLES WITH READ LOCK failed: %w", err)
 		return op, op.Error
 	}
 
+	mq.conn = conn
 	mq.tablesLocked = true
 	op.QuiesceTime = time.Now()
 	op.State = StateQuiesced
 	op.Metadata["lock_duration_ms"] = op.QuiesceTime.Sub(op.StartTime).Milliseconds()
 
-	// Get binary log position
+	// Get binary log position (same pinned connection)
 	var binlogFile string
 	var binlogPos int64
-	err = mq.db.QueryRowContext(ctx, "SHOW MASTER STATUS").Scan(&binlogFile, &binlogPos)
+	err = conn.QueryRowContext(ctx, "SHOW MASTER STATUS").Scan(&binlogFile, &binlogPos)
 	if err == nil {
 		op.Metadata["binlog_file"] = binlogFile
 		op.Metadata["binlog_position"] = binlogPos
 	}
 
-	// Get database size
+	// Get database size (same pinned connection)
 	var dbSize sql.NullInt64
 	sizeQuery := "SELECT SUM(data_length + index_length) FROM information_schema.tables WHERE table_schema = DATABASE()"
-	if err := mq.db.QueryRowContext(ctx, sizeQuery).Scan(&dbSize); err == nil && dbSize.Valid {
+	if err := conn.QueryRowContext(ctx, sizeQuery).Scan(&dbSize); err == nil && dbSize.Valid {
 		op.Metadata["database_size_bytes"] = dbSize.Int64
 	}
 
-	// Get table count
+	// Get table count (same pinned connection)
 	var tableCount int
 	countQuery := "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()"
-	if err := mq.db.QueryRowContext(ctx, countQuery).Scan(&tableCount); err == nil {
+	if err := conn.QueryRowContext(ctx, countQuery).Scan(&tableCount); err == nil {
 		op.Metadata["table_count"] = tableCount
 	}
 
 	return op, nil
 }
 
-// Resume unlocks all MySQL tables
+// Resume unlocks all MySQL tables on the pinned connection.
 func (mq *MySQLQuiescer) Resume(ctx context.Context) error {
 	if !mq.tablesLocked {
 		return nil
 	}
 
-	// Execute UNLOCK TABLES
-	_, err := mq.db.ExecContext(ctx, "UNLOCK TABLES")
+	if mq.conn == nil {
+		// Lock flag set without a pinned connection should not happen; treat the
+		// lock as released since the holding connection is gone.
+		mq.tablesLocked = false
+		return nil
+	}
+
+	// Execute UNLOCK TABLES on the SAME connection that holds the read lock,
+	// then release the pinned connection back to the pool.
+	_, err := mq.conn.ExecContext(ctx, "UNLOCK TABLES")
+	closeErr := mq.conn.Close()
+	mq.conn = nil
+	mq.tablesLocked = false
 	if err != nil {
 		return fmt.Errorf("UNLOCK TABLES failed: %w", err)
 	}
+	if closeErr != nil {
+		return fmt.Errorf("failed to release pinned connection: %w", closeErr)
+	}
 
-	mq.tablesLocked = false
 	return nil
 }
 
@@ -250,8 +313,8 @@ func (mq *MySQLQuiescer) Close() error {
 
 // MongoDBQuiescer handles MongoDB quiesce operations
 type MongoDBQuiescer struct {
-	client     *mongo.Client
-	database   string
+	client      *mongo.Client
+	database    string
 	fsyncLocked bool
 }
 
@@ -291,9 +354,9 @@ func (mq *MongoDBQuiescer) Quiesce(ctx context.Context) (*QuiesceOperation, erro
 	adminDB := mq.client.Database("admin")
 
 	var result struct {
-		OK     int    `bson:"ok"`
-		Info   string `bson:"info"`
-		LockCount int `bson:"lockCount"`
+		OK        int    `bson:"ok"`
+		Info      string `bson:"info"`
+		LockCount int    `bson:"lockCount"`
 	}
 
 	command := map[string]interface{}{"fsync": 1, "lock": true}

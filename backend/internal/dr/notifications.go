@@ -171,13 +171,13 @@ func (ns *NotificationService) buildSlackMessage(schedule *TestSchedule, result 
 
 	// Build attachment
 	attachment := map[string]interface{}{
-		"color":      color,
-		"title":      fmt.Sprintf("DR Test: %s", schedule.Name),
-		"text":       fmt.Sprintf("Test Status: %s", status),
-		"fields":     fields,
-		"footer":     "DB-Backup DR Testing",
+		"color":       color,
+		"title":       fmt.Sprintf("DR Test: %s", schedule.Name),
+		"text":        fmt.Sprintf("Test Status: %s", status),
+		"fields":      fields,
+		"footer":      "DB-Backup DR Testing",
 		"footer_icon": "https://platform.slack-edge.com/img/default_application_icon.png",
-		"ts":         result.EndTime.Unix(),
+		"ts":          result.EndTime.Unix(),
 	}
 
 	// Add error details if test failed

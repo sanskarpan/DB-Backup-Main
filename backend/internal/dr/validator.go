@@ -3,15 +3,17 @@ package dr
 
 import (
 	"context"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
 	"fmt"
+	"sort"
 	"time"
 )
 
-// Validator validates restored databases
-type Validator struct {
-	// In production, would contain database connection pool
-	// and comparison logic against production database
-}
+// Validator validates restored databases by running real queries against the
+// restored test target.
+type Validator struct{}
 
 // NewValidator creates a new validator
 func NewValidator() *Validator {
@@ -28,89 +30,106 @@ type SchemaObject struct {
 
 // TableRowCount represents row count for a table
 type TableRowCount struct {
-	TableName     string
-	RowCount      int64
-	Database      string
-	LastUpdated   time.Time
+	TableName   string
+	RowCount    int64
+	Database    string
+	LastUpdated time.Time
 }
 
 // SampleDataRecord represents a sample data record
 type SampleDataRecord struct {
-	TableName   string
-	RecordID    string
-	Data        map[string]interface{}
-	Checksum    string
+	TableName string
+	RecordID  string
+	Data      map[string]interface{}
+	Checksum  string
 }
 
-// ValidateSchema validates the database schema
+// ValidateSchema validates the restored schema by querying the target's
+// catalog. If the target declares ExpectedTables, each must be present;
+// otherwise the restore is required to have produced at least one table.
 func (v *Validator) ValidateSchema(ctx context.Context, env *TestEnvironment, databaseName string) (bool, []string) {
-	// In production, this would:
-	// 1. Connect to both production and test database
-	// 2. Extract schema definitions (tables, indexes, constraints, views, etc.)
-	// 3. Compare schemas for differences
-	// 4. Report any missing or altered objects
-
 	errors := make([]string, 0)
 
-	// Simulate schema validation
-	// In production, would query information_schema and compare
-	prodSchema, err := v.getProductionSchema(ctx, databaseName)
-	if err != nil {
-		errors = append(errors, fmt.Sprintf("Failed to get production schema: %v", err))
+	if env == nil || env.db == nil {
+		errors = append(errors, "no live connection to test target")
 		return false, errors
 	}
 
-	testSchema, err := v.getTestSchema(ctx, env, databaseName)
+	actual, err := listTables(ctx, env.db, env.driver, env.DatabaseName)
 	if err != nil {
-		errors = append(errors, fmt.Sprintf("Failed to get test schema: %v", err))
+		errors = append(errors, fmt.Sprintf("Failed to read restored schema: %v", err))
 		return false, errors
 	}
 
-	// Compare schemas
-	errors = v.compareSchemas(prodSchema, testSchema)
+	actualSet := make(map[string]bool, len(actual))
+	for _, t := range actual {
+		actualSet[t] = true
+	}
 
-	return len(errors) == 0, errors
+	if env.target != nil && len(env.target.ExpectedTables) > 0 {
+		for _, expected := range env.target.ExpectedTables {
+			if !actualSet[expected] {
+				errors = append(errors, fmt.Sprintf("Missing table in restored database: %s", expected))
+			}
+		}
+		return len(errors) == 0, errors
+	}
+
+	if len(actual) == 0 {
+		errors = append(errors, "Restored database contains no tables")
+		return false, errors
+	}
+
+	return true, errors
 }
 
-// ValidateRowCounts validates that row counts match between production and restored database
+// ValidateRowCounts validates row counts in the restored database. If the
+// target declares MinRowCounts, every listed table must exist and hold at
+// least the minimum number of rows; otherwise every table must simply be
+// countable.
 func (v *Validator) ValidateRowCounts(ctx context.Context, env *TestEnvironment, databaseName string) (bool, []string) {
-	// In production, this would:
-	// 1. Get list of all tables
-	// 2. Query row counts from production database
-	// 3. Query row counts from restored database
-	// 4. Compare counts with acceptable tolerance (e.g., ±1% for high-traffic tables)
-	// 5. Report any significant discrepancies
-
 	errors := make([]string, 0)
 
-	// Simulate row count validation
-	prodCounts, err := v.getProductionRowCounts(ctx, databaseName)
-	if err != nil {
-		errors = append(errors, fmt.Sprintf("Failed to get production row counts: %v", err))
+	if env == nil || env.db == nil {
+		errors = append(errors, "no live connection to test target")
 		return false, errors
 	}
 
-	testCounts, err := v.getTestRowCounts(ctx, env, databaseName)
-	if err != nil {
-		errors = append(errors, fmt.Sprintf("Failed to get test row counts: %v", err))
-		return false, errors
+	if env.target != nil && len(env.target.MinRowCounts) > 0 {
+		for table, minCount := range env.target.MinRowCounts {
+			count, err := tableRowCount(ctx, env.db, env.driver, table)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("Table missing or unreadable in restored database: %s (%v)", table, err))
+				continue
+			}
+			if count < minCount {
+				errors = append(errors, fmt.Sprintf(
+					"Row count too low for table %s: got %d, expected at least %d",
+					table, count, minCount,
+				))
+			}
+		}
+		return len(errors) == 0, errors
 	}
 
-	// Compare row counts
-	errors = v.compareRowCounts(prodCounts, testCounts)
+	// No explicit expectations: verify every table is countable.
+	tables, err := listTables(ctx, env.db, env.driver, env.DatabaseName)
+	if err != nil {
+		errors = append(errors, fmt.Sprintf("Failed to list tables: %v", err))
+		return false, errors
+	}
+	for _, table := range tables {
+		if _, err := tableRowCount(ctx, env.db, env.driver, table); err != nil {
+			errors = append(errors, fmt.Sprintf("Failed to count rows in %s: %v", table, err))
+		}
+	}
 
 	return len(errors) == 0, errors
 }
 
-// ValidateSampleData validates a sample of actual data records
+// ValidateSampleData reads a real sample of rows from the restored database to
+// confirm the data is present and readable, computing a checksum per row.
 func (v *Validator) ValidateSampleData(ctx context.Context, env *TestEnvironment, databaseName string, samplePercent float64) (bool, []string) {
-	// In production, this would:
-	// 1. Randomly sample X% of records from each table
-	// 2. Compute checksums for sampled records in production
-	// 3. Retrieve same records from restored database
-	// 4. Compare checksums to verify data integrity
-	// 5. Report any data corruption or missing records
-
 	errors := make([]string, 0)
 
 	if samplePercent <= 0 || samplePercent > 100 {
@@ -118,64 +137,125 @@ func (v *Validator) ValidateSampleData(ctx context.Context, env *TestEnvironment
 		return false, errors
 	}
 
-	// Simulate sample data validation
-	prodSamples, err := v.getProductionSampleData(ctx, databaseName, samplePercent)
-	if err != nil {
-		errors = append(errors, fmt.Sprintf("Failed to get production samples: %v", err))
+	if env == nil || env.db == nil {
+		errors = append(errors, "no live connection to test target")
 		return false, errors
 	}
 
-	testSamples, err := v.getTestSampleData(ctx, env, databaseName, prodSamples)
-	if err != nil {
-		errors = append(errors, fmt.Sprintf("Failed to get test samples: %v", err))
-		return false, errors
+	var tables []string
+	if env.target != nil && len(env.target.SampleTables) > 0 {
+		tables = env.target.SampleTables
+	} else {
+		var err error
+		tables, err = listTables(ctx, env.db, env.driver, env.DatabaseName)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("Failed to list tables: %v", err))
+			return false, errors
+		}
 	}
 
-	// Compare sample data
-	errors = v.compareSampleData(prodSamples, testSamples)
+	for _, table := range tables {
+		count, err := tableRowCount(ctx, env.db, env.driver, table)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("Sample read failed for table %s: %v", table, err))
+			continue
+		}
+		if count == 0 {
+			continue // Empty table: nothing to sample, not an error.
+		}
+
+		sampleSize := int(float64(count) * samplePercent / 100.0)
+		if sampleSize < 1 {
+			sampleSize = 1
+		}
+
+		if _, err := v.sampleTable(ctx, env.db, env.driver, table, sampleSize); err != nil {
+			errors = append(errors, fmt.Sprintf("Sample read failed for table %s: %v", table, err))
+		}
+	}
 
 	return len(errors) == 0, errors
 }
 
-// getProductionSchema retrieves schema from production database
-func (v *Validator) getProductionSchema(ctx context.Context, databaseName string) ([]SchemaObject, error) {
-	// Simulate schema retrieval
-	// In production, would query:
-	// SELECT table_name, table_type, table_schema FROM information_schema.tables
-	// SELECT constraint_name, constraint_type FROM information_schema.table_constraints
-	// SELECT index_name, index_type FROM information_schema.statistics
-	// etc.
+// sampleTable reads up to limit rows from a table and returns them as
+// SampleDataRecords with per-row checksums. This proves the restored data is
+// actually readable, not just that the schema exists.
+func (v *Validator) sampleTable(ctx context.Context, db *sql.DB, driver, table string, limit int) ([]SampleDataRecord, error) {
+	// The table name is quoted/escaped via quoteIdent and limit is an int, so
+	// the formatted query cannot carry SQL injection.
+	query := fmt.Sprintf("SELECT * FROM %s LIMIT %d", quoteIdent(driver, table), limit) // #nosec G201 -- identifier is validated/quoted
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-	time.Sleep(10 * time.Millisecond) // Simulate query time
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
 
-	// Return mock schema
-	return []SchemaObject{
-		{Type: "table", Name: "users", Definition: "CREATE TABLE users...", Database: databaseName},
-		{Type: "table", Name: "orders", Definition: "CREATE TABLE orders...", Database: databaseName},
-		{Type: "index", Name: "idx_users_email", Definition: "CREATE INDEX...", Database: databaseName},
-		{Type: "constraint", Name: "fk_orders_user", Definition: "FOREIGN KEY...", Database: databaseName},
-	}, nil
+	records := make([]SampleDataRecord, 0, limit)
+	idx := 0
+	for rows.Next() {
+		values := make([]interface{}, len(cols))
+		scanTargets := make([]interface{}, len(cols))
+		for i := range values {
+			scanTargets[i] = &values[i]
+		}
+		if err := rows.Scan(scanTargets...); err != nil {
+			return nil, err
+		}
+
+		data := make(map[string]interface{}, len(cols))
+		for i, col := range cols {
+			data[col] = normalizeValue(values[i])
+		}
+
+		records = append(records, SampleDataRecord{
+			TableName: table,
+			RecordID:  fmt.Sprintf("%s-%d", table, idx),
+			Data:      data,
+			Checksum:  checksumRow(cols, data),
+		})
+		idx++
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return records, nil
 }
 
-// getTestSchema retrieves schema from test database
-func (v *Validator) getTestSchema(ctx context.Context, env *TestEnvironment, databaseName string) ([]SchemaObject, error) {
-	// Simulate schema retrieval from test environment
-	time.Sleep(10 * time.Millisecond)
-
-	// Return same mock schema (indicating successful restore)
-	return []SchemaObject{
-		{Type: "table", Name: "users", Definition: "CREATE TABLE users...", Database: databaseName},
-		{Type: "table", Name: "orders", Definition: "CREATE TABLE orders...", Database: databaseName},
-		{Type: "index", Name: "idx_users_email", Definition: "CREATE INDEX...", Database: databaseName},
-		{Type: "constraint", Name: "fk_orders_user", Definition: "FOREIGN KEY...", Database: databaseName},
-	}, nil
+// normalizeValue converts raw driver values (often []byte) into stable forms
+// for checksumming.
+func normalizeValue(v interface{}) interface{} {
+	if b, ok := v.([]byte); ok {
+		return string(b)
+	}
+	return v
 }
 
-// compareSchemas compares two schema sets
+// checksumRow computes a deterministic checksum over a row's columns.
+func checksumRow(cols []string, data map[string]interface{}) string {
+	sorted := make([]string, len(cols))
+	copy(sorted, cols)
+	sort.Strings(sorted)
+
+	h := sha256.New()
+	for _, col := range sorted {
+		fmt.Fprintf(h, "%s=%v;", col, data[col])
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// compareSchemas compares two schema sets, reporting objects that are missing
+// from or unexpectedly present in the second (test) set. Retained as a pure,
+// reusable comparison used for strict production-vs-restore checks.
 func (v *Validator) compareSchemas(prod, test []SchemaObject) []string {
 	errors := make([]string, 0)
 
-	// Build maps for quick lookup
 	prodMap := make(map[string]SchemaObject)
 	for _, obj := range prod {
 		key := fmt.Sprintf("%s:%s", obj.Type, obj.Name)
@@ -188,68 +268,31 @@ func (v *Validator) compareSchemas(prod, test []SchemaObject) []string {
 		testMap[key] = obj
 	}
 
-	// Check for missing objects in test
 	for key, obj := range prodMap {
 		if _, exists := testMap[key]; !exists {
 			errors = append(errors, fmt.Sprintf("Missing %s in restored database: %s", obj.Type, obj.Name))
 		}
 	}
 
-	// Check for extra objects in test (shouldn't happen)
 	for key, obj := range testMap {
 		if _, exists := prodMap[key]; !exists {
 			errors = append(errors, fmt.Sprintf("Unexpected %s in restored database: %s", obj.Type, obj.Name))
 		}
 	}
 
-	// In production, would also compare definitions for differences
-	// For now, return empty errors indicating schemas match
 	return errors
 }
 
-// getProductionRowCounts retrieves row counts from production database
-func (v *Validator) getProductionRowCounts(ctx context.Context, databaseName string) ([]TableRowCount, error) {
-	// Simulate row count retrieval
-	// In production:
-	// SELECT table_name, table_rows FROM information_schema.tables
-	// Or for exact counts: SELECT COUNT(*) FROM each_table
-
-	time.Sleep(15 * time.Millisecond)
-
-	// Return mock counts
-	return []TableRowCount{
-		{TableName: "users", RowCount: 10000, Database: databaseName, LastUpdated: time.Now()},
-		{TableName: "orders", RowCount: 50000, Database: databaseName, LastUpdated: time.Now()},
-		{TableName: "products", RowCount: 5000, Database: databaseName, LastUpdated: time.Now()},
-		{TableName: "inventory", RowCount: 25000, Database: databaseName, LastUpdated: time.Now()},
-	}, nil
-}
-
-// getTestRowCounts retrieves row counts from test database
-func (v *Validator) getTestRowCounts(ctx context.Context, env *TestEnvironment, databaseName string) ([]TableRowCount, error) {
-	// Simulate row count retrieval from test environment
-	time.Sleep(15 * time.Millisecond)
-
-	// Return same mock counts (indicating successful restore)
-	return []TableRowCount{
-		{TableName: "users", RowCount: 10000, Database: databaseName, LastUpdated: time.Now()},
-		{TableName: "orders", RowCount: 50000, Database: databaseName, LastUpdated: time.Now()},
-		{TableName: "products", RowCount: 5000, Database: databaseName, LastUpdated: time.Now()},
-		{TableName: "inventory", RowCount: 25000, Database: databaseName, LastUpdated: time.Now()},
-	}, nil
-}
-
-// compareRowCounts compares row counts with tolerance
+// compareRowCounts compares row counts between two sets, reporting missing
+// tables and count mismatches. Pure, reusable comparison helper.
 func (v *Validator) compareRowCounts(prod, test []TableRowCount) []string {
 	errors := make([]string, 0)
 
-	// Build map for quick lookup
 	testMap := make(map[string]int64)
 	for _, count := range test {
 		testMap[count.TableName] = count.RowCount
 	}
 
-	// Compare each table
 	for _, prodCount := range prod {
 		testCount, exists := testMap[prodCount.TableName]
 		if !exists {
@@ -257,10 +300,12 @@ func (v *Validator) compareRowCounts(prod, test []TableRowCount) []string {
 			continue
 		}
 
-		// Check for exact match (in production, might allow small tolerance for high-traffic tables)
 		if prodCount.RowCount != testCount {
 			diff := testCount - prodCount.RowCount
-			diffPercent := (float64(diff) / float64(prodCount.RowCount)) * 100.0
+			diffPercent := 0.0
+			if prodCount.RowCount != 0 {
+				diffPercent = (float64(diff) / float64(prodCount.RowCount)) * 100.0
+			}
 			errors = append(errors, fmt.Sprintf(
 				"Row count mismatch for table %s: production=%d, test=%d (diff: %+d, %.2f%%)",
 				prodCount.TableName, prodCount.RowCount, testCount, diff, diffPercent,
@@ -271,72 +316,17 @@ func (v *Validator) compareRowCounts(prod, test []TableRowCount) []string {
 	return errors
 }
 
-// getProductionSampleData retrieves sample data from production
-func (v *Validator) getProductionSampleData(ctx context.Context, databaseName string, samplePercent float64) ([]SampleDataRecord, error) {
-	// Simulate sample data retrieval
-	// In production:
-	// 1. Get list of tables
-	// 2. For each table, SELECT random sample of rows (using TABLESAMPLE or ORDER BY RANDOM())
-	// 3. Compute checksums for each row
-	// 4. Store sample IDs for later comparison
-
-	time.Sleep(20 * time.Millisecond)
-
-	// Calculate number of samples based on percentage
-	totalRecords := 90000 // Sum of all table row counts
-	sampleSize := int(float64(totalRecords) * samplePercent / 100.0)
-
-	samples := make([]SampleDataRecord, 0, sampleSize)
-
-	// Generate mock samples with deterministic IDs (avoid rand for test consistency)
-	tables := []string{"users", "orders", "products", "inventory"}
-	samplesPerTable := sampleSize / len(tables)
-
-	for _, table := range tables {
-		for i := 0; i < samplesPerTable; i++ {
-			recordID := fmt.Sprintf("%s-%d", table, i+1) // Deterministic ID
-			samples = append(samples, SampleDataRecord{
-				TableName: table,
-				RecordID:  recordID,
-				Data: map[string]interface{}{
-					"id":   recordID,
-					"data": "sample data",
-				},
-				Checksum: fmt.Sprintf("checksum-%s-%d", table, i),
-			})
-		}
-	}
-
-	return samples, nil
-}
-
-// getTestSampleData retrieves the same sample data from test database
-func (v *Validator) getTestSampleData(ctx context.Context, env *TestEnvironment, databaseName string, prodSamples []SampleDataRecord) ([]SampleDataRecord, error) {
-	// Simulate retrieving specific records from test database
-	// In production:
-	// 1. For each sample ID from production
-	// 2. SELECT that specific record from test database
-	// 3. Compute checksum
-	// 4. Compare with production checksum
-
-	time.Sleep(20 * time.Millisecond)
-
-	// Return same samples (indicating data integrity preserved)
-	return prodSamples, nil
-}
-
-// compareSampleData compares sample data checksums
+// compareSampleData compares sample data checksums between two sets. Pure,
+// reusable comparison helper.
 func (v *Validator) compareSampleData(prod, test []SampleDataRecord) []string {
 	errors := make([]string, 0)
 
-	// Build map for quick lookup
 	testMap := make(map[string]SampleDataRecord)
 	for _, record := range test {
 		key := fmt.Sprintf("%s:%s", record.TableName, record.RecordID)
 		testMap[key] = record
 	}
 
-	// Compare each sample
 	corruptedCount := 0
 	missingCount := 0
 
@@ -346,7 +336,7 @@ func (v *Validator) compareSampleData(prod, test []SampleDataRecord) []string {
 
 		if !exists {
 			missingCount++
-			if missingCount <= 5 { // Only report first 5 to avoid overwhelming
+			if missingCount <= 5 {
 				errors = append(errors, fmt.Sprintf(
 					"Sample record missing: table=%s, id=%s",
 					prodRecord.TableName, prodRecord.RecordID,
@@ -355,10 +345,9 @@ func (v *Validator) compareSampleData(prod, test []SampleDataRecord) []string {
 			continue
 		}
 
-		// Compare checksums
 		if prodRecord.Checksum != testRecord.Checksum {
 			corruptedCount++
-			if corruptedCount <= 5 { // Only report first 5
+			if corruptedCount <= 5 {
 				errors = append(errors, fmt.Sprintf(
 					"Data corruption detected: table=%s, id=%s (checksum mismatch)",
 					prodRecord.TableName, prodRecord.RecordID,
@@ -367,7 +356,6 @@ func (v *Validator) compareSampleData(prod, test []SampleDataRecord) []string {
 		}
 	}
 
-	// Summary if there are many errors
 	if missingCount > 5 {
 		errors = append(errors, fmt.Sprintf("... and %d more missing records", missingCount-5))
 	}
@@ -378,33 +366,41 @@ func (v *Validator) compareSampleData(prod, test []SampleDataRecord) []string {
 	return errors
 }
 
-// ValidateConnectivity validates that the restored database is accessible
+// ValidateConnectivity validates that the restored database is accessible by
+// issuing a real ping.
 func (v *Validator) ValidateConnectivity(ctx context.Context, env *TestEnvironment) error {
-	// In production, would attempt to connect to the database
-	// and execute a simple query like SELECT 1
-
-	time.Sleep(5 * time.Millisecond)
-
-	// Simulate successful connectivity
-	return nil
+	if env == nil || env.db == nil {
+		return fmt.Errorf("no live connection to test target")
+	}
+	return env.db.PingContext(ctx)
 }
 
-// ValidatePerformance validates that the restored database meets performance requirements
+// ValidatePerformance runs a real query against the restored database and
+// times it, reporting an error if the query fails or exceeds a sane ceiling.
 func (v *Validator) ValidatePerformance(ctx context.Context, env *TestEnvironment, databaseName string) (bool, []string) {
-	// In production, would run performance tests:
-	// 1. Simple SELECT queries
-	// 2. Complex JOIN queries
-	// 3. Index usage verification
-	// 4. Query plan analysis
-	// 5. Compare against baseline performance metrics
-
 	errors := make([]string, 0)
 
-	time.Sleep(25 * time.Millisecond)
+	if env == nil || env.db == nil {
+		errors = append(errors, "no live connection to test target")
+		return false, errors
+	}
 
-	// Simulate performance validation
-	// In a real scenario, might detect performance issues
-	// For now, return success
+	const maxQueryLatency = 30 * time.Second
+
+	start := time.Now()
+	var probe int
+	if err := env.db.QueryRowContext(ctx, "SELECT 1").Scan(&probe); err != nil {
+		errors = append(errors, fmt.Sprintf("Performance probe query failed: %v", err))
+		return false, errors
+	}
+	elapsed := time.Since(start)
+
+	if elapsed > maxQueryLatency {
+		errors = append(errors, fmt.Sprintf(
+			"Performance probe too slow: %s (threshold %s)", elapsed, maxQueryLatency,
+		))
+		return false, errors
+	}
 
 	return true, errors
 }

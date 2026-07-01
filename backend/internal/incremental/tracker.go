@@ -3,24 +3,30 @@ package incremental
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
+// snapshotFileSuffix is the on-disk suffix used for persisted snapshots.
+const snapshotFileSuffix = ".snapshot.json"
+
 // BlockSize represents different block sizes for change tracking
 type BlockSize int
 
 const (
-	BlockSize4KB  BlockSize = 4096       // 4 KB blocks
-	BlockSize8KB  BlockSize = 8192       // 8 KB blocks
-	BlockSize16KB BlockSize = 16384      // 16 KB blocks
-	BlockSize64KB BlockSize = 65536      // 64 KB blocks
-	BlockSize1MB  BlockSize = 1048576    // 1 MB blocks
+	BlockSize4KB  BlockSize = 4096    // 4 KB blocks
+	BlockSize8KB  BlockSize = 8192    // 8 KB blocks
+	BlockSize16KB BlockSize = 16384   // 16 KB blocks
+	BlockSize64KB BlockSize = 65536   // 64 KB blocks
+	BlockSize1MB  BlockSize = 1048576 // 1 MB blocks
 )
 
 // BlockMetadata represents metadata for a single block
@@ -65,19 +71,118 @@ type ChangeSet struct {
 
 // ChangeTracker tracks block-level changes for incremental backups
 type ChangeTracker struct {
-	mu        sync.RWMutex
-	snapshots map[string]*FileSnapshot
-	changeSets map[string]*ChangeSet
-	blockSize BlockSize
+	mu          sync.RWMutex
+	snapshots   map[string]*FileSnapshot
+	changeSets  map[string]*ChangeSet
+	blockSize   BlockSize
+	snapshotDir string // directory for persisting snapshots; empty == in-memory only
 }
 
-// NewChangeTracker creates a new change tracker
+// NewChangeTracker creates a new in-memory change tracker.
+//
+// Snapshots created by a tracker built with this constructor are NOT persisted
+// to disk and will not survive a process restart. Use NewChangeTrackerWithDir
+// for durable tracking.
 func NewChangeTracker(blockSize BlockSize) *ChangeTracker {
 	return &ChangeTracker{
 		snapshots:  make(map[string]*FileSnapshot),
 		changeSets: make(map[string]*ChangeSet),
 		blockSize:  blockSize,
 	}
+}
+
+// NewChangeTrackerWithDir creates a change tracker that persists block snapshots
+// as JSON under snapshotDir and loads any previously persisted snapshots so that
+// state survives process restarts. The directory is created if it does not exist.
+func NewChangeTrackerWithDir(blockSize BlockSize, snapshotDir string) (*ChangeTracker, error) {
+	ct := NewChangeTracker(blockSize)
+	ct.snapshotDir = snapshotDir
+
+	if snapshotDir != "" {
+		if err := os.MkdirAll(snapshotDir, 0o755); err != nil {
+			return nil, fmt.Errorf("failed to create snapshot directory: %w", err)
+		}
+		if err := ct.LoadSnapshots(); err != nil {
+			return nil, fmt.Errorf("failed to load snapshots: %w", err)
+		}
+	}
+
+	return ct, nil
+}
+
+// snapshotPath returns the on-disk path for a snapshot ID.
+func (ct *ChangeTracker) snapshotPath(snapshotID string) string {
+	return filepath.Join(ct.snapshotDir, snapshotID+snapshotFileSuffix)
+}
+
+// persistSnapshot writes a snapshot to disk atomically. It is a no-op when the
+// tracker has no snapshot directory configured. The snapshot is immutable once
+// created, so this can safely run without holding ct.mu.
+func (ct *ChangeTracker) persistSnapshot(snapshot *FileSnapshot) error {
+	if ct.snapshotDir == "" {
+		return nil
+	}
+	if err := writeJSONAtomic(ct.snapshotPath(snapshot.ID), snapshot); err != nil {
+		return fmt.Errorf("failed to persist snapshot %s: %w", snapshot.ID, err)
+	}
+	return nil
+}
+
+// LoadSnapshots loads all persisted snapshots from the snapshot directory into
+// memory. It is safe to call on a freshly constructed tracker pointed at an
+// existing directory (e.g. after a restart).
+func (ct *ChangeTracker) LoadSnapshots() error {
+	if ct.snapshotDir == "" {
+		return nil
+	}
+
+	entries, err := os.ReadDir(ct.snapshotDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to read snapshot directory: %w", err)
+	}
+
+	ct.mu.Lock()
+	defer ct.mu.Unlock()
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), snapshotFileSuffix) {
+			continue
+		}
+
+		data, err := os.ReadFile(filepath.Join(ct.snapshotDir, entry.Name()))
+		if err != nil {
+			return fmt.Errorf("failed to read snapshot file %s: %w", entry.Name(), err)
+		}
+
+		var snapshot FileSnapshot
+		if err := json.Unmarshal(data, &snapshot); err != nil {
+			return fmt.Errorf("failed to unmarshal snapshot file %s: %w", entry.Name(), err)
+		}
+
+		ct.snapshots[snapshot.ID] = &snapshot
+	}
+
+	return nil
+}
+
+// RemoveSnapshot deletes a snapshot from memory and from disk. It returns a real
+// error if the on-disk artifact cannot be removed.
+func (ct *ChangeTracker) RemoveSnapshot(snapshotID string) error {
+	ct.mu.Lock()
+	delete(ct.snapshots, snapshotID)
+	ct.mu.Unlock()
+
+	if ct.snapshotDir == "" {
+		return nil
+	}
+
+	if err := os.Remove(ct.snapshotPath(snapshotID)); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove snapshot file for %s: %w", snapshotID, err)
+	}
+	return nil
 }
 
 // CreateSnapshot creates a snapshot of a file's blocks
@@ -151,10 +256,16 @@ func (ct *ChangeTracker) CreateSnapshot(filePath string) (*FileSnapshot, error) 
 
 	snapshot.Checksum = hex.EncodeToString(fileHasher.Sum(nil))
 
-	// Store snapshot
+	// Store snapshot in memory
 	ct.mu.Lock()
 	ct.snapshots[snapshot.ID] = snapshot
 	ct.mu.Unlock()
+
+	// Persist to disk so it survives restarts. Done outside the lock; the
+	// snapshot is immutable from here and persistSnapshot touches no shared state.
+	if err := ct.persistSnapshot(snapshot); err != nil {
+		return nil, err
+	}
 
 	return snapshot, nil
 }
@@ -331,22 +442,70 @@ func (ct *ChangeTracker) GetStatistics() map[string]interface{} {
 	return stats
 }
 
-// CleanupOldSnapshots removes snapshots older than the specified duration
+// CleanupOldSnapshots removes snapshots older than the specified duration, both
+// from memory and from disk.
 func (ct *ChangeTracker) CleanupOldSnapshots(maxAge time.Duration) int {
-	ct.mu.Lock()
-	defer ct.mu.Unlock()
-
 	cutoff := time.Now().Add(-maxAge)
-	removed := 0
 
+	ct.mu.Lock()
+	toRemove := make([]string, 0)
 	for id, snapshot := range ct.snapshots {
 		if snapshot.CreatedAt.Before(cutoff) {
-			delete(ct.snapshots, id)
-			removed++
+			toRemove = append(toRemove, id)
+		}
+	}
+	for _, id := range toRemove {
+		delete(ct.snapshots, id)
+	}
+	ct.mu.Unlock()
+
+	// Remove persisted files outside the lock (best effort).
+	if ct.snapshotDir != "" {
+		for _, id := range toRemove {
+			_ = os.Remove(ct.snapshotPath(id))
 		}
 	}
 
-	return removed
+	return len(toRemove)
+}
+
+// writeJSONAtomic marshals v to indented JSON and writes it to path atomically
+// using a temporary file in the same directory followed by os.Rename, so a
+// concurrent reader or a crash mid-write never observes a partially written file.
+func writeJSONAtomic(path string, v interface{}) error {
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".tmp-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpName := tmp.Name()
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return fmt.Errorf("failed to write temp file: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return fmt.Errorf("failed to sync temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	if err := os.Rename(tmpName, path); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("failed to rename temp file into place: %w", err)
+	}
+
+	return nil
 }
 
 // GetChangedBlockData extracts data for changed blocks from a file

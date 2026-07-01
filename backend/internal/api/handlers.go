@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -65,21 +67,21 @@ func (s *Server) handleVersion(c *gin.Context) {
 // Backup handlers
 
 type CreateBackupRequest struct {
-	DatabaseType string   `json:"database_type" binding:"required"`
-	Host         string   `json:"host" binding:"required"`
-	Port         int      `json:"port"`
-	Username     string   `json:"username"`
-	Password     string   `json:"password"`
-	Database     string   `json:"database"`
-	Databases    []string `json:"databases"`
-	AllDatabases bool     `json:"all_databases"`
-	Tables       []string `json:"tables"`
-	ExcludeTables []string `json:"exclude_tables"`
-	Compression  string   `json:"compression"`
-	Encrypt      bool     `json:"encrypt"`
-	EncryptionKey string  `json:"encryption_key"`
-	StorageType  string   `json:"storage_type"`
-	Tags         map[string]string `json:"tags"`
+	DatabaseType  string            `json:"database_type" binding:"required"`
+	Host          string            `json:"host" binding:"required"`
+	Port          int               `json:"port"`
+	Username      string            `json:"username"`
+	Password      string            `json:"password"`
+	Database      string            `json:"database"`
+	Databases     []string          `json:"databases"`
+	AllDatabases  bool              `json:"all_databases"`
+	Tables        []string          `json:"tables"`
+	ExcludeTables []string          `json:"exclude_tables"`
+	Compression   string            `json:"compression"`
+	Encrypt       bool              `json:"encrypt"`
+	EncryptionKey string            `json:"encryption_key"`
+	StorageType   string            `json:"storage_type"`
+	Tags          map[string]string `json:"tags"`
 }
 
 func (s *Server) handleCreateBackup(c *gin.Context) {
@@ -274,27 +276,55 @@ func (s *Server) handleRestoreBackup(c *gin.Context) {
 
 func (s *Server) handleDownloadBackup(c *gin.Context) {
 	backupID := c.Param("id")
+	if err := validation.ValidateBackupID(backupID); err != nil {
+		s.respondError(c, http.StatusBadRequest, err, "Invalid backup ID")
+		return
+	}
 
-	// This would implement backup file download
-	// For now, return not implemented
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"error": "Download not implemented yet",
-		"backup_id": backupID,
-	})
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Minute)
+	defer cancel()
+
+	// Load backup metadata.
+	metadata, err := s.backupEngine.GetBackup(ctx, backupID)
+	if err != nil {
+		s.respondError(c, http.StatusNotFound, err, "Backup not found")
+		return
+	}
+
+	// Download (or copy) the artifact into a temp file, verifying its checksum.
+	tmpDir, err := os.MkdirTemp("", "backup-download-*")
+	if err != nil {
+		s.respondError(c, http.StatusInternalServerError, err, "Failed to prepare download")
+		return
+	}
+	defer os.RemoveAll(tmpDir)
+
+	fileName := backupID
+	if metadata.BackupPath != "" {
+		fileName = filepath.Base(metadata.BackupPath)
+	}
+	destPath := filepath.Join(tmpDir, fileName)
+
+	if err := s.restoreEngine.DownloadBackup(ctx, metadata, destPath); err != nil {
+		s.respondError(c, http.StatusInternalServerError, err, "Failed to download backup")
+		return
+	}
+
+	c.FileAttachment(destPath, fileName)
 }
 
 // Schedule handlers
 
 type CreateScheduleRequest struct {
-	ID           string                  `json:"id" binding:"required"`
-	Name         string                  `json:"name"`
-	Schedule     string                  `json:"schedule" binding:"required"`
-	BackupOpts   CreateBackupRequest     `json:"backup_options" binding:"required"`
-	Enabled      bool                    `json:"enabled"`
-	Retries      int                     `json:"retries"`
-	RetryDelay   string                  `json:"retry_delay"` // Duration string
-	Timeout      string                  `json:"timeout"`      // Duration string
-	Tags         map[string]string       `json:"tags"`
+	ID         string              `json:"id" binding:"required"`
+	Name       string              `json:"name"`
+	Schedule   string              `json:"schedule" binding:"required"`
+	BackupOpts CreateBackupRequest `json:"backup_options" binding:"required"`
+	Enabled    bool                `json:"enabled"`
+	Retries    int                 `json:"retries"`
+	RetryDelay string              `json:"retry_delay"` // Duration string
+	Timeout    string              `json:"timeout"`     // Duration string
+	Tags       map[string]string   `json:"tags"`
 }
 
 func (s *Server) handleCreateSchedule(c *gin.Context) {
@@ -322,16 +352,16 @@ func (s *Server) handleCreateSchedule(c *gin.Context) {
 
 	// Create backup options
 	backupOpts := &backup.CreateOptions{
-		DatabaseType:  dbType,
-		Host:          req.BackupOpts.Host,
-		Port:          req.BackupOpts.Port,
-		Username:      req.BackupOpts.Username,
-		Password:      req.BackupOpts.Password,
-		Database:      req.BackupOpts.Database,
-		Databases:     req.BackupOpts.Databases,
-		AllDatabases:  req.BackupOpts.AllDatabases,
-		Compression:   database.CompressionType(req.BackupOpts.Compression),
-		Encrypt:       req.BackupOpts.Encrypt,
+		DatabaseType: dbType,
+		Host:         req.BackupOpts.Host,
+		Port:         req.BackupOpts.Port,
+		Username:     req.BackupOpts.Username,
+		Password:     req.BackupOpts.Password,
+		Database:     req.BackupOpts.Database,
+		Databases:    req.BackupOpts.Databases,
+		AllDatabases: req.BackupOpts.AllDatabases,
+		Compression:  database.CompressionType(req.BackupOpts.Compression),
+		Encrypt:      req.BackupOpts.Encrypt,
 	}
 
 	// Parse durations
@@ -357,15 +387,15 @@ func (s *Server) handleCreateSchedule(c *gin.Context) {
 
 	// Create scheduled job
 	job := &scheduler.ScheduledJob{
-		ID:          req.ID,
-		Name:        req.Name,
-		Schedule:    req.Schedule,
-		BackupOpts:  backupOpts,
-		Enabled:     req.Enabled,
-		Retries:     req.Retries,
-		RetryDelay:  retryDelay,
-		Timeout:     timeout,
-		Tags:        req.Tags,
+		ID:         req.ID,
+		Name:       req.Name,
+		Schedule:   req.Schedule,
+		BackupOpts: backupOpts,
+		Enabled:    req.Enabled,
+		Retries:    req.Retries,
+		RetryDelay: retryDelay,
+		Timeout:    timeout,
+		Tags:       req.Tags,
 	}
 
 	if err := s.scheduler.AddJob(job); err != nil {
@@ -408,7 +438,7 @@ func (s *Server) handleUpdateSchedule(c *gin.Context) {
 
 	// Implementation would update the schedule
 	c.JSON(http.StatusNotImplemented, gin.H{
-		"error": "Update not fully implemented",
+		"error":       "Update not fully implemented",
 		"schedule_id": scheduleID,
 	})
 }
@@ -670,15 +700,15 @@ func (s *Server) handleUpdateThreatAlert(c *gin.Context) {
 
 // StorageProviderConfig represents immutable storage configuration
 type StorageProviderConfig struct {
-	ID                   string `json:"id"`
-	Name                 string `json:"name"`
-	Type                 string `json:"type"`
-	Enabled              bool   `json:"enabled"`
-	ImmutabilityEnabled  bool   `json:"immutability_enabled"`
-	RetentionDays        int    `json:"retention_days"`
-	Mode                 string `json:"mode"`
-	LegalHold            bool   `json:"legal_hold"`
-	ProtectedBackups     int    `json:"protected_backups"`
+	ID                  string `json:"id"`
+	Name                string `json:"name"`
+	Type                string `json:"type"`
+	Enabled             bool   `json:"enabled"`
+	ImmutabilityEnabled bool   `json:"immutability_enabled"`
+	RetentionDays       int    `json:"retention_days"`
+	Mode                string `json:"mode"`
+	LegalHold           bool   `json:"legal_hold"`
+	ProtectedBackups    int    `json:"protected_backups"`
 }
 
 // handleListStorageProviders returns all storage provider configurations

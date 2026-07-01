@@ -44,9 +44,9 @@ func (p *PITRManager) RestoreToPIT(ctx context.Context, targetTime time.Time, op
 
 	// Restore table to point in time
 	_, err := p.driver.client.RestoreTableToPointInTime(ctx, &dynamodb.RestoreTableToPointInTimeInput{
-		SourceTableName:       aws.String(sourceTable),
-		TargetTableName:       aws.String(targetTable),
-		RestoreDateTime:       aws.Time(targetTime),
+		SourceTableName:         aws.String(sourceTable),
+		TargetTableName:         aws.String(targetTable),
+		RestoreDateTime:         aws.Time(targetTime),
 		UseLatestRestorableTime: aws.Bool(false),
 	})
 	if err != nil {

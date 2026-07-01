@@ -58,8 +58,25 @@ func TestScheduler_AddScheduleInvalidCron(t *testing.T) {
 	}
 
 	err := scheduler.AddSchedule(schedule)
-	// Should succeed with empty cron (simplified implementation adds 7 days)
-	assert.NoError(t, err)
+	// The real cron parser rejects an empty/invalid expression.
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid cron expression")
+}
+
+func TestScheduler_AddScheduleMalformedCron(t *testing.T) {
+	provisioner := NewEnvironmentProvisioner()
+	validator := NewValidator()
+	executor := NewTestExecutor(provisioner, validator)
+	scheduler := NewScheduler(executor, nil)
+
+	err := scheduler.AddSchedule(&TestSchedule{
+		Name:           "Bad Schedule",
+		DatabaseName:   "test-db",
+		Enabled:        true,
+		CronExpression: "not a cron",
+		TestConfig:     DefaultTestConfig(),
+	})
+	assert.Error(t, err)
 }
 
 func TestScheduler_RemoveSchedule(t *testing.T) {
@@ -206,7 +223,7 @@ func TestScheduler_RunTest(t *testing.T) {
 		DatabaseName:   "test-db",
 		Enabled:        true,
 		CronExpression: "0 2 * * 0",
-		TestConfig:     DefaultTestConfig(),
+		TestConfig:     testConfigForTarget(newSQLiteTarget(t)),
 	}
 
 	err := scheduler.AddSchedule(schedule)
@@ -214,11 +231,12 @@ func TestScheduler_RunTest(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Manually run the test
+	// Manually run the test against a real restored target.
 	result, err := scheduler.RunTest(ctx, schedule.ID)
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, "test-db", result.DatabaseName)
+	assert.True(t, result.Success)
 }
 
 func TestScheduler_RunTestNonExistent(t *testing.T) {
@@ -256,17 +274,17 @@ func TestTestSchedule_Fields(t *testing.T) {
 	nextRun := now.Add(7 * 24 * time.Hour)
 
 	schedule := &TestSchedule{
-		ID:             "schedule-123",
-		Name:           "Weekly DR Test",
-		DatabaseName:   "prod-db",
-		Enabled:        true,
-		CronExpression: "0 2 * * 0",
-		LastRun:        &now,
-		NextRun:        &nextRun,
-		TestConfig:     DefaultTestConfig(),
-		NotifyOnSuccess: true,
-		NotifyOnFailure: true,
-		NotificationEmails: []string{"admin@example.com"},
+		ID:                       "schedule-123",
+		Name:                     "Weekly DR Test",
+		DatabaseName:             "prod-db",
+		Enabled:                  true,
+		CronExpression:           "0 2 * * 0",
+		LastRun:                  &now,
+		NextRun:                  &nextRun,
+		TestConfig:               DefaultTestConfig(),
+		NotifyOnSuccess:          true,
+		NotifyOnFailure:          true,
+		NotificationEmails:       []string{"admin@example.com"},
 		NotificationSlackWebhook: "https://hooks.slack.com/...",
 	}
 
@@ -277,6 +295,7 @@ func TestTestSchedule_Fields(t *testing.T) {
 	assert.Equal(t, "0 2 * * 0", schedule.CronExpression)
 	assert.NotNil(t, schedule.LastRun)
 	assert.NotNil(t, schedule.NextRun)
+	assert.NotNil(t, schedule.TestConfig)
 	assert.True(t, schedule.NotifyOnSuccess)
 	assert.True(t, schedule.NotifyOnFailure)
 	assert.Len(t, schedule.NotificationEmails, 1)
@@ -296,16 +315,28 @@ func TestGenerateScheduleID(t *testing.T) {
 }
 
 func TestCalculateNextRun(t *testing.T) {
+	// "0 2 * * 0" => every Sunday at 02:00.
 	now := time.Now()
-	cronExpr := "0 2 * * 0"
-
-	nextRun, err := calculateNextRun(cronExpr, now)
+	nextRun, err := calculateNextRun("0 2 * * 0", now)
 	assert.NoError(t, err)
 	assert.True(t, nextRun.After(now))
+	assert.Equal(t, time.Sunday, nextRun.Weekday())
+	assert.Equal(t, 2, nextRun.Hour())
+	assert.Equal(t, 0, nextRun.Minute())
+}
 
-	// Simplified implementation adds 7 days
-	expectedNextRun := now.Add(7 * 24 * time.Hour)
-	// Allow 1 second tolerance
-	diff := nextRun.Sub(expectedNextRun)
-	assert.LessOrEqual(t, diff, 1*time.Second)
+func TestCalculateNextRun_Invalid(t *testing.T) {
+	_, err := calculateNextRun("", time.Now())
+	assert.Error(t, err)
+
+	_, err = calculateNextRun("bogus expression", time.Now())
+	assert.Error(t, err)
+}
+
+func TestCalculateNextRun_Interval(t *testing.T) {
+	// Standard cron supports @every style descriptors via ParseStandard.
+	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	next, err := calculateNextRun("@daily", from)
+	assert.NoError(t, err)
+	assert.Equal(t, from.Add(24*time.Hour), next)
 }

@@ -75,21 +75,21 @@ func (rg *ReportGenerator) GetTestHistoryByDatabase(dbName string, limit int) []
 
 // ComplianceReport represents a compliance report
 type ComplianceReport struct {
-	ReportID          string
-	GeneratedAt       time.Time
-	ReportPeriod      ReportPeriod
-	DatabaseName      string
-	TotalTests        int
-	SuccessfulTests   int
-	FailedTests       int
-	SuccessRate       float64
-	AverageRTO        time.Duration
-	AverageRPO        time.Duration
-	RTOCompliance     float64 // Percentage of tests meeting RTO
-	RPOCompliance     float64 // Percentage of tests meeting RPO
-	TestResults       []TestResult
-	Recommendations   []string
-	ComplianceStatus  ComplianceStatus
+	ReportID         string
+	GeneratedAt      time.Time
+	ReportPeriod     ReportPeriod
+	DatabaseName     string
+	TotalTests       int
+	SuccessfulTests  int
+	FailedTests      int
+	SuccessRate      float64
+	AverageRTO       time.Duration
+	AverageRPO       time.Duration
+	RTOCompliance    float64 // Percentage of tests meeting RTO
+	RPOCompliance    float64 // Percentage of tests meeting RPO
+	TestResults      []TestResult
+	Recommendations  []string
+	ComplianceStatus ComplianceStatus
 }
 
 // ReportPeriod represents the time period for a report
