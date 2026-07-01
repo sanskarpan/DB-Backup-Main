@@ -211,14 +211,21 @@ func TestDynamoDBDriver_Restore(t *testing.T) {
 	backupResult, err := driver.Backup(ctx, opts)
 	require.NoError(t, err)
 
-	// Then restore
+	arns, ok := backupResult.Metadata["backup_arns"].([]string)
+	require.True(t, ok, "backup result should expose backup_arns")
+	require.NotEmpty(t, arns)
+
+	// Then restore into a brand-new table (RestoreTableFromBackup always
+	// creates a new table; it cannot overwrite the source).
 	restoreOpts := &database.RestoreOptions{
-		BackupPath: backupResult.BackupPath,
+		SourceBackup: arns[0],
+		Database:     testTable + "_restored_" + time.Now().Format("20060102_150405"),
 	}
 
 	restoreResult, err := driver.Restore(ctx, restoreOpts)
 	require.NoError(t, err)
 	assert.Equal(t, database.RestoreStatusCompleted, restoreResult.Status)
+	assert.NotEmpty(t, restoreResult.RestoredTables)
 }
 
 func TestDynamoDBDriver_GetDatabaseSize(t *testing.T) {
