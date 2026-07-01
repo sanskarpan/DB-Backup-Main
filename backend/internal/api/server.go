@@ -7,6 +7,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/auth"
 	"github.com/sanskarpan/db-backup/internal/backup"
 	"github.com/sanskarpan/db-backup/internal/catalog"
+	"github.com/sanskarpan/db-backup/internal/dbregistry"
 	"github.com/sanskarpan/db-backup/internal/health"
 	"github.com/sanskarpan/db-backup/internal/logger"
 	"github.com/sanskarpan/db-backup/internal/restore"
@@ -26,6 +27,7 @@ type Server struct {
 	jwtService    *auth.TokenService
 	oauth2Service *auth.OAuth2Service
 	oauth2Handler *auth.OAuth2Handler
+	dbStore       *dbregistry.Store
 	logger        *logger.Logger
 }
 
@@ -40,7 +42,7 @@ type Config struct {
 	RateLimit     int
 	// ScanBaseDir restricts ransomware scan endpoints to this directory.
 	// If empty, scan endpoints will reject all requests.
-	ScanBaseDir   string
+	ScanBaseDir string
 }
 
 // NewServer creates a new API server
@@ -55,6 +57,7 @@ func NewServer(
 	jwtService *auth.TokenService,
 	oauth2Service *auth.OAuth2Service,
 	oauth2Handler *auth.OAuth2Handler,
+	dbStore *dbregistry.Store,
 	log *logger.Logger,
 ) *Server {
 	return &Server{
@@ -68,6 +71,7 @@ func NewServer(
 		jwtService:    jwtService,
 		oauth2Service: oauth2Service,
 		oauth2Handler: oauth2Handler,
+		dbStore:       dbStore,
 		logger:        log,
 	}
 }
@@ -151,6 +155,17 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 			backups.DELETE("/:id", s.handleDeleteBackup)
 			backups.POST("/:id/restore", s.handleRestoreBackup)
 			backups.GET("/:id/download", s.handleDownloadBackup)
+		}
+
+		// Database registry (the set of databases to back up)
+		databases := v1.Group("/databases", authMiddleware)
+		{
+			databases.GET("", s.handleListDatabases)
+			databases.GET("/:id", s.handleGetDatabase)
+			databases.POST("", s.handleCreateDatabase)
+			databases.PUT("/:id", s.handleUpdateDatabase)
+			databases.DELETE("/:id", s.handleDeleteDatabase)
+			databases.POST("/:id/test", s.handleTestDatabase)
 		}
 
 		// Schedule management

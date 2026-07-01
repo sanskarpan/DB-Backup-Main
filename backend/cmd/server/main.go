@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/backup"
 	"github.com/sanskarpan/db-backup/internal/catalog"
 	"github.com/sanskarpan/db-backup/internal/config"
+	"github.com/sanskarpan/db-backup/internal/dbregistry"
 	"github.com/sanskarpan/db-backup/internal/health"
 	"github.com/sanskarpan/db-backup/internal/logger"
 	"github.com/sanskarpan/db-backup/internal/restore"
@@ -120,6 +122,23 @@ func main() {
 		}
 	}
 
+	// Initialize the database registry store. Persist under the metadata
+	// directory when configured, otherwise fall back to the temp directory or
+	// a local ./data path. Passwords are encrypted at rest using the JWT
+	// secret (always present, >= 32 chars) as the encryption key.
+	dbStoreDir := cfg.Backup.MetadataDirectory
+	if dbStoreDir == "" {
+		dbStoreDir = cfg.Backup.TempDirectory
+	}
+	if dbStoreDir == "" {
+		dbStoreDir = "./data"
+	}
+	dbStore, err := dbregistry.NewStore(filepath.Join(dbStoreDir, "databases"), jwtSecret)
+	if err != nil {
+		log.Error("Failed to initialize database registry store", err)
+		os.Exit(1)
+	}
+
 	// Create API server
 	apiServer := api.NewServer(&api.Config{
 		Host:          cfg.Server.Host,
@@ -129,7 +148,7 @@ func main() {
 		EnableSwagger: true,
 		JWTSecret:     jwtSecret,
 		ScanBaseDir:   os.Getenv("SCAN_BASE_DIR"),
-	}, backupEngine, restoreEngine, sched, healthChecker, detector, searchEngine, jwtService, oauth2Service, oauth2Handler, log)
+	}, backupEngine, restoreEngine, sched, healthChecker, detector, searchEngine, jwtService, oauth2Service, oauth2Handler, dbStore, log)
 
 	// Setup Gin router
 	if cfg.Logging.Level != "debug" {
