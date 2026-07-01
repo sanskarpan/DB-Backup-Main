@@ -740,7 +740,7 @@ func TestStrategyStateSurvivesRestart(t *testing.T) {
 
 	// Base snapshot must be reloaded so an incremental can be taken.
 	time.Sleep(10 * time.Millisecond)
-	if err := os.WriteFile(testFile, []byte("changed content after the simulated restart event"), 0o644); err != nil {
+	if err = os.WriteFile(testFile, []byte("changed content after the simulated restart event"), 0o644); err != nil {
 		t.Fatalf("Failed to modify test file: %v", err)
 	}
 
@@ -840,7 +840,7 @@ func TestApplyRetentionPolicyDeletesOldBackups(t *testing.T) {
 
 	// A newer full backup that forms the latest chain to be retained.
 	time.Sleep(10 * time.Millisecond)
-	if err := os.WriteFile(testFile, []byte("new chain data"), 0o644); err != nil {
+	if err = os.WriteFile(testFile, []byte("new chain data"), 0o644); err != nil {
 		t.Fatalf("Failed to modify test file: %v", err)
 	}
 	newFull, err := strategy.PerformFullBackup(testFile, "db-001", "Test DB")

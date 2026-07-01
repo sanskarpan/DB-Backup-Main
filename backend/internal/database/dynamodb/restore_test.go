@@ -16,7 +16,7 @@ import (
 
 // mockDynamoAPI is a configurable mock implementation of dynamoDBAPI used by the
 // non-PITR restore unit tests. Only the methods exercised by restore have
-// behaviour hooks; the remaining methods satisfy the interface as no-ops.
+// behavior hooks; the remaining methods satisfy the interface as no-ops.
 type mockDynamoAPI struct {
 	describeTableFunc          func(ctx context.Context, params *dynamodb.DescribeTableInput) (*dynamodb.DescribeTableOutput, error)
 	describeBackupFunc         func(ctx context.Context, params *dynamodb.DescribeBackupInput) (*dynamodb.DescribeBackupOutput, error)

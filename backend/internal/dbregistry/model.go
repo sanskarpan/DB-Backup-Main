@@ -33,25 +33,23 @@ var SupportedTypes = map[string]bool{
 // disk is handled separately by the Store, which serializes credentials into
 // its own on-disk record format.
 type Database struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Type      string    `json:"type"`
-	Host      string    `json:"host"`
-	Username  string    `json:"username"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-
-	// Write-only credentials — never returned to clients.
-	Password string            `json:"-"`
-	Database string            `json:"-"`
-	SSLMode  string            `json:"-"`
-	Options  map[string]string `json:"-"`
-
-	Port int `json:"port"`
+	CreatedAt time.Time         `json:"created_at"`
+	UpdatedAt time.Time         `json:"updated_at"`
+	Options   map[string]string `json:"-"`
+	ID        string            `json:"id"`
+	Name      string            `json:"name"`
+	Type      string            `json:"type"`
+	Host      string            `json:"host"`
+	Username  string            `json:"username"`
+	Password  string            `json:"-"`
+	Database  string            `json:"-"`
+	SSLMode   string            `json:"-"`
+	Port      int               `json:"port"`
 }
 
 // CreateRequest is the body accepted by POST /api/v1/databases.
 type CreateRequest struct {
+	Options  map[string]string `json:"options"`
 	Name     string            `json:"name"`
 	Type     string            `json:"type"`
 	Host     string            `json:"host"`
@@ -59,7 +57,6 @@ type CreateRequest struct {
 	Password string            `json:"password"`
 	Database string            `json:"database"`
 	SSLMode  string            `json:"ssl_mode"`
-	Options  map[string]string `json:"options"`
 	Port     int               `json:"port"`
 }
 
@@ -67,6 +64,7 @@ type CreateRequest struct {
 // Password is optional on update: an empty password leaves the stored
 // credential unchanged.
 type UpdateRequest struct {
+	Options  map[string]string `json:"options"`
 	Name     string            `json:"name"`
 	Type     string            `json:"type"`
 	Host     string            `json:"host"`
@@ -74,7 +72,6 @@ type UpdateRequest struct {
 	Password string            `json:"password"`
 	Database string            `json:"database"`
 	SSLMode  string            `json:"ssl_mode"`
-	Options  map[string]string `json:"options"`
 	Port     int               `json:"port"`
 }
 

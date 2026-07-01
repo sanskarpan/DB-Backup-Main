@@ -264,7 +264,7 @@ func applySQLScript(ctx context.Context, db *sql.DB, script string) (int, error)
 	for _, stmt := range statements {
 		if _, err := tx.ExecContext(ctx, stmt); err != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				return applied, fmt.Errorf("apply statement %d: %w (rollback failed: %v)", applied+1, err, rbErr)
+				return applied, fmt.Errorf("apply statement %d: %w (rollback failed: %w)", applied+1, err, rbErr)
 			}
 			return applied, fmt.Errorf("apply statement %d: %w", applied+1, err)
 		}

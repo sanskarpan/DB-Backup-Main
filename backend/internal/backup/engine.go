@@ -172,7 +172,7 @@ func (e *Engine) CreateBackup(ctx context.Context, opts *CreateOptions) (*models
 	metadata.DatabaseVersion = version
 
 	// Ensure temp directory exists
-	if err := os.MkdirAll(e.config.TempDirectory, 0o700); err != nil {
+	if err = os.MkdirAll(e.config.TempDirectory, 0o700); err != nil {
 		metadata.Status = database.BackupStatusFailed
 		return metadata, err
 	}

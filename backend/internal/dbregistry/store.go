@@ -21,19 +21,19 @@ const storeFileName = "databases.json"
 // restart) but they still never reach a client, because handlers only ever
 // serialize Database values.
 type storedRecord struct {
-	ID        string            `json:"id"`
-	Name      string            `json:"name"`
-	Type      string            `json:"type"`
+	UpdatedAt time.Time         `json:"updated_at"`
+	CreatedAt time.Time         `json:"created_at"`
+	Options   map[string]string `json:"options,omitempty"`
 	Host      string            `json:"host"`
 	Username  string            `json:"username"`
-	Password  string            `json:"password"` // encrypted when Encrypted is true
+	Password  string            `json:"password"`
 	Database  string            `json:"database,omitempty"`
 	SSLMode   string            `json:"ssl_mode,omitempty"`
-	Options   map[string]string `json:"options,omitempty"`
-	CreatedAt time.Time         `json:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at"`
+	ID        string            `json:"id"`
+	Type      string            `json:"type"`
+	Name      string            `json:"name"`
 	Port      int               `json:"port"`
-	Encrypted bool              `json:"encrypted"` // whether Password is AES-encrypted (hex)
+	Encrypted bool              `json:"encrypted"`
 }
 
 // Store persists registered databases to a JSON file on disk. It is safe for
