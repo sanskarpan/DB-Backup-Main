@@ -28,6 +28,7 @@ import (
 	storageGCS "github.com/sanskarpan/db-backup/internal/storage/gcs"
 	storageLocal "github.com/sanskarpan/db-backup/internal/storage/local"
 	storageS3 "github.com/sanskarpan/db-backup/internal/storage/s3"
+	"github.com/sanskarpan/db-backup/internal/storageregistry"
 
 	// Register database drivers
 	_ "github.com/sanskarpan/db-backup/internal/database/mongodb"
@@ -159,6 +160,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize the storage provider registry store. Secret config values
+	// (access/secret/account/application keys) are encrypted at rest using the
+	// JWT secret and are never returned in API responses.
+	storageStore, err := storageregistry.NewStore(filepath.Join(dbStoreDir, "storage"), jwtSecret)
+	if err != nil {
+		log.Error("Failed to initialize storage provider registry store", err)
+		os.Exit(1)
+	}
+
 	// Create API server
 	apiServer := api.NewServer(&api.Config{
 		Host:          cfg.Server.Host,
@@ -168,7 +178,7 @@ func main() {
 		EnableSwagger: true,
 		JWTSecret:     jwtSecret,
 		ScanBaseDir:   os.Getenv("SCAN_BASE_DIR"),
-	}, backupEngine, restoreEngine, sched, healthChecker, detector, searchEngine, jwtService, oauth2Service, oauth2Handler, dbStore, log)
+	}, backupEngine, restoreEngine, sched, healthChecker, detector, searchEngine, jwtService, oauth2Service, oauth2Handler, dbStore, storageStore, log)
 
 	// Setup Gin router
 	if cfg.Logging.Level != "debug" {

@@ -13,6 +13,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/restore"
 	"github.com/sanskarpan/db-backup/internal/scheduler"
 	"github.com/sanskarpan/db-backup/internal/security/ransomware"
+	"github.com/sanskarpan/db-backup/internal/storageregistry"
 )
 
 // Server represents the API server
@@ -28,6 +29,7 @@ type Server struct {
 	oauth2Service *auth.OAuth2Service
 	oauth2Handler *auth.OAuth2Handler
 	dbStore       *dbregistry.Store
+	storageStore  *storageregistry.Store
 	logger        *logger.Logger
 }
 
@@ -58,6 +60,7 @@ func NewServer(
 	oauth2Service *auth.OAuth2Service,
 	oauth2Handler *auth.OAuth2Handler,
 	dbStore *dbregistry.Store,
+	storageStore *storageregistry.Store,
 	log *logger.Logger,
 ) *Server {
 	return &Server{
@@ -72,6 +75,7 @@ func NewServer(
 		oauth2Service: oauth2Service,
 		oauth2Handler: oauth2Handler,
 		dbStore:       dbStore,
+		storageStore:  storageStore,
 		logger:        log,
 	}
 }
@@ -198,10 +202,13 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 			security.GET("/alerts/:id", s.handleGetThreatAlert)
 			security.PUT("/alerts/:id", s.handleUpdateThreatAlert)
 
-			// Immutable storage configuration
+			// Storage provider configuration (backed by storageregistry.Store)
 			security.GET("/storage/providers", s.handleListStorageProviders)
 			security.GET("/storage/providers/:id", s.handleGetStorageProvider)
+			security.POST("/storage/providers", s.handleCreateStorageProvider)
 			security.PUT("/storage/providers/:id", s.handleUpdateStorageProvider)
+			security.DELETE("/storage/providers/:id", s.handleDeleteStorageProvider)
+			security.POST("/storage/providers/:id/test", s.handleTestStorageProvider)
 		}
 
 		// Catalog and search endpoints
