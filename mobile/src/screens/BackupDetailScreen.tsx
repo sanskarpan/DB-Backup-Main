@@ -1,10 +1,11 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -15,6 +16,7 @@ import {apiService} from '../services/api';
 export default function BackupDetailScreen({route, navigation}: any) {
   const dispatch = useDispatch();
   const {backup} = route.params;
+  const [downloading, setDownloading] = useState(false);
 
   const statusColors: Record<string, {bg: string; text: string; icon: string}> = {
     completed: {bg: '#d1fae5', text: '#065f46', icon: 'checkmark-circle'},
@@ -40,12 +42,30 @@ export default function BackupDetailScreen({route, navigation}: any) {
     return `${m}m ${s}s`;
   };
 
-  const handleDownload = () => {
-    Alert.alert(
-      'Download Backup',
-      'Download will start in the background.',
-      [{text: 'OK'}],
-    );
+  const handleDownload = async () => {
+    if (downloading) {
+      return;
+    }
+    setDownloading(true);
+    try {
+      // Hit the real authenticated download endpoint and pull the artifact.
+      const blob = await apiService.downloadBackup(backup.id);
+      const sizeLabel =
+        blob && typeof (blob as any).size === 'number'
+          ? ` (${formatSize((blob as any).size)})`
+          : '';
+      Alert.alert(
+        'Download Complete',
+        `Backup "${backup.filename || backup.id}" was downloaded${sizeLabel}.`,
+      );
+    } catch (error) {
+      Alert.alert(
+        'Download Failed',
+        'Could not download the backup file. Please try again.',
+      );
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const handleRestore = () => {
@@ -153,17 +173,26 @@ export default function BackupDetailScreen({route, navigation}: any) {
       <View style={styles.actionsCard}>
         <Text style={styles.cardTitle}>Actions</Text>
 
-        <TouchableOpacity style={styles.actionButton} onPress={handleDownload}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={handleDownload}
+          disabled={downloading}>
           <View style={[styles.actionIcon, {backgroundColor: '#dbeafe'}]}>
             <Icon name="download-outline" size={22} color="#1e40af" />
           </View>
           <View style={styles.actionInfo}>
             <Text style={styles.actionLabel}>Download</Text>
             <Text style={styles.actionDescription}>
-              Download backup file to device
+              {downloading
+                ? 'Downloading backup file...'
+                : 'Download backup file to device'}
             </Text>
           </View>
-          <Icon name="chevron-forward" size={18} color="#9ca3af" />
+          {downloading ? (
+            <ActivityIndicator size="small" color="#1e40af" />
+          ) : (
+            <Icon name="chevron-forward" size={18} color="#9ca3af" />
+          )}
         </TouchableOpacity>
 
         {backup.status === 'completed' && (

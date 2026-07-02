@@ -30,15 +30,16 @@ export const fetchDatabases = createAsyncThunk(
   'databases/fetchDatabases',
   async (_, {rejectWithValue}) => {
     try {
-      const response = await apiService.getDatabases();
+      // listDatabases() returns the parsed Database[] payload directly.
+      const databases = await apiService.listDatabases();
 
       try {
-        await AsyncStorage.setItem('databases', JSON.stringify(response.data));
+        await AsyncStorage.setItem('databases', JSON.stringify(databases));
       } catch (storageError) {
         console.warn('[fetchDatabases] Failed to persist databases locally:', storageError);
       }
 
-      return response.data;
+      return databases;
     } catch (error: any) {
       if (error?.response?.status === 401 || error?.response?.status === 403) {
         return rejectWithValue('Unauthorized: please log in again');
@@ -58,8 +59,13 @@ export const createDatabase = createAsyncThunk(
   'databases/createDatabase',
   async (databaseData: Partial<Database>, {rejectWithValue}) => {
     try {
-      const response = await apiService.createDatabase(databaseData);
-      return response.data;
+      // createDatabase() returns the created Database payload directly.
+      // Cast the input: our local Database.type is a plain string whereas the
+      // shared client narrows it to a DatabaseType union.
+      const database = await apiService.createDatabase(
+        databaseData as Parameters<typeof apiService.createDatabase>[0],
+      );
+      return database;
     } catch (error: any) {
       return rejectWithValue(
         error?.response?.data?.message || 'Failed to create database',
