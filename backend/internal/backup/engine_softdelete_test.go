@@ -74,7 +74,7 @@ func TestDeleteBackup_SoftDeleteHidesFromList(t *testing.T) {
 	}
 
 	// Soft delete must retain the artifact and metadata.
-	if _, err := os.Stat(artifact); err != nil {
+	if _, err = os.Stat(artifact); err != nil {
 		t.Errorf("artifact should be retained after soft delete: %v", err)
 	}
 	meta, err := engine.GetBackup(ctx, "b1")
@@ -185,10 +185,10 @@ func TestPurgeExpired(t *testing.T) {
 	}
 	oldTime := time.Now().Add(-48 * time.Hour)
 	oldMeta.DeletedAt = &oldTime
-	if err := engine.saveMetadata(oldMeta); err != nil {
+	if err = engine.saveMetadata(oldMeta); err != nil {
 		t.Fatalf("saveMetadata old: %v", err)
 	}
-	if err := engine.DeleteBackup(ctx, "recent"); err != nil {
+	if err = engine.DeleteBackup(ctx, "recent"); err != nil {
 		t.Fatalf("DeleteBackup recent: %v", err)
 	}
 

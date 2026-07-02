@@ -13,7 +13,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/models"
 )
 
-func newTrashServer(t *testing.T) (*Server, string) {
+func newTrashServer(t *testing.T) (srv *Server, dir string) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	tempDir := filepath.Join(t.TempDir(), "backups")
@@ -134,7 +134,7 @@ func TestTrashHandlers_Flow(t *testing.T) {
 	}
 
 	// Restore from trash brings it back to the live list.
-	if w := doJSON(t, r, http.MethodPost, "/api/v1/backups/b1/restore-from-trash", nil); w.Code != http.StatusOK {
+	if w = doJSON(t, r, http.MethodPost, "/api/v1/backups/b1/restore-from-trash", nil); w.Code != http.StatusOK {
 		t.Fatalf("restore-from-trash: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	w = doJSON(t, r, http.MethodGet, "/api/v1/backups", nil)
@@ -143,15 +143,15 @@ func TestTrashHandlers_Flow(t *testing.T) {
 	}
 
 	// Purging a live backup is rejected.
-	if w := doJSON(t, r, http.MethodDelete, "/api/v1/backups/b1/purge", nil); w.Code == http.StatusOK {
+	if w = doJSON(t, r, http.MethodDelete, "/api/v1/backups/b1/purge", nil); w.Code == http.StatusOK {
 		t.Fatalf("purge of live backup should fail, got 200")
 	}
 
 	// Soft delete again, then purge permanently.
-	if w := doJSON(t, r, http.MethodDelete, "/api/v1/backups/b1", nil); w.Code != http.StatusOK {
+	if w = doJSON(t, r, http.MethodDelete, "/api/v1/backups/b1", nil); w.Code != http.StatusOK {
 		t.Fatalf("second soft delete: got %d", w.Code)
 	}
-	if w := doJSON(t, r, http.MethodDelete, "/api/v1/backups/b1/purge", nil); w.Code != http.StatusOK {
+	if w = doJSON(t, r, http.MethodDelete, "/api/v1/backups/b1/purge", nil); w.Code != http.StatusOK {
 		t.Fatalf("purge: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	if _, err := os.Stat(artifact); !os.IsNotExist(err) {
