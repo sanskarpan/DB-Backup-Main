@@ -100,13 +100,13 @@ func (s *Store) persist() error {
 	}
 	if err := tmp.Close(); err != nil {
 		if rmErr := os.Remove(tmpName); rmErr != nil {
-			return fmt.Errorf("approvals: close temp: %w (cleanup: %v)", err, rmErr)
+			return fmt.Errorf("approvals: close temp: %w (cleanup: %w)", err, rmErr)
 		}
 		return fmt.Errorf("approvals: close temp: %w", err)
 	}
 	if err := os.Rename(tmpName, s.path()); err != nil {
 		if rmErr := os.Remove(tmpName); rmErr != nil {
-			return fmt.Errorf("approvals: rename store: %w (cleanup: %v)", err, rmErr)
+			return fmt.Errorf("approvals: rename store: %w (cleanup: %w)", err, rmErr)
 		}
 		return fmt.Errorf("approvals: rename store: %w", err)
 	}
@@ -226,7 +226,7 @@ func (s *Store) Approve(id, approverUserID string) (*ApprovalRequest, error) {
 }
 
 // Reject transitions a pending request to rejected, recording an optional
-// reason. Unlike approval, rejection by the requester is allowed (cancelling
+// reason. Unlike approval, rejection by the requester is allowed (canceling
 // one's own request is harmless).
 func (s *Store) Reject(id, approverUserID, reason string) (*ApprovalRequest, error) {
 	s.mu.Lock()

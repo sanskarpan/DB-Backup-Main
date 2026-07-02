@@ -82,7 +82,7 @@ func TestStore_SelfApprovalRejected(t *testing.T) {
 	}
 
 	// The requester cannot approve their own request — the whole point of MUA.
-	if _, err := s.Approve(req.ID, "alice"); !errors.Is(err, ErrSelfApproval) {
+	if _, err = s.Approve(req.ID, "alice"); !errors.Is(err, ErrSelfApproval) {
 		t.Fatalf("expected ErrSelfApproval, got %v", err)
 	}
 
@@ -112,7 +112,7 @@ func TestStore_ApproveAndConsume(t *testing.T) {
 	}
 
 	// Approving again is not allowed (no longer pending).
-	if _, err := s.Approve(req.ID, "carol"); !errors.Is(err, ErrNotPending) {
+	if _, err = s.Approve(req.ID, "carol"); !errors.Is(err, ErrNotPending) {
 		t.Fatalf("expected ErrNotPending on re-approve, got %v", err)
 	}
 
@@ -189,7 +189,7 @@ func TestStore_RestartPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if _, err := s1.Approve(req.ID, "bob"); err != nil {
+	if _, err = s1.Approve(req.ID, "bob"); err != nil {
 		t.Fatalf("Approve: %v", err)
 	}
 

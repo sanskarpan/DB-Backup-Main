@@ -179,7 +179,7 @@ func evaluateSchedule(
 		sh.OverdueBySeconds = now.Sub(last).Seconds()
 	}
 
-	sh.IsStale, sh.Reason = staleReason(staleInputs{
+	sh.IsStale, sh.Reason = staleReason(&staleInputs{
 		hasSuccess:    hasSuccess,
 		intervalKnown: intervalKnown,
 		interval:      interval,
@@ -204,7 +204,7 @@ type staleInputs struct {
 // when it has never produced a successful backup, when its last success is
 // older than staleIntervalMultiplier x the expected interval, or when its next
 // run is overdue by more than one interval (indicating missed runs).
-func staleReason(in staleInputs) (isStale bool, reason string) {
+func staleReason(in *staleInputs) (isStale bool, reason string) {
 	if !in.hasSuccess {
 		return true, "no successful backup recorded"
 	}
@@ -281,13 +281,20 @@ func buildGap(db *dbregistry.Database, lastSuccess *time.Time, status string) Pr
 }
 
 // overallStatus rolls the counts up into a single protection status.
+// Overall protection-status values.
+const (
+	statusHealthy  = "healthy"
+	statusDegraded = "degraded"
+	statusAtRisk   = "at_risk"
+)
+
 func overallStatus(stale, unprotected, underProtected int) string {
 	switch {
 	case unprotected > 0:
-		return "at_risk"
+		return statusAtRisk
 	case stale > 0 || underProtected > 0:
-		return "degraded"
+		return statusDegraded
 	default:
-		return "healthy"
+		return statusHealthy
 	}
 }
