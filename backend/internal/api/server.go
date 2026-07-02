@@ -2,6 +2,9 @@
 package api
 
 import (
+	"errors"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sanskarpan/db-backup/internal/api/middleware"
 	"github.com/sanskarpan/db-backup/internal/auth"
@@ -295,6 +298,17 @@ func (s *Server) respondError(c *gin.Context, code int, err error, message strin
 		Error:   errMsg,
 		Message: message,
 	})
+}
+
+// respondLookupError maps a store lookup/mutation error to an HTTP response:
+// the given not-found sentinel becomes 404 with notFoundMsg, anything else
+// becomes 500 with failMsg.
+func (s *Server) respondLookupError(c *gin.Context, err, notFound error, notFoundMsg, failMsg string) {
+	if errors.Is(err, notFound) {
+		s.respondError(c, http.StatusNotFound, err, notFoundMsg)
+		return
+	}
+	s.respondError(c, http.StatusInternalServerError, err, failMsg)
 }
 
 func (s *Server) respondSuccess(c *gin.Context, data interface{}) {

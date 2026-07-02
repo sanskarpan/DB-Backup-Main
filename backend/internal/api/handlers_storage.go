@@ -52,11 +52,7 @@ func (s *Server) handleGetStorageProvider(c *gin.Context) {
 	}
 	provider, err := s.storageStore.Get(c.Param("id"))
 	if err != nil {
-		if errors.Is(err, storageregistry.ErrNotFound) {
-			s.respondError(c, http.StatusNotFound, err, "Storage provider not found")
-			return
-		}
-		s.respondError(c, http.StatusInternalServerError, err, "Failed to get storage provider")
+		s.respondLookupError(c, err, storageregistry.ErrNotFound, "Storage provider not found", "Failed to get storage provider")
 		return
 	}
 	c.JSON(http.StatusOK, provider)
@@ -138,11 +134,7 @@ func (s *Server) handleTestStorageProvider(c *gin.Context) {
 	}
 	resolved, err := s.storageStore.Resolve(c.Param("id"))
 	if err != nil {
-		if errors.Is(err, storageregistry.ErrNotFound) {
-			s.respondError(c, http.StatusNotFound, err, "Storage provider not found")
-			return
-		}
-		s.respondError(c, http.StatusInternalServerError, err, "Failed to get storage provider")
+		s.respondLookupError(c, err, storageregistry.ErrNotFound, "Storage provider not found", "Failed to get storage provider")
 		return
 	}
 

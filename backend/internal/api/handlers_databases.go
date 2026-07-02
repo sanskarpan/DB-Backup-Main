@@ -44,11 +44,7 @@ func (s *Server) handleGetDatabase(c *gin.Context) {
 	}
 	db, err := s.dbStore.Get(c.Param("id"))
 	if err != nil {
-		if errors.Is(err, dbregistry.ErrNotFound) {
-			s.respondError(c, http.StatusNotFound, err, "Database not found")
-			return
-		}
-		s.respondError(c, http.StatusInternalServerError, err, "Failed to get database")
+		s.respondLookupError(c, err, dbregistry.ErrNotFound, "Database not found", "Failed to get database")
 		return
 	}
 	c.JSON(http.StatusOK, db)
@@ -129,11 +125,7 @@ func (s *Server) handleTestDatabase(c *gin.Context) {
 	}
 	db, err := s.dbStore.Get(c.Param("id"))
 	if err != nil {
-		if errors.Is(err, dbregistry.ErrNotFound) {
-			s.respondError(c, http.StatusNotFound, err, "Database not found")
-			return
-		}
-		s.respondError(c, http.StatusInternalServerError, err, "Failed to get database")
+		s.respondLookupError(c, err, dbregistry.ErrNotFound, "Database not found", "Failed to get database")
 		return
 	}
 
