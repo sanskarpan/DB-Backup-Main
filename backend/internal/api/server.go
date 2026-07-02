@@ -14,6 +14,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/scheduler"
 	"github.com/sanskarpan/db-backup/internal/security/ransomware"
 	"github.com/sanskarpan/db-backup/internal/storageregistry"
+	"github.com/sanskarpan/db-backup/internal/websocket"
 )
 
 // Server represents the API server
@@ -30,6 +31,7 @@ type Server struct {
 	oauth2Handler *auth.OAuth2Handler
 	dbStore       *dbregistry.Store
 	storageStore  *storageregistry.Store
+	wsHub         *websocket.Hub
 	logger        *logger.Logger
 }
 
@@ -61,6 +63,7 @@ func NewServer(
 	oauth2Handler *auth.OAuth2Handler,
 	dbStore *dbregistry.Store,
 	storageStore *storageregistry.Store,
+	wsHub *websocket.Hub,
 	log *logger.Logger,
 ) *Server {
 	return &Server{
@@ -76,6 +79,7 @@ func NewServer(
 		oauth2Handler: oauth2Handler,
 		dbStore:       dbStore,
 		storageStore:  storageStore,
+		wsHub:         wsHub,
 		logger:        log,
 	}
 }
@@ -140,6 +144,15 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 					authGroup.GET("/oauth2/user", gin.WrapF(s.oauth2Handler.GetUserInfo))
 				}
 			}
+		}
+
+		// Real-time notifications over WebSocket. Browsers cannot set the
+		// Authorization header on a WebSocket handshake, so the JWT is passed as
+		// a `token` query parameter and validated by the handler itself before
+		// upgrading. It is therefore registered outside the header-based auth
+		// middleware group.
+		if s.wsHub != nil && s.jwtService != nil {
+			v1.GET("/notifications/ws", s.handleNotificationsWS)
 		}
 
 		// All routes below require authentication

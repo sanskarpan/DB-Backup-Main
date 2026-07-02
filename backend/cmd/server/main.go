@@ -30,6 +30,7 @@ import (
 	storageLocal "github.com/sanskarpan/db-backup/internal/storage/local"
 	storageS3 "github.com/sanskarpan/db-backup/internal/storage/s3"
 	"github.com/sanskarpan/db-backup/internal/storageregistry"
+	"github.com/sanskarpan/db-backup/internal/websocket"
 
 	// Register database drivers
 	_ "github.com/sanskarpan/db-backup/internal/database/mongodb"
@@ -81,6 +82,13 @@ func main() {
 	if err != nil {
 		log.Warn("Some notification channels failed to initialize: " + err.Error())
 	}
+
+	// Start the WebSocket hub and wire it into the notification router so that
+	// backup/restore notifications are broadcast to connected WebSocket clients
+	// in real time, alongside the config-driven channels (slack/email/webhook).
+	wsHub := websocket.NewHub()
+	go wsHub.Run()
+	notificationRouter.AddNotifier(websocket.NewNotifierAdapter(wsHub))
 
 	// Initialize components
 	backupEngine := backup.NewEngine(&backup.Config{
@@ -188,7 +196,7 @@ func main() {
 		EnableSwagger: true,
 		JWTSecret:     jwtSecret,
 		ScanBaseDir:   os.Getenv("SCAN_BASE_DIR"),
-	}, backupEngine, restoreEngine, sched, healthChecker, detector, searchEngine, jwtService, oauth2Service, oauth2Handler, dbStore, storageStore, log)
+	}, backupEngine, restoreEngine, sched, healthChecker, detector, searchEngine, jwtService, oauth2Service, oauth2Handler, dbStore, storageStore, wsHub, log)
 
 	// Setup Gin router
 	if cfg.Logging.Level != "debug" {
