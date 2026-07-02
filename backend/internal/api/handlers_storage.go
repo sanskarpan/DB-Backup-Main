@@ -60,51 +60,23 @@ func (s *Server) handleGetStorageProvider(c *gin.Context) {
 
 // handleCreateStorageProvider handles POST /security/storage/providers.
 func (s *Server) handleCreateStorageProvider(c *gin.Context) {
-	if !s.storageStoreReady(c) {
-		return
-	}
-	var req storageregistry.CreateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		s.respondError(c, http.StatusBadRequest, err, "Invalid request body")
-		return
-	}
-	provider, err := s.storageStore.Create(&req)
-	if err != nil {
-		var verr *storageregistry.ValidationError
-		if errors.As(err, &verr) {
-			s.respondError(c, http.StatusBadRequest, err, "Validation failed")
-			return
-		}
-		s.respondError(c, http.StatusInternalServerError, err, "Failed to create storage provider")
-		return
-	}
-	c.JSON(http.StatusCreated, provider)
+	handleMutation(s, c, s.storageStoreReady, s.storageStore.Create,
+		nil, isStorageValidationError, "", "Failed to create storage provider", http.StatusCreated)
+}
+
+// isStorageValidationError reports whether err is a storageregistry validation error.
+func isStorageValidationError(err error) bool {
+	var verr *storageregistry.ValidationError
+	return errors.As(err, &verr)
 }
 
 // handleUpdateStorageProvider handles PUT /security/storage/providers/:id.
 func (s *Server) handleUpdateStorageProvider(c *gin.Context) {
-	if !s.storageStoreReady(c) {
-		return
-	}
-	var req storageregistry.UpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		s.respondError(c, http.StatusBadRequest, err, "Invalid request body")
-		return
-	}
-	provider, err := s.storageStore.Update(c.Param("id"), &req)
-	if err != nil {
-		var verr *storageregistry.ValidationError
-		switch {
-		case errors.Is(err, storageregistry.ErrNotFound):
-			s.respondError(c, http.StatusNotFound, err, "Storage provider not found")
-		case errors.As(err, &verr):
-			s.respondError(c, http.StatusBadRequest, err, "Validation failed")
-		default:
-			s.respondError(c, http.StatusInternalServerError, err, "Failed to update storage provider")
-		}
-		return
-	}
-	c.JSON(http.StatusOK, provider)
+	handleMutation(s, c, s.storageStoreReady,
+		func(r *storageregistry.UpdateRequest) (*storageregistry.StorageProvider, error) {
+			return s.storageStore.Update(c.Param("id"), r)
+		},
+		storageregistry.ErrNotFound, isStorageValidationError, "Storage provider not found", "Failed to update storage provider", http.StatusOK)
 }
 
 // handleDeleteStorageProvider handles DELETE /security/storage/providers/:id.

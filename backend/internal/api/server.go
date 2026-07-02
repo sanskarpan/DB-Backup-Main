@@ -311,6 +311,47 @@ func (s *Server) respondLookupError(c *gin.Context, err, notFound error, notFoun
 	s.respondError(c, http.StatusInternalServerError, err, failMsg)
 }
 
+// respondMutationError maps a create/update store error to an HTTP response.
+// A not-found sentinel (when non-nil) becomes 404, a value the isValidation
+// predicate matches becomes 400, and anything else becomes 500 with failMsg.
+func (s *Server) respondMutationError(c *gin.Context, err, notFound error, isValidation func(error) bool, notFoundMsg, failMsg string) {
+	switch {
+	case notFound != nil && errors.Is(err, notFound):
+		s.respondError(c, http.StatusNotFound, err, notFoundMsg)
+	case isValidation != nil && isValidation(err):
+		s.respondError(c, http.StatusBadRequest, err, "Validation failed")
+	default:
+		s.respondError(c, http.StatusInternalServerError, err, failMsg)
+	}
+}
+
+// handleMutation is the shared shape of a create/update handler: it checks the
+// store is ready, binds the JSON request into Req, runs the store op, maps any
+// error, and writes the result with successCode. It removes the boilerplate
+// duplicated across parallel resource handlers (databases, storage providers).
+func handleMutation[Req, Res any](
+	s *Server, c *gin.Context,
+	ready func(*gin.Context) bool,
+	op func(*Req) (Res, error),
+	notFound error, isValidation func(error) bool,
+	notFoundMsg, failMsg string, successCode int,
+) {
+	if !ready(c) {
+		return
+	}
+	var req Req
+	if err := c.ShouldBindJSON(&req); err != nil {
+		s.respondError(c, http.StatusBadRequest, err, "Invalid request body")
+		return
+	}
+	res, err := op(&req)
+	if err != nil {
+		s.respondMutationError(c, err, notFound, isValidation, notFoundMsg, failMsg)
+		return
+	}
+	c.JSON(successCode, res)
+}
+
 func (s *Server) respondSuccess(c *gin.Context, data interface{}) {
 	c.JSON(200, SuccessResponse{
 		Success: true,
