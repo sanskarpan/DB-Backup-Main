@@ -121,6 +121,14 @@ func remoteBackupPath(backupID, fileName string) string {
 	return fmt.Sprintf("backups/%s/%s", backupID, fileName)
 }
 
+// reportProgress invokes the optional progress callback with a simple stage
+// update, doing nothing when no callback is configured.
+func reportProgress(opts *CreateOptions, stage string, pct float64, msg string) {
+	if opts.ProgressCallback != nil {
+		opts.ProgressCallback(Progress{Stage: stage, Percentage: pct, Message: msg})
+	}
+}
+
 // CreateBackup creates a new backup and dispatches a completion notification
 // (success or failure) through the configured notifier, if any. This is the
 // single integration point for backup notifications: callers such as the
@@ -210,13 +218,7 @@ func (e *Engine) createBackup(ctx context.Context, opts *CreateOptions) (*models
 	}
 
 	// Update progress
-	if opts.ProgressCallback != nil {
-		opts.ProgressCallback(Progress{
-			Stage:      "initializing",
-			Percentage: 0,
-			Message:    "Initializing backup...",
-		})
-	}
+	reportProgress(opts, "initializing", 0, "Initializing backup...")
 
 	// Create database driver
 	driver, err := database.CreateDriver(opts.DatabaseType)
@@ -237,13 +239,7 @@ func (e *Engine) createBackup(ctx context.Context, opts *CreateOptions) (*models
 		MaxConnections:    10,
 	}
 
-	if opts.ProgressCallback != nil {
-		opts.ProgressCallback(Progress{
-			Stage:      "connecting",
-			Percentage: 10,
-			Message:    "Connecting to database...",
-		})
-	}
+	reportProgress(opts, "connecting", 10, "Connecting to database...")
 
 	if err := driver.Connect(ctx, connConfig); err != nil {
 		metadata.Status = database.BackupStatusFailed
@@ -265,13 +261,7 @@ func (e *Engine) createBackup(ctx context.Context, opts *CreateOptions) (*models
 	backupFileName := fmt.Sprintf("%s.%s", backupID, e.getFileExtension(opts.Compression))
 	backupPath := filepath.Join(e.config.TempDirectory, backupFileName)
 
-	if opts.ProgressCallback != nil {
-		opts.ProgressCallback(Progress{
-			Stage:      "backing_up",
-			Percentage: 30,
-			Message:    "Creating backup...",
-		})
-	}
+	reportProgress(opts, "backing_up", 30, "Creating backup...")
 
 	// Create backup options for driver
 	backupOpts := &database.BackupOptions{
@@ -299,13 +289,7 @@ func (e *Engine) createBackup(ctx context.Context, opts *CreateOptions) (*models
 	metadata.Tables = result.Tables
 	metadata.BackupPath = backupPath
 
-	if opts.ProgressCallback != nil {
-		opts.ProgressCallback(Progress{
-			Stage:      "validating",
-			Percentage: 70,
-			Message:    "Validating backup...",
-		})
-	}
+	reportProgress(opts, "validating", 70, "Validating backup...")
 
 	// Calculate checksum
 	checksum, err := e.calculateChecksum(backupPath)
@@ -323,13 +307,7 @@ func (e *Engine) createBackup(ctx context.Context, opts *CreateOptions) (*models
 		return metadata, err
 	}
 
-	if opts.ProgressCallback != nil {
-		opts.ProgressCallback(Progress{
-			Stage:      "finalizing",
-			Percentage: 90,
-			Message:    "Finalizing backup...",
-		})
-	}
+	reportProgress(opts, "finalizing", 90, "Finalizing backup...")
 
 	// Complete
 	metadata.EndTime = time.Now()
@@ -357,13 +335,7 @@ func (e *Engine) createBackup(ctx context.Context, opts *CreateOptions) (*models
 		}
 	}
 
-	if opts.ProgressCallback != nil {
-		opts.ProgressCallback(Progress{
-			Stage:      "completed",
-			Percentage: 100,
-			Message:    "Backup completed successfully",
-		})
-	}
+	reportProgress(opts, "completed", 100, "Backup completed successfully")
 
 	return metadata, nil
 }
@@ -377,13 +349,7 @@ func (e *Engine) storeArtifact(ctx context.Context, metadata *models.BackupMetad
 		return nil
 	}
 
-	if opts.ProgressCallback != nil {
-		opts.ProgressCallback(Progress{
-			Stage:      "uploading",
-			Percentage: 80,
-			Message:    "Uploading backup to storage...",
-		})
-	}
+	reportProgress(opts, "uploading", 80, "Uploading backup to storage...")
 
 	remotePath := remoteBackupPath(backupID, backupFileName)
 	uploadOpts := &storage.UploadOptions{
