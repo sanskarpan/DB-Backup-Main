@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -243,18 +244,56 @@ func TestPITRManager_CreateCheckpoint(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestPITRManager_GetRecoveryRange(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test")
-	}
+// TestPITRManager_GetRecoveryRange_Honest verifies that GetRecoveryRange no
+// longer fabricates a now/now-24h range and instead returns an honest error,
+// because Redis maintains no continuous recovery window. This is a pure unit
+// test and needs no live Redis (the method returns before touching the client).
+func TestPITRManager_GetRecoveryRange_Honest(t *testing.T) {
+	p := NewPITRManager(NewRedisDriver())
 
-	driver := setupTestDriver(t)
-	defer driver.Disconnect()
+	start, end, err := p.GetRecoveryRange(context.Background())
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrPITRNotSupported)
+	assert.True(t, start.IsZero())
+	assert.True(t, end.IsZero())
+}
 
-	ctx := context.Background()
-	start, end, err := driver.pitrManager.GetRecoveryRange(ctx)
-	assert.NoError(t, err)
-	assert.True(t, end.After(start))
+// TestRedisDriver_SupportsPITR verifies the driver honestly reports that it
+// cannot perform true time-based point-in-time recovery.
+func TestRedisDriver_SupportsPITR(t *testing.T) {
+	driver := NewRedisDriver()
+	assert.False(t, driver.SupportsPITR())
+}
+
+// TestPITRManager_RestoreToPIT_SnapshotNewerThanTarget verifies that a request
+// whose only snapshot is newer than the target time returns an honest
+// granularity error instead of silently restoring the wrong data. The method
+// returns before touching the Redis client, so no live Redis is required.
+func TestPITRManager_RestoreToPIT_SnapshotNewerThanTarget(t *testing.T) {
+	p := NewPITRManager(NewRedisDriver())
+
+	backupPath := filepath.Join(t.TempDir(), "snapshot.rdb")
+	require.NoError(t, os.WriteFile(backupPath, []byte("REDIS0011"), 0o600))
+
+	// Force the snapshot's modification time to be well after the target.
+	snapshotTime := time.Now()
+	require.NoError(t, os.Chtimes(backupPath, snapshotTime, snapshotTime))
+	targetTime := snapshotTime.Add(-1 * time.Hour)
+
+	err := p.RestoreToPIT(context.Background(), targetTime, backupPath)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrPITRGranularity)
+}
+
+// TestPITRManager_RestoreToPIT_MissingBackup verifies an honest error when the
+// referenced backup artifact does not exist.
+func TestPITRManager_RestoreToPIT_MissingBackup(t *testing.T) {
+	p := NewPITRManager(NewRedisDriver())
+
+	missing := filepath.Join(t.TempDir(), "does-not-exist.rdb")
+	err := p.RestoreToPIT(context.Background(), time.Now(), missing)
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, ErrPITRGranularity)
 }
 
 func TestClusterDriver_Connect(t *testing.T) {

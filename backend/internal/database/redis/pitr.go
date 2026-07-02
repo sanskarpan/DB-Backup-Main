@@ -2,15 +2,35 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/sanskarpan/db-backup/internal/database"
 )
 
-// PITRManager handles Point-in-Time Recovery for Redis using AOF
+// ErrPITRNotSupported indicates that Redis cannot perform true, time-based
+// point-in-time recovery. Redis has no continuous, timestamped write log that
+// can be replayed to an arbitrary instant: RDB captures discrete snapshots and
+// standard AOF files do not expose per-command timestamps that could be
+// replayed up to a specific second.
+var ErrPITRNotSupported = errors.New("redis: time-based point-in-time recovery is not supported; Redis cannot be replayed to an arbitrary timestamp")
+
+// ErrPITRGranularity indicates that the requested target time cannot be honored
+// because recovery is limited to whole backup snapshots rather than arbitrary
+// timestamps.
+var ErrPITRGranularity = errors.New("redis: point-in-time recovery granularity is limited to whole backup snapshots")
+
+// PITRManager handles snapshot-based recovery for Redis.
+//
+// IMPORTANT: Redis does not support true transactional point-in-time recovery.
+// The only artifacts available are RDB snapshots and AOF files, neither of
+// which can be replayed to an arbitrary second. This manager therefore offers
+// best-effort recovery to the state captured by a whole backup snapshot and is
+// honest (returns an error) when a request cannot be satisfied.
 type PITRManager struct {
 	driver *RedisDriver
 }
@@ -42,42 +62,49 @@ func (p *PITRManager) DisablePITR(ctx context.Context) error {
 	return p.driver.client.ConfigSet(ctx, "appendonly", "no").Err()
 }
 
-// RestoreToPIT restores the database to a specific point in time
+// RestoreToPIT performs best-effort recovery toward a target time.
+//
+// Redis cannot be replayed to an arbitrary timestamp (see ErrPITRNotSupported).
+// The realistic behavior, and the one implemented here, is to restore the whole
+// backup snapshot at backupPath, provided that snapshot represents state at or
+// before targetTime. Recovery granularity is therefore limited to the discrete
+// moments at which backups were taken, NOT arbitrary timestamps: the resulting
+// state reflects the snapshot's creation time, which will be at or before
+// targetTime.
+//
+// If the snapshot is newer than targetTime it cannot satisfy the request (it
+// contains writes that happened after the requested moment) and an honest
+// ErrPITRGranularity error is returned instead of silently restoring the wrong
+// data. The target time is never ignored.
 func (p *PITRManager) RestoreToPIT(ctx context.Context, targetTime time.Time, backupPath string) error {
-	// Read AOF file
-	data, err := os.ReadFile(backupPath)
+	// Use the backup file's modification time as a proxy for the moment the
+	// snapshot captured state. copyFile creates the backup at capture time, so
+	// this is a faithful, honest approximation of the snapshot instant.
+	info, err := os.Stat(backupPath)
 	if err != nil {
-		return fmt.Errorf("failed to read AOF file: %w", err)
+		return fmt.Errorf("failed to stat backup file %q: %w", backupPath, err)
 	}
 
-	// Parse AOF commands and replay up to target time
-	// This is a simplified implementation
-	// In production, you would need to:
-	// 1. Parse AOF format
-	// 2. Extract timestamps
-	// 3. Replay commands up to targetTime
-	// 4. Stop at the target timestamp
-
-	// For now, we'll use a marker-based approach
-	// AOF files with timestamps need to be parsed carefully
-
-	// Create temporary AOF file with commands up to target time
-	tempAOF := filepath.Join(filepath.Dir(backupPath), "temp_pitr.aof")
-	defer os.Remove(tempAOF)
-
-	// Write filtered commands to temp file
-	if err := os.WriteFile(tempAOF, data, 0644); err != nil {
-		return fmt.Errorf("failed to write temp AOF: %w", err)
+	snapshotTime := info.ModTime()
+	if snapshotTime.After(targetTime) {
+		return fmt.Errorf("%w: backup %q was captured at %s, which is after the requested target time %s; "+
+			"Redis recovery can only use whole snapshots taken at or before the target time",
+			ErrPITRGranularity, backupPath,
+			snapshotTime.UTC().Format(time.RFC3339), targetTime.UTC().Format(time.RFC3339))
 	}
 
-	// Restore from filtered AOF
+	// Restore the whole snapshot. This recovers state as of snapshotTime, which
+	// is guaranteed to be at or before targetTime.
 	restoreOpts := &database.RestoreOptions{
-		BackupPath:   tempAOF,
+		BackupPath:   backupPath,
 		DropExisting: true,
 	}
-
 	result := &database.RestoreResult{}
-	return p.driver.restoreAOF(ctx, restoreOpts, result)
+
+	if strings.HasSuffix(backupPath, ".aof") {
+		return p.driver.restoreAOF(ctx, restoreOpts, result)
+	}
+	return p.driver.restoreRDB(ctx, restoreOpts, result)
 }
 
 // CreatePITRCheckpoint creates a consistent checkpoint for PITR
@@ -122,18 +149,15 @@ func (p *PITRManager) CreatePITRCheckpoint(ctx context.Context, outputDir string
 	return checkpointPath, nil
 }
 
-// GetRecoveryRange returns the available recovery time range
-func (p *PITRManager) GetRecoveryRange(ctx context.Context) (start, end time.Time, err error) {
-	// Check if AOF is enabled
-	_, err = p.driver.client.Info(ctx, "persistence").Result()
-	if err != nil {
-		return time.Time{}, time.Time{}, err
-	}
-
-	// Parse AOF info to get time range
-	// This is simplified - in production, parse AOF file for actual range
-	end = time.Now()
-	start = end.Add(-24 * time.Hour) // Default to last 24 hours
-
-	return start, end, nil
+// GetRecoveryRange reports the continuous window over which time-based recovery
+// is possible.
+//
+// Redis maintains no such continuous, timestamped window: RDB snapshots capture
+// discrete moments and standard AOF files do not expose per-command timestamps
+// that could bound a recovery interval. Rather than returning a fabricated range
+// (the previous implementation hardcoded now .. now-24h), this returns an honest
+// error so callers do not act on a range that does not exist. Recovery is
+// snapshot-based; see RestoreToPIT.
+func (p *PITRManager) GetRecoveryRange(_ context.Context) (start, end time.Time, err error) {
+	return time.Time{}, time.Time{}, fmt.Errorf("%w: no continuous recovery range exists; recovery is limited to whole backup snapshots", ErrPITRNotSupported)
 }
