@@ -65,6 +65,11 @@ export const api = {
   updateStorageProvider: apiClient.updateStorageProvider.bind(apiClient),
   deleteStorageProvider: apiClient.deleteStorageProvider.bind(apiClient),
   testStorageProvider: apiClient.testStorageProvider.bind(apiClient),
+
+  // Security
+  getSecurityStats: apiClient.getSecurityStats.bind(apiClient),
+  listThreatAlerts: apiClient.listThreatAlerts.bind(apiClient),
+  getThreatAlert: apiClient.getThreatAlert.bind(apiClient),
 };
 
 // Re-export types from shared package
@@ -85,6 +90,12 @@ export type {
   WasabiConfig,
   BackblazeB2Config,
   LocalStorageConfig,
+  SecurityStats,
+  ThreatAlert,
+  ThreatAlertSeverity,
+  ThreatAlertStatus,
+  ThreatAlertListResponse,
+  ThreatAlertFilter,
 } from '@db-backup/types';
 
 export default api;

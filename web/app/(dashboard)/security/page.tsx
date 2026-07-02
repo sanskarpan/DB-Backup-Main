@@ -1,17 +1,17 @@
 'use client'
 
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/lib/api'
+import type { ThreatAlert } from '@db-backup/types'
 import {
   Shield,
   AlertTriangle,
   Lock,
   Eye,
-  AlertCircle,
   CheckCircle,
   XCircle,
-  TrendingUp,
   Activity,
-  FileKey2,
   Key,
   Scan,
   ShieldCheck,
@@ -19,35 +19,38 @@ import {
   Zap,
   Cloud,
   Server,
+  Loader2,
 } from 'lucide-react'
+
+function formatLastScan(value: string | null): string {
+  if (!value) return 'Never'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Never'
+  return date.toLocaleString()
+}
 
 export default function SecurityPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'ransomware' | 'encryption' | 'alerts'>('overview')
 
-  // Mock data
-  const securityStats = {
-    protectedBackups: 156,
-    threatsBlocked: 0,
-    encryptionRate: 100,
-    lastScan: '2 minutes ago',
-  }
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isError: statsError,
+  } = useQuery({
+    queryKey: ['security-stats'],
+    queryFn: () => api.getSecurityStats(),
+  })
 
-  const encryptionMethods = [
-    { name: 'AES-256-GCM', backups: 120, percentage: 77 },
-    { name: 'ChaCha20-Poly1305', backups: 36, percentage: 23 },
-  ]
+  const {
+    data: alertsResponse,
+    isLoading: alertsLoading,
+    isError: alertsError,
+  } = useQuery({
+    queryKey: ['threat-alerts'],
+    queryFn: () => api.listThreatAlerts(),
+  })
 
-  const immutableStorageProviders = [
-    { name: 'AWS S3 Object Lock', status: 'active', backups: 85, icon: Cloud },
-    { name: 'Azure Immutable Blobs', status: 'active', backups: 42, icon: Cloud },
-    { name: 'GCS Retention Policies', status: 'active', backups: 29, icon: Cloud },
-  ]
-
-  const recentScans = [
-    { timestamp: '2 min ago', files: 1247, threats: 0, status: 'clean' },
-    { timestamp: '1 hour ago', files: 1189, threats: 0, status: 'clean' },
-    { timestamp: '6 hours ago', files: 1145, threats: 0, status: 'clean' },
-  ]
+  const alerts: ThreatAlert[] = alertsResponse?.alerts ?? []
 
   const tabs = [
     { id: 'overview', name: 'Overview', icon: Activity },
@@ -68,22 +71,35 @@ export default function SecurityPage() {
               <h1 className="text-4xl font-bold">Security & Protection</h1>
             </div>
             <p className="text-red-100 text-lg max-w-3xl">
-              Enterprise-grade security with multi-cloud immutable storage, real-time ransomware detection, and end-to-end encryption
+              Ransomware detection and immutable, encrypted storage. Metrics below are
+              reported directly by the backend security service.
             </p>
           </div>
         </div>
 
-        {/* Stats Cards */}
+        {statsError && (
+          <div className="rounded-xl border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950 p-4 text-red-700 dark:text-red-300">
+            Unable to load security statistics from the backend.
+          </div>
+        )}
+
+        {/* Stats Cards - real data from GET /security/stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="stats-card bg-white dark:bg-gray-900 dark:border-gray-800">
             <div className="flex items-center justify-between mb-4">
               <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg">
                 <ShieldCheck className="w-6 h-6" />
               </div>
-              <CheckCircle className="w-5 h-5 text-emerald-500" />
+              {stats?.detector_active ? (
+                <CheckCircle className="w-5 h-5 text-emerald-500" />
+              ) : (
+                <XCircle className="w-5 h-5 text-gray-400" />
+              )}
             </div>
-            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{securityStats.protectedBackups}</div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Protected Backups</div>
+            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+              {statsLoading ? '—' : stats?.detector_active ? 'Active' : 'Inactive'}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">Ransomware Detector</div>
           </div>
 
           <div className="stats-card bg-white dark:bg-gray-900 dark:border-gray-800">
@@ -91,37 +107,35 @@ export default function SecurityPage() {
               <div className="p-3 rounded-xl bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg">
                 <Ban className="w-6 h-6" />
               </div>
-              <TrendingUp className="w-5 h-5 text-emerald-500" />
             </div>
-            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{securityStats.threatsBlocked}</div>
+            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+              {statsLoading ? '—' : (stats?.threats_blocked ?? 0).toLocaleString()}
+            </div>
             <div className="text-sm text-gray-600 dark:text-gray-400">Threats Blocked</div>
           </div>
 
           <div className="stats-card bg-white dark:bg-gray-900 dark:border-gray-800">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg">
-                <Key className="w-6 h-6" />
+              <div className="p-3 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg">
+                <AlertTriangle className="w-6 h-6" />
               </div>
-              <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-2 py-1 rounded-full">
-                {securityStats.encryptionRate}%
-              </span>
             </div>
-            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{securityStats.encryptionRate}%</div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Encryption Rate</div>
+            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+              {statsLoading ? '—' : (stats?.threats_detected ?? 0).toLocaleString()}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">Threats Detected</div>
           </div>
 
           <div className="stats-card bg-white dark:bg-gray-900 dark:border-gray-800">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg">
-                <Scan className="w-6 h-6" />
+              <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg">
+                <Cloud className="w-6 h-6" />
               </div>
-              <span className="flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-purple-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-500"></span>
-              </span>
             </div>
-            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{securityStats.lastScan}</div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Last Scan</div>
+            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+              {statsLoading ? '—' : (stats?.configured_providers ?? 0).toLocaleString()}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">Configured Providers</div>
           </div>
         </div>
 
@@ -153,60 +167,60 @@ export default function SecurityPage() {
             {/* Overview Tab */}
             {activeTab === 'overview' && (
               <div className="space-y-6">
-                {/* Protection Status */}
+                {/* Detector Status */}
                 <div>
                   <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                     <Shield className="w-5 h-5 text-orange-500" />
                     Protection Status
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {immutableStorageProviders.map((provider) => {
-                      const Icon = provider.icon
-                      return (
-                        <div key={provider.name} className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-                                <Icon className="w-5 h-5" />
-                              </div>
-                              <div>
-                                <h4 className="font-semibold text-gray-900 dark:text-white">{provider.name}</h4>
-                                <p className="text-xs text-gray-600 dark:text-gray-400">{provider.backups} backups</p>
-                              </div>
-                            </div>
-                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800">
-                              <CheckCircle className="w-3 h-3" />
-                              Active
-                            </span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                {/* Recent Scans */}
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                    <Scan className="w-5 h-5 text-orange-500" />
-                    Recent Scans
-                  </h3>
-                  <div className="space-y-3">
-                    {recentScans.map((scan, i) => (
-                      <div key={i} className="flex items-center justify-between bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4">
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                          <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white">
+                            <Scan className="w-5 h-5" />
+                          </div>
                           <div>
-                            <p className="font-medium text-gray-900 dark:text-white">Scan completed - {scan.status}</p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              {scan.files} files scanned, {scan.threats} threats detected
+                            <h4 className="font-semibold text-gray-900 dark:text-white">Ransomware Detector</h4>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              Last scan: {stats ? formatLastScan(stats.last_scan_time) : '—'}
                             </p>
                           </div>
                         </div>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">{scan.timestamp}</span>
+                        <span
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                            stats?.detector_active
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800'
+                              : 'bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                          }`}
+                        >
+                          {stats?.detector_active ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                          {stats?.detector_active ? 'Active' : 'Inactive'}
+                        </span>
                       </div>
-                    ))}
+                    </div>
+
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+                            <Server className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-gray-900 dark:text-white">Storage Providers</h4>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              {(stats?.configured_providers ?? 0).toLocaleString()} configured
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+                    Scans run on demand and no cumulative scan history is retained, so files
+                    scanned, threats detected and threats blocked report honest zeros until a
+                    scan records activity.
+                  </p>
                 </div>
 
                 {/* Feature Highlights */}
@@ -215,14 +229,14 @@ export default function SecurityPage() {
                     <Lock className="w-8 h-8 text-blue-600 dark:text-blue-400 mb-3" />
                     <h4 className="font-bold text-gray-900 dark:text-white mb-2">Immutable Storage</h4>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      WORM protection prevents malicious deletion across AWS, Azure, and GCP
+                      WORM protection prevents malicious deletion across supported providers
                     </p>
                   </div>
                   <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 rounded-xl p-6 border border-purple-200 dark:border-purple-800">
                     <AlertTriangle className="w-8 h-8 text-purple-600 dark:text-purple-400 mb-3" />
                     <h4 className="font-bold text-gray-900 dark:text-white mb-2">Ransomware Detection</h4>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Real-time entropy analysis and behavioral detection identify threats early
+                      Entropy analysis and behavioral detection identify threats during scans
                     </p>
                   </div>
                   <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900 rounded-xl p-6 border border-emerald-200 dark:border-emerald-800">
@@ -245,21 +259,29 @@ export default function SecurityPage() {
                       <AlertTriangle className="w-6 h-6" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Ransomware Detection Active</h3>
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                        Ransomware Detection {stats?.detector_active ? 'Active' : 'Inactive'}
+                      </h3>
                       <p className="text-gray-600 dark:text-gray-400 mb-4">
-                        All backups are continuously monitored for ransomware signatures and suspicious patterns
+                        Backups are scanned for ransomware signatures and suspicious patterns.
                       </p>
                       <div className="grid grid-cols-3 gap-4">
                         <div className="bg-white dark:bg-gray-800 rounded-lg p-3">
-                          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">98.7%</div>
-                          <div className="text-xs text-gray-600 dark:text-gray-400">Detection Rate</div>
+                          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                            {(stats?.files_scanned ?? 0).toLocaleString()}
+                          </div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400">Files Scanned</div>
                         </div>
                         <div className="bg-white dark:bg-gray-800 rounded-lg p-3">
-                          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">&lt;5s</div>
-                          <div className="text-xs text-gray-600 dark:text-gray-400">Scan Time</div>
+                          <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                            {(stats?.threats_detected ?? 0).toLocaleString()}
+                          </div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400">Threats Detected</div>
                         </div>
                         <div className="bg-white dark:bg-gray-800 rounded-lg p-3">
-                          <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">0</div>
+                          <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                            {alerts.filter((a) => a.status === 'active').length}
+                          </div>
                           <div className="text-xs text-gray-600 dark:text-gray-400">Active Threats</div>
                         </div>
                       </div>
@@ -271,19 +293,24 @@ export default function SecurityPage() {
                   <h4 className="font-bold text-gray-900 dark:text-white mb-4">Detection Methods</h4>
                   <div className="space-y-3">
                     {[
-                      { name: 'Entropy Analysis', description: 'Detects unusual file randomness patterns', status: 'active' },
-                      { name: 'Signature Matching', description: 'Identifies known ransomware families', status: 'active' },
-                      { name: 'Behavioral Detection', description: 'Monitors for suspicious file modifications', status: 'active' },
-                      { name: 'ML-Based Analysis', description: 'Uses AI to detect emerging threats', status: 'active' },
+                      { name: 'Entropy Analysis', description: 'Detects unusual file randomness patterns' },
+                      { name: 'Signature Matching', description: 'Identifies known ransomware families' },
+                      { name: 'Behavioral Detection', description: 'Monitors for suspicious file modifications' },
                     ].map((method) => (
                       <div key={method.name} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
                         <div>
                           <h5 className="font-semibold text-gray-900 dark:text-white">{method.name}</h5>
                           <p className="text-sm text-gray-600 dark:text-gray-400">{method.description}</p>
                         </div>
-                        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800">
+                        <span
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                            stats?.detector_active
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800'
+                              : 'bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                          }`}
+                        >
                           <Zap className="w-3 h-3" />
-                          Active
+                          {stats?.detector_active ? 'Active' : 'Inactive'}
                         </span>
                       </div>
                     ))}
@@ -300,86 +327,61 @@ export default function SecurityPage() {
                     <Key className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                     <div>
                       <h3 className="text-xl font-bold text-gray-900 dark:text-white">End-to-End Encryption</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">All backups are encrypted at rest and in transit</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Backups are encrypted at rest and in transit</p>
                     </div>
                   </div>
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-gray-900 dark:text-white mb-4">Encryption Methods</h4>
-                  <div className="space-y-4">
-                    {encryptionMethods.map((method) => (
-                      <div key={method.name} className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                        <div className="flex justify-between mb-2">
-                          <div>
-                            <h5 className="font-semibold text-gray-900 dark:text-white">{method.name}</h5>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">{method.backups} backups</p>
-                          </div>
-                          <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{method.percentage}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                          <div
-                            className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all"
-                            style={{ width: `${method.percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">256-bit</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Key Length</div>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">100%</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Coverage</div>
-                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Supported ciphers include AES-256-GCM and ChaCha20-Poly1305 with 256-bit keys.
+                    Per-backup encryption breakdown is not yet exposed by the backend API.
+                  </p>
                 </div>
               </div>
             )}
 
-            {/* Alerts Tab */}
+            {/* Alerts Tab - real data from GET /security/alerts */}
             {activeTab === 'alerts' && (
               <div className="space-y-6">
-                <div className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-xl p-6">
-                  <div className="flex items-center gap-3 mb-2">
-                    <CheckCircle className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">All Systems Secure</h3>
+                {alertsError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950 p-4 text-red-700 dark:text-red-300">
+                    Unable to load threat alerts from the backend.
                   </div>
-                  <p className="text-gray-600 dark:text-gray-400">No security threats detected in the last 30 days</p>
-                </div>
+                )}
 
-                <div>
-                  <h4 className="font-bold text-gray-900 dark:text-white mb-4">Alert Configuration</h4>
+                {alertsLoading ? (
+                  <div className="flex items-center justify-center gap-2 py-12 text-gray-500 dark:text-gray-400">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Loading threat alerts…
+                  </div>
+                ) : alerts.length === 0 ? (
+                  <div className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-xl p-6">
+                    <div className="flex items-center gap-3 mb-2">
+                      <CheckCircle className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">No Active Threat Alerts</h3>
+                    </div>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      The backend reports no threat alerts.
+                    </p>
+                  </div>
+                ) : (
                   <div className="space-y-3">
-                    {[
-                      { name: 'Ransomware Detection', enabled: true, severity: 'critical' },
-                      { name: 'Failed Encryption', enabled: true, severity: 'high' },
-                      { name: 'Unauthorized Access', enabled: true, severity: 'high' },
-                      { name: 'Storage Quota Warning', enabled: true, severity: 'medium' },
-                    ].map((alert) => (
-                      <div key={alert.name} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-3 h-3 rounded-full ${alert.enabled ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-                          <div>
-                            <h5 className="font-semibold text-gray-900 dark:text-white">{alert.name}</h5>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">Severity: {alert.severity}</p>
-                          </div>
+                    {alerts.map((alert) => (
+                      <div key={alert.id} className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center justify-between mb-1">
+                          <h5 className="font-semibold text-gray-900 dark:text-white">{alert.title}</h5>
+                          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800">
+                            {alert.severity}
+                          </span>
                         </div>
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                          alert.enabled
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400'
-                            : 'bg-gray-50 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-400'
-                        }`}>
-                          {alert.enabled ? 'Enabled' : 'Disabled'}
-                        </span>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{alert.description}</p>
+                        <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-400">
+                          <span>Type: {alert.type}</span>
+                          <span>Status: {alert.status}</span>
+                          {alert.detection_method && <span>Detected via: {alert.detection_method}</span>}
+                        </div>
                       </div>
                     ))}
                   </div>
-                </div>
+                )}
               </div>
             )}
           </div>

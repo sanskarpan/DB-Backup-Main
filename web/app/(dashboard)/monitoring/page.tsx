@@ -1,6 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/lib/api'
+import { SampleDataBadge } from '@/components/ui/sample-data-badge'
 import {
   Activity,
   BarChart3,
@@ -26,17 +29,22 @@ export default function MonitoringPage() {
   const [selectedView, setSelectedView] = useState<'overview' | 'security' | 'cost' | 'performance'>('overview')
   const [timeRange, setTimeRange] = useState<'1h' | '24h' | '7d' | '30d'>('24h')
 
-  // Mock data
-  const stats = {
-    totalBackups: 1247,
-    successRate: 98.5,
-    storageUsed: 2.4 * 1024 * 1024 * 1024 * 1024, // 2.4TB
-    storageTotal: 5 * 1024 * 1024 * 1024 * 1024, // 5TB
-    activeDatabases: 12,
-    failedBackups: 3,
-    avgBackupDuration: 124.5,
-    costMonthly: 186.42,
-  }
+  // Real backup statistics from GET /stats.
+  const { data: realStats } = useQuery({
+    queryKey: ['stats'],
+    queryFn: () => api.getStats(),
+  })
+
+  const totalBackups = realStats?.total_backups ?? 0
+  const successfulBackups = realStats?.successful_backups ?? 0
+  const failedBackups = realStats?.failed_backups ?? 0
+  const storageUsed = realStats?.total_size ?? 0
+  const activeDatabases = realStats?.databases ?? 0
+  const successRate = totalBackups > 0 ? (successfulBackups / totalBackups) * 100 : 0
+
+  // Sample-only metric — no backend source exists for cost, so it is clearly
+  // labelled as sample data in the UI rather than presented as live.
+  const sampleCostMonthly = 186.42
 
   const performanceMetrics = [
     { name: 'Avg Throughput', value: '125 MB/s', icon: Zap, trend: '+12%', color: 'text-blue-600 dark:text-blue-400' },
@@ -142,7 +150,7 @@ export default function MonitoringPage() {
               </div>
               <TrendingUp className="w-5 h-5 text-emerald-500" />
             </div>
-            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{stats.totalBackups.toLocaleString()}</div>
+            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{totalBackups.toLocaleString()}</div>
             <div className="text-sm text-gray-600 dark:text-gray-400">Total Backups</div>
           </div>
 
@@ -155,7 +163,7 @@ export default function MonitoringPage() {
                 Excellent
               </span>
             </div>
-            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{stats.successRate}%</div>
+            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{successRate.toFixed(1)}%</div>
             <div className="text-sm text-gray-600 dark:text-gray-400">Success Rate</div>
           </div>
 
@@ -167,22 +175,22 @@ export default function MonitoringPage() {
               <Gauge className="w-5 h-5 text-purple-500" />
             </div>
             <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
-              {((stats.storageUsed / stats.storageTotal) * 100).toFixed(1)}%
+              {formatBytes(storageUsed)}
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              Storage Used ({formatBytes(stats.storageUsed)})
+              Total Storage Used
             </div>
           </div>
 
           <div className="stats-card bg-white dark:bg-gray-900 dark:border-gray-800">
             <div className="flex items-center justify-between mb-4">
               <div className="p-3 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg">
-                <Clock className="w-6 h-6" />
+                <Database className="w-6 h-6" />
               </div>
               <Target className="w-5 h-5 text-amber-500" />
             </div>
-            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{stats.avgBackupDuration.toFixed(1)}s</div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Avg Duration</div>
+            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{activeDatabases.toLocaleString()}</div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">Active Databases</div>
           </div>
         </div>
 
@@ -199,32 +207,29 @@ export default function MonitoringPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                   <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-                    <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{stats.activeDatabases}</div>
+                    <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{activeDatabases}</div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">Active Databases</div>
                   </div>
                   <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-                    <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{stats.failedBackups}</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Failed Backups (24h)</div>
+                    <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{failedBackups}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Failed Backups</div>
                   </div>
                   <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-                    <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{stats.avgBackupDuration.toFixed(1)}s</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Avg Duration</div>
+                    <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{successfulBackups}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Successful Backups</div>
                   </div>
                 </div>
 
                 <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold text-gray-900 dark:text-white">Storage Utilization</h3>
+                    <h3 className="font-bold text-gray-900 dark:text-white">Total Storage Used</h3>
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      {formatBytes(stats.storageUsed)} / {formatBytes(stats.storageTotal)}
+                      {formatBytes(storageUsed)}
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
-                    <div
-                      className="bg-gradient-to-r from-cyan-500 to-cyan-600 h-4 rounded-full transition-all shadow-lg"
-                      style={{ width: `${(stats.storageUsed / stats.storageTotal) * 100}%` }}
-                    />
-                  </div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Aggregate size of all backups reported by the backend.
+                  </p>
                 </div>
               </div>
             </div>
@@ -237,6 +242,7 @@ export default function MonitoringPage() {
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
                   <Shield className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
                   Security & Compliance
+                  <SampleDataBadge className="ml-2" />
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -297,12 +303,13 @@ export default function MonitoringPage() {
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
                   <DollarSign className="w-6 h-6 text-amber-600 dark:text-amber-400" />
                   Cost Analytics
+                  <SampleDataBadge className="ml-2" />
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                   <div className="bg-amber-50 dark:bg-amber-950 rounded-xl p-6 border border-amber-200 dark:border-amber-800">
                     <div className="text-3xl font-bold text-amber-600 dark:text-amber-400 mb-2">
-                      ${stats.costMonthly.toFixed(2)}
+                      ${sampleCostMonthly.toFixed(2)}
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">Monthly Cost</div>
                   </div>
@@ -312,7 +319,7 @@ export default function MonitoringPage() {
                   </div>
                   <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
                     <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                      ${(stats.costMonthly * 12).toFixed(2)}
+                      ${(sampleCostMonthly * 12).toFixed(2)}
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">Annual Projection</div>
                   </div>
@@ -347,6 +354,7 @@ export default function MonitoringPage() {
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
                   <Zap className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                   Performance Metrics
+                  <SampleDataBadge className="ml-2" />
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

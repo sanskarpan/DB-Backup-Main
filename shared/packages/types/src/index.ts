@@ -89,6 +89,56 @@ export interface Stats {
 }
 
 // ====================================
+// Security Types
+// ====================================
+
+/**
+ * Real security statistics returned by GET /security/stats.
+ *
+ * The backend ransomware detector performs stateless, on-demand scans and does
+ * not persist cumulative scan history, so several counters are honest zeros
+ * rather than fabricated totals.
+ */
+export interface SecurityStats {
+  detector_active: boolean;
+  files_scanned: number;
+  threats_detected: number;
+  threats_blocked: number;
+  last_scan_time: string | null;
+  configured_providers: number;
+}
+
+export type ThreatAlertSeverity = 'low' | 'medium' | 'high' | 'critical';
+export type ThreatAlertStatus = 'active' | 'investigating' | 'resolved' | 'dismissed';
+
+/**
+ * A threat alert as returned by GET /security/alerts. No alert history is
+ * persisted by the backend, so the list is genuinely empty in this deployment.
+ */
+export interface ThreatAlert {
+  id: string;
+  timestamp: string;
+  severity: ThreatAlertSeverity;
+  type: string;
+  title: string;
+  description: string;
+  affected_resources: string[];
+  status: ThreatAlertStatus;
+  detection_method: string;
+  recommended_action: string;
+}
+
+export interface ThreatAlertListResponse {
+  alerts: ThreatAlert[];
+  total: number;
+}
+
+export interface ThreatAlertFilter {
+  severity?: ThreatAlertSeverity;
+  status?: ThreatAlertStatus;
+}
+
+// ====================================
 // Storage Provider Types
 // ====================================
 

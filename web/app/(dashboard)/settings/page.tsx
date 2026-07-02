@@ -16,7 +16,10 @@ import {
 } from 'lucide-react'
 import { PWASettings } from '@/components/pwa/pwa-settings'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1'
+// Settings are stored locally in the browser. The backend does not expose a
+// /settings API in this deployment, so persisting these preferences to
+// localStorage keeps the UI honest (no silent 404s against a missing endpoint).
+const SETTINGS_STORAGE_KEY = 'db_backup_settings'
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('storage')
@@ -43,22 +46,14 @@ export default function SettingsPage() {
     })
 
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
-      const res = await fetch(`${API_BASE_URL}/settings/${activeTab}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(payload),
-      })
-
-      if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({}))
-        throw new Error(errorBody.message || `Request failed with status ${res.status}`)
+      // Persist locally only — there is no backend settings endpoint.
+      if (typeof window !== 'undefined') {
+        const existing = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY) || '{}')
+        existing[activeTab] = payload
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(existing))
       }
 
-      setSaveStatus({ success: true, message: 'Settings saved successfully!' })
+      setSaveStatus({ success: true, message: 'Settings saved locally in this browser.' })
       setTimeout(() => setSaveStatus(null), 3000)
     } catch (error) {
       setSaveStatus({
@@ -75,6 +70,11 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
         <p className="text-gray-500 mt-1">Configure your backup utility preferences</p>
+      </div>
+
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+        These settings are saved locally in your browser only. There is no server-side
+        settings API in this deployment, so preferences are not synced across devices.
       </div>
 
       <div className="flex space-x-6">
