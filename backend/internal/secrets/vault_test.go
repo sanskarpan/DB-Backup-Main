@@ -1,11 +1,48 @@
 package secrets
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"net"
 	"testing"
 	"time"
 )
+
+func TestTransitPlaintextRoundTrip(t *testing.T) {
+	cases := map[string][]byte{
+		"empty":  {},
+		"ascii":  []byte("hello world"),
+		"binary": {0x00, 0x01, 0xfe, 0xff, 0x10, 0x7f, 0x80},
+		"utf8":   []byte("héllo-世界"),
+	}
+
+	for name, plaintext := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Encoding must produce valid base64 (what Vault's transit API expects).
+			encoded := encodeTransitPlaintext(plaintext)
+			if _, err := base64.StdEncoding.DecodeString(encoded); err != nil {
+				t.Fatalf("encodeTransitPlaintext produced invalid base64: %v", err)
+			}
+
+			decoded, err := decodeTransitPlaintext(encoded)
+			if err != nil {
+				t.Fatalf("decodeTransitPlaintext() error = %v", err)
+			}
+
+			if !bytes.Equal(decoded, plaintext) {
+				t.Errorf("round-trip mismatch: got %v, want %v", decoded, plaintext)
+			}
+		})
+	}
+}
+
+func TestDecodeTransitPlaintextInvalid(t *testing.T) {
+	// A value that is not valid base64 must yield an error rather than garbage.
+	if _, err := decodeTransitPlaintext("not!valid!base64!"); err == nil {
+		t.Error("expected error for invalid base64 input, got nil")
+	}
+}
 
 func skipIfVaultUnavailable(t *testing.T) {
 	t.Helper()

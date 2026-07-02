@@ -34,20 +34,21 @@ type KeyRotationManager struct {
 	keys         map[string]*RotatableKey
 	mu           sync.RWMutex
 	stopChan     chan struct{}
+	stopOnce     sync.Once
 	rotationChan chan string
 }
 
 // RotatableKey represents a key that can be rotated
 type RotatableKey struct {
-	ID             string
-	CurrentKey     string
-	CurrentVersion int
-	PreviousKey    string
+	ID              string
+	CurrentKey      string
+	CurrentVersion  int
+	PreviousKey     string
 	PreviousVersion int
-	LastRotation   time.Time
-	NextRotation   time.Time
-	Path           string
-	mu             sync.RWMutex
+	LastRotation    time.Time
+	NextRotation    time.Time
+	Path            string
+	mu              sync.RWMutex
 }
 
 // NewKeyRotationManager creates a new key rotation manager
@@ -96,9 +97,9 @@ func (m *KeyRotationManager) RegisterKey(keyID, path string) error {
 
 		// Store in Vault
 		keyData := map[string]interface{}{
-			"current_key":      currentKey,
-			"current_version":  1,
-			"last_rotation":    time.Now().Unix(),
+			"current_key":     currentKey,
+			"current_version": 1,
+			"last_rotation":   time.Now().Unix(),
 		}
 
 		if err := m.vault.PutSecret(ctx, path, keyData); err != nil {
@@ -106,12 +107,12 @@ func (m *KeyRotationManager) RegisterKey(keyID, path string) error {
 		}
 
 		m.keys[keyID] = &RotatableKey{
-			ID:              keyID,
-			CurrentKey:      currentKey,
-			CurrentVersion:  1,
-			LastRotation:    time.Now(),
-			NextRotation:    time.Now().Add(m.config.RotationInterval),
-			Path:            path,
+			ID:             keyID,
+			CurrentKey:     currentKey,
+			CurrentVersion: 1,
+			LastRotation:   time.Now(),
+			NextRotation:   time.Now().Add(m.config.RotationInterval),
+			Path:           path,
 		}
 	} else {
 		// Load existing key
@@ -254,7 +255,7 @@ func (m *KeyRotationManager) Start(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				close(m.stopChan)
+				m.closeStopChan()
 				return
 
 			case <-ticker.C:
@@ -319,15 +320,15 @@ func (m *KeyRotationManager) GetKeyInfo(keyID string) (*KeyInfo, error) {
 	defer key.mu.RUnlock()
 
 	return &KeyInfo{
-		ID:              key.ID,
-		CurrentVersion:  key.CurrentVersion,
-		PreviousVersion: key.PreviousVersion,
-		LastRotation:    key.LastRotation,
-		NextRotation:    key.NextRotation,
+		ID:                key.ID,
+		CurrentVersion:    key.CurrentVersion,
+		PreviousVersion:   key.PreviousVersion,
+		LastRotation:      key.LastRotation,
+		NextRotation:      key.NextRotation,
 		TimeSinceRotation: time.Since(key.LastRotation),
 		TimeUntilRotation: time.Until(key.NextRotation),
-		HasPreviousKey:   key.PreviousKey != "",
-		InGracePeriod:    time.Since(key.LastRotation) <= m.config.GracePeriod,
+		HasPreviousKey:    key.PreviousKey != "",
+		InGracePeriod:     time.Since(key.LastRotation) <= m.config.GracePeriod,
 	}, nil
 }
 
@@ -371,7 +372,16 @@ func (m *KeyRotationManager) generateKey() (string, error) {
 
 // Stop stops the key rotation manager
 func (m *KeyRotationManager) Stop() {
-	close(m.stopChan)
+	m.closeStopChan()
+}
+
+// closeStopChan closes stopChan exactly once, making it safe to call from both
+// the Start goroutine (on ctx cancellation) and Stop without risking a
+// double-close panic.
+func (m *KeyRotationManager) closeStopChan() {
+	m.stopOnce.Do(func() {
+		close(m.stopChan)
+	})
 }
 
 // KeyInfo contains information about a key
