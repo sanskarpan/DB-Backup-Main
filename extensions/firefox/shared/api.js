@@ -39,6 +39,22 @@ class BackupAPI {
   }
 
   /**
+   * Unwrap the backend response envelope.
+   * Most endpoints return { success, data }, a few return raw payloads.
+   * When `key` is provided, dig one level into the data object for that key.
+   */
+  unwrap(res, key) {
+    let data = res;
+    if (res && typeof res === 'object' && 'data' in res) {
+      data = res.data;
+    }
+    if (key && data && typeof data === 'object' && key in data) {
+      return data[key];
+    }
+    return data;
+  }
+
+  /**
    * Make API request
    */
   async request(endpoint, options = {}) {
@@ -69,40 +85,67 @@ class BackupAPI {
   }
 
   // ============================================================================
+  // Authentication
+  // ============================================================================
+
+  /**
+   * Log in with username/password and obtain a JWT.
+   * Backend: POST /api/v1/auth/login -> { token, user }
+   * On success the returned token is stored as the API key for this client.
+   */
+  async login(username, password) {
+    const data = await this.request('/api/v1/auth/login', {
+      method: 'POST',
+      body: { username, password },
+    });
+
+    if (data && data.token) {
+      this.setApiKey(data.token);
+    }
+
+    return data;
+  }
+
+  // ============================================================================
   // Backup Operations
   // ============================================================================
 
   /**
-   * List all backups
+   * List all backups.
+   * Backend returns { success, data: { backups: [...], total } };
+   * we normalize to a plain array for callers.
    */
   async listBackups(params = {}) {
     const queryString = new URLSearchParams(params).toString();
-    const endpoint = `/api/backups${queryString ? '?' + queryString : ''}`;
-    return this.request(endpoint);
+    const endpoint = `/api/v1/backups${queryString ? '?' + queryString : ''}`;
+    const res = await this.request(endpoint);
+    return this.unwrap(res, 'backups') || [];
   }
 
   /**
    * Get backup details
    */
   async getBackup(id) {
-    return this.request(`/api/backups/${id}`);
+    const res = await this.request(`/api/v1/backups/${id}`);
+    return this.unwrap(res);
   }
 
   /**
    * Create a new backup
    */
   async createBackup(data) {
-    return this.request('/api/backups', {
+    const res = await this.request('/api/v1/backups', {
       method: 'POST',
       body: data,
     });
+    return this.unwrap(res);
   }
 
   /**
    * Delete a backup
    */
   async deleteBackup(id) {
-    return this.request(`/api/backups/${id}`, {
+    return this.request(`/api/v1/backups/${id}`, {
       method: 'DELETE',
     });
   }
@@ -111,7 +154,7 @@ class BackupAPI {
    * Download a backup
    */
   async downloadBackup(id) {
-    const url = `${this.baseURL}/api/backups/${id}/download`;
+    const url = `${this.baseURL}/api/v1/backups/${id}/download`;
     return url; // Return URL for download
   }
 
@@ -120,53 +163,78 @@ class BackupAPI {
   // ============================================================================
 
   /**
-   * List databases
+   * List databases (backend returns a raw array).
    */
   async listDatabases() {
-    return this.request('/api/databases');
+    const res = await this.request('/api/v1/databases');
+    return Array.isArray(res) ? res : this.unwrap(res, 'databases') || [];
   }
 
   /**
    * Get database details
    */
   async getDatabase(id) {
-    return this.request(`/api/databases/${id}`);
+    const res = await this.request(`/api/v1/databases/${id}`);
+    return this.unwrap(res);
   }
 
   /**
    * Test database connection
    */
   async testConnection(id) {
-    return this.request(`/api/databases/${id}/test`, {
+    return this.request(`/api/v1/databases/${id}/test`, {
       method: 'POST',
     });
   }
 
   // ============================================================================
   // Monitoring Operations
+  //
+  // The backend does not expose /monitoring/* routes. Overall health/metrics
+  // are derived from the real /stats endpoint, and alerts come from
+  // /security/alerts. All of these degrade gracefully (never throw) so the
+  // popup and background sync do not perpetually error.
   // ============================================================================
 
   /**
-   * Get monitoring status
+   * Get monitoring status.
+   * No dedicated route exists; we surface aggregate stats from /stats instead.
    */
   async getMonitoringStatus() {
-    return this.request('/api/monitoring/status');
+    try {
+      return await this.request('/api/v1/stats');
+    } catch (error) {
+      console.warn('getMonitoringStatus unavailable:', error.message);
+      return null;
+    }
   }
 
   /**
-   * Get metrics
+   * Get metrics.
+   * No /monitoring/metrics route exists; fall back to storage stats.
    */
-  async getMetrics(params = {}) {
-    const queryString = new URLSearchParams(params).toString();
-    const endpoint = `/api/monitoring/metrics${queryString ? '?' + queryString : ''}`;
-    return this.request(endpoint);
+  async getMetrics() {
+    try {
+      return await this.request('/api/v1/stats/storage');
+    } catch (error) {
+      console.warn('getMetrics unavailable:', error.message);
+      return null;
+    }
   }
 
   /**
-   * Get alerts
+   * Get alerts. Backend exposes security threat alerts at /security/alerts,
+   * shaped as { success, data: { alerts: [...] } }. Returns an array and
+   * never throws so callers can safely .filter() over the result.
    */
   async getAlerts() {
-    return this.request('/api/monitoring/alerts');
+    try {
+      const res = await this.request('/api/v1/security/alerts');
+      return this.unwrap(res, 'alerts') || [];
+    } catch (error) {
+      console.warn('getAlerts unavailable:', error.message);
+      return [];
+    }
   }
 
   // ============================================================================
@@ -177,14 +245,14 @@ class BackupAPI {
    * List schedules
    */
   async listSchedules() {
-    return this.request('/api/schedules');
+    return this.request('/api/v1/schedules');
   }
 
   /**
    * Create schedule
    */
   async createSchedule(data) {
-    return this.request('/api/schedules', {
+    return this.request('/api/v1/schedules', {
       method: 'POST',
       body: data,
     });
@@ -194,7 +262,7 @@ class BackupAPI {
    * Update schedule
    */
   async updateSchedule(id, data) {
-    return this.request(`/api/schedules/${id}`, {
+    return this.request(`/api/v1/schedules/${id}`, {
       method: 'PUT',
       body: data,
     });
@@ -204,27 +272,32 @@ class BackupAPI {
    * Delete schedule
    */
   async deleteSchedule(id) {
-    return this.request(`/api/schedules/${id}`, {
+    return this.request(`/api/v1/schedules/${id}`, {
       method: 'DELETE',
     });
   }
 
   // ============================================================================
   // Compliance Operations
+  //
+  // The backend does not expose /compliance/* routes for the extension.
+  // These return null gracefully rather than throwing on a 404.
   // ============================================================================
 
   /**
-   * Get compliance status
+   * Get compliance status (no backend route; returns null).
    */
   async getComplianceStatus() {
-    return this.request('/api/compliance/status');
+    console.warn('getComplianceStatus: no backend route available');
+    return null;
   }
 
   /**
-   * Get compliance reports
+   * Get compliance reports (no backend route; returns empty list).
    */
   async getComplianceReports() {
-    return this.request('/api/compliance/reports');
+    console.warn('getComplianceReports: no backend route available');
+    return [];
   }
 
   // ============================================================================
@@ -232,19 +305,22 @@ class BackupAPI {
   // ============================================================================
 
   /**
-   * Get dashboard stats
+   * Get dashboard stats.
+   * Backend: GET /api/v1/stats -> { total_backups, successful_backups,
+   * failed_backups, total_size, databases, schedules }
    */
   async getDashboardStats() {
-    return this.request('/api/stats/dashboard');
+    const res = await this.request('/api/v1/stats');
+    return this.unwrap(res);
   }
 
   /**
-   * Get backup statistics
+   * Get backup/storage statistics.
+   * Backend: GET /api/v1/stats/storage
    */
-  async getBackupStats(params = {}) {
-    const queryString = new URLSearchParams(params).toString();
-    const endpoint = `/api/stats/backups${queryString ? '?' + queryString : ''}`;
-    return this.request(endpoint);
+  async getBackupStats() {
+    const res = await this.request('/api/v1/stats/storage');
+    return this.unwrap(res);
   }
 }
 
@@ -252,3 +328,5 @@ class BackupAPI {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = BackupAPI;
 }
+
+export { BackupAPI };

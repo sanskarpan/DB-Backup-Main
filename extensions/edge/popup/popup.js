@@ -2,6 +2,8 @@
  * Popup UI Controller for DB Backup Manager Extension
  */
 
+import { Utils } from '../shared/utils.js';
+
 let settings = null;
 let state = null;
 
@@ -62,6 +64,8 @@ function updateConnectionStatus() {
   const statusDot = document.getElementById('statusDot');
   const statusText = document.getElementById('statusText');
 
+  if (!statusDot || !statusText) return;
+
   if (state && state.isConnected) {
     statusDot.classList.remove('disconnected', 'connecting');
     statusText.textContent = 'Connected';
@@ -73,6 +77,8 @@ function updateConnectionStatus() {
 
 function updateLastSyncTime() {
   const lastSyncText = document.getElementById('lastSyncText');
+
+  if (!lastSyncText) return;
 
   if (state && state.lastSyncTime) {
     lastSyncText.textContent = Utils.formatDate(state.lastSyncTime);
@@ -254,7 +260,7 @@ function setupEventListeners() {
   document.getElementById('syncBtn').addEventListener('click', async () => {
     const btn = document.getElementById('syncBtn');
     const svg = btn.querySelector('svg');
-    svg.classList.add('spinning');
+    if (svg) svg.classList.add('spinning');
 
     try {
       await Utils.sendMessage({ action: 'sync' });
@@ -264,7 +270,7 @@ function setupEventListeners() {
     } catch (error) {
       console.error('Sync failed:', error);
     } finally {
-      svg.classList.remove('spinning');
+      if (svg) svg.classList.remove('spinning');
     }
   });
 
