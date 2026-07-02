@@ -22,12 +22,17 @@ type BackupMetadata struct {
 	Checksum        string                   `json:"checksum"`
 	StartTime       time.Time                `json:"start_time"`
 	EndTime         time.Time                `json:"end_time"`
-	Duration        time.Duration            `json:"duration"`
-	Status          database.BackupStatus    `json:"status"`
-	Tags            map[string]string        `json:"tags,omitempty"`
-	Metadata        map[string]interface{}   `json:"metadata,omitempty"`
-	StorageLocation string                   `json:"storage_location"`
-	BackupPath      string                   `json:"backup_path"`
+	// DeletedAt marks a backup as soft-deleted (in the recycle bin). A nil value
+	// means the backup is live; a non-nil value is the time it was moved to the
+	// recycle bin. It is a pointer so it is omitted from serialized metadata for
+	// live backups.
+	DeletedAt       *time.Time             `json:"deleted_at,omitempty"`
+	Duration        time.Duration          `json:"duration"`
+	Status          database.BackupStatus  `json:"status"`
+	Tags            map[string]string      `json:"tags,omitempty"`
+	Metadata        map[string]interface{} `json:"metadata,omitempty"`
+	StorageLocation string                 `json:"storage_location"`
+	BackupPath      string                 `json:"backup_path"`
 }
 
 // BackupStatus represents the status of a backup operation
