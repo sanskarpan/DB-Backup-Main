@@ -44,11 +44,7 @@ func (s *Server) handleGetDatabase(c *gin.Context) {
 	}
 	db, err := s.dbStore.Get(c.Param("id"))
 	if err != nil {
-		if errors.Is(err, dbregistry.ErrNotFound) {
-			s.respondError(c, http.StatusNotFound, err, "Database not found")
-			return
-		}
-		s.respondError(c, http.StatusInternalServerError, err, "Failed to get database")
+		s.respondLookupError(c, err, dbregistry.ErrNotFound, "Database not found", "Failed to get database")
 		return
 	}
 	c.JSON(http.StatusOK, db)
@@ -56,51 +52,23 @@ func (s *Server) handleGetDatabase(c *gin.Context) {
 
 // handleCreateDatabase handles POST /api/v1/databases.
 func (s *Server) handleCreateDatabase(c *gin.Context) {
-	if !s.databaseStoreReady(c) {
-		return
-	}
-	var req dbregistry.CreateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		s.respondError(c, http.StatusBadRequest, err, "Invalid request body")
-		return
-	}
-	db, err := s.dbStore.Create(&req)
-	if err != nil {
-		var verr *dbregistry.ValidationError
-		if errors.As(err, &verr) {
-			s.respondError(c, http.StatusBadRequest, err, "Validation failed")
-			return
-		}
-		s.respondError(c, http.StatusInternalServerError, err, "Failed to create database")
-		return
-	}
-	c.JSON(http.StatusCreated, db)
+	handleMutation(s, c, s.databaseStoreReady, s.dbStore.Create,
+		nil, isDBValidationError, "", "Failed to create database", http.StatusCreated)
+}
+
+// isDBValidationError reports whether err is a dbregistry validation error.
+func isDBValidationError(err error) bool {
+	var verr *dbregistry.ValidationError
+	return errors.As(err, &verr)
 }
 
 // handleUpdateDatabase handles PUT /api/v1/databases/:id.
 func (s *Server) handleUpdateDatabase(c *gin.Context) {
-	if !s.databaseStoreReady(c) {
-		return
-	}
-	var req dbregistry.UpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		s.respondError(c, http.StatusBadRequest, err, "Invalid request body")
-		return
-	}
-	db, err := s.dbStore.Update(c.Param("id"), &req)
-	if err != nil {
-		var verr *dbregistry.ValidationError
-		switch {
-		case errors.Is(err, dbregistry.ErrNotFound):
-			s.respondError(c, http.StatusNotFound, err, "Database not found")
-		case errors.As(err, &verr):
-			s.respondError(c, http.StatusBadRequest, err, "Validation failed")
-		default:
-			s.respondError(c, http.StatusInternalServerError, err, "Failed to update database")
-		}
-		return
-	}
-	c.JSON(http.StatusOK, db)
+	handleMutation(s, c, s.databaseStoreReady,
+		func(r *dbregistry.UpdateRequest) (*dbregistry.Database, error) {
+			return s.dbStore.Update(c.Param("id"), r)
+		},
+		dbregistry.ErrNotFound, isDBValidationError, "Database not found", "Failed to update database", http.StatusOK)
 }
 
 // handleDeleteDatabase handles DELETE /api/v1/databases/:id.
@@ -129,11 +97,7 @@ func (s *Server) handleTestDatabase(c *gin.Context) {
 	}
 	db, err := s.dbStore.Get(c.Param("id"))
 	if err != nil {
-		if errors.Is(err, dbregistry.ErrNotFound) {
-			s.respondError(c, http.StatusNotFound, err, "Database not found")
-			return
-		}
-		s.respondError(c, http.StatusInternalServerError, err, "Failed to get database")
+		s.respondLookupError(c, err, dbregistry.ErrNotFound, "Database not found", "Failed to get database")
 		return
 	}
 

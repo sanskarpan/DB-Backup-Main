@@ -21,6 +21,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/dbregistry"
 	"github.com/sanskarpan/db-backup/internal/health"
 	"github.com/sanskarpan/db-backup/internal/logger"
+	notifyFactory "github.com/sanskarpan/db-backup/internal/notification/factory"
 	"github.com/sanskarpan/db-backup/internal/restore"
 	"github.com/sanskarpan/db-backup/internal/security/ransomware"
 	"github.com/sanskarpan/db-backup/internal/storage"
@@ -28,6 +29,8 @@ import (
 	storageGCS "github.com/sanskarpan/db-backup/internal/storage/gcs"
 	storageLocal "github.com/sanskarpan/db-backup/internal/storage/local"
 	storageS3 "github.com/sanskarpan/db-backup/internal/storage/s3"
+	"github.com/sanskarpan/db-backup/internal/storageregistry"
+	"github.com/sanskarpan/db-backup/internal/websocket"
 
 	// Register database drivers
 	_ "github.com/sanskarpan/db-backup/internal/database/mongodb"
@@ -72,6 +75,21 @@ func main() {
 		"type": string(storageProvider.GetType()),
 	})
 
+	// Build the notification router from the configured channels. The router is
+	// always non-nil (a no-op when nothing is enabled) so behavior is unchanged
+	// when notifications are disabled. A partial-init error is logged, not fatal.
+	notificationRouter, err := notifyFactory.NewRouterFromConfig(&cfg.Notifications)
+	if err != nil {
+		log.Warn("Some notification channels failed to initialize: " + err.Error())
+	}
+
+	// Start the WebSocket hub and wire it into the notification router so that
+	// backup/restore notifications are broadcast to connected WebSocket clients
+	// in real time, alongside the config-driven channels (slack/email/webhook).
+	wsHub := websocket.NewHub()
+	go wsHub.Run()
+	notificationRouter.AddNotifier(websocket.NewNotifierAdapter(wsHub))
+
 	// Initialize components
 	backupEngine := backup.NewEngine(&backup.Config{
 		TempDirectory:      cfg.Backup.TempDirectory,
@@ -80,6 +98,7 @@ func main() {
 		EnableEncryption:   cfg.Backup.Encryption.Enabled,
 		EncryptionKey:      "",
 		StorageProvider:    storageProvider,
+		Notifier:           notificationRouter,
 	})
 
 	restoreEngine := restore.NewEngine(&restore.Config{
@@ -159,6 +178,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize the storage provider registry store. Secret config values
+	// (access/secret/account/application keys) are encrypted at rest using the
+	// JWT secret and are never returned in API responses.
+	storageStore, err := storageregistry.NewStore(filepath.Join(dbStoreDir, "storage"), jwtSecret)
+	if err != nil {
+		log.Error("Failed to initialize storage provider registry store", err)
+		os.Exit(1)
+	}
+
 	// Create API server
 	apiServer := api.NewServer(&api.Config{
 		Host:          cfg.Server.Host,
@@ -168,7 +196,7 @@ func main() {
 		EnableSwagger: true,
 		JWTSecret:     jwtSecret,
 		ScanBaseDir:   os.Getenv("SCAN_BASE_DIR"),
-	}, backupEngine, restoreEngine, sched, healthChecker, detector, searchEngine, jwtService, oauth2Service, oauth2Handler, dbStore, log)
+	}, backupEngine, restoreEngine, sched, healthChecker, detector, searchEngine, jwtService, oauth2Service, oauth2Handler, dbStore, storageStore, wsHub, log)
 
 	// Setup Gin router
 	if cfg.Logging.Level != "debug" {

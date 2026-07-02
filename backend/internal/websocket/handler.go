@@ -75,6 +75,26 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	go client.ReadPump()
 }
 
+// ServeWithUserID upgrades the HTTP connection to a WebSocket and registers the
+// resulting client with the hub using an already-authenticated user ID. Callers
+// that authenticate out-of-band (for example, validating a JWT passed as a query
+// parameter before the handshake) should use this instead of ServeHTTP.
+func (h *Handler) ServeWithUserID(w http.ResponseWriter, r *http.Request, userID string) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("WebSocket upgrade failed: %v", err)
+		return
+	}
+
+	client := NewClient(h.hub, conn, userID)
+	client.ID = generateClientID()
+
+	h.hub.register <- client
+
+	go client.WritePump()
+	go client.ReadPump()
+}
+
 // getUserIDFromRequest extracts user ID from the request context
 func getUserIDFromRequest(r *http.Request) string {
 	// Try to get user ID from context (set by auth middleware)

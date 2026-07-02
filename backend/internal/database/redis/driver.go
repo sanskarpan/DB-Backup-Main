@@ -460,9 +460,16 @@ func (d *RedisDriver) SupportsIncremental() bool {
 	return true // Redis supports incremental via AOF
 }
 
-// SupportsPITR returns whether point-in-time recovery is supported
+// SupportsPITR returns whether true, time-based point-in-time recovery is
+// supported. It is not for Redis: there is no continuous, timestamped write log
+// that can be replayed to an arbitrary instant. RDB captures discrete snapshots
+// and standard AOF files carry no per-command timestamps usable for
+// second-granularity replay. Advertising PITR here would be dishonest, so we
+// return false and let the restore engine reject time-based recovery requests
+// with a clear error. Best-effort, snapshot-based recovery is still available
+// via the PITRManager (see pitr.go).
 func (d *RedisDriver) SupportsPITR() bool {
-	return true // Redis supports PITR via AOF
+	return false
 }
 
 // ValidateRestore validates that a restore can be performed

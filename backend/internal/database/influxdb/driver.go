@@ -7,14 +7,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"
+	"github.com/influxdata/influxdb-client-go/v2/api/write"
 	"github.com/sanskarpan/db-backup/internal/database"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 	"github.com/sanskarpan/db-backup/pkg/utils"
@@ -137,7 +140,7 @@ func (d *InfluxDBDriver) Backup(ctx context.Context, opts *database.BackupOption
 // backupV1 performs backup for InfluxDB v1.x using influxd backup command
 func (d *InfluxDBDriver) backupV1(ctx context.Context, opts *database.BackupOptions, result *database.BackupResult) (*database.BackupResult, error) {
 	backupDir := filepath.Join(opts.OutputDir, result.ID)
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(backupDir, 0o755); err != nil {
 		result.Status = database.BackupStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseBackup(err)
@@ -204,7 +207,7 @@ func (d *InfluxDBDriver) backupV1(ctx context.Context, opts *database.BackupOpti
 // backupV2 performs backup for InfluxDB v2.x using API
 func (d *InfluxDBDriver) backupV2(ctx context.Context, opts *database.BackupOptions, result *database.BackupResult) (*database.BackupResult, error) {
 	backupDir := filepath.Join(opts.OutputDir, result.ID)
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(backupDir, 0o755); err != nil {
 		result.Status = database.BackupStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseBackup(err)
@@ -249,6 +252,71 @@ func (d *InfluxDBDriver) backupV2(ctx context.Context, opts *database.BackupOpti
 	return result, nil
 }
 
+// backupRecord is the on-disk serialization format for a single InfluxDB v2
+// data point (one field value). It is written as one JSON object per line
+// (NDJSON) so that a backup can be read back losslessly by restoreBucket.
+// Measurement, timestamp, the field name/value and all tags are preserved.
+type backupRecord struct {
+	Time        time.Time         `json:"time"`
+	Value       interface{}       `json:"value"`
+	Tags        map[string]string `json:"tags,omitempty"`
+	Measurement string            `json:"measurement"`
+	Field       string            `json:"field"`
+}
+
+// reservedFluxColumns are the columns present in a (non-pivoted) Flux result
+// that are not user-defined tags. Everything else in a record's Values() map
+// is treated as a tag.
+var reservedFluxColumns = map[string]struct{}{
+	"result":       {},
+	"table":        {},
+	"_start":       {},
+	"_stop":        {},
+	"_time":        {},
+	"_value":       {},
+	"_field":       {},
+	"_measurement": {},
+}
+
+// newBackupRecord builds a backupRecord from the components of a Flux record.
+// The values map is the full record.Values(); any key that is not a reserved
+// Flux column is stored as a tag (stringified to match line-protocol semantics).
+func newBackupRecord(measurement, field string, value interface{}, ts time.Time, values map[string]interface{}) *backupRecord {
+	rec := &backupRecord{
+		Measurement: measurement,
+		Time:        ts,
+		Field:       field,
+		Value:       value,
+	}
+
+	for key, v := range values {
+		if _, reserved := reservedFluxColumns[key]; reserved {
+			continue
+		}
+		if v == nil {
+			continue
+		}
+		if rec.Tags == nil {
+			rec.Tags = make(map[string]string)
+		}
+		if s, ok := v.(string); ok {
+			rec.Tags[key] = s
+		} else {
+			rec.Tags[key] = fmt.Sprintf("%v", v)
+		}
+	}
+
+	return rec
+}
+
+// toPoint converts a decoded backupRecord back into an InfluxDB write point.
+func (r *backupRecord) toPoint() *write.Point {
+	fields := map[string]interface{}{
+		r.Field: r.Value,
+	}
+	return influxdb2.NewPoint(r.Measurement, r.Tags, fields, r.Time)
+}
+
 // backupBucket backs up a single bucket to a file
 func (d *InfluxDBDriver) backupBucket(ctx context.Context, bucket, outputFile string, opts *database.BackupOptions) (int64, error) {
 	// Create output file
@@ -256,7 +324,11 @@ func (d *InfluxDBDriver) backupBucket(ctx context.Context, bucket, outputFile st
 	if err != nil {
 		return 0, err
 	}
-	defer file.Close()
+	defer func() {
+		if cerr := file.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	// Build Flux query to export all data from bucket
 	var startTime string
@@ -270,10 +342,12 @@ func (d *InfluxDBDriver) backupBucket(ctx context.Context, bucket, outputFile st
 		startTime = "1970-01-01T00:00:00Z" // Export all data
 	}
 
+	// Note: the query is intentionally NOT pivoted. Keeping one row per field
+	// value means _field/_value/_measurement are explicit and every remaining
+	// column is unambiguously a tag, which lets the backup round-trip cleanly.
 	query := fmt.Sprintf(`
 		from(bucket: "%s")
 		  |> range(start: %s)
-		  |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
 	`, bucket, startTime)
 
 	// Execute query and write to file
@@ -285,9 +359,22 @@ func (d *InfluxDBDriver) backupBucket(ctx context.Context, bucket, outputFile st
 	written := int64(0)
 	for queryResult.Next() {
 		record := queryResult.Record()
-		// Write record as JSON to file
-		data := fmt.Sprintf("%v\n", record.Values())
-		n, err := file.WriteString(data)
+
+		rec := newBackupRecord(
+			record.Measurement(),
+			record.Field(),
+			record.Value(),
+			record.Time(),
+			record.Values(),
+		)
+
+		encoded, err := json.Marshal(rec)
+		if err != nil {
+			return written, err
+		}
+		encoded = append(encoded, '\n')
+
+		n, err := file.Write(encoded)
 		if err != nil {
 			return written, err
 		}
@@ -503,7 +590,11 @@ func (d *InfluxDBDriver) restoreBucket(ctx context.Context, bucket, inputFile st
 	if err != nil {
 		return fmt.Errorf("failed to open backup file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if cerr := file.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	// Get the write API for this bucket
 	writeAPI := d.client.WriteAPIBlocking(d.organization, bucket)
@@ -521,81 +612,29 @@ func (d *InfluxDBDriver) restoreBucket(ctx context.Context, bucket, inputFile st
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
-		lineCount++
 
 		// Skip empty lines
 		if len(line) == 0 {
 			continue
 		}
+		lineCount++
 
-		// Parse the JSON line into a point structure
-		var pointData map[string]interface{}
-		if err := json.Unmarshal(line, &pointData); err != nil {
+		// Decode the line using the same structured format written by
+		// backupBucket, preserving measurement, tags, field and timestamp.
+		var rec backupRecord
+		if err := json.Unmarshal(line, &rec); err != nil {
 			errorCount++
 			// Log error but continue processing
 			continue
 		}
 
-		// Extract point components
-		measurement, ok := pointData["_measurement"].(string)
-		if !ok {
+		if rec.Measurement == "" || rec.Field == "" {
 			errorCount++
 			continue
 		}
 
-		// Extract timestamp
-		var timestamp time.Time
-		if timeStr, ok := pointData["_time"].(string); ok {
-			timestamp, err = time.Parse(time.RFC3339Nano, timeStr)
-			if err != nil {
-				errorCount++
-				continue
-			}
-		} else {
-			timestamp = time.Now()
-		}
-
-		// Build tags and fields
-		tags := make(map[string]string)
-		fields := make(map[string]interface{})
-
-		for key, value := range pointData {
-			// Skip internal InfluxDB fields
-			if strings.HasPrefix(key, "_") {
-				continue
-			}
-
-			// Determine if this is a tag or field
-			// In InfluxDB line protocol, tags are typically strings
-			// and fields can be any type
-			switch v := value.(type) {
-			case string:
-				// Could be a tag or a string field
-				// By convention, use lowercase for tags
-				if strings.ToLower(key) == key {
-					tags[key] = v
-				} else {
-					fields[key] = v
-				}
-			case float64, int, int64, bool:
-				// These are fields
-				fields[key] = v
-			default:
-				// Default to field
-				fields[key] = v
-			}
-		}
-
-		// Create a point
-		point := influxdb2.NewPoint(
-			measurement,
-			tags,
-			fields,
-			timestamp,
-		)
-
 		// Write the point
-		if err := writeAPI.WritePoint(ctx, point); err != nil {
+		if err := writeAPI.WritePoint(ctx, rec.toPoint()); err != nil {
 			errorCount++
 			// Continue processing even if individual point fails
 		}
@@ -683,12 +722,108 @@ func (d *InfluxDBDriver) GetTableSize(ctx context.Context, database, table strin
 	return count, queryResult.Err()
 }
 
-// GetDatabaseSize returns the total size of all buckets
-func (d *InfluxDBDriver) GetDatabaseSize(ctx context.Context) (int64, error) {
-	// InfluxDB doesn't expose direct size metrics easily
-	// We would need to query storage usage metrics or use the management API
-	// For now, return 0 as placeholder
-	return 0, nil
+// GetDatabaseSize returns the total on-disk size (in bytes) of the InfluxDB
+// storage engine.
+//
+// InfluxDB v2 does not expose per-bucket byte size through its client API, but
+// it publishes the on-disk shard size on the Prometheus /metrics endpoint via
+// the storage_shard_disk_size gauge. We fetch and sum those gauges to obtain a
+// real value. If the metric is not exposed (or metrics are unreachable) we
+// return an honest error rather than a fabricated size.
+func (d *InfluxDBDriver) GetDatabaseSize(ctx context.Context) (size int64, err error) {
+	if d.client == nil {
+		return 0, pkgErrors.New(pkgErrors.ErrorTypeDatabase, "not connected to database")
+	}
+
+	metricsURL := strings.TrimSuffix(d.client.ServerURL(), "/") + "/metrics"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, metricsURL, http.NoBody)
+	if err != nil {
+		return 0, pkgErrors.Wrap(err, pkgErrors.ErrorTypeDatabase, "failed to build metrics request")
+	}
+
+	token := d.config.Password
+	if token == "" {
+		token = d.config.Options["token"]
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Token "+token)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, pkgErrors.Wrap(err, pkgErrors.ErrorTypeDatabase, "failed to fetch InfluxDB metrics")
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, pkgErrors.New(pkgErrors.ErrorTypeDatabase,
+			fmt.Sprintf("failed to fetch InfluxDB metrics: status %d", resp.StatusCode))
+	}
+
+	total, found, perr := sumShardDiskSize(resp.Body)
+	if perr != nil {
+		return 0, pkgErrors.Wrap(perr, pkgErrors.ErrorTypeDatabase, "failed to parse InfluxDB metrics")
+	}
+	if !found {
+		return 0, pkgErrors.New(pkgErrors.ErrorTypeDatabase,
+			"database size unavailable: InfluxDB did not expose the storage_shard_disk_size metric")
+	}
+
+	return total, nil
+}
+
+// sumShardDiskSize parses a Prometheus text-format metrics stream and sums the
+// values of the storage_shard_disk_size gauge (bytes on disk). It reports
+// whether any such metric line was found so callers can distinguish "size is
+// zero" from "metric not exposed".
+func sumShardDiskSize(r io.Reader) (total int64, found bool, err error) {
+	const metricName = "storage_shard_disk_size"
+
+	scanner := bufio.NewScanner(r)
+	const maxCapacity = 1024 * 1024 // 1MB
+	scanner.Buffer(make([]byte, maxCapacity), maxCapacity)
+
+	var sum float64
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if !strings.HasPrefix(line, metricName) {
+			continue
+		}
+
+		// Guard against metrics that merely share the same prefix
+		// (e.g. storage_shard_disk_size_something). The character after the
+		// metric name must start a label set or the value separator.
+		rest := line[len(metricName):]
+		if rest != "" && rest[0] != '{' && rest[0] != ' ' {
+			continue
+		}
+
+		// Prometheus line: <name>[{labels}] <value> [timestamp]
+		idx := strings.LastIndexByte(line, ' ')
+		if idx < 0 {
+			continue
+		}
+		v, perr := strconv.ParseFloat(line[idx+1:], 64)
+		if perr != nil {
+			continue
+		}
+		sum += v
+		found = true
+	}
+
+	if serr := scanner.Err(); serr != nil {
+		return 0, false, serr
+	}
+
+	return int64(sum), found, nil
 }
 
 // GetVersion returns the InfluxDB version

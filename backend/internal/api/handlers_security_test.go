@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sanskarpan/db-backup/internal/logger"
 	"github.com/sanskarpan/db-backup/internal/security/ransomware"
+	"github.com/sanskarpan/db-backup/internal/storageregistry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,10 +27,14 @@ func setupSecurityTestServer(t *testing.T) (*Server, *gin.Engine) {
 
 	detector := ransomware.NewDetector(ransomware.DefaultDetectorConfig())
 
+	storageStore, err := storageregistry.NewStore(t.TempDir(), "")
+	require.NoError(t, err)
+
 	server := &Server{
-		config:   &Config{ScanBaseDir: os.TempDir()},
-		detector: detector,
-		logger:   log,
+		config:       &Config{ScanBaseDir: os.TempDir()},
+		detector:     detector,
+		storageStore: storageStore,
+		logger:       log,
 	}
 
 	router := gin.New()
@@ -58,11 +63,16 @@ func TestHandleGetSecurityStats(t *testing.T) {
 	data, ok := response.Data.(map[string]interface{})
 	require.True(t, ok)
 
-	assert.Contains(t, data, "protected_backups")
-	assert.Contains(t, data, "active_scans")
+	// Honest, real values: the detector does not persist cumulative history,
+	// so counts are real zeros rather than fabricated totals.
+	assert.Contains(t, data, "detector_active")
 	assert.Contains(t, data, "threats_blocked")
-	assert.Contains(t, data, "security_score")
 	assert.Contains(t, data, "files_scanned")
+	assert.Contains(t, data, "threats_detected")
+	assert.Contains(t, data, "configured_providers")
+	assert.Equal(t, true, data["detector_active"])
+	assert.Equal(t, float64(0), data["files_scanned"])
+	assert.Equal(t, float64(0), data["threats_detected"])
 }
 
 func TestHandleScanFile_Success(t *testing.T) {
@@ -253,24 +263,20 @@ func TestHandleGetThreatAlert(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	var response SuccessResponse
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	require.NoError(t, err)
-
-	assert.True(t, response.Success)
-	assert.NotNil(t, response.Data)
+	// No alert history is persisted, so a lookup honestly returns 404 rather
+	// than a fabricated record.
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
-func TestHandleUpdateThreatAlert_Success(t *testing.T) {
+func TestHandleUpdateThreatAlert_NotFound(t *testing.T) {
 	server, router := setupSecurityTestServer(t)
 	router.PUT("/security/alerts/:id", server.handleUpdateThreatAlert)
 
 	requestBody := UpdateThreatAlertRequest{
 		Status: "resolved",
 	}
-	bodyBytes, _ := json.Marshal(requestBody)
+	bodyBytes, err := json.Marshal(requestBody)
+	require.NoError(t, err)
 
 	req := httptest.NewRequest("PUT", "/security/alerts/123", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
@@ -278,14 +284,8 @@ func TestHandleUpdateThreatAlert_Success(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	var response SuccessResponse
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	require.NoError(t, err)
-
-	assert.True(t, response.Success)
-	assert.NotEmpty(t, response.Message)
+	// No alert store exists, so an update targets a non-existent record.
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
 func TestHandleUpdateThreatAlert_InvalidStatus(t *testing.T) {
@@ -306,117 +306,5 @@ func TestHandleUpdateThreatAlert_InvalidStatus(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
-func TestHandleListStorageProviders(t *testing.T) {
-	server, router := setupSecurityTestServer(t)
-	router.GET("/security/storage/providers", server.handleListStorageProviders)
-
-	req := httptest.NewRequest("GET", "/security/storage/providers", nil)
-	w := httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	var response SuccessResponse
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	require.NoError(t, err)
-
-	assert.True(t, response.Success)
-
-	data, ok := response.Data.(map[string]interface{})
-	require.True(t, ok)
-	assert.Contains(t, data, "providers")
-	assert.Contains(t, data, "total")
-
-	// Verify we have 3 providers (S3, Azure, GCS)
-	assert.Equal(t, float64(3), data["total"])
-}
-
-func TestHandleGetStorageProvider(t *testing.T) {
-	server, router := setupSecurityTestServer(t)
-	router.GET("/security/storage/providers/:id", server.handleGetStorageProvider)
-
-	req := httptest.NewRequest("GET", "/security/storage/providers/1", nil)
-	w := httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	var response SuccessResponse
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	require.NoError(t, err)
-
-	assert.True(t, response.Success)
-	assert.NotNil(t, response.Data)
-}
-
-func TestHandleUpdateStorageProvider_Success(t *testing.T) {
-	server, router := setupSecurityTestServer(t)
-	router.PUT("/security/storage/providers/:id", server.handleUpdateStorageProvider)
-
-	requestBody := UpdateStorageProviderRequest{
-		ImmutabilityEnabled: true,
-		RetentionDays:       60,
-		Mode:                "GOVERNANCE",
-		LegalHold:           false,
-	}
-	bodyBytes, _ := json.Marshal(requestBody)
-
-	req := httptest.NewRequest("PUT", "/security/storage/providers/1", bytes.NewReader(bodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	var response SuccessResponse
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	require.NoError(t, err)
-
-	assert.True(t, response.Success)
-	assert.NotEmpty(t, response.Message)
-}
-
-func TestHandleUpdateStorageProvider_InvalidRetention(t *testing.T) {
-	server, router := setupSecurityTestServer(t)
-	router.PUT("/security/storage/providers/:id", server.handleUpdateStorageProvider)
-
-	requestBody := UpdateStorageProviderRequest{
-		ImmutabilityEnabled: true,
-		RetentionDays:       5000, // Exceeds max of 3650
-		Mode:                "GOVERNANCE",
-		LegalHold:           false,
-	}
-	bodyBytes, _ := json.Marshal(requestBody)
-
-	req := httptest.NewRequest("PUT", "/security/storage/providers/1", bytes.NewReader(bodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-}
-
-func TestHandleUpdateStorageProvider_MissingMode(t *testing.T) {
-	server, router := setupSecurityTestServer(t)
-	router.PUT("/security/storage/providers/:id", server.handleUpdateStorageProvider)
-
-	requestBody := UpdateStorageProviderRequest{
-		ImmutabilityEnabled: true,
-		RetentionDays:       60,
-		// Mode is missing (required field)
-		LegalHold: false,
-	}
-	bodyBytes, _ := json.Marshal(requestBody)
-
-	req := httptest.NewRequest("PUT", "/security/storage/providers/1", bytes.NewReader(bodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-}
+// Storage provider handler tests live in handlers_storage_test.go, backed by a
+// real storageregistry.Store.

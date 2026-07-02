@@ -2,6 +2,9 @@
 package api
 
 import (
+	"errors"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sanskarpan/db-backup/internal/api/middleware"
 	"github.com/sanskarpan/db-backup/internal/auth"
@@ -13,6 +16,8 @@ import (
 	"github.com/sanskarpan/db-backup/internal/restore"
 	"github.com/sanskarpan/db-backup/internal/scheduler"
 	"github.com/sanskarpan/db-backup/internal/security/ransomware"
+	"github.com/sanskarpan/db-backup/internal/storageregistry"
+	"github.com/sanskarpan/db-backup/internal/websocket"
 )
 
 // Server represents the API server
@@ -28,6 +33,8 @@ type Server struct {
 	oauth2Service *auth.OAuth2Service
 	oauth2Handler *auth.OAuth2Handler
 	dbStore       *dbregistry.Store
+	storageStore  *storageregistry.Store
+	wsHub         *websocket.Hub
 	logger        *logger.Logger
 }
 
@@ -58,6 +65,8 @@ func NewServer(
 	oauth2Service *auth.OAuth2Service,
 	oauth2Handler *auth.OAuth2Handler,
 	dbStore *dbregistry.Store,
+	storageStore *storageregistry.Store,
+	wsHub *websocket.Hub,
 	log *logger.Logger,
 ) *Server {
 	return &Server{
@@ -72,6 +81,8 @@ func NewServer(
 		oauth2Service: oauth2Service,
 		oauth2Handler: oauth2Handler,
 		dbStore:       dbStore,
+		storageStore:  storageStore,
+		wsHub:         wsHub,
 		logger:        log,
 	}
 }
@@ -138,6 +149,15 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 			}
 		}
 
+		// Real-time notifications over WebSocket. Browsers cannot set the
+		// Authorization header on a WebSocket handshake, so the JWT is passed as
+		// a `token` query parameter and validated by the handler itself before
+		// upgrading. It is therefore registered outside the header-based auth
+		// middleware group.
+		if s.wsHub != nil && s.jwtService != nil {
+			v1.GET("/notifications/ws", s.handleNotificationsWS)
+		}
+
 		// All routes below require authentication
 		var authMiddleware gin.HandlerFunc
 		if s.jwtService != nil {
@@ -198,10 +218,13 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 			security.GET("/alerts/:id", s.handleGetThreatAlert)
 			security.PUT("/alerts/:id", s.handleUpdateThreatAlert)
 
-			// Immutable storage configuration
+			// Storage provider configuration (backed by storageregistry.Store)
 			security.GET("/storage/providers", s.handleListStorageProviders)
 			security.GET("/storage/providers/:id", s.handleGetStorageProvider)
+			security.POST("/storage/providers", s.handleCreateStorageProvider)
 			security.PUT("/storage/providers/:id", s.handleUpdateStorageProvider)
+			security.DELETE("/storage/providers/:id", s.handleDeleteStorageProvider)
+			security.POST("/storage/providers/:id/test", s.handleTestStorageProvider)
 		}
 
 		// Catalog and search endpoints
@@ -275,6 +298,58 @@ func (s *Server) respondError(c *gin.Context, code int, err error, message strin
 		Error:   errMsg,
 		Message: message,
 	})
+}
+
+// respondLookupError maps a store lookup/mutation error to an HTTP response:
+// the given not-found sentinel becomes 404 with notFoundMsg, anything else
+// becomes 500 with failMsg.
+func (s *Server) respondLookupError(c *gin.Context, err, notFound error, notFoundMsg, failMsg string) {
+	if errors.Is(err, notFound) {
+		s.respondError(c, http.StatusNotFound, err, notFoundMsg)
+		return
+	}
+	s.respondError(c, http.StatusInternalServerError, err, failMsg)
+}
+
+// respondMutationError maps a create/update store error to an HTTP response.
+// A not-found sentinel (when non-nil) becomes 404, a value the isValidation
+// predicate matches becomes 400, and anything else becomes 500 with failMsg.
+func (s *Server) respondMutationError(c *gin.Context, err, notFound error, isValidation func(error) bool, notFoundMsg, failMsg string) {
+	switch {
+	case notFound != nil && errors.Is(err, notFound):
+		s.respondError(c, http.StatusNotFound, err, notFoundMsg)
+	case isValidation != nil && isValidation(err):
+		s.respondError(c, http.StatusBadRequest, err, "Validation failed")
+	default:
+		s.respondError(c, http.StatusInternalServerError, err, failMsg)
+	}
+}
+
+// handleMutation is the shared shape of a create/update handler: it checks the
+// store is ready, binds the JSON request into Req, runs the store op, maps any
+// error, and writes the result with successCode. It removes the boilerplate
+// duplicated across parallel resource handlers (databases, storage providers).
+func handleMutation[Req, Res any](
+	s *Server, c *gin.Context,
+	ready func(*gin.Context) bool,
+	op func(*Req) (Res, error),
+	notFound error, isValidation func(error) bool,
+	notFoundMsg, failMsg string, successCode int,
+) {
+	if !ready(c) {
+		return
+	}
+	var req Req
+	if err := c.ShouldBindJSON(&req); err != nil {
+		s.respondError(c, http.StatusBadRequest, err, "Invalid request body")
+		return
+	}
+	res, err := op(&req)
+	if err != nil {
+		s.respondMutationError(c, err, notFound, isValidation, notFoundMsg, failMsg)
+		return
+	}
+	c.JSON(successCode, res)
 }
 
 func (s *Server) respondSuccess(c *gin.Context, data interface{}) {

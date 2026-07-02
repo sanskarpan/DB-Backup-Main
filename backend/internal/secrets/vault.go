@@ -2,6 +2,7 @@ package secrets
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -25,9 +26,9 @@ type VaultConfig struct {
 	SecretID string `mapstructure:"secret_id"`
 
 	// Kubernetes auth
-	K8sRole            string `mapstructure:"k8s_role"`
-	K8sServiceAccount  string `mapstructure:"k8s_service_account"`
-	K8sTokenPath       string `mapstructure:"k8s_token_path"`
+	K8sRole           string `mapstructure:"k8s_role"`
+	K8sServiceAccount string `mapstructure:"k8s_service_account"`
+	K8sTokenPath      string `mapstructure:"k8s_token_path"`
 
 	// TLS configuration
 	TLSSkipVerify bool   `mapstructure:"tls_skip_verify"`
@@ -410,15 +411,34 @@ type DatabaseCredentials struct {
 	Renewable     bool
 }
 
-// EncryptData encrypts data using Vault's transit engine
+// encodeTransitPlaintext base64-encodes plaintext for Vault's transit API,
+// which requires the plaintext parameter to be a base64-encoded string.
+func encodeTransitPlaintext(plaintext []byte) string {
+	return base64.StdEncoding.EncodeToString(plaintext)
+}
+
+// decodeTransitPlaintext base64-decodes the plaintext returned by Vault's
+// transit decrypt endpoint back into the original raw bytes.
+func decodeTransitPlaintext(encoded string) ([]byte, error) {
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil, fmt.Errorf("failed to base64-decode transit plaintext: %w", err)
+	}
+	return decoded, nil
+}
+
+// EncryptData encrypts data using Vault's transit engine.
+//
+// Vault's transit encrypt endpoint requires the plaintext to be
+// base64-encoded before it is sent, and returns the ciphertext as a string.
 func (v *VaultClient) EncryptData(ctx context.Context, key string, plaintext []byte) (string, error) {
 	path := fmt.Sprintf("transit/encrypt/%s", key)
 
 	data := map[string]interface{}{
-		"plaintext": plaintext,
+		"plaintext": encodeTransitPlaintext(plaintext),
 	}
 
-	secret, err := v.client.Logical().Write(path, data)
+	secret, err := v.client.Logical().WriteWithContext(ctx, path, data)
 	if err != nil {
 		return "", fmt.Errorf("failed to encrypt data: %w", err)
 	}
@@ -429,13 +449,16 @@ func (v *VaultClient) EncryptData(ctx context.Context, key string, plaintext []b
 
 	ciphertext, ok := secret.Data["ciphertext"].(string)
 	if !ok {
-		return "", fmt.Errorf("ciphertext not found in response")
+		return "", fmt.Errorf("ciphertext not found or not a string in vault response")
 	}
 
 	return ciphertext, nil
 }
 
-// DecryptData decrypts data using Vault's transit engine
+// DecryptData decrypts data using Vault's transit engine.
+//
+// Vault's transit decrypt endpoint returns the plaintext as a base64-encoded
+// string, which is decoded back into the original raw bytes.
 func (v *VaultClient) DecryptData(ctx context.Context, key string, ciphertext string) ([]byte, error) {
 	path := fmt.Sprintf("transit/decrypt/%s", key)
 
@@ -443,7 +466,7 @@ func (v *VaultClient) DecryptData(ctx context.Context, key string, ciphertext st
 		"ciphertext": ciphertext,
 	}
 
-	secret, err := v.client.Logical().Write(path, data)
+	secret, err := v.client.Logical().WriteWithContext(ctx, path, data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt data: %w", err)
 	}
@@ -452,12 +475,12 @@ func (v *VaultClient) DecryptData(ctx context.Context, key string, ciphertext st
 		return nil, fmt.Errorf("no plaintext returned from vault")
 	}
 
-	plaintext, ok := secret.Data["plaintext"].([]byte)
+	encoded, ok := secret.Data["plaintext"].(string)
 	if !ok {
-		return nil, fmt.Errorf("plaintext not found in response")
+		return nil, fmt.Errorf("plaintext not found or not a string in vault response")
 	}
 
-	return plaintext, nil
+	return decodeTransitPlaintext(encoded)
 }
 
 // getFullPath constructs the full path for a secret

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,15 +17,24 @@ import (
 
 	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/sanskarpan/db-backup/internal/models"
+	"github.com/sanskarpan/db-backup/internal/notification"
 	"github.com/sanskarpan/db-backup/internal/storage"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 	"github.com/sanskarpan/db-backup/pkg/utils"
 )
 
+// Notifier is the minimal notification sink used by the engine to report backup
+// outcomes. *notification.Router satisfies it. A nil Notifier disables
+// notifications.
+type Notifier interface {
+	Send(ctx context.Context, notif *notification.Notification) error
+}
+
 // Engine orchestrates backup operations
 type Engine struct {
 	config   *Config
 	provider storage.Provider
+	notifier Notifier
 }
 
 // Config holds backup engine configuration
@@ -39,6 +49,11 @@ type Config struct {
 	// are uploaded here after being dumped locally. When nil, backups remain in
 	// the local temp directory.
 	StorageProvider storage.Provider
+
+	// Notifier is the optional notification sink. When set, a completion
+	// notification (success or failure) is dispatched after each backup. When
+	// nil, no notifications are sent.
+	Notifier Notifier
 }
 
 // CreateOptions holds options for creating a backup
@@ -85,6 +100,7 @@ func NewEngine(config *Config) *Engine {
 	return &Engine{
 		config:   config,
 		provider: config.StorageProvider,
+		notifier: config.Notifier,
 	}
 }
 
@@ -94,13 +110,89 @@ func (e *Engine) SetStorageProvider(provider storage.Provider) {
 	e.provider = provider
 }
 
+// SetNotifier injects (or replaces) the notification sink used to report backup
+// outcomes. Passing nil disables notifications.
+func (e *Engine) SetNotifier(notifier Notifier) {
+	e.notifier = notifier
+}
+
 // remoteBackupPath returns the deterministic remote path for a backup artifact.
 func remoteBackupPath(backupID, fileName string) string {
 	return fmt.Sprintf("backups/%s/%s", backupID, fileName)
 }
 
-// CreateBackup creates a new backup
+// reportProgress invokes the optional progress callback with a simple stage
+// update, doing nothing when no callback is configured.
+func reportProgress(opts *CreateOptions, stage string, pct float64, msg string) {
+	if opts.ProgressCallback != nil {
+		opts.ProgressCallback(Progress{Stage: stage, Percentage: pct, Message: msg})
+	}
+}
+
+// CreateBackup creates a new backup and dispatches a completion notification
+// (success or failure) through the configured notifier, if any. This is the
+// single integration point for backup notifications: callers such as the
+// scheduler delegate here, so they must not send their own notifications. A
+// notification failure never affects the backup result.
 func (e *Engine) CreateBackup(ctx context.Context, opts *CreateOptions) (*models.BackupMetadata, error) {
+	metadata, err := e.createBackup(ctx, opts)
+	e.notifyResult(ctx, metadata, err)
+	return metadata, err
+}
+
+// notifyResult builds and sends a backup completion notification. It is
+// nil-safe (no notifier or no metadata is a no-op) and never returns an error:
+// a notification failure is logged and swallowed so it cannot fail the backup.
+func (e *Engine) notifyResult(ctx context.Context, metadata *models.BackupMetadata, backupErr error) {
+	if e.notifier == nil || metadata == nil {
+		return
+	}
+
+	notif := buildBackupNotification(metadata, backupErr)
+	if err := e.notifier.Send(ctx, notif); err != nil {
+		log.Printf("backup: failed to send %s notification for backup %s: %v",
+			notif.Level, metadata.ID, err)
+	}
+}
+
+// buildBackupNotification summarizes a backup outcome as a *notification.
+// Notification. The "backup" and event ("success"/"failure") tags let each
+// channel honor its NotifyOn configuration.
+func buildBackupNotification(metadata *models.BackupMetadata, backupErr error) *notification.Notification {
+	level := notification.LevelSuccess
+	event := "success"
+	title := fmt.Sprintf("Backup succeeded: %s", metadata.Database)
+	message := fmt.Sprintf("Backup %s of database %q completed successfully.", metadata.ID, metadata.Database)
+
+	if backupErr != nil {
+		level = notification.LevelError
+		event = "failure"
+		title = fmt.Sprintf("Backup failed: %s", metadata.Database)
+		message = fmt.Sprintf("Backup %s of database %q failed: %v", metadata.ID, metadata.Database, backupErr)
+	}
+
+	meta := map[string]interface{}{
+		"backup_id": metadata.ID,
+		"database":  metadata.Database,
+		"status":    string(metadata.Status),
+		"size":      metadata.Size,
+		"duration":  metadata.Duration.String(),
+	}
+	if backupErr != nil {
+		meta["error"] = backupErr.Error()
+	}
+
+	return &notification.Notification{
+		Title:    title,
+		Message:  message,
+		Level:    level,
+		Metadata: meta,
+		Tags:     []string{"backup", event},
+	}
+}
+
+// createBackup performs the actual backup work.
+func (e *Engine) createBackup(ctx context.Context, opts *CreateOptions) (*models.BackupMetadata, error) {
 	// Generate backup ID
 	backupID := utils.GenerateBackupID()
 
@@ -126,13 +218,7 @@ func (e *Engine) CreateBackup(ctx context.Context, opts *CreateOptions) (*models
 	}
 
 	// Update progress
-	if opts.ProgressCallback != nil {
-		opts.ProgressCallback(Progress{
-			Stage:      "initializing",
-			Percentage: 0,
-			Message:    "Initializing backup...",
-		})
-	}
+	reportProgress(opts, "initializing", 0, "Initializing backup...")
 
 	// Create database driver
 	driver, err := database.CreateDriver(opts.DatabaseType)
@@ -153,13 +239,7 @@ func (e *Engine) CreateBackup(ctx context.Context, opts *CreateOptions) (*models
 		MaxConnections:    10,
 	}
 
-	if opts.ProgressCallback != nil {
-		opts.ProgressCallback(Progress{
-			Stage:      "connecting",
-			Percentage: 10,
-			Message:    "Connecting to database...",
-		})
-	}
+	reportProgress(opts, "connecting", 10, "Connecting to database...")
 
 	if err := driver.Connect(ctx, connConfig); err != nil {
 		metadata.Status = database.BackupStatusFailed
@@ -181,13 +261,7 @@ func (e *Engine) CreateBackup(ctx context.Context, opts *CreateOptions) (*models
 	backupFileName := fmt.Sprintf("%s.%s", backupID, e.getFileExtension(opts.Compression))
 	backupPath := filepath.Join(e.config.TempDirectory, backupFileName)
 
-	if opts.ProgressCallback != nil {
-		opts.ProgressCallback(Progress{
-			Stage:      "backing_up",
-			Percentage: 30,
-			Message:    "Creating backup...",
-		})
-	}
+	reportProgress(opts, "backing_up", 30, "Creating backup...")
 
 	// Create backup options for driver
 	backupOpts := &database.BackupOptions{
@@ -215,13 +289,7 @@ func (e *Engine) CreateBackup(ctx context.Context, opts *CreateOptions) (*models
 	metadata.Tables = result.Tables
 	metadata.BackupPath = backupPath
 
-	if opts.ProgressCallback != nil {
-		opts.ProgressCallback(Progress{
-			Stage:      "validating",
-			Percentage: 70,
-			Message:    "Validating backup...",
-		})
-	}
+	reportProgress(opts, "validating", 70, "Validating backup...")
 
 	// Calculate checksum
 	checksum, err := e.calculateChecksum(backupPath)
@@ -231,60 +299,15 @@ func (e *Engine) CreateBackup(ctx context.Context, opts *CreateOptions) (*models
 	}
 	metadata.Checksum = checksum
 
-	// Upload the backup artifact to the configured storage provider. If no
-	// provider is configured the backup stays in the local temp directory and
-	// the storage location is recorded explicitly.
-	if e.provider != nil {
-		if opts.ProgressCallback != nil {
-			opts.ProgressCallback(Progress{
-				Stage:      "uploading",
-				Percentage: 80,
-				Message:    "Uploading backup to storage...",
-			})
-		}
-
-		remotePath := remoteBackupPath(backupID, backupFileName)
-		uploadOpts := &storage.UploadOptions{
-			ContentType: "application/octet-stream",
-			Checksum:    checksum,
-			Metadata: map[string]string{
-				"backup_id": backupID,
-				"database":  opts.Database,
-			},
-		}
-		if opts.ProgressCallback != nil {
-			uploadOpts.ProgressCallback = func(uploaded, total int64) {
-				opts.ProgressCallback(Progress{
-					Stage:       "uploading",
-					Percentage:  80,
-					Message:     "Uploading backup to storage...",
-					BytesTotal:  total,
-					BytesCopied: uploaded,
-				})
-			}
-		}
-
-		if err := e.provider.Upload(ctx, backupPath, remotePath, uploadOpts); err != nil {
-			// Never report success for a backup that was not durably stored.
-			metadata.Status = database.BackupStatusFailed
-			return metadata, pkgErrors.ErrStorageUpload(err)
-		}
-
-		// Record provider type + remote path. BackupPath keeps pointing at the
-		// local temp copy so callers can still read it before cleanup.
-		metadata.StorageLocation = fmt.Sprintf("%s://%s", e.provider.GetType(), remotePath)
-	} else {
-		// Explicit local-temp behavior.
-		metadata.StorageLocation = backupPath
+	// Upload the backup artifact to the configured storage provider (or record
+	// the explicit local-temp location when none is configured). Never report
+	// success for a backup that was not durably stored.
+	if err = e.storeArtifact(ctx, metadata, backupID, backupFileName, backupPath, checksum, opts); err != nil {
+		metadata.Status = database.BackupStatusFailed
+		return metadata, err
 	}
 
-	if opts.ProgressCallback != nil {
-		opts.ProgressCallback(Progress{
-			Stage:      "finalizing",
-			Percentage: 90,
-			Message:    "Finalizing backup...",
-		})
-	}
+	reportProgress(opts, "finalizing", 90, "Finalizing backup...")
 
 	// Complete
 	metadata.EndTime = time.Now()
@@ -312,15 +335,51 @@ func (e *Engine) CreateBackup(ctx context.Context, opts *CreateOptions) (*models
 		}
 	}
 
-	if opts.ProgressCallback != nil {
-		opts.ProgressCallback(Progress{
-			Stage:      "completed",
-			Percentage: 100,
-			Message:    "Backup completed successfully",
-		})
-	}
+	reportProgress(opts, "completed", 100, "Backup completed successfully")
 
 	return metadata, nil
+}
+
+// storeArtifact uploads the backup artifact to the configured storage provider
+// and records its location on the metadata. When no provider is configured the
+// backup stays in the local temp directory and the local path is recorded.
+func (e *Engine) storeArtifact(ctx context.Context, metadata *models.BackupMetadata, backupID, backupFileName, backupPath, checksum string, opts *CreateOptions) error {
+	if e.provider == nil {
+		metadata.StorageLocation = backupPath
+		return nil
+	}
+
+	reportProgress(opts, "uploading", 80, "Uploading backup to storage...")
+
+	remotePath := remoteBackupPath(backupID, backupFileName)
+	uploadOpts := &storage.UploadOptions{
+		ContentType: "application/octet-stream",
+		Checksum:    checksum,
+		Metadata: map[string]string{
+			"backup_id": backupID,
+			"database":  opts.Database,
+		},
+	}
+	if opts.ProgressCallback != nil {
+		uploadOpts.ProgressCallback = func(uploaded, total int64) {
+			opts.ProgressCallback(Progress{
+				Stage:       "uploading",
+				Percentage:  80,
+				Message:     "Uploading backup to storage...",
+				BytesTotal:  total,
+				BytesCopied: uploaded,
+			})
+		}
+	}
+
+	if err := e.provider.Upload(ctx, backupPath, remotePath, uploadOpts); err != nil {
+		return pkgErrors.ErrStorageUpload(err)
+	}
+
+	// Record provider type + remote path. BackupPath keeps pointing at the
+	// local temp copy so callers can still read it before cleanup.
+	metadata.StorageLocation = fmt.Sprintf("%s://%s", e.provider.GetType(), remotePath)
+	return nil
 }
 
 // ValidateBackup validates a backup file

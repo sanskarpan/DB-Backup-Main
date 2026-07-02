@@ -436,11 +436,75 @@ func (s *Server) handleUpdateSchedule(c *gin.Context) {
 		return
 	}
 
-	// Implementation would update the schedule
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"error":       "Update not fully implemented",
-		"schedule_id": scheduleID,
-	})
+	// Map the request into a partial ScheduledJob understood by the scheduler.
+	// UpdateJob only applies non-zero fields, so unset fields are left intact.
+	updates := &scheduler.ScheduledJob{
+		Name:     req.Name,
+		Schedule: req.Schedule,
+		Enabled:  req.Enabled,
+		Retries:  req.Retries,
+		Tags:     req.Tags,
+	}
+
+	// A backup database type, when supplied, updates the backup options.
+	if req.BackupOpts.DatabaseType != "" {
+		var dbType database.DatabaseType
+		switch req.BackupOpts.DatabaseType {
+		case "mysql":
+			dbType = database.DatabaseTypeMySQL
+		case "postgres", "postgresql":
+			dbType = database.DatabaseTypePostgreSQL
+		case "mongodb", "mongo":
+			dbType = database.DatabaseTypeMongoDB
+		case "sqlite":
+			dbType = database.DatabaseTypeSQLite
+		default:
+			s.respondError(c, http.StatusBadRequest, fmt.Errorf("invalid database type"), "Unsupported database type")
+			return
+		}
+		updates.BackupOpts = &backup.CreateOptions{
+			DatabaseType: dbType,
+			Host:         req.BackupOpts.Host,
+			Port:         req.BackupOpts.Port,
+			Username:     req.BackupOpts.Username,
+			Password:     req.BackupOpts.Password,
+			Database:     req.BackupOpts.Database,
+			Databases:    req.BackupOpts.Databases,
+			AllDatabases: req.BackupOpts.AllDatabases,
+			Compression:  database.CompressionType(req.BackupOpts.Compression),
+			Encrypt:      req.BackupOpts.Encrypt,
+		}
+	}
+
+	if req.RetryDelay != "" {
+		d, err := time.ParseDuration(req.RetryDelay)
+		if err != nil {
+			s.respondError(c, http.StatusBadRequest, err, "Invalid retry_delay format")
+			return
+		}
+		updates.RetryDelay = d
+	}
+	if req.Timeout != "" {
+		d, err := time.ParseDuration(req.Timeout)
+		if err != nil {
+			s.respondError(c, http.StatusBadRequest, err, "Invalid timeout format")
+			return
+		}
+		updates.Timeout = d
+	}
+
+	if err := s.scheduler.UpdateJob(scheduleID, updates); err != nil {
+		s.respondError(c, http.StatusNotFound, err, "Failed to update schedule")
+		return
+	}
+
+	job, err := s.scheduler.GetJob(scheduleID)
+	if err != nil {
+		s.respondError(c, http.StatusInternalServerError, err, "Failed to load updated schedule")
+		return
+	}
+
+	s.respondSuccessWithMessage(c, "Schedule updated successfully", job)
 }
 
 func (s *Server) handleDeleteSchedule(c *gin.Context) {
@@ -499,16 +563,97 @@ func (s *Server) handleRunSchedule(c *gin.Context) {
 // Stats handlers
 
 func (s *Server) handleGetStats(c *gin.Context) {
-	// Implementation would return statistics
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	backups, err := s.backupEngine.ListBackups(ctx)
+	if err != nil {
+		s.respondError(c, http.StatusInternalServerError, err, "Failed to list backups")
+		return
+	}
+
+	var successful, failed int
+	var totalSize int64
+	for _, b := range backups {
+		switch b.Status {
+		case database.BackupStatusSuccess, database.BackupStatusCompleted:
+			successful++
+		case database.BackupStatusFailed:
+			failed++
+		}
+		totalSize += b.Size
+	}
+
+	databases := 0
+	if s.dbStore != nil {
+		dbs, derr := s.dbStore.List()
+		if derr != nil {
+			s.respondError(c, http.StatusInternalServerError, derr, "Failed to list databases")
+			return
+		}
+		databases = len(dbs)
+	}
+
+	schedules := len(s.scheduler.ListJobs())
+
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Stats endpoint - implementation pending",
+		"total_backups":      len(backups),
+		"successful_backups": successful,
+		"failed_backups":     failed,
+		"total_size":         totalSize,
+		"databases":          databases,
+		"schedules":          schedules,
 	})
 }
 
 func (s *Server) handleGetStorageStats(c *gin.Context) {
-	// Implementation would return storage statistics
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	backups, err := s.backupEngine.ListBackups(ctx)
+	if err != nil {
+		s.respondError(c, http.StatusInternalServerError, err, "Failed to list backups")
+		return
+	}
+
+	// Aggregate real storage usage from backup metadata, broken down by the
+	// storage location each backup was written to.
+	type locationStat struct {
+		Size           int64 `json:"size"`
+		CompressedSize int64 `json:"compressed_size"`
+		Backups        int   `json:"backups"`
+	}
+	var totalSize, totalCompressed int64
+	byLocation := make(map[string]*locationStat)
+	for _, b := range backups {
+		totalSize += b.Size
+		totalCompressed += b.CompressedSize
+
+		loc := b.StorageLocation
+		if loc == "" {
+			loc = "local"
+		}
+		entry := byLocation[loc]
+		if entry == nil {
+			entry = &locationStat{}
+			byLocation[loc] = entry
+		}
+		entry.Backups++
+		entry.Size += b.Size
+		entry.CompressedSize += b.CompressedSize
+	}
+
+	providers := 0
+	if s.storageStore != nil {
+		providers = s.storageStore.Count()
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Storage stats endpoint - implementation pending",
+		"total_backups":         len(backups),
+		"total_size":            totalSize,
+		"total_compressed_size": totalCompressed,
+		"configured_providers":  providers,
+		"by_location":           byLocation,
 	})
 }
 
@@ -589,17 +734,28 @@ func (s *Server) handleScanDirectory(c *gin.Context) {
 	})
 }
 
-// handleGetSecurityStats returns security statistics
+// handleGetSecurityStats returns security statistics.
+//
+// The ransomware detector performs stateless, on-demand scans and does not
+// retain aggregate scan history (files scanned, threats detected/blocked over
+// time). Rather than fabricate metrics, we report the detector's real
+// availability plus honest zero counts for figures that are not tracked. The
+// number of configured storage providers is a real value from the registry.
 func (s *Server) handleGetSecurityStats(c *gin.Context) {
-	// Mock data - in production, would aggregate from detector history and storage providers
+	configuredProviders := 0
+	if s.storageStore != nil {
+		configuredProviders = s.storageStore.Count()
+	}
+
 	stats := gin.H{
-		"protected_backups": 156,
-		"active_scans":      "24/7",
-		"threats_blocked":   0,
-		"security_score":    98,
-		"last_scan_time":    time.Now().Add(-2 * time.Minute).Format(time.RFC3339),
-		"files_scanned":     1247,
-		"threats_detected":  0,
+		"detector_active": s.detector != nil,
+		// The detector does not persist cumulative scan history, so these are
+		// honest zeros rather than fabricated totals.
+		"files_scanned":        0,
+		"threats_detected":     0,
+		"threats_blocked":      0,
+		"last_scan_time":       nil,
+		"configured_providers": configuredProviders,
 	}
 
 	s.respondSuccess(c, stats)
@@ -619,61 +775,28 @@ type ThreatAlert struct {
 	RecommendedAction string   `json:"recommended_action"`
 }
 
-// handleListThreatAlerts returns all threat alerts
+// handleListThreatAlerts returns all threat alerts.
+//
+// Threat detection is performed on-demand via the scan endpoints and no alert
+// history is persisted, so this honestly returns an empty list rather than
+// fabricated alerts. The response still honors the severity/status query
+// filters for forward compatibility.
 func (s *Server) handleListThreatAlerts(c *gin.Context) {
-	// Mock data - in production, would fetch from database
-	alerts := []ThreatAlert{
-		{
-			ID:                "1",
-			Timestamp:         time.Now().Add(-15 * time.Minute).Format(time.RFC3339),
-			Severity:          "INFO",
-			Type:              "INFO",
-			Title:             "Backup Scan Completed Successfully",
-			Description:       "Regular security scan completed with no threats detected",
-			AffectedResources: []string{"All backup files"},
-			Status:            "resolved",
-			DetectionMethod:   "Scheduled Scan",
-			RecommendedAction: "No action required",
-		},
-	}
-
-	severity := c.Query("severity")
-	status := c.Query("status")
-
-	// Filter alerts based on query parameters
-	filteredAlerts := []ThreatAlert{}
-	for _, alert := range alerts {
-		if (severity == "" || alert.Severity == severity) &&
-			(status == "" || alert.Status == status) {
-			filteredAlerts = append(filteredAlerts, alert)
-		}
-	}
+	// No persisted alert store exists, so there are genuinely no alerts.
+	alerts := []ThreatAlert{}
 
 	s.respondSuccess(c, gin.H{
-		"alerts": filteredAlerts,
-		"total":  len(filteredAlerts),
+		"alerts": alerts,
+		"total":  len(alerts),
 	})
 }
 
-// handleGetThreatAlert returns a specific threat alert
+// handleGetThreatAlert returns a specific threat alert. No alerts are persisted,
+// so any lookup is an honest 404 rather than a fabricated record.
 func (s *Server) handleGetThreatAlert(c *gin.Context) {
-	alertID := c.Param("id")
-
-	// Mock implementation - in production, fetch from database
-	alert := ThreatAlert{
-		ID:                alertID,
-		Timestamp:         time.Now().Add(-15 * time.Minute).Format(time.RFC3339),
-		Severity:          "INFO",
-		Type:              "INFO",
-		Title:             "Backup Scan Completed Successfully",
-		Description:       "Regular security scan completed with no threats detected",
-		AffectedResources: []string{"All backup files"},
-		Status:            "resolved",
-		DetectionMethod:   "Scheduled Scan",
-		RecommendedAction: "No action required",
-	}
-
-	s.respondSuccess(c, alert)
+	s.respondError(c, http.StatusNotFound,
+		fmt.Errorf("threat alert not found"),
+		"No persisted threat alerts are available")
 }
 
 // UpdateThreatAlertRequest represents a request to update an alert
@@ -681,126 +804,19 @@ type UpdateThreatAlertRequest struct {
 	Status string `json:"status" binding:"required,oneof=active investigating resolved dismissed"`
 }
 
-// handleUpdateThreatAlert updates a threat alert
+// handleUpdateThreatAlert updates a threat alert. No alerts are persisted, so an
+// update targets a non-existent record and returns an honest 404.
 func (s *Server) handleUpdateThreatAlert(c *gin.Context) {
-	alertID := c.Param("id")
-
 	var req UpdateThreatAlertRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		s.respondError(c, http.StatusBadRequest, err, "Invalid request body")
 		return
 	}
 
-	// Mock implementation - in production, update in database
-	s.respondSuccessWithMessage(c, "Alert updated successfully", gin.H{
-		"alert_id": alertID,
-		"status":   req.Status,
-	})
+	s.respondError(c, http.StatusNotFound,
+		fmt.Errorf("threat alert not found"),
+		"No persisted threat alerts are available to update")
 }
 
-// StorageProviderConfig represents immutable storage configuration
-type StorageProviderConfig struct {
-	ID                  string `json:"id"`
-	Name                string `json:"name"`
-	Type                string `json:"type"`
-	Enabled             bool   `json:"enabled"`
-	ImmutabilityEnabled bool   `json:"immutability_enabled"`
-	RetentionDays       int    `json:"retention_days"`
-	Mode                string `json:"mode"`
-	LegalHold           bool   `json:"legal_hold"`
-	ProtectedBackups    int    `json:"protected_backups"`
-}
-
-// handleListStorageProviders returns all storage provider configurations
-func (s *Server) handleListStorageProviders(c *gin.Context) {
-	// Mock data - in production, fetch from config and storage providers
-	providers := []StorageProviderConfig{
-		{
-			ID:                  "1",
-			Name:                "AWS S3 Production",
-			Type:                "S3",
-			Enabled:             true,
-			ImmutabilityEnabled: true,
-			RetentionDays:       30,
-			Mode:                "GOVERNANCE",
-			LegalHold:           false,
-			ProtectedBackups:    87,
-		},
-		{
-			ID:                  "2",
-			Name:                "Azure Blob Storage",
-			Type:                "AZURE",
-			Enabled:             true,
-			ImmutabilityEnabled: true,
-			RetentionDays:       90,
-			Mode:                "LOCKED",
-			LegalHold:           false,
-			ProtectedBackups:    42,
-		},
-		{
-			ID:                  "3",
-			Name:                "Google Cloud Storage",
-			Type:                "GCS",
-			Enabled:             true,
-			ImmutabilityEnabled: true,
-			RetentionDays:       60,
-			Mode:                "UNLOCKED",
-			LegalHold:           false,
-			ProtectedBackups:    27,
-		},
-	}
-
-	s.respondSuccess(c, gin.H{
-		"providers": providers,
-		"total":     len(providers),
-	})
-}
-
-// handleGetStorageProvider returns a specific storage provider configuration
-func (s *Server) handleGetStorageProvider(c *gin.Context) {
-	providerID := c.Param("id")
-
-	// Mock implementation - in production, fetch from config
-	provider := StorageProviderConfig{
-		ID:                  providerID,
-		Name:                "AWS S3 Production",
-		Type:                "S3",
-		Enabled:             true,
-		ImmutabilityEnabled: true,
-		RetentionDays:       30,
-		Mode:                "GOVERNANCE",
-		LegalHold:           false,
-		ProtectedBackups:    87,
-	}
-
-	s.respondSuccess(c, provider)
-}
-
-// UpdateStorageProviderRequest represents a request to update storage provider config
-type UpdateStorageProviderRequest struct {
-	ImmutabilityEnabled bool   `json:"immutability_enabled"`
-	RetentionDays       int    `json:"retention_days" binding:"min=1,max=3650"`
-	Mode                string `json:"mode" binding:"required"`
-	LegalHold           bool   `json:"legal_hold"`
-}
-
-// handleUpdateStorageProvider updates storage provider configuration
-func (s *Server) handleUpdateStorageProvider(c *gin.Context) {
-	providerID := c.Param("id")
-
-	var req UpdateStorageProviderRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		s.respondError(c, http.StatusBadRequest, err, "Invalid request body")
-		return
-	}
-
-	// Validate mode based on provider type
-	// In production, would interact with actual storage provider APIs
-	s.respondSuccessWithMessage(c, "Storage provider configuration updated successfully", gin.H{
-		"provider_id":          providerID,
-		"immutability_enabled": req.ImmutabilityEnabled,
-		"retention_days":       req.RetentionDays,
-		"mode":                 req.Mode,
-		"legal_hold":           req.LegalHold,
-	})
-}
+// Storage provider CRUD + connection-test handlers live in handlers_storage.go
+// and are backed by the persistent storageregistry.Store.

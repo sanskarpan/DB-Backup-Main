@@ -2,8 +2,10 @@ package influxdb
 
 import (
 	"context"
+	"encoding/json"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +13,78 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// TestBackupRecord_RoundTrip proves that a v2 record survives the
+// backup -> restore serialization round-trip without a live InfluxDB. It
+// mirrors what backupBucket writes and what restoreBucket reads back.
+func TestBackupRecord_RoundTrip(t *testing.T) {
+	ts := time.Date(2026, 7, 1, 12, 34, 56, 789000000, time.UTC)
+
+	// Simulate a non-pivoted Flux record's Values() map: reserved columns
+	// plus two tags. newBackupRecord must keep only the tags.
+	values := map[string]interface{}{
+		"result":       "_result",
+		"table":        int64(0),
+		"_start":       ts.Add(-time.Hour),
+		"_stop":        ts.Add(time.Hour),
+		"_time":        ts,
+		"_measurement": "cpu",
+		"_field":       "usage_user",
+		"_value":       float64(42.5),
+		"host":         "server-a",
+		"region":       "us-east-1",
+	}
+
+	original := newBackupRecord("cpu", "usage_user", float64(42.5), ts, values)
+
+	// Tags must be exactly the non-reserved columns.
+	assert.Equal(t, map[string]string{
+		"host":   "server-a",
+		"region": "us-east-1",
+	}, original.Tags)
+
+	// Marshal (as backupBucket does) then unmarshal (as restoreBucket does).
+	encoded, err := json.Marshal(original)
+	require.NoError(t, err)
+	assert.False(t, strings.Contains(string(encoded), "map["),
+		"serialized form must be JSON, not Go map stringification")
+
+	var decoded backupRecord
+	require.NoError(t, json.Unmarshal(encoded, &decoded))
+
+	// Measurement, field, value, timestamp and tags must all survive.
+	assert.Equal(t, original.Measurement, decoded.Measurement)
+	assert.Equal(t, original.Field, decoded.Field)
+	assert.Equal(t, original.Value, decoded.Value)
+	assert.True(t, original.Time.Equal(decoded.Time), "timestamp must round-trip")
+	assert.Equal(t, original.Tags, decoded.Tags)
+
+	// The decoded record must produce a writable point.
+	point := decoded.toPoint()
+	require.NotNil(t, point)
+	assert.Equal(t, "cpu", point.Name())
+}
+
+// TestSumShardDiskSize verifies the Prometheus metrics parser used by
+// GetDatabaseSize sums the storage_shard_disk_size gauge and reports presence.
+func TestSumShardDiskSize(t *testing.T) {
+	metrics := `# HELP storage_shard_disk_size Gauge of the disk size for the shard
+# TYPE storage_shard_disk_size gauge
+storage_shard_disk_size{bucket="b1"} 1024
+storage_shard_disk_size{bucket="b2"} 2048
+storage_shard_disk_size_ignored{bucket="b3"} 9999
+other_metric 5
+`
+	total, found, err := sumShardDiskSize(strings.NewReader(metrics))
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, int64(3072), total)
+
+	// When the metric is absent, found must be false so callers can error.
+	_, found, err = sumShardDiskSize(strings.NewReader("other_metric 5\n"))
+	require.NoError(t, err)
+	assert.False(t, found)
+}
 
 func skipIfInfluxDBUnavailable(t *testing.T) {
 	t.Helper()
@@ -357,8 +431,13 @@ func TestInfluxDBDriver_GetDatabaseSize(t *testing.T) {
 	ctx := context.Background()
 	size, err := driver.GetDatabaseSize(ctx)
 
-	assert.NoError(t, err)
-	assert.GreaterOrEqual(t, size, int64(0))
+	// GetDatabaseSize returns a real size from the /metrics endpoint when the
+	// storage_shard_disk_size gauge is exposed, otherwise an honest error.
+	if err != nil {
+		t.Logf("database size unavailable via API: %v", err)
+	} else {
+		assert.GreaterOrEqual(t, size, int64(0))
+	}
 }
 
 func TestInfluxDBDriver_GetVersion(t *testing.T) {
@@ -565,8 +644,13 @@ func TestInfluxDB_GetBackupSize(t *testing.T) {
 	opts := &database.BackupOptions{}
 
 	size, err := driver.GetBackupSize(ctx, opts)
-	assert.NoError(t, err)
-	assert.GreaterOrEqual(t, size, int64(0))
+	// GetBackupSize delegates to GetDatabaseSize, which returns an honest error
+	// when InfluxDB does not expose the disk-size metric.
+	if err != nil {
+		t.Logf("backup size unavailable via API: %v", err)
+	} else {
+		assert.GreaterOrEqual(t, size, int64(0))
+	}
 }
 
 // Helper functions
