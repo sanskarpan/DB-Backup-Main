@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sanskarpan/db-backup/internal/api"
+	"github.com/sanskarpan/db-backup/internal/approvals"
 	"github.com/sanskarpan/db-backup/internal/auth"
 	"github.com/sanskarpan/db-backup/internal/backup"
 	"github.com/sanskarpan/db-backup/internal/catalog"
@@ -187,6 +188,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize the approval store for multi-user authorization (four-eyes).
+	// Pending/approved requests are persisted so they survive a restart.
+	approvalStore, err := approvals.NewStore(filepath.Join(dbStoreDir, "approvals"))
+	if err != nil {
+		log.Error("Failed to initialize approval store", err)
+		os.Exit(1)
+	}
+	muaEnabled := cfg.Security.MultiUserAuth.Enabled
+
 	// Create API server
 	apiServer := api.NewServer(&api.Config{
 		Host:          cfg.Server.Host,
@@ -196,7 +206,7 @@ func main() {
 		EnableSwagger: true,
 		JWTSecret:     jwtSecret,
 		ScanBaseDir:   os.Getenv("SCAN_BASE_DIR"),
-	}, backupEngine, restoreEngine, sched, healthChecker, detector, searchEngine, jwtService, oauth2Service, oauth2Handler, dbStore, storageStore, wsHub, log)
+	}, backupEngine, restoreEngine, sched, healthChecker, detector, searchEngine, jwtService, oauth2Service, oauth2Handler, dbStore, storageStore, approvalStore, muaEnabled, wsHub, log)
 
 	// Setup Gin router
 	if cfg.Logging.Level != "debug" {

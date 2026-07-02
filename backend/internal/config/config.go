@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -243,10 +244,18 @@ type OTLPConfig struct {
 
 // SecurityConfig holds security configuration
 type SecurityConfig struct {
-	JWT          JWTConfig          `mapstructure:"jwt"`
-	OAuth2       OAuth2Config       `mapstructure:"oauth2"`
-	APIKeys      APIKeysConfig      `mapstructure:"api_keys"`
-	RateLimiting RateLimitingConfig `mapstructure:"rate_limiting"`
+	JWT           JWTConfig           `mapstructure:"jwt"`
+	OAuth2        OAuth2Config        `mapstructure:"oauth2"`
+	APIKeys       APIKeysConfig       `mapstructure:"api_keys"`
+	RateLimiting  RateLimitingConfig  `mapstructure:"rate_limiting"`
+	MultiUserAuth MultiUserAuthConfig `mapstructure:"multi_user_auth"`
+}
+
+// MultiUserAuthConfig holds multi-user authorization (four-eyes approval)
+// configuration. When enabled, irreversible operations such as the permanent
+// purge of a backup require a second approver before they execute.
+type MultiUserAuthConfig struct {
+	Enabled bool `mapstructure:"enabled"`
 }
 
 // JWTConfig holds JWT configuration
@@ -324,6 +333,16 @@ func Load(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// Convenience env override for multi-user authorization. MUA_ENABLED takes
+	// precedence over the config file / DBBACKUP_ prefixed value when set.
+	if val, ok := os.LookupEnv("MUA_ENABLED"); ok {
+		enabled, perr := strconv.ParseBool(val)
+		if perr != nil {
+			return nil, fmt.Errorf("invalid MUA_ENABLED value %q: %w", val, perr)
+		}
+		config.Security.MultiUserAuth.Enabled = enabled
+	}
+
 	// Validate configuration
 	if err := validate(&config); err != nil {
 		return nil, fmt.Errorf("config validation failed: %w", err)
@@ -374,6 +393,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("security.api_keys.enabled", false)
 	v.SetDefault("security.rate_limiting.enabled", true)
 	v.SetDefault("security.rate_limiting.requests_per_minute", 100)
+	// Multi-user authorization (four-eyes approval) is opt-in.
+	v.SetDefault("security.multi_user_auth.enabled", false)
 }
 
 // validate validates the configuration
