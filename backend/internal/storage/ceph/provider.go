@@ -79,9 +79,13 @@ func NewCephProvider(cfg *storage.CephConfig) (*CephProvider, error) {
 
 // Upload uploads a file to Ceph storage
 func (p *CephProvider) Upload(ctx context.Context, localPath, remotePath string, opts *storage.UploadOptions) error {
-	file, err := openFile(localPath)
+	file, err := os.Open(localPath)
 	if err != nil {
-		return err
+		return &storage.ProviderError{
+			Type:    storage.ProviderTypeCeph,
+			Message: fmt.Sprintf("failed to open file for upload: %s", localPath),
+			Err:     err,
+		}
 	}
 	defer file.Close()
 
@@ -397,11 +401,6 @@ func validateConfig(cfg *storage.CephConfig) error {
 		cfg.Region = "default" // Ceph uses "default" region
 	}
 	return nil
-}
-
-func openFile(path string) (io.ReadCloser, error) {
-	// Placeholder - implement file opening
-	return nil, fmt.Errorf("not implemented")
 }
 
 func createFile(path string) (*os.File, error) {
