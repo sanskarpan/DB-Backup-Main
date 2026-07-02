@@ -195,6 +195,9 @@ func (s *Server) handleGetBackup(c *gin.Context) {
 	s.respondSuccess(c, metadata)
 }
 
+// handleDeleteBackup soft-deletes a backup, moving it to the recycle bin. The
+// artifact is retained and can be recovered via handleRestoreDeletedBackup or
+// permanently removed via handlePurgeBackup.
 func (s *Server) handleDeleteBackup(c *gin.Context) {
 	backupID := c.Param("id")
 
@@ -207,7 +210,91 @@ func (s *Server) handleDeleteBackup(c *gin.Context) {
 		return
 	}
 
-	s.respondSuccessWithMessage(c, "Backup deleted successfully", nil)
+	s.respondSuccessWithMessage(c, "Backup moved to recycle bin", nil)
+}
+
+// handleListDeletedBackups lists the soft-deleted backups in the recycle bin.
+func (s *Server) handleListDeletedBackups(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	backups, err := s.backupEngine.ListDeletedBackups(ctx)
+	if err != nil {
+		s.respondError(c, http.StatusInternalServerError, err, "Failed to list deleted backups")
+		return
+	}
+
+	s.respondSuccess(c, gin.H{
+		"backups": backups,
+		"total":   len(backups),
+	})
+}
+
+// handleRestoreDeletedBackup undeletes a backup, moving it out of the recycle
+// bin. It is distinct from handleRestoreBackup, which restores backup data into
+// a target database.
+func (s *Server) handleRestoreDeletedBackup(c *gin.Context) {
+	backupID := c.Param("id")
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	err := s.backupEngine.RestoreDeletedBackup(ctx, backupID)
+	if err != nil {
+		s.respondError(c, http.StatusNotFound, err, "Failed to restore backup from recycle bin")
+		return
+	}
+
+	s.respondSuccessWithMessage(c, "Backup restored from recycle bin", nil)
+}
+
+// handlePurgeBackup permanently removes a soft-deleted backup and its artifact.
+func (s *Server) handlePurgeBackup(c *gin.Context) {
+	backupID := c.Param("id")
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	err := s.backupEngine.PurgeBackup(ctx, backupID)
+	if err != nil {
+		s.respondError(c, http.StatusInternalServerError, err, "Failed to purge backup")
+		return
+	}
+
+	s.respondSuccessWithMessage(c, "Backup permanently deleted", nil)
+}
+
+// PurgeExpiredRequest configures a recycle-bin sweep. Retention is a Go duration
+// string (for example "168h"); soft-deleted backups older than it are purged.
+type PurgeExpiredRequest struct {
+	Retention string `json:"retention" binding:"required"`
+}
+
+// handlePurgeExpired permanently purges every recycle-bin backup whose deletion
+// is older than the requested retention window.
+func (s *Server) handlePurgeExpired(c *gin.Context) {
+	var req PurgeExpiredRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		s.respondError(c, http.StatusBadRequest, err, "Invalid request body")
+		return
+	}
+
+	retention, err := time.ParseDuration(req.Retention)
+	if err != nil {
+		s.respondError(c, http.StatusBadRequest, err, "Invalid retention format")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Minute)
+	defer cancel()
+
+	purged, err := s.backupEngine.PurgeExpired(ctx, retention)
+	if err != nil {
+		s.respondError(c, http.StatusInternalServerError, err, "Failed to purge expired backups")
+		return
+	}
+
+	s.respondSuccessWithMessage(c, "Expired backups purged", gin.H{"purged": purged})
 }
 
 type RestoreBackupRequest struct {

@@ -431,8 +431,20 @@ func parseRemotePath(storageLocation string) (string, bool) {
 	return storageLocation[idx+len(sep):], true
 }
 
-// ListBackups lists all available backups
+// ListBackups lists all live (non-soft-deleted) backups. Backups sitting in the
+// recycle bin (DeletedAt != nil) are excluded; use ListDeletedBackups for those.
 func (e *Engine) ListBackups(ctx context.Context) ([]*models.BackupMetadata, error) {
+	return e.listBackups(func(m *models.BackupMetadata) bool { return m.DeletedAt == nil })
+}
+
+// ListDeletedBackups lists only soft-deleted backups: the recycle bin.
+func (e *Engine) ListDeletedBackups(ctx context.Context) ([]*models.BackupMetadata, error) {
+	return e.listBackups(func(m *models.BackupMetadata) bool { return m.DeletedAt != nil })
+}
+
+// listBackups reads every metadata file and returns those matching the include
+// predicate. Invalid metadata files are skipped.
+func (e *Engine) listBackups(include func(*models.BackupMetadata) bool) ([]*models.BackupMetadata, error) {
 	metadataDir := filepath.Join(e.config.TempDirectory, "metadata")
 
 	if _, err := os.Stat(metadataDir); os.IsNotExist(err) {
@@ -456,7 +468,9 @@ func (e *Engine) ListBackups(ctx context.Context) ([]*models.BackupMetadata, err
 			continue // Skip invalid metadata files
 		}
 
-		backups = append(backups, metadata)
+		if include(metadata) {
+			backups = append(backups, metadata)
+		}
 	}
 
 	return backups, nil
@@ -467,26 +481,118 @@ func (e *Engine) GetBackup(ctx context.Context, backupID string) (*models.Backup
 	return e.loadMetadata(backupID)
 }
 
-// DeleteBackup deletes a backup and its metadata
+// DeleteBackup soft-deletes a backup: it stamps DeletedAt and persists the
+// metadata, moving the backup into the recycle bin. The artifact and metadata
+// file are retained so the deletion can be undone via RestoreDeletedBackup or
+// made permanent via PurgeBackup. Deleting an already soft-deleted backup is a
+// no-op that succeeds (idempotent).
 func (e *Engine) DeleteBackup(ctx context.Context, backupID string) error {
-	// Load metadata
 	metadata, err := e.loadMetadata(backupID)
 	if err != nil {
 		return err
 	}
 
-	// Delete backup file
-	if err := os.Remove(metadata.BackupPath); err != nil && !os.IsNotExist(err) {
+	if metadata.DeletedAt != nil {
+		return nil // Already in the recycle bin.
+	}
+
+	now := time.Now()
+	metadata.DeletedAt = &now
+	return e.saveMetadata(metadata)
+}
+
+// RestoreDeletedBackup undeletes a soft-deleted backup, clearing DeletedAt and
+// moving it out of the recycle bin. It errors if the backup does not exist or is
+// not currently soft-deleted.
+func (e *Engine) RestoreDeletedBackup(ctx context.Context, backupID string) error {
+	metadata, err := e.loadMetadata(backupID)
+	if err != nil {
 		return err
 	}
 
-	// Delete metadata file
-	metadataPath := filepath.Join(e.config.TempDirectory, "metadata", backupID+".json")
+	if metadata.DeletedAt == nil {
+		return pkgErrors.ErrValidationFailed(fmt.Sprintf("backup is not in the recycle bin: %s", backupID))
+	}
+
+	metadata.DeletedAt = nil
+	return e.saveMetadata(metadata)
+}
+
+// PurgeBackup permanently removes a backup's artifact and metadata. It is only
+// allowed on backups already in the recycle bin (soft-deleted); purging a live
+// backup is rejected so a permanent deletion always requires an explicit
+// soft-delete first. After a successful purge the backup is unrecoverable.
+func (e *Engine) PurgeBackup(ctx context.Context, backupID string) error {
+	metadata, err := e.loadMetadata(backupID)
+	if err != nil {
+		return err
+	}
+
+	if metadata.DeletedAt == nil {
+		return pkgErrors.ErrValidationFailed(fmt.Sprintf("backup must be soft-deleted before it can be purged: %s", backupID))
+	}
+
+	return e.purge(ctx, metadata)
+}
+
+// purge removes the artifact (from the remote provider when the storage location
+// is remote, plus any local temp copy) and the metadata file. It is the shared
+// hard-delete used by PurgeBackup and PurgeExpired.
+func (e *Engine) purge(ctx context.Context, metadata *models.BackupMetadata) error {
+	// Remove the remote artifact (and its self-describing metadata.json) when the
+	// location is a "<type>://<path>" reference.
+	if e.provider != nil {
+		if remotePath, ok := parseRemotePath(metadata.StorageLocation); ok {
+			if err := e.provider.Delete(ctx, remotePath); err != nil {
+				return fmt.Errorf("delete remote artifact %s: %w", remotePath, err)
+			}
+			metaRemotePath := remoteBackupPath(metadata.ID, "metadata.json")
+			if err := e.provider.Delete(ctx, metaRemotePath); err != nil {
+				return fmt.Errorf("delete remote metadata %s: %w", metaRemotePath, err)
+			}
+		}
+	}
+
+	// Remove any local temp copy of the artifact.
+	if metadata.BackupPath != "" {
+		if err := os.Remove(metadata.BackupPath); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+
+	// Remove the metadata file last so a failure above leaves a recoverable
+	// recycle-bin entry rather than an orphaned artifact.
+	metadataPath := filepath.Join(e.config.TempDirectory, "metadata", metadata.ID+".json")
 	if err := os.Remove(metadataPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
 	return nil
+}
+
+// PurgeExpired permanently purges every soft-deleted backup whose DeletedAt is
+// older than the given retention window, returning the number purged. A backup
+// that fails to purge aborts the sweep and the error is returned along with the
+// count purged so far.
+func (e *Engine) PurgeExpired(ctx context.Context, retention time.Duration) (int, error) {
+	deleted, err := e.ListDeletedBackups(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	cutoff := time.Now().Add(-retention)
+	purged := 0
+	for _, metadata := range deleted {
+		if metadata.DeletedAt == nil || metadata.DeletedAt.After(cutoff) {
+			continue
+		}
+		if err := e.purge(ctx, metadata); err != nil {
+			return purged, err
+		}
+		purged++
+	}
+
+	return purged, nil
 }
 
 // calculateChecksum calculates SHA256 checksum of a file

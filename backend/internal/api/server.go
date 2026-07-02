@@ -171,9 +171,19 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 		{
 			backups.POST("", s.handleCreateBackup)
 			backups.GET("", s.handleListBackups)
+
+			// Recycle-bin (soft-delete) endpoints. The static "/trash" routes are
+			// registered before the "/:id" routes; gin's radix tree lets a static
+			// segment coexist with a param segment at the same level, so there is
+			// no route conflict. DELETE "/:id" now soft-deletes (moves to trash).
+			backups.GET("/trash", s.handleListDeletedBackups)
+			backups.POST("/trash/purge-expired", s.handlePurgeExpired)
+
 			backups.GET("/:id", s.handleGetBackup)
 			backups.DELETE("/:id", s.handleDeleteBackup)
 			backups.POST("/:id/restore", s.handleRestoreBackup)
+			backups.POST("/:id/restore-from-trash", s.handleRestoreDeletedBackup)
+			backups.DELETE("/:id/purge", s.handlePurgeBackup)
 			backups.GET("/:id/download", s.handleDownloadBackup)
 		}
 
