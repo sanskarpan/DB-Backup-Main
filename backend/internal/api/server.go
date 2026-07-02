@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sanskarpan/db-backup/internal/api/middleware"
+	"github.com/sanskarpan/db-backup/internal/approvals"
 	"github.com/sanskarpan/db-backup/internal/auth"
 	"github.com/sanskarpan/db-backup/internal/backup"
 	"github.com/sanskarpan/db-backup/internal/catalog"
@@ -34,8 +35,11 @@ type Server struct {
 	oauth2Handler *auth.OAuth2Handler
 	dbStore       *dbregistry.Store
 	storageStore  *storageregistry.Store
+	approvalStore *approvals.Store
 	wsHub         *websocket.Hub
 	logger        *logger.Logger
+	// muaEnabled gates irreversible operations behind four-eyes approval.
+	muaEnabled bool
 }
 
 // Config holds API server configuration
@@ -66,6 +70,8 @@ func NewServer(
 	oauth2Handler *auth.OAuth2Handler,
 	dbStore *dbregistry.Store,
 	storageStore *storageregistry.Store,
+	approvalStore *approvals.Store,
+	muaEnabled bool,
 	wsHub *websocket.Hub,
 	log *logger.Logger,
 ) *Server {
@@ -82,6 +88,8 @@ func NewServer(
 		oauth2Handler: oauth2Handler,
 		dbStore:       dbStore,
 		storageStore:  storageStore,
+		approvalStore: approvalStore,
+		muaEnabled:    muaEnabled,
 		wsHub:         wsHub,
 		logger:        log,
 	}
@@ -196,6 +204,16 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 			databases.PUT("/:id", s.handleUpdateDatabase)
 			databases.DELETE("/:id", s.handleDeleteDatabase)
 			databases.POST("/:id/test", s.handleTestDatabase)
+		}
+
+		// Multi-user authorization (four-eyes) approval workflow. Registered only
+		// when an approval store is wired in; endpoints are safe no-ops otherwise.
+		if s.approvalStore != nil {
+			approvalsGrp := v1.Group("/approvals", authMiddleware)
+			approvalsGrp.GET("", s.handleListApprovals)
+			approvalsGrp.GET("/:id", s.handleGetApproval)
+			approvalsGrp.POST("/:id/approve", s.handleApproveRequest)
+			approvalsGrp.POST("/:id/reject", s.handleRejectRequest)
 		}
 
 		// Schedule management

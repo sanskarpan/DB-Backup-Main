@@ -249,8 +249,20 @@ func (s *Server) handleRestoreDeletedBackup(c *gin.Context) {
 }
 
 // handlePurgeBackup permanently removes a soft-deleted backup and its artifact.
+//
+// Purge is irreversible, so when multi-user authorization is enabled it is gated
+// behind four-eyes approval: the first call creates a pending approval request
+// and returns 202 without purging; only after a DIFFERENT user approves does a
+// subsequent call actually purge (consuming the approval). When MUA is disabled
+// or no approval store is wired in, purge executes immediately as before.
 func (s *Server) handlePurgeBackup(c *gin.Context) {
 	backupID := c.Param("id")
+
+	if s.muaEnabled && s.approvalStore != nil {
+		if !s.enforcePurgeApproval(c, backupID) {
+			return
+		}
+	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
