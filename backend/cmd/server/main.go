@@ -21,6 +21,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/dbregistry"
 	"github.com/sanskarpan/db-backup/internal/health"
 	"github.com/sanskarpan/db-backup/internal/logger"
+	notifyFactory "github.com/sanskarpan/db-backup/internal/notification/factory"
 	"github.com/sanskarpan/db-backup/internal/restore"
 	"github.com/sanskarpan/db-backup/internal/security/ransomware"
 	"github.com/sanskarpan/db-backup/internal/storage"
@@ -73,6 +74,14 @@ func main() {
 		"type": string(storageProvider.GetType()),
 	})
 
+	// Build the notification router from the configured channels. The router is
+	// always non-nil (a no-op when nothing is enabled) so behavior is unchanged
+	// when notifications are disabled. A partial-init error is logged, not fatal.
+	notificationRouter, err := notifyFactory.NewRouterFromConfig(cfg.Notifications)
+	if err != nil {
+		log.Warn("Some notification channels failed to initialize: " + err.Error())
+	}
+
 	// Initialize components
 	backupEngine := backup.NewEngine(&backup.Config{
 		TempDirectory:      cfg.Backup.TempDirectory,
@@ -81,6 +90,7 @@ func main() {
 		EnableEncryption:   cfg.Backup.Encryption.Enabled,
 		EncryptionKey:      "",
 		StorageProvider:    storageProvider,
+		Notifier:           notificationRouter,
 	})
 
 	restoreEngine := restore.NewEngine(&restore.Config{

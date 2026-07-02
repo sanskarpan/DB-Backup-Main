@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,15 +17,24 @@ import (
 
 	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/sanskarpan/db-backup/internal/models"
+	"github.com/sanskarpan/db-backup/internal/notification"
 	"github.com/sanskarpan/db-backup/internal/storage"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 	"github.com/sanskarpan/db-backup/pkg/utils"
 )
 
+// Notifier is the minimal notification sink used by the engine to report backup
+// outcomes. *notification.Router satisfies it. A nil Notifier disables
+// notifications.
+type Notifier interface {
+	Send(ctx context.Context, notif *notification.Notification) error
+}
+
 // Engine orchestrates backup operations
 type Engine struct {
 	config   *Config
 	provider storage.Provider
+	notifier Notifier
 }
 
 // Config holds backup engine configuration
@@ -39,6 +49,11 @@ type Config struct {
 	// are uploaded here after being dumped locally. When nil, backups remain in
 	// the local temp directory.
 	StorageProvider storage.Provider
+
+	// Notifier is the optional notification sink. When set, a completion
+	// notification (success or failure) is dispatched after each backup. When
+	// nil, no notifications are sent.
+	Notifier Notifier
 }
 
 // CreateOptions holds options for creating a backup
@@ -85,6 +100,7 @@ func NewEngine(config *Config) *Engine {
 	return &Engine{
 		config:   config,
 		provider: config.StorageProvider,
+		notifier: config.Notifier,
 	}
 }
 
@@ -94,13 +110,81 @@ func (e *Engine) SetStorageProvider(provider storage.Provider) {
 	e.provider = provider
 }
 
+// SetNotifier injects (or replaces) the notification sink used to report backup
+// outcomes. Passing nil disables notifications.
+func (e *Engine) SetNotifier(notifier Notifier) {
+	e.notifier = notifier
+}
+
 // remoteBackupPath returns the deterministic remote path for a backup artifact.
 func remoteBackupPath(backupID, fileName string) string {
 	return fmt.Sprintf("backups/%s/%s", backupID, fileName)
 }
 
-// CreateBackup creates a new backup
+// CreateBackup creates a new backup and dispatches a completion notification
+// (success or failure) through the configured notifier, if any. This is the
+// single integration point for backup notifications: callers such as the
+// scheduler delegate here, so they must not send their own notifications. A
+// notification failure never affects the backup result.
 func (e *Engine) CreateBackup(ctx context.Context, opts *CreateOptions) (*models.BackupMetadata, error) {
+	metadata, err := e.createBackup(ctx, opts)
+	e.notifyResult(ctx, metadata, err)
+	return metadata, err
+}
+
+// notifyResult builds and sends a backup completion notification. It is
+// nil-safe (no notifier or no metadata is a no-op) and never returns an error:
+// a notification failure is logged and swallowed so it cannot fail the backup.
+func (e *Engine) notifyResult(ctx context.Context, metadata *models.BackupMetadata, backupErr error) {
+	if e.notifier == nil || metadata == nil {
+		return
+	}
+
+	notif := buildBackupNotification(metadata, backupErr)
+	if err := e.notifier.Send(ctx, notif); err != nil {
+		log.Printf("backup: failed to send %s notification for backup %s: %v",
+			notif.Level, metadata.ID, err)
+	}
+}
+
+// buildBackupNotification summarizes a backup outcome as a *notification.
+// Notification. The "backup" and event ("success"/"failure") tags let each
+// channel honor its NotifyOn configuration.
+func buildBackupNotification(metadata *models.BackupMetadata, backupErr error) *notification.Notification {
+	level := notification.LevelSuccess
+	event := "success"
+	title := fmt.Sprintf("Backup succeeded: %s", metadata.Database)
+	message := fmt.Sprintf("Backup %s of database %q completed successfully.", metadata.ID, metadata.Database)
+
+	if backupErr != nil {
+		level = notification.LevelError
+		event = "failure"
+		title = fmt.Sprintf("Backup failed: %s", metadata.Database)
+		message = fmt.Sprintf("Backup %s of database %q failed: %v", metadata.ID, metadata.Database, backupErr)
+	}
+
+	meta := map[string]interface{}{
+		"backup_id": metadata.ID,
+		"database":  metadata.Database,
+		"status":    string(metadata.Status),
+		"size":      metadata.Size,
+		"duration":  metadata.Duration.String(),
+	}
+	if backupErr != nil {
+		meta["error"] = backupErr.Error()
+	}
+
+	return &notification.Notification{
+		Title:    title,
+		Message:  message,
+		Level:    level,
+		Metadata: meta,
+		Tags:     []string{"backup", event},
+	}
+}
+
+// createBackup performs the actual backup work.
+func (e *Engine) createBackup(ctx context.Context, opts *CreateOptions) (*models.BackupMetadata, error) {
 	// Generate backup ID
 	backupID := utils.GenerateBackupID()
 

@@ -363,7 +363,11 @@ func (s *Scheduler) createJobFunc(job *ScheduledJob) func() {
 	}
 }
 
-// executeJob executes a backup job with retry logic
+// executeJob executes a backup job with retry logic.
+//
+// Notifications are intentionally NOT sent here: executeJob delegates every
+// attempt to backup.Engine.CreateBackup, which is the single integration point
+// for backup notifications. Sending here too would double-notify.
 func (s *Scheduler) executeJob(job *ScheduledJob) *JobResult {
 	result := &JobResult{
 		JobID:     job.ID,
