@@ -315,51 +315,12 @@ func (e *Engine) createBackup(ctx context.Context, opts *CreateOptions) (*models
 	}
 	metadata.Checksum = checksum
 
-	// Upload the backup artifact to the configured storage provider. If no
-	// provider is configured the backup stays in the local temp directory and
-	// the storage location is recorded explicitly.
-	if e.provider != nil {
-		if opts.ProgressCallback != nil {
-			opts.ProgressCallback(Progress{
-				Stage:      "uploading",
-				Percentage: 80,
-				Message:    "Uploading backup to storage...",
-			})
-		}
-
-		remotePath := remoteBackupPath(backupID, backupFileName)
-		uploadOpts := &storage.UploadOptions{
-			ContentType: "application/octet-stream",
-			Checksum:    checksum,
-			Metadata: map[string]string{
-				"backup_id": backupID,
-				"database":  opts.Database,
-			},
-		}
-		if opts.ProgressCallback != nil {
-			uploadOpts.ProgressCallback = func(uploaded, total int64) {
-				opts.ProgressCallback(Progress{
-					Stage:       "uploading",
-					Percentage:  80,
-					Message:     "Uploading backup to storage...",
-					BytesTotal:  total,
-					BytesCopied: uploaded,
-				})
-			}
-		}
-
-		if err := e.provider.Upload(ctx, backupPath, remotePath, uploadOpts); err != nil {
-			// Never report success for a backup that was not durably stored.
-			metadata.Status = database.BackupStatusFailed
-			return metadata, pkgErrors.ErrStorageUpload(err)
-		}
-
-		// Record provider type + remote path. BackupPath keeps pointing at the
-		// local temp copy so callers can still read it before cleanup.
-		metadata.StorageLocation = fmt.Sprintf("%s://%s", e.provider.GetType(), remotePath)
-	} else {
-		// Explicit local-temp behavior.
-		metadata.StorageLocation = backupPath
+	// Upload the backup artifact to the configured storage provider (or record
+	// the explicit local-temp location when none is configured). Never report
+	// success for a backup that was not durably stored.
+	if err = e.storeArtifact(ctx, metadata, backupID, backupFileName, backupPath, checksum, opts); err != nil {
+		metadata.Status = database.BackupStatusFailed
+		return metadata, err
 	}
 
 	if opts.ProgressCallback != nil {
@@ -405,6 +366,54 @@ func (e *Engine) createBackup(ctx context.Context, opts *CreateOptions) (*models
 	}
 
 	return metadata, nil
+}
+
+// storeArtifact uploads the backup artifact to the configured storage provider
+// and records its location on the metadata. When no provider is configured the
+// backup stays in the local temp directory and the local path is recorded.
+func (e *Engine) storeArtifact(ctx context.Context, metadata *models.BackupMetadata, backupID, backupFileName, backupPath, checksum string, opts *CreateOptions) error {
+	if e.provider == nil {
+		metadata.StorageLocation = backupPath
+		return nil
+	}
+
+	if opts.ProgressCallback != nil {
+		opts.ProgressCallback(Progress{
+			Stage:      "uploading",
+			Percentage: 80,
+			Message:    "Uploading backup to storage...",
+		})
+	}
+
+	remotePath := remoteBackupPath(backupID, backupFileName)
+	uploadOpts := &storage.UploadOptions{
+		ContentType: "application/octet-stream",
+		Checksum:    checksum,
+		Metadata: map[string]string{
+			"backup_id": backupID,
+			"database":  opts.Database,
+		},
+	}
+	if opts.ProgressCallback != nil {
+		uploadOpts.ProgressCallback = func(uploaded, total int64) {
+			opts.ProgressCallback(Progress{
+				Stage:       "uploading",
+				Percentage:  80,
+				Message:     "Uploading backup to storage...",
+				BytesTotal:  total,
+				BytesCopied: uploaded,
+			})
+		}
+	}
+
+	if err := e.provider.Upload(ctx, backupPath, remotePath, uploadOpts); err != nil {
+		return pkgErrors.ErrStorageUpload(err)
+	}
+
+	// Record provider type + remote path. BackupPath keeps pointing at the
+	// local temp copy so callers can still read it before cleanup.
+	metadata.StorageLocation = fmt.Sprintf("%s://%s", e.provider.GetType(), remotePath)
+	return nil
 }
 
 // ValidateBackup validates a backup file

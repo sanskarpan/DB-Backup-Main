@@ -19,7 +19,7 @@ import (
 // are enabled it is an empty, no-op router. A non-nil error reports channels
 // that were enabled but could not be constructed - the router still contains
 // every channel that built successfully.
-func NewRouterFromConfig(cfg config.NotificationConfig) (*notification.Router, error) {
+func NewRouterFromConfig(cfg *config.NotificationConfig) (*notification.Router, error) {
 	router := notification.NewRouter()
 	var errs []error
 

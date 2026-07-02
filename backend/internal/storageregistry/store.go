@@ -181,7 +181,7 @@ func stringify(v interface{}) string {
 
 // encodeSecrets encrypts (if a key is configured) and hex-encodes each secret
 // value, returning the encoded map and whether encryption was applied.
-func (s *Store) encodeSecrets(secrets map[string]string) (map[string]string, bool, error) {
+func (s *Store) encodeSecrets(secrets map[string]string) (encoded map[string]string, encrypted bool, err error) {
 	if len(secrets) == 0 {
 		return nil, false, nil
 	}
@@ -193,9 +193,9 @@ func (s *Store) encodeSecrets(secrets map[string]string) (map[string]string, boo
 		return out, false, nil
 	}
 	for k, v := range secrets {
-		ciphertext, err := s.encryptor.Encrypt([]byte(v))
-		if err != nil {
-			return nil, false, fmt.Errorf("storageregistry: encrypt secret %q: %w", k, err)
+		ciphertext, encErr := s.encryptor.Encrypt([]byte(v))
+		if encErr != nil {
+			return nil, false, fmt.Errorf("storageregistry: encrypt secret %q: %w", k, encErr)
 		}
 		out[k] = hex.EncodeToString(ciphertext)
 	}

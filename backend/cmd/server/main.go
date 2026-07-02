@@ -78,7 +78,7 @@ func main() {
 	// Build the notification router from the configured channels. The router is
 	// always non-nil (a no-op when nothing is enabled) so behavior is unchanged
 	// when notifications are disabled. A partial-init error is logged, not fatal.
-	notificationRouter, err := notifyFactory.NewRouterFromConfig(cfg.Notifications)
+	notificationRouter, err := notifyFactory.NewRouterFromConfig(&cfg.Notifications)
 	if err != nil {
 		log.Warn("Some notification channels failed to initialize: " + err.Error())
 	}

@@ -618,8 +618,13 @@ func (s *Server) handleGetStorageStats(c *gin.Context) {
 
 	// Aggregate real storage usage from backup metadata, broken down by the
 	// storage location each backup was written to.
+	type locationStat struct {
+		Size           int64 `json:"size"`
+		CompressedSize int64 `json:"compressed_size"`
+		Backups        int   `json:"backups"`
+	}
 	var totalSize, totalCompressed int64
-	byLocation := make(map[string]gin.H)
+	byLocation := make(map[string]*locationStat)
 	for _, b := range backups {
 		totalSize += b.Size
 		totalCompressed += b.CompressedSize
@@ -628,14 +633,14 @@ func (s *Server) handleGetStorageStats(c *gin.Context) {
 		if loc == "" {
 			loc = "local"
 		}
-		entry, ok := byLocation[loc]
-		if !ok {
-			entry = gin.H{"backups": 0, "size": int64(0), "compressed_size": int64(0)}
+		entry := byLocation[loc]
+		if entry == nil {
+			entry = &locationStat{}
+			byLocation[loc] = entry
 		}
-		entry["backups"] = entry["backups"].(int) + 1
-		entry["size"] = entry["size"].(int64) + b.Size
-		entry["compressed_size"] = entry["compressed_size"].(int64) + b.CompressedSize
-		byLocation[loc] = entry
+		entry.Backups++
+		entry.Size += b.Size
+		entry.CompressedSize += b.CompressedSize
 	}
 
 	providers := 0
@@ -774,7 +779,7 @@ type ThreatAlert struct {
 //
 // Threat detection is performed on-demand via the scan endpoints and no alert
 // history is persisted, so this honestly returns an empty list rather than
-// fabricated alerts. The response still honours the severity/status query
+// fabricated alerts. The response still honors the severity/status query
 // filters for forward compatibility.
 func (s *Server) handleListThreatAlerts(c *gin.Context) {
 	// No persisted alert store exists, so there are genuinely no alerts.

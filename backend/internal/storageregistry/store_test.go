@@ -90,6 +90,21 @@ func TestStore_CRUD(t *testing.T) {
 		t.Fatalf("Resolve did not return secrets: %+v", resolved.Config)
 	}
 
+	if err := s.Delete(sp.ID); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if _, err := s.Get(sp.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound after delete, got %v", err)
+	}
+}
+
+func TestStore_UpdateSecrets(t *testing.T) {
+	s := newTestStore(t)
+	sp, err := s.Create(sampleCreate())
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
 	// Update without resupplying secrets preserves them.
 	updated, err := s.Update(sp.ID, &UpdateRequest{
 		Name: "prod-s3-renamed",
@@ -116,7 +131,7 @@ func TestStore_CRUD(t *testing.T) {
 
 	// Update resupplying a secret overwrites it.
 	newSecret := "cred-" + strings.Repeat("c", 6)
-	if _, err := s.Update(sp.ID, &UpdateRequest{
+	if _, err = s.Update(sp.ID, &UpdateRequest{
 		Name: "prod-s3-renamed", Type: "s3",
 		Config: map[string]interface{}{"secret_key": newSecret},
 	}); err != nil {
@@ -128,13 +143,6 @@ func TestStore_CRUD(t *testing.T) {
 	}
 	if resolved3.Config["secret_key"] != newSecret {
 		t.Fatalf("secret not updated: %+v", resolved3.Config)
-	}
-
-	if err := s.Delete(sp.ID); err != nil {
-		t.Fatalf("Delete: %v", err)
-	}
-	if _, err := s.Get(sp.ID); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("expected ErrNotFound after delete, got %v", err)
 	}
 }
 

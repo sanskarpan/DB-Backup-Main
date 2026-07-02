@@ -9,7 +9,7 @@ import (
 )
 
 func TestNewRouterFromConfigEmpty(t *testing.T) {
-	router, err := NewRouterFromConfig(config.NotificationConfig{})
+	router, err := NewRouterFromConfig(&config.NotificationConfig{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -27,7 +27,7 @@ func TestNewRouterFromConfigEnabledButInvalid(t *testing.T) {
 	cfg := config.NotificationConfig{
 		Slack: config.SlackConfig{Enabled: true},
 	}
-	router, err := NewRouterFromConfig(cfg)
+	router, err := NewRouterFromConfig(&cfg)
 	if err == nil {
 		t.Fatal("expected error for enabled Slack channel without a webhook URL")
 	}

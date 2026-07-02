@@ -35,7 +35,7 @@ func newStatsTestServer(t *testing.T) *gin.Engine {
 	if err != nil {
 		t.Fatalf("dbregistry NewStore: %v", err)
 	}
-	if _, err := dbStore.Create(&dbregistry.CreateRequest{
+	if _, err = dbStore.Create(&dbregistry.CreateRequest{
 		Name: "pg", Type: "postgres", Host: "localhost", Port: 5432, Username: "admin",
 	}); err != nil {
 		t.Fatalf("seed database: %v", err)

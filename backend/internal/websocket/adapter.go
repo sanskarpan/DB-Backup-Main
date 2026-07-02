@@ -52,20 +52,28 @@ func (a *NotifierAdapter) ValidateConfig() error {
 	return nil
 }
 
+// Notification payload type strings understood by the WebSocket client.
+const (
+	notifTypeWarning = "warning"
+	notifTypeError   = "error"
+	notifTypeSuccess = "success"
+	notifTypeInfo    = "info"
+)
+
 // mapLevel maps a notification severity level to the string type understood by
 // the WebSocket Notification payload.
 func mapLevel(level notification.NotificationLevel) string {
 	switch level {
 	case notification.LevelWarning:
-		return "warning"
+		return notifTypeWarning
 	case notification.LevelError:
-		return "error"
+		return notifTypeError
 	case notification.LevelSuccess:
-		return "success"
+		return notifTypeSuccess
 	case notification.LevelInfo:
-		return "info"
+		return notifTypeInfo
 	default:
-		return "info"
+		return notifTypeInfo
 	}
 }
 

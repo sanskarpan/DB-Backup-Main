@@ -140,7 +140,7 @@ func (d *InfluxDBDriver) Backup(ctx context.Context, opts *database.BackupOption
 // backupV1 performs backup for InfluxDB v1.x using influxd backup command
 func (d *InfluxDBDriver) backupV1(ctx context.Context, opts *database.BackupOptions, result *database.BackupResult) (*database.BackupResult, error) {
 	backupDir := filepath.Join(opts.OutputDir, result.ID)
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(backupDir, 0o755); err != nil {
 		result.Status = database.BackupStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseBackup(err)
@@ -207,7 +207,7 @@ func (d *InfluxDBDriver) backupV1(ctx context.Context, opts *database.BackupOpti
 // backupV2 performs backup for InfluxDB v2.x using API
 func (d *InfluxDBDriver) backupV2(ctx context.Context, opts *database.BackupOptions, result *database.BackupResult) (*database.BackupResult, error) {
 	backupDir := filepath.Join(opts.OutputDir, result.ID)
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(backupDir, 0o755); err != nil {
 		result.Status = database.BackupStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseBackup(err)
@@ -257,11 +257,11 @@ func (d *InfluxDBDriver) backupV2(ctx context.Context, opts *database.BackupOpti
 // (NDJSON) so that a backup can be read back losslessly by restoreBucket.
 // Measurement, timestamp, the field name/value and all tags are preserved.
 type backupRecord struct {
-	Measurement string            `json:"measurement"`
 	Time        time.Time         `json:"time"`
-	Field       string            `json:"field"`
 	Value       interface{}       `json:"value"`
 	Tags        map[string]string `json:"tags,omitempty"`
+	Measurement string            `json:"measurement"`
+	Field       string            `json:"field"`
 }
 
 // reservedFluxColumns are the columns present in a (non-pivoted) Flux result
@@ -736,7 +736,7 @@ func (d *InfluxDBDriver) GetDatabaseSize(ctx context.Context) (size int64, err e
 	}
 
 	metricsURL := strings.TrimSuffix(d.client.ServerURL(), "/") + "/metrics"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, metricsURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, metricsURL, http.NoBody)
 	if err != nil {
 		return 0, pkgErrors.Wrap(err, pkgErrors.ErrorTypeDatabase, "failed to build metrics request")
 	}
@@ -780,15 +780,14 @@ func (d *InfluxDBDriver) GetDatabaseSize(ctx context.Context) (size int64, err e
 // values of the storage_shard_disk_size gauge (bytes on disk). It reports
 // whether any such metric line was found so callers can distinguish "size is
 // zero" from "metric not exposed".
-func sumShardDiskSize(r io.Reader) (int64, bool, error) {
+func sumShardDiskSize(r io.Reader) (total int64, found bool, err error) {
 	const metricName = "storage_shard_disk_size"
 
 	scanner := bufio.NewScanner(r)
 	const maxCapacity = 1024 * 1024 // 1MB
 	scanner.Buffer(make([]byte, maxCapacity), maxCapacity)
 
-	var total float64
-	found := false
+	var sum float64
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -816,15 +815,15 @@ func sumShardDiskSize(r io.Reader) (int64, bool, error) {
 		if perr != nil {
 			continue
 		}
-		total += v
+		sum += v
 		found = true
 	}
 
-	if err := scanner.Err(); err != nil {
-		return 0, false, err
+	if serr := scanner.Err(); serr != nil {
+		return 0, false, serr
 	}
 
-	return int64(total), found, nil
+	return int64(sum), found, nil
 }
 
 // GetVersion returns the InfluxDB version
