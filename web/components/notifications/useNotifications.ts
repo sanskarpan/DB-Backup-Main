@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { getNotificationsWsUrl } from '@/lib/notifications-ws'
 
 interface Notification {
   id: string
@@ -64,7 +65,12 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       return
     }
 
-    const ws = new WebSocket('ws://localhost:8080/api/v1/notifications/ws')
+    const wsUrl = getNotificationsWsUrl()
+    if (!wsUrl) {
+      return
+    }
+
+    const ws = new WebSocket(wsUrl)
 
     ws.onopen = () => {
       console.log('WebSocket connected')

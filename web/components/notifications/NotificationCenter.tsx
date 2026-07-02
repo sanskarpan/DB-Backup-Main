@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Bell, X, Check, Clock, Filter, Settings, ChevronDown, Trash2, Archive } from 'lucide-react'
+import { getNotificationsWsUrl } from '@/lib/notifications-ws'
 
 // Types
 interface Notification {
@@ -85,7 +86,12 @@ export default function NotificationCenter() {
   // WebSocket connection for real-time updates
   useEffect(() => {
     const connectWebSocket = () => {
-      const socket = new WebSocket('ws://localhost:8080/api/v1/notifications/ws')
+      const wsUrl = getNotificationsWsUrl()
+      if (!wsUrl) {
+        return
+      }
+
+      const socket = new WebSocket(wsUrl)
 
       socket.onopen = () => {
         console.log('WebSocket connected')

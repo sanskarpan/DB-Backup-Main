@@ -21,6 +21,7 @@ import {
 } from '@/lib/visualization-manager'
 import Chart from '@/components/visualizations/Chart'
 import Dashboard from '@/components/visualizations/Dashboard'
+import { SampleDataBadge } from '@/components/ui/sample-data-badge'
 
 export default function VisualizationsPage() {
   const [activeTab, setActiveTab] = useState<'charts' | 'dashboards'>('charts')
@@ -314,10 +315,17 @@ export default function VisualizationsPage() {
   return (
     <div className="container mx-auto p-6">
       <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2">Data Visualizations</h1>
+        <div className="flex items-center gap-3 mb-2">
+          <h1 className="text-4xl font-bold">Data Visualizations</h1>
+          <SampleDataBadge />
+        </div>
         <p className="text-gray-600">
           Advanced charts and dashboards for backup operations monitoring and analytics
         </p>
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          These charts render generated sample data to demonstrate the visualization
+          engine. They are not backed by live backup metrics.
+        </div>
       </div>
 
       {/* Tabs */}

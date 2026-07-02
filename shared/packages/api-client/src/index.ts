@@ -16,7 +16,20 @@ import type {
   ConnectionTestResponse,
   BackupFilter,
   PaginationParams,
+  SecurityStats,
+  ThreatAlert,
+  ThreatAlertListResponse,
+  ThreatAlertFilter,
 } from '@db-backup/types';
+
+/**
+ * Envelope used by endpoints that wrap their payload in { success, data }.
+ */
+interface SuccessEnvelope<T> {
+  success: boolean;
+  message?: string;
+  data: T;
+}
 
 // ====================================
 // API Client Configuration
@@ -240,6 +253,34 @@ export class DbBackupApiClient {
       `/security/storage/providers/${id}/test`
     );
     return data;
+  }
+
+  // ====================================
+  // Security Operations
+  //
+  // These map to the real backend endpoints GET /security/stats and
+  // GET /security/alerts. Both wrap their payload in a { success, data }
+  // envelope, so we unwrap `data.data` here.
+  // ====================================
+
+  async getSecurityStats(): Promise<SecurityStats> {
+    const { data } = await this.client.get<SuccessEnvelope<SecurityStats>>('/security/stats');
+    return data.data;
+  }
+
+  async listThreatAlerts(params?: ThreatAlertFilter): Promise<ThreatAlertListResponse> {
+    const { data } = await this.client.get<SuccessEnvelope<ThreatAlertListResponse>>(
+      '/security/alerts',
+      { params }
+    );
+    return data.data;
+  }
+
+  async getThreatAlert(id: string): Promise<ThreatAlert> {
+    const { data } = await this.client.get<SuccessEnvelope<ThreatAlert>>(
+      `/security/alerts/${id}`
+    );
+    return data.data;
   }
 
   // ====================================
