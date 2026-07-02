@@ -214,6 +214,7 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 		// Statistics and monitoring
 		v1.GET("/stats", authMiddleware, s.handleGetStats)
 		v1.GET("/stats/storage", authMiddleware, s.handleGetStorageStats)
+		v1.GET("/stats/backup-health", authMiddleware, s.handleBackupHealth)
 
 		// Security endpoints
 		security := v1.Group("/security", authMiddleware)
