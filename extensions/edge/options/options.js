@@ -2,6 +2,8 @@
  * Options Page Controller for DB Backup Manager Extension
  */
 
+import { Utils } from '../shared/utils.js';
+
 // ============================================================================
 // Initialize
 // ============================================================================
@@ -80,6 +82,9 @@ function setupEventListeners() {
 
   // API Key toggle
   document.getElementById('toggleApiKey').addEventListener('click', toggleApiKeyVisibility);
+
+  // Log in to obtain a token
+  document.getElementById('loginBtn').addEventListener('click', handleLogin);
 
   // Test connection
   document.getElementById('testConnection').addEventListener('click', testConnection);
@@ -185,6 +190,62 @@ function toggleApiKeyVisibility() {
 }
 
 // ============================================================================
+// Login (obtain a JWT token from username/password)
+// ============================================================================
+
+async function handleLogin() {
+  const loginBtn = document.getElementById('loginBtn');
+  const statusSpan = document.getElementById('loginStatus');
+  const originalHTML = loginBtn.innerHTML;
+
+  const apiUrl = document.getElementById('apiUrl').value;
+  const username = document.getElementById('loginUsername').value;
+  const password = document.getElementById('loginPassword').value;
+
+  statusSpan.textContent = '';
+  statusSpan.className = 'connection-status';
+
+  try {
+    if (!Utils.isValidURL(apiUrl)) {
+      throw new Error('Please enter a valid API URL first');
+    }
+    if (!username || !password) {
+      throw new Error('Please enter both username and password');
+    }
+
+    loginBtn.disabled = true;
+    loginBtn.innerHTML = '<svg class="spinning" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Signing in...';
+
+    const response = await fetch(`${apiUrl.replace(/\/$/, '')}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || !data.token) {
+      throw new Error(data.message || data.error || `Login failed: ${response.status}`);
+    }
+
+    // Store the returned token in the API Token field so it gets saved with settings.
+    document.getElementById('apiKey').value = data.token;
+    // Clear the password field for safety once the token is obtained.
+    document.getElementById('loginPassword').value = '';
+
+    statusSpan.textContent = '✓ Logged in. Token filled in below — click "Save Settings".';
+    statusSpan.className = 'connection-status success';
+  } catch (error) {
+    console.error('Login failed:', error);
+    statusSpan.textContent = `✗ ${error.message}`;
+    statusSpan.className = 'connection-status error';
+  } finally {
+    loginBtn.disabled = false;
+    loginBtn.innerHTML = originalHTML;
+  }
+}
+
+// ============================================================================
 // Test Connection
 // ============================================================================
 
@@ -203,11 +264,11 @@ async function testConnection() {
     const apiKey = document.getElementById('apiKey').value;
 
     if (!apiUrl || !apiKey) {
-      throw new Error('Please enter both API URL and API Key');
+      throw new Error('Please enter both API URL and API Token');
     }
 
-    // Test connection by fetching stats
-    const response = await fetch(`${apiUrl}/api/stats/dashboard`, {
+    // Test connection by fetching stats (real endpoint: /api/v1/stats)
+    const response = await fetch(`${apiUrl.replace(/\/$/, '')}/api/v1/stats`, {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',

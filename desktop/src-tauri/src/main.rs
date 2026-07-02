@@ -61,22 +61,6 @@ struct BackupJob {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct BackupPreview {
-    id: String,
-    database_name: String,
-    tables: Vec<TableInfo>,
-    total_size: i64,
-    schema_sql: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct TableInfo {
-    name: String,
-    row_count: i64,
-    size_bytes: i64,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 struct BackupConfig {
     api_url: String,
     api_key: String,
@@ -105,17 +89,65 @@ struct SearchResult {
     score: f64,
 }
 
+// ============================================================================
+// PERSISTED CONFIG (survives app restarts)
+// ============================================================================
+
+/// Config that is written to disk so settings (including the API key) survive
+/// application restarts. Stored as JSON in the platform config directory.
 #[derive(Debug, Serialize, Deserialize)]
-struct ExportOptions {
-    format: String, // "pdf", "excel", "csv"
-    include_metadata: bool,
-    date_range: Option<DateRange>,
+struct PersistedConfig {
+    api_url: String,
+    api_key: Option<String>,
+    notifications_enabled: bool,
+    theme: String,
+    language: String,
+    auto_launch: bool,
+    keyboard_shortcuts: KeyboardShortcuts,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct DateRange {
-    start: String,
-    end: String,
+impl Default for PersistedConfig {
+    fn default() -> Self {
+        Self {
+            api_url: "http://localhost:8080".to_string(),
+            api_key: None,
+            notifications_enabled: true,
+            theme: "light".to_string(),
+            language: "en".to_string(),
+            auto_launch: false,
+            keyboard_shortcuts: KeyboardShortcuts::default(),
+        }
+    }
+}
+
+/// Location of the persisted config file (e.g. ~/.config/dbbackup/desktop/config.json).
+fn config_file_path() -> Option<std::path::PathBuf> {
+    directories::ProjectDirs::from("com", "dbbackup", "desktop")
+        .map(|dirs| dirs.config_dir().join("config.json"))
+}
+
+/// Load persisted config from disk, falling back to defaults when the file is
+/// missing or unreadable.
+fn load_persisted_config() -> PersistedConfig {
+    if let Some(path) = config_file_path() {
+        if let Ok(contents) = std::fs::read_to_string(&path) {
+            if let Ok(cfg) = serde_json::from_str::<PersistedConfig>(&contents) {
+                return cfg;
+            }
+        }
+    }
+    PersistedConfig::default()
+}
+
+/// Persist config to disk, creating the config directory if needed.
+fn save_persisted_config(cfg: &PersistedConfig) -> Result<(), String> {
+    let path = config_file_path().ok_or("Could not determine config directory")?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let json = serde_json::to_string_pretty(cfg).map_err(|e| e.to_string())?;
+    std::fs::write(&path, json).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 // ============================================================================
@@ -201,37 +233,6 @@ async fn create_backup(
 // NEW COMMANDS - ENHANCEMENTS
 // ============================================================================
 
-/// NEW: Get backup preview without downloading full backup
-#[tauri::command]
-async fn get_backup_preview(
-    state: tauri::State<'_, AppState>,
-    backup_id: String,
-) -> Result<BackupPreview, String> {
-    let api_url = state.api_url.lock().unwrap().clone();
-    let api_key = state.api_key.lock().unwrap().clone();
-
-    if api_key.is_none() {
-        return Err("API key not configured".to_string());
-    }
-
-    let client = reqwest::Client::new();
-    let url = format!("{}/api/v1/backups/{}/preview", api_url, backup_id);
-
-    let response = client
-        .get(&url)
-        .header("Authorization", format!("Bearer {}", api_key.unwrap()))
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    if !response.status().is_success() {
-        return Err(format!("API error: {}", response.status()));
-    }
-
-    let preview: BackupPreview = response.json().await.map_err(|e| e.to_string())?;
-    Ok(preview)
-}
-
 /// NEW: Search across backups, databases, settings
 #[tauri::command]
 async fn quick_search(
@@ -246,7 +247,8 @@ async fn quick_search(
     }
 
     let client = reqwest::Client::new();
-    let url = format!("{}/api/v1/search", api_url);
+    // Backend exposes catalog search at /api/v1/catalog/search (see backend server.go)
+    let url = format!("{}/api/v1/catalog/search", api_url);
 
     let response = client
         .get(&url)
@@ -262,39 +264,6 @@ async fn quick_search(
 
     let results: Vec<SearchResult> = response.json().await.map_err(|e| e.to_string())?;
     Ok(results)
-}
-
-/// NEW: Export backups to PDF/Excel
-#[tauri::command]
-async fn export_backups(
-    state: tauri::State<'_, AppState>,
-    options: ExportOptions,
-) -> Result<String, String> {
-    let api_url = state.api_url.lock().unwrap().clone();
-    let api_key = state.api_key.lock().unwrap().clone();
-
-    if api_key.is_none() {
-        return Err("API key not configured".to_string());
-    }
-
-    let client = reqwest::Client::new();
-    let url = format!("{}/api/v1/backups/export", api_url);
-
-    let response = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", api_key.unwrap()))
-        .json(&options)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    if !response.status().is_success() {
-        return Err(format!("API error: {}", response.status()));
-    }
-
-    // Get the file path from response
-    let export_path: String = response.text().await.map_err(|e| e.to_string())?;
-    Ok(export_path)
 }
 
 /// NEW: Toggle theme (light/dark)
@@ -412,13 +381,29 @@ async fn update_config(
     state: tauri::State<'_, AppState>,
     config: BackupConfig,
 ) -> Result<(), String> {
-    *state.api_url.lock().unwrap() = config.api_url;
-    *state.api_key.lock().unwrap() = Some(config.api_key);
+    *state.api_url.lock().unwrap() = config.api_url.clone();
+    *state.api_key.lock().unwrap() = Some(config.api_key.clone());
     *state.notifications_enabled.lock().unwrap() = config.notifications_enabled;
-    *state.theme.lock().unwrap() = config.theme;
-    *state.language.lock().unwrap() = config.language;
+    *state.theme.lock().unwrap() = config.theme.clone();
+    *state.language.lock().unwrap() = config.language.clone();
     *state.auto_launch.lock().unwrap() = config.auto_launch;
-    *state.keyboard_shortcuts.lock().unwrap() = config.keyboard_shortcuts;
+    *state.keyboard_shortcuts.lock().unwrap() = config.keyboard_shortcuts.clone();
+
+    // Persist to disk so settings (including the API key) survive restarts.
+    let persisted = PersistedConfig {
+        api_url: config.api_url,
+        api_key: if config.api_key.is_empty() {
+            None
+        } else {
+            Some(config.api_key)
+        },
+        notifications_enabled: config.notifications_enabled,
+        theme: config.theme,
+        language: config.language,
+        auto_launch: config.auto_launch,
+        keyboard_shortcuts: config.keyboard_shortcuts,
+    };
+    save_persisted_config(&persisted)?;
 
     Ok(())
 }
@@ -428,8 +413,8 @@ async fn send_notification(
     app: AppHandle,
     payload: NotificationPayload,
 ) -> Result<(), String> {
-    app.notification()
-        .builder()
+    let identifier = app.config().tauri.bundle.identifier.clone();
+    tauri::api::notification::Notification::new(identifier)
         .title(&payload.title)
         .body(&payload.body)
         .show()
@@ -550,14 +535,17 @@ fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
 fn main() {
     env_logger::init();
 
+    // Load persisted settings (including the API key) so they survive restarts.
+    let persisted = load_persisted_config();
+
     let app_state = AppState {
-        api_url: Mutex::new("http://localhost:8080".to_string()),
-        api_key: Mutex::new(None),
-        notifications_enabled: Mutex::new(true),
-        theme: Mutex::new("light".to_string()),
-        language: Mutex::new("en".to_string()),
-        auto_launch: Mutex::new(false),
-        keyboard_shortcuts: Mutex::new(KeyboardShortcuts::default()),
+        api_url: Mutex::new(persisted.api_url),
+        api_key: Mutex::new(persisted.api_key),
+        notifications_enabled: Mutex::new(persisted.notifications_enabled),
+        theme: Mutex::new(persisted.theme),
+        language: Mutex::new(persisted.language),
+        auto_launch: Mutex::new(persisted.auto_launch),
+        keyboard_shortcuts: Mutex::new(persisted.keyboard_shortcuts),
     };
 
     tauri::Builder::default()
@@ -576,9 +564,7 @@ fn main() {
             show_window,
             hide_window,
             // Enhanced features
-            get_backup_preview,
             quick_search,
-            export_backups,
             toggle_theme,
             get_theme,
             set_language,
@@ -674,12 +660,10 @@ fn main() {
                 .unwrap();
 
             // Startup notification
-            let app_handle = app.handle();
+            let identifier = app.config().tauri.bundle.identifier.clone();
             tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                let _ = app_handle
-                    .notification()
-                    .builder()
+                let _ = tauri::api::notification::Notification::new(identifier)
                     .title("DB Backup Desktop")
                     .body("Application started successfully! Press Cmd/Ctrl+K for quick search")
                     .show();

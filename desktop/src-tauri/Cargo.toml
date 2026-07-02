@@ -23,7 +23,6 @@ directories = "5.0"
 log = "0.4"
 env_logger = "0.11"
 auto-launch = "0.5" # Auto-launch on startup
-pdf-rs = "0.8" # PDF export support
 
 # Platform-specific dependencies
 [target.'cfg(target_os = "windows")'.dependencies]

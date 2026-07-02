@@ -4,11 +4,13 @@ import { sendNotification } from '@tauri-apps/api/notification'
 import { appWindow } from '@tauri-apps/api/window'
 import { useTranslation } from 'react-i18next'
 import { Command } from 'cmdk'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 import {
   Database,
   Settings,
   Activity,
-  Bell,
   Minimize,
   X,
   Search,
@@ -186,8 +188,10 @@ function EnhancedApp() {
     setLoading(true)
     setError(null)
     try {
+      // Tauri converts JS camelCase arg keys to the Rust snake_case params,
+      // so this must be `databaseId` to bind to the `database_id` parameter.
       await invoke('create_backup', {
-        database_id: 'default-db',
+        databaseId: 'default-db',
         options: {}
       })
       await sendNotification({
@@ -224,31 +228,30 @@ function EnhancedApp() {
     }
   }
 
-  const handlePreviewBackup = async (backup: Backup) => {
-    try {
-      const preview = await invoke<BackupPreview>('get_backup_preview', {
-        backup_id: backup.id
-      })
-      setPreviewData(preview)
-      setSelectedBackup(backup)
-      setShowBackupPreview(true)
-    } catch (err) {
-      setError(err as string)
+  const handlePreviewBackup = (backup: Backup) => {
+    // The backend does not expose a per-backup "preview" endpoint, so build the
+    // preview from the backup metadata we already loaded. No fabricated data:
+    // table-level detail is unavailable, so `tables` is left empty.
+    const preview: BackupPreview = {
+      id: backup.id,
+      database_name: backup.database_name,
+      tables: [],
+      total_size: backup.size ?? 0,
+      schema_sql: ''
     }
+    setPreviewData(preview)
+    setSelectedBackup(backup)
+    setShowBackupPreview(true)
   }
 
   const handleExport = async (format: string) => {
     try {
-      const filePath = await invoke<string>('export_backups', {
-        options: {
-          format,
-          include_metadata: true,
-          date_range: null
-        }
-      })
+      // Export using the data already fetched from the backend (no server-side
+      // export endpoint exists). Files are generated locally.
+      const filename = exportBackupsToFile(format, backups)
       await sendNotification({
         title: t('exportSuccess'),
-        body: `Exported to ${filePath}`
+        body: `Exported to ${filename}`
       })
       setShowExportDialog(false)
     } catch (err) {
@@ -372,7 +375,7 @@ function EnhancedApp() {
           />
         )}
 
-        {activeTab === 'activity' && <ActivityTab />}
+        {activeTab === 'activity' && <ActivityTab backups={backups} />}
 
         {activeTab === 'settings' && (
           <SettingsTab
@@ -543,28 +546,44 @@ function BackupsTab({ backups, loading, onCreateBackup, onRefresh, onPreview, on
   )
 }
 
-function ActivityTab() {
+function ActivityTab({ backups }: { backups: Backup[] }) {
   const { t } = useTranslation()
+
+  // Derive activity from real backup data (most recent first). No fabricated rows.
+  const items = [...backups].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )
+
+  const statusFor = (status: string): ActivityItemProps['status'] => {
+    if (status === 'completed') return 'success'
+    if (status === 'failed') return 'error'
+    return 'info'
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">{t('activity')} Log</h1>
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <div className="space-y-4">
-          <ActivityItem
-            icon={<Database className="w-5 h-5" />}
-            title="Backup Completed"
-            description="PostgreSQL production backup completed successfully"
-            time="2 minutes ago"
-            status="success"
-          />
-          <ActivityItem
-            icon={<Bell className="w-5 h-5" />}
-            title="Notification Sent"
-            description="Backup completion notification delivered"
-            time="2 minutes ago"
-            status="info"
-          />
-        </div>
+        {items.length === 0 ? (
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+            No recent activity
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {items.map((backup) => (
+              <ActivityItem
+                key={backup.id}
+                icon={<Database className="w-5 h-5" />}
+                title={`Backup ${t(backup.status)}`}
+                description={`${backup.database_name}${
+                  backup.size ? ' • ' + formatBytes(backup.size) : ''
+                }`}
+                time={new Date(backup.created_at).toLocaleString()}
+                status={statusFor(backup.status)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -878,6 +897,61 @@ function StatusBadge({ status }: { status: string }) {
       {t(status)}
     </span>
   )
+}
+
+// Export the already-fetched backups to a local file. Returns the file name.
+function exportBackupsToFile(format: string, backups: Backup[]): string {
+  const headers = ['Database', 'Status', 'Created', 'Size']
+  const rows = backups.map((b) => ({
+    Database: b.database_name,
+    Status: b.status,
+    Created: new Date(b.created_at).toLocaleString(),
+    Size: b.size ? formatBytes(b.size) : '-'
+  }))
+  const stamp = Date.now()
+
+  if (format === 'excel') {
+    const worksheet = XLSX.utils.json_to_sheet(rows)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Backups')
+    const filename = `backups-${stamp}.xlsx`
+    XLSX.writeFile(workbook, filename)
+    return filename
+  }
+
+  if (format === 'pdf') {
+    const doc = new jsPDF()
+    doc.text('Backups', 14, 16)
+    autoTable(doc, {
+      startY: 20,
+      head: [headers],
+      body: rows.map((r) => [r.Database, r.Status, r.Created, r.Size])
+    })
+    const filename = `backups-${stamp}.pdf`
+    doc.save(filename)
+    return filename
+  }
+
+  // Default: CSV
+  const escape = (value: string) => `"${value.replace(/"/g, '""')}"`
+  const csv = [
+    headers.join(','),
+    ...rows.map((r) => headers.map((h) => escape(String((r as Record<string, string>)[h] ?? ''))).join(','))
+  ].join('\n')
+  const filename = `backups-${stamp}.csv`
+  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), filename)
+  return filename
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  document.body.removeChild(anchor)
+  URL.revokeObjectURL(url)
 }
 
 function formatBytes(bytes: number): string {

@@ -225,11 +225,11 @@ async function syncBackupData() {
     api.setBaseURL(settings.apiUrl);
     api.setApiKey(settings.apiKey);
 
-    // Fetch backups
+    // Fetch backups (listBackups normalizes to a plain array)
     const backups = await api.listBackups({ limit: 100 });
 
     // Update state
-    state.backupCount = backups.total || backups.length || 0;
+    state.backupCount = backups.length || 0;
     state.failedBackupCount = backups.filter(b => b.status === 'failed').length;
     state.lastSyncTime = new Date();
     state.isConnected = true;
@@ -242,10 +242,27 @@ async function syncBackupData() {
     // Store sync time
     await Utils.setStorage('lastSync', Date.now());
 
-    // Update statistics
+    // Update statistics from the real /stats endpoint when available,
+    // falling back to numbers derived from the backup list.
+    let dashStats = null;
+    try {
+      dashStats = await api.getDashboardStats();
+    } catch (error) {
+      console.warn('Dashboard stats unavailable:', error.message);
+    }
+
     const stats = await Utils.getStorage('statistics') || {};
-    stats.totalBackups = state.backupCount;
-    stats.failedBackups = state.failedBackupCount;
+    if (dashStats) {
+      stats.totalBackups = dashStats.total_backups ?? backups.length;
+      stats.successfulBackups = dashStats.successful_backups ?? stats.successfulBackups ?? 0;
+      stats.failedBackups = dashStats.failed_backups ?? state.failedBackupCount;
+      stats.totalSize = dashStats.total_size ?? stats.totalSize ?? 0;
+      state.backupCount = stats.totalBackups;
+      state.failedBackupCount = stats.failedBackups;
+    } else {
+      stats.totalBackups = state.backupCount;
+      stats.failedBackups = state.failedBackupCount;
+    }
     await Utils.setStorage('statistics', stats);
 
     console.log('Sync completed:', backups.length, 'backups');

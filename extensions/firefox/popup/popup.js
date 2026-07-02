@@ -2,6 +2,8 @@
  * Popup UI Controller for DB Backup Manager Extension
  */
 
+import { Utils } from '../shared/utils.js';
+
 let settings = null;
 let state = null;
 

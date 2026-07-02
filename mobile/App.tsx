@@ -17,6 +17,11 @@ import LoginScreen from './src/screens/LoginScreen';
 
 import {store, RootState, AppDispatch} from './src/store';
 import {loadSettings} from './src/store/settingsSlice';
+import {
+  initApiService,
+  setApiAuthToken,
+  setApiBaseURL,
+} from './src/services/api';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -61,8 +66,21 @@ function AppNavigator() {
   const authToken = useSelector(
     (state: RootState) => state.settings.authToken,
   );
+  const apiUrl = useSelector((state: RootState) => state.settings.apiUrl);
+
+  // Keep the api client's bearer token in sync with the store (login/logout).
+  useEffect(() => {
+    setApiAuthToken(authToken);
+  }, [authToken]);
+
+  // Rebuild the api client whenever the configured base URL changes.
+  useEffect(() => {
+    setApiBaseURL(apiUrl);
+  }, [apiUrl]);
 
   useEffect(() => {
+    // Hydrate the api client (base URL + token) before any request is made.
+    initApiService();
     // Load persisted settings (including auth_token) on mount
     dispatch(loadSettings());
 

@@ -36,18 +36,20 @@ export const fetchBackups = createAsyncThunk(
   'backups/fetchBackups',
   async (_, {rejectWithValue}) => {
     try {
-      // Try to fetch from API
-      const response = await apiService.getBackups();
+      // Try to fetch from API. listBackups() returns the parsed
+      // BackupListResponse payload directly ({ backups, total, page, page_size }).
+      const response = await apiService.listBackups();
+      const backups = response.backups ?? [];
 
       // Save to local storage for offline access
       try {
-        await AsyncStorage.setItem('backups', JSON.stringify(response.data));
-        await offlineService.saveBackups(response.data);
+        await AsyncStorage.setItem('backups', JSON.stringify(backups));
+        await offlineService.saveBackups(backups);
       } catch (storageError) {
         console.warn('[fetchBackups] Failed to persist backups locally:', storageError);
       }
 
-      return {data: response.data, isCachedData: false};
+      return {data: backups, isCachedData: false};
     } catch (error: any) {
       // Auth errors should not fall back to cache
       if (error?.response?.status === 401 || error?.response?.status === 403) {
@@ -78,8 +80,14 @@ export const createBackup = createAsyncThunk(
     {rejectWithValue},
   ) => {
     try {
-      const response = await apiService.createBackup(databaseId, options);
-      return response.data;
+      // The client takes a single config object; map our thunk args onto it.
+      const backup = await apiService.createBackup({
+        database_id: databaseId,
+        ...(options || {}),
+      });
+      // The shared Backup type marks database_name optional; the slice's local
+      // Backup shape requires it, so narrow to the slice type.
+      return backup as unknown as (typeof initialState.backups)[number];
     } catch (error) {
       // Queue for offline sync
       await offlineService.queueBackupRequest({
@@ -102,10 +110,10 @@ export const syncOfflineData = createAsyncThunk(
       for (const request of pendingRequests) {
         if (request.type === 'create_backup') {
           try {
-            await apiService.createBackup(
-              request.data.databaseId,
-              request.data.options,
-            );
+            await apiService.createBackup({
+              database_id: request.data.databaseId,
+              ...(request.data.options || {}),
+            });
             await offlineService.markRequestProcessed(request.id);
           } catch (requestError) {
             console.error(

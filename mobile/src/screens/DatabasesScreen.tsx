@@ -8,10 +8,35 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import {useDispatch, useSelector} from 'react-redux';
-import {fetchDatabases, deleteDatabase} from '../store/databasesSlice';
+import {
+  fetchDatabases,
+  deleteDatabase,
+  createDatabase,
+} from '../store/databasesSlice';
+
+const DB_TYPES = [
+  'postgres',
+  'mysql',
+  'mongodb',
+  'redis',
+  'sqlite',
+];
+
+const emptyForm = {
+  name: '',
+  type: 'postgres',
+  host: '',
+  port: '',
+  username: '',
+  database_name: '',
+};
 
 const DB_TYPE_ICONS: Record<string, string> = {
   postgres: 'server',
@@ -33,6 +58,9 @@ const DB_TYPE_COLORS: Record<string, string> = {
 
 export default function DatabasesScreen({navigation}: any) {
   const [refreshing, setRefreshing] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [submitting, setSubmitting] = useState(false);
   const dispatch = useDispatch();
   const {databases, loading, error} = useSelector(
     (state: any) => state.databases,
@@ -41,6 +69,59 @@ export default function DatabasesScreen({navigation}: any) {
   useEffect(() => {
     dispatch(fetchDatabases() as any);
   }, []);
+
+  const openAddModal = () => {
+    setForm(emptyForm);
+    setModalVisible(true);
+  };
+
+  const updateField = (field: keyof typeof emptyForm, value: string) =>
+    setForm(prev => ({...prev, [field]: value}));
+
+  const handleCreateDatabase = async () => {
+    if (!form.name.trim() || !form.type.trim() || !form.host.trim()) {
+      Alert.alert('Missing fields', 'Name, type and host are required.');
+      return;
+    }
+
+    const payload: any = {
+      name: form.name.trim(),
+      type: form.type.trim().toLowerCase(),
+      host: form.host.trim(),
+    };
+    if (form.port.trim()) {
+      const parsedPort = parseInt(form.port.trim(), 10);
+      if (Number.isNaN(parsedPort)) {
+        Alert.alert('Invalid port', 'Port must be a number.');
+        return;
+      }
+      payload.port = parsedPort;
+    }
+    if (form.username.trim()) {
+      payload.username = form.username.trim();
+    }
+    if (form.database_name.trim()) {
+      payload.database_name = form.database_name.trim();
+    }
+
+    setSubmitting(true);
+    try {
+      const result: any = await dispatch(createDatabase(payload) as any);
+      if (result?.error) {
+        Alert.alert(
+          'Failed',
+          result.payload || 'Could not create the database connection.',
+        );
+        return;
+      }
+      setModalVisible(false);
+      setForm(emptyForm);
+      // Refresh the list from the backend.
+      dispatch(fetchDatabases() as any);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -154,13 +235,116 @@ export default function DatabasesScreen({navigation}: any) {
         }
       />
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() =>
-          Alert.alert('Add Database', 'Feature coming soon.', [{text: 'OK'}])
-        }>
+      <TouchableOpacity style={styles.fab} onPress={openAddModal}>
         <Icon name="add" size={28} color="white" />
       </TouchableOpacity>
+
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalVisible(false)}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Database</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Icon name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.fieldLabel}>Name *</Text>
+            <TextInput
+              style={styles.input}
+              value={form.name}
+              onChangeText={v => updateField('name', v)}
+              placeholder="Production DB"
+              placeholderTextColor="#9ca3af"
+              autoCapitalize="none"
+            />
+
+            <Text style={styles.fieldLabel}>Type *</Text>
+            <View style={styles.typeRow}>
+              {DB_TYPES.map(t => (
+                <TouchableOpacity
+                  key={t}
+                  style={[
+                    styles.typeChip,
+                    form.type === t && styles.typeChipActive,
+                  ]}
+                  onPress={() => updateField('type', t)}>
+                  <Text
+                    style={[
+                      styles.typeChipText,
+                      form.type === t && styles.typeChipTextActive,
+                    ]}>
+                    {t}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.fieldLabel}>Host *</Text>
+            <TextInput
+              style={styles.input}
+              value={form.host}
+              onChangeText={v => updateField('host', v)}
+              placeholder="localhost"
+              placeholderTextColor="#9ca3af"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <Text style={styles.fieldLabel}>Port</Text>
+            <TextInput
+              style={styles.input}
+              value={form.port}
+              onChangeText={v => updateField('port', v)}
+              placeholder="5432"
+              placeholderTextColor="#9ca3af"
+              keyboardType="number-pad"
+            />
+
+            <Text style={styles.fieldLabel}>Username</Text>
+            <TextInput
+              style={styles.input}
+              value={form.username}
+              onChangeText={v => updateField('username', v)}
+              placeholder="postgres"
+              placeholderTextColor="#9ca3af"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <Text style={styles.fieldLabel}>Database name</Text>
+            <TextInput
+              style={styles.input}
+              value={form.database_name}
+              onChangeText={v => updateField('database_name', v)}
+              placeholder="app_production"
+              placeholderTextColor="#9ca3af"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <TouchableOpacity
+              style={[
+                styles.submitButton,
+                submitting && styles.submitButtonDisabled,
+              ]}
+              onPress={handleCreateDatabase}
+              disabled={submitting}>
+              {submitting ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.submitButtonText}>Add Database</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -300,5 +484,86 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 6,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 32,
+  } as any,
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  input: {
+    height: 44,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: '#111827',
+    backgroundColor: '#f9fafb',
+  },
+  typeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  typeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    backgroundColor: '#f9fafb',
+  },
+  typeChipActive: {
+    backgroundColor: '#3b82f6',
+    borderColor: '#3b82f6',
+  },
+  typeChipText: {
+    fontSize: 13,
+    color: '#374151',
+  },
+  typeChipTextActive: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  submitButton: {
+    marginTop: 20,
+    height: 48,
+    backgroundColor: '#3b82f6',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
+  },
+  submitButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16,
   },
 });
