@@ -14,14 +14,14 @@ import (
 // dailyCron runs once a day at 02:00 (5-field standard cron).
 const dailyCron = "0 2 * * *"
 
-func job(db, cron string, enabled bool, nextRun time.Time) *scheduler.ScheduledJob {
+func job(enabled bool, nextRun time.Time) *scheduler.ScheduledJob {
 	return &scheduler.ScheduledJob{
 		ID:         "j1",
 		Name:       "j1",
-		Schedule:   cron,
+		Schedule:   dailyCron,
 		Enabled:    enabled,
 		NextRun:    nextRun,
-		BackupOpts: &backup.CreateOptions{Database: db},
+		BackupOpts: &backup.CreateOptions{Database: "app"},
 	}
 }
 
@@ -34,13 +34,13 @@ func successBackup(end time.Time) *models.BackupMetadata {
 	}
 }
 
-func regDB(name, dbName string) *dbregistry.Database {
-	return &dbregistry.Database{ID: "d1", Name: name, Type: "postgres", Host: "h", Database: dbName}
+func regDB() *dbregistry.Database {
+	return &dbregistry.Database{ID: "d1", Name: "app-db", Type: "postgres", Host: "h", Database: "app"}
 }
 
 func TestAnalyze_RecentSuccessNotStale(t *testing.T) {
 	now := time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
-	jobs := []*scheduler.ScheduledJob{job("app", dailyCron, true, now.Add(12*time.Hour))}
+	jobs := []*scheduler.ScheduledJob{job(true, now.Add(12*time.Hour))}
 	backups := []*models.BackupMetadata{successBackup(now.Add(-1 * time.Hour))}
 
 	rep := Analyze(jobs, backups, nil, now, defaultWindow())
@@ -66,7 +66,7 @@ func TestAnalyze_RecentSuccessNotStale(t *testing.T) {
 func TestAnalyze_OldSuccessIsStale(t *testing.T) {
 	now := time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
 	// Last success 3 days ago, daily schedule -> older than 2x interval.
-	jobs := []*scheduler.ScheduledJob{job("app", dailyCron, true, now.Add(12*time.Hour))}
+	jobs := []*scheduler.ScheduledJob{job(true, now.Add(12*time.Hour))}
 	backups := []*models.BackupMetadata{successBackup(now.Add(-72 * time.Hour))}
 
 	rep := Analyze(jobs, backups, nil, now, defaultWindow())
@@ -87,7 +87,7 @@ func TestAnalyze_MissedRunIsStale(t *testing.T) {
 	now := time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
 	// Recent success (not stale by age) but NextRun is 2 days in the past ->
 	// overdue by more than one daily interval => missed runs.
-	jobs := []*scheduler.ScheduledJob{job("app", dailyCron, true, now.Add(-48*time.Hour))}
+	jobs := []*scheduler.ScheduledJob{job(true, now.Add(-48*time.Hour))}
 	backups := []*models.BackupMetadata{successBackup(now.Add(-1 * time.Hour))}
 
 	rep := Analyze(jobs, backups, nil, now, defaultWindow())
@@ -102,8 +102,8 @@ func TestAnalyze_MissedRunIsStale(t *testing.T) {
 
 func TestAnalyze_NoSuccessScheduleStaleAndDatabaseUnprotected(t *testing.T) {
 	now := time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
-	jobs := []*scheduler.ScheduledJob{job("app", dailyCron, true, now.Add(12*time.Hour))}
-	dbs := []*dbregistry.Database{regDB("app-db", "app")}
+	jobs := []*scheduler.ScheduledJob{job(true, now.Add(12*time.Hour))}
+	dbs := []*dbregistry.Database{regDB()}
 
 	rep := Analyze(jobs, nil, dbs, now, defaultWindow())
 
@@ -122,7 +122,7 @@ func TestAnalyze_UnderProtectedDatabase(t *testing.T) {
 	now := time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
 	// Success exists but 3 days old, window is 24h -> under-protected.
 	backups := []*models.BackupMetadata{successBackup(now.Add(-72 * time.Hour))}
-	dbs := []*dbregistry.Database{regDB("app-db", "app")}
+	dbs := []*dbregistry.Database{regDB()}
 
 	rep := Analyze(nil, backups, dbs, now, 24*time.Hour)
 
@@ -140,7 +140,7 @@ func TestAnalyze_UnderProtectedDatabase(t *testing.T) {
 func TestAnalyze_ProtectedDatabaseNoGap(t *testing.T) {
 	now := time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
 	backups := []*models.BackupMetadata{successBackup(now.Add(-1 * time.Hour))}
-	dbs := []*dbregistry.Database{regDB("app-db", "app")}
+	dbs := []*dbregistry.Database{regDB()}
 
 	rep := Analyze(nil, backups, dbs, now, 24*time.Hour)
 
@@ -154,7 +154,7 @@ func TestAnalyze_ProtectedDatabaseNoGap(t *testing.T) {
 
 func TestAnalyze_DisabledScheduleSkipped(t *testing.T) {
 	now := time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
-	jobs := []*scheduler.ScheduledJob{job("app", dailyCron, false, time.Time{})}
+	jobs := []*scheduler.ScheduledJob{job(false, time.Time{})}
 
 	rep := Analyze(jobs, nil, nil, now, defaultWindow())
 
@@ -166,7 +166,7 @@ func TestAnalyze_DisabledScheduleSkipped(t *testing.T) {
 func TestAnalyze_FailedBackupDoesNotCount(t *testing.T) {
 	now := time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
 	failed := &models.BackupMetadata{Database: "app", Status: database.BackupStatusFailed, EndTime: now.Add(-time.Hour)}
-	dbs := []*dbregistry.Database{regDB("app-db", "app")}
+	dbs := []*dbregistry.Database{regDB()}
 
 	rep := Analyze(nil, []*models.BackupMetadata{failed}, dbs, now, 24*time.Hour)
 
