@@ -43,6 +43,8 @@ import (
 	"github.com/sanskarpan/db-backup/internal/scheduler"
 )
 
+const defaultDataDir = "./data"
+
 var (
 	Version   = "dev"
 	BuildTime = "unknown"
@@ -150,7 +152,7 @@ func main() {
 		catalogDir = cfg.Backup.TempDirectory
 	}
 	if catalogDir == "" {
-		catalogDir = "./data"
+		catalogDir = defaultDataDir
 	}
 	var searchEngine catalog.SearchEngineInterface
 	memCatalog, catErr := catalog.NewPersistentInMemorySearchEngine(filepath.Join(catalogDir, "catalog"))
@@ -197,7 +199,7 @@ func main() {
 		dbStoreDir = cfg.Backup.TempDirectory
 	}
 	if dbStoreDir == "" {
-		dbStoreDir = "./data"
+		dbStoreDir = defaultDataDir
 	}
 	dbStore, err := dbregistry.NewStore(filepath.Join(dbStoreDir, "databases"), jwtSecret)
 	if err != nil {
@@ -353,7 +355,7 @@ func buildStorageProvider(cfg *config.Config) (storage.Provider, error) {
 	// Fallback: local provider rooted under the temp/data directory.
 	base := cfg.Backup.TempDirectory
 	if base == "" {
-		base = "./data"
+		base = defaultDataDir
 	}
 	return storageLocal.NewLocalProvider(&storage.LocalConfig{Path: filepath.Join(base, "backups")})
 }

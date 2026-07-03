@@ -1,6 +1,7 @@
 package multicloud
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -39,7 +40,7 @@ func (f *fakeStorageProvider) Download(ctx context.Context, remotePath, localPat
 }
 
 func (f *fakeStorageProvider) DownloadStream(ctx context.Context, remotePath string) (io.ReadCloser, error) {
-	return nil, nil
+	return io.NopCloser(bytes.NewReader(nil)), nil
 }
 
 func (f *fakeStorageProvider) Delete(ctx context.Context, remotePath string) error {
@@ -51,7 +52,7 @@ func (f *fakeStorageProvider) Exists(ctx context.Context, remotePath string) (bo
 }
 
 func (f *fakeStorageProvider) GetMetadata(ctx context.Context, remotePath string) (*storage.FileMetadata, error) {
-	return nil, nil
+	return &storage.FileMetadata{}, nil
 }
 
 func (f *fakeStorageProvider) List(ctx context.Context, prefix string) ([]*storage.FileMetadata, error) {

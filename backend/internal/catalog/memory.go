@@ -14,7 +14,11 @@ import (
 
 // memoryStoreFileName is the single JSON file that holds all indexed backup
 // documents when the in-memory engine is configured with a persistence dir.
-const memoryStoreFileName = "catalog.json"
+const (
+	memoryStoreFileName = "catalog.json"
+	sortFieldCreatedAt  = "created_at"
+	sortOrderDesc       = "desc"
+)
 
 // InMemorySearchEngine satisfies the same interface the API handlers use, so it
 // can replace the Elasticsearch-backed SearchEngine transparently.
@@ -278,10 +282,10 @@ func (e *InMemorySearchEngine) Search(_ context.Context, query *SearchQuery) (*S
 		query.Limit = 100
 	}
 	if query.SortBy == "" {
-		query.SortBy = "created_at"
+		query.SortBy = sortFieldCreatedAt
 	}
 	if query.SortOrder == "" {
-		query.SortOrder = "desc"
+		query.SortOrder = sortOrderDesc
 	}
 
 	e.mu.RLock()

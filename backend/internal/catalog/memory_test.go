@@ -405,12 +405,12 @@ func TestInMemoryPersistenceSurvivesRestart(t *testing.T) {
 		CreatedAt:       time.Now(),
 		Tags:            map[string]string{"env": "prod"},
 	}
-	if err := e1.IndexBackup(ctx, doc); err != nil {
+	if err = e1.IndexBackup(ctx, doc); err != nil {
 		t.Fatalf("IndexBackup failed: %v", err)
 	}
 
 	// The JSON file exists.
-	if _, err := os.ReadFile(filepath.Join(dir, memoryStoreFileName)); err != nil {
+	if _, err = os.ReadFile(filepath.Join(dir, memoryStoreFileName)); err != nil {
 		t.Fatalf("expected persistence file: %v", err)
 	}
 

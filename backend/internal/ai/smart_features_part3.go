@@ -15,7 +15,10 @@ import (
 
 // manualActionRequired is the honest auto-fix note used when no remediation
 // backend is configured to actually resolve a diagnosed issue.
-const manualActionRequired = "no automatic remediation configured - manual action required"
+const (
+	strLow               = "low"
+	manualActionRequired = "no automatic remediation configured - manual action required"
+)
 
 // severityCritical is the severity/priority label for critical issues.
 const severityCritical = "critical"
@@ -204,7 +207,7 @@ func (aa *AIAdvisor) handleOptimizationQuery(_ context.Context, _ string) (*Advi
 			Description: "Use Zstd compression to reduce backup size by 60-70%",
 			Priority:    "high",
 			Impact:      "Reduces storage costs by ~65% and transfer time by ~60%",
-			Effort:      "low",
+			Effort:      strLow,
 			Confidence:  95.0,
 			Reasoning: []string{
 				"Historical data shows 67% compression ratio with Zstd",
@@ -232,7 +235,7 @@ func (aa *AIAdvisor) handleOptimizationQuery(_ context.Context, _ string) (*Advi
 			Description: "Schedule backups during off-peak hours (2-4 AM)",
 			Priority:    "medium",
 			Impact:      "Reduces backup duration by 40% and system load by 50%",
-			Effort:      "low",
+			Effort:      strLow,
 			Confidence:  88.0,
 			Reasoning: []string{
 				"Analysis shows 40% faster backups during 2-4 AM window",
@@ -388,7 +391,7 @@ func (aa *AIAdvisor) handleSecurityQuery(_ context.Context, _ string) (*AdvisorR
 				Description: "Encrypt all backups using AES-256 encryption",
 				Priority:    severityCritical,
 				Impact:      "Protects data from unauthorized access",
-				Effort:      "low",
+				Effort:      strLow,
 				Confidence:  99.0,
 				ActionSteps: []string{
 					"Generate encryption keys using KMS",
@@ -816,7 +819,7 @@ func (ate *AutomatedTroubleshootingEngine) GenerateReport(ctx context.Context, d
 			report.HighCount++
 		case "medium":
 			report.MediumCount++
-		case "low":
+		case strLow:
 			report.LowCount++
 		}
 
@@ -925,9 +928,9 @@ func mapPredictionSeverity(s prediction.PredictionSeverity) string {
 	case prediction.PredictionSeverityMedium:
 		return "medium"
 	case prediction.PredictionSeverityLow:
-		return "low"
+		return strLow
 	default:
-		return "low"
+		return strLow
 	}
 }
 

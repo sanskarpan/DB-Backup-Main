@@ -534,7 +534,7 @@ func (fm *FailoverManager) performHealthCheck(ctx context.Context, config *Healt
 	if becameUnhealthy {
 		reason := fmt.Sprintf("provider %s failed health check %d times: %v",
 			provider, config.FailureThreshold, err)
-		_, _ = fm.triggerFailover(ctx, provider, reason)
+		_, _ = fm.triggerFailover(ctx, provider, reason) //nolint:errcheck // outcome recorded as a FailoverEvent
 	}
 }
 

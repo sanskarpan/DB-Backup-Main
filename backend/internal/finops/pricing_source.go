@@ -65,7 +65,7 @@ func defaultPricingAsOf() time.Time {
 }
 
 // StaticPricingSource holds a fixed rate table. By default it carries the
-// built-in estimates, clearly labelled as such, and can be overridden with
+// built-in estimates, clearly labeled as such, and can be overridden with
 // operator-supplied rates through NewPricingSourceFromConfig or PricingFromJSON.
 type StaticPricingSource struct {
 	providerRates map[StorageProvider]*ProviderRates

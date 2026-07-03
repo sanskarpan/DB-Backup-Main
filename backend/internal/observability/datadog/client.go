@@ -115,7 +115,10 @@ func (c *Client) postJSON(ctx context.Context, path string, payload interface{})
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 512))
+		if readErr != nil {
+			respBody = nil
+		}
 		return fmt.Errorf("datadog api %s returned status %d: %s", path, resp.StatusCode, bytes.TrimSpace(respBody))
 	}
 	return nil
