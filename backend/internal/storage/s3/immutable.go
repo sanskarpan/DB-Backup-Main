@@ -12,8 +12,59 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 
+	"github.com/sanskarpan/db-backup/internal/storage"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
+
+// SetRetention locks the object until the given time using the given mode,
+// satisfying storage.ImmutableProvider. It is a thin adapter over
+// PutObjectRetention.
+func (p *S3Provider) SetRetention(ctx context.Context, remotePath string, until time.Time, mode string) error {
+	s3Mode := types.ObjectLockRetentionModeGovernance
+	if mode == storage.LockModeCompliance {
+		s3Mode = types.ObjectLockRetentionModeCompliance
+	}
+
+	_, err := p.client.PutObjectRetention(ctx, &s3.PutObjectRetentionInput{
+		Bucket: aws.String(p.config.Bucket),
+		Key:    aws.String(remotePath),
+		Retention: &types.ObjectLockRetention{
+			Mode:            s3Mode,
+			RetainUntilDate: aws.Time(until),
+		},
+	})
+	if err != nil {
+		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
+			"failed to set object retention")
+	}
+
+	return nil
+}
+
+// GetRetention returns the retention expiry and mode for the object, satisfying
+// storage.ImmutableProvider. It returns storage.ErrNoRetention when the object
+// is not under retention.
+func (p *S3Provider) GetRetention(ctx context.Context, remotePath string) (time.Time, string, error) {
+	config, err := p.GetObjectRetention(ctx, remotePath)
+	if errors.Is(err, ErrNoRetention) {
+		return time.Time{}, "", storage.ErrNoRetention
+	}
+	if err != nil {
+		return time.Time{}, "", err
+	}
+
+	var until time.Time
+	if config.RetainUntilDate != nil {
+		until = *config.RetainUntilDate
+	}
+	return until, string(config.Mode), nil
+}
+
+// GetLegalHold reports whether a legal hold is on for the object, satisfying
+// storage.ImmutableProvider. It is a thin adapter over GetLegalHoldStatus.
+func (p *S3Provider) GetLegalHold(ctx context.Context, remotePath string) (bool, error) {
+	return p.GetLegalHoldStatus(ctx, remotePath)
+}
 
 // ErrNoRetention indicates that an object has no Object Lock retention configured.
 var ErrNoRetention = errors.New("object has no retention configuration")
