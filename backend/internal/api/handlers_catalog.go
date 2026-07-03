@@ -168,48 +168,8 @@ func (s *Server) handleSearchCatalog(c *gin.Context) {
 		return
 	}
 
-	// Convert results to response format
-	items := make([]*SearchResultItem, len(results.Results))
-	for i, result := range results.Results {
-		items[i] = &SearchResultItem{
-			BackupID:        result.Backup.ID,
-			DatabaseName:    result.Backup.DatabaseName,
-			DatabaseType:    result.Backup.DatabaseType,
-			BackupType:      result.Backup.BackupType,
-			Status:          result.Backup.Status,
-			SizeBytes:       result.Backup.SizeBytes,
-			Duration:        result.Backup.Duration,
-			StoragePath:     result.Backup.StoragePath,
-			StorageProvider: result.Backup.StorageProvider,
-			CreatedAt:       result.Backup.CreatedAt,
-			ExpiresAt:       result.Backup.ExpiresAt,
-			Tags:            result.Backup.Tags,
-			Tables:          result.Backup.Tables,
-			Schemas:         result.Backup.Schemas,
-			Score:           result.Score,
-		}
-	}
-
-	// Calculate pagination metadata
-	hasMore := false
-	var nextOffset *int
-	if query.Offset+query.Limit < int(results.Total) {
-		hasMore = true
-		next := query.Offset + query.Limit
-		nextOffset = &next
-	}
-
-	response := &SearchResponse{
-		Results:    items,
-		Total:      results.Total,
-		Took:       results.Took,
-		Limit:      query.Limit,
-		Offset:     query.Offset,
-		HasMore:    hasMore,
-		NextOffset: nextOffset,
-	}
-
-	c.JSON(http.StatusOK, response)
+	// Convert results and write the paginated response.
+	s.convertAndReturnSearchResults(c, results, query)
 }
 
 // handleSearchCatalogSimple handles GET /api/v1/catalog/search

@@ -177,30 +177,36 @@ func (d *DatabaseCheck) Name() string {
 	return d.name
 }
 
-// Check performs the health check.
-func (d *DatabaseCheck) Check(ctx context.Context) *CheckResult {
+// runTimedCheck executes fn under a timeout and builds a CheckResult, recording
+// its duration. successMessage is used when fn returns no error.
+func runTimedCheck(ctx context.Context, name string, timeout time.Duration, fn func(context.Context) error, successMessage string) *CheckResult {
 	start := time.Now()
 
-	ctx, cancel := context.WithTimeout(ctx, d.timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	result := &CheckResult{
-		Name:      d.name,
+		Name:      name,
 		Timestamp: time.Now(),
 	}
 
-	err := d.pingFunc(ctx)
+	err := fn(ctx)
 	result.Duration = time.Since(start)
 
 	if err == nil {
 		result.Status = StatusHealthy
-		result.Message = "database connection successful"
+		result.Message = successMessage
 	} else {
 		result.Status = StatusUnhealthy
 		result.Error = err.Error()
 	}
 
 	return result
+}
+
+// Check performs the health check.
+func (d *DatabaseCheck) Check(ctx context.Context) *CheckResult {
+	return runTimedCheck(ctx, d.name, d.timeout, d.pingFunc, "database connection successful")
 }
 
 // StorageCheck checks storage accessibility.
@@ -230,28 +236,7 @@ func (s *StorageCheck) Name() string {
 
 // Check performs the health check.
 func (s *StorageCheck) Check(ctx context.Context) *CheckResult {
-	start := time.Now()
-
-	ctx, cancel := context.WithTimeout(ctx, s.timeout)
-	defer cancel()
-
-	result := &CheckResult{
-		Name:      s.name,
-		Timestamp: time.Now(),
-	}
-
-	err := s.checkFunc(ctx)
-	result.Duration = time.Since(start)
-
-	if err == nil {
-		result.Status = StatusHealthy
-		result.Message = "storage accessible"
-	} else {
-		result.Status = StatusUnhealthy
-		result.Error = err.Error()
-	}
-
-	return result
+	return runTimedCheck(ctx, s.name, s.timeout, s.checkFunc, "storage accessible")
 }
 
 // DiskSpaceCheck checks available disk space.

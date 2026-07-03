@@ -511,8 +511,11 @@ func (d *RedisDriver) ValidateRestore(ctx context.Context, opts *database.Restor
 	return nil
 }
 
-// waitForBGSave waits for BGSAVE operation to complete.
-func (d *RedisDriver) waitForBGSave(ctx context.Context) error {
+// waitForPersistenceCompletion polls the Redis "persistence" INFO section until
+// the given completion marker appears, indicating the background operation has
+// finished. It fails with timeoutErr if the operation does not complete within
+// the timeout window, or returns the context error if the context is cancelled.
+func (d *RedisDriver) waitForPersistenceCompletion(ctx context.Context, completionMarker string, timeoutErr error) error {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
@@ -523,46 +526,28 @@ func (d *RedisDriver) waitForBGSave(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-timeout:
-			return fmt.Errorf("BGSAVE timeout")
+			return timeoutErr
 		case <-ticker.C:
 			info, err := d.client.Info(ctx, "persistence").Result()
 			if err != nil {
 				return err
 			}
 
-			// Check rdb_bgsave_in_progress
-			if strings.Contains(info, "rdb_bgsave_in_progress:0") {
+			if strings.Contains(info, completionMarker) {
 				return nil
 			}
 		}
 	}
 }
 
+// waitForBGSave waits for BGSAVE operation to complete.
+func (d *RedisDriver) waitForBGSave(ctx context.Context) error {
+	return d.waitForPersistenceCompletion(ctx, "rdb_bgsave_in_progress:0", fmt.Errorf("BGSAVE timeout"))
+}
+
 // waitForAOFRewrite waits for AOF rewrite operation to complete.
 func (d *RedisDriver) waitForAOFRewrite(ctx context.Context) error {
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	timeout := time.After(5 * time.Minute)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-timeout:
-			return fmt.Errorf("AOF rewrite timeout")
-		case <-ticker.C:
-			info, err := d.client.Info(ctx, "persistence").Result()
-			if err != nil {
-				return err
-			}
-
-			// Check aof_rewrite_in_progress
-			if strings.Contains(info, "aof_rewrite_in_progress:0") {
-				return nil
-			}
-		}
-	}
+	return d.waitForPersistenceCompletion(ctx, "aof_rewrite_in_progress:0", fmt.Errorf("AOF rewrite timeout"))
 }
 
 // getRDBVersion gets the RDB format version.

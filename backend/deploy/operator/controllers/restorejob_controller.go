@@ -486,30 +486,7 @@ func (r *RestoreJobReconciler) shouldRetry(restoreJob *backupv1.RestoreJob) bool
 
 // updateCondition updates a condition in the restore job status.
 func (r *RestoreJobReconciler) updateCondition(restoreJob *backupv1.RestoreJob, conditionType string, status metav1.ConditionStatus, reason, message string) {
-	condition := metav1.Condition{
-		Type:               conditionType,
-		Status:             status,
-		ObservedGeneration: restoreJob.Generation,
-		LastTransitionTime: metav1.Now(),
-		Reason:             reason,
-		Message:            message,
-	}
-
-	// Find and update existing condition or append new one
-	found := false
-	for i, cond := range restoreJob.Status.Conditions {
-		if cond.Type == conditionType {
-			if cond.Status != status {
-				restoreJob.Status.Conditions[i] = condition
-			}
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		restoreJob.Status.Conditions = append(restoreJob.Status.Conditions, condition)
-	}
+	restoreJob.Status.Conditions = upsertCondition(restoreJob.Status.Conditions, restoreJob.Generation, conditionType, status, reason, message)
 }
 
 // SetupWithManager sets up the controller with the Manager.

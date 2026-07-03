@@ -286,31 +286,34 @@ func (r *BackupPolicyReconciler) calculateNextBackupTime(schedule string) (time.
 
 // updateCondition updates a condition in the policy status.
 func (r *BackupPolicyReconciler) updateCondition(policy *backupv1.BackupPolicy, conditionType string, status metav1.ConditionStatus, reason, message string) {
+	policy.Status.Conditions = upsertCondition(policy.Status.Conditions, policy.Generation, conditionType, status, reason, message)
+}
+
+// upsertCondition updates the matching condition in conditions (only when its
+// status changed) or appends a new one, returning the resulting slice. The
+// condition's ObservedGeneration is set to generation.
+func upsertCondition(conditions []metav1.Condition, generation int64, conditionType string, status metav1.ConditionStatus, reason, message string) []metav1.Condition {
 	condition := metav1.Condition{
 		Type:               conditionType,
 		Status:             status,
-		ObservedGeneration: policy.Generation,
+		ObservedGeneration: generation,
 		LastTransitionTime: metav1.Now(),
 		Reason:             reason,
 		Message:            message,
 	}
 
 	// Find and update existing condition or append new one
-	found := false
-	for i, cond := range policy.Status.Conditions {
+	for i, cond := range conditions {
 		if cond.Type == conditionType {
 			// Only update if status changed
 			if cond.Status != status {
-				policy.Status.Conditions[i] = condition
+				conditions[i] = condition
 			}
-			found = true
-			break
+			return conditions
 		}
 	}
 
-	if !found {
-		policy.Status.Conditions = append(policy.Status.Conditions, condition)
-	}
+	return append(conditions, condition)
 }
 
 // SetupWithManager sets up the controller with the Manager.

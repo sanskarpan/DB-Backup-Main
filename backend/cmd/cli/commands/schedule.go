@@ -128,6 +128,47 @@ func init() {
 	scheduleListCmd.Flags().String("format", "table", "Output format (table, json)")
 }
 
+// newSchedulerEngine constructs a scheduler backed by a backup engine built
+// from the active configuration. It centralizes the boilerplate shared by all
+// schedule subcommands.
+func newSchedulerEngine() (*scheduler.Scheduler, error) {
+	cfg := GetConfig()
+	log := GetLogger()
+	engine := backup.NewEngine(&backup.Config{
+		TempDirectory:      cfg.Backup.TempDirectory,
+		ParallelOperations: cfg.Backup.ParallelOperations,
+		DefaultCompression: cfg.Backup.DefaultCompression,
+		EnableEncryption:   cfg.Backup.Encryption.Enabled,
+		EncryptionKey:      "",
+	})
+
+	sched, err := scheduler.NewScheduler(engine, log, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create scheduler: %w", err)
+	}
+	return sched, nil
+}
+
+// runScheduleJobAction performs a simple lifecycle action (remove/enable/disable)
+// against the schedule identified by args[0]. verb is used both for the error
+// wrapping ("failed to <verb> schedule") and the success message ("<verb>d
+// successfully").
+func runScheduleJobAction(args []string, verb string, action func(*scheduler.Scheduler, string) error) error {
+	scheduleID := args[0]
+
+	sched, err := newSchedulerEngine()
+	if err != nil {
+		return err
+	}
+
+	if err := action(sched, scheduleID); err != nil {
+		return fmt.Errorf("failed to %s schedule: %w", verb, err)
+	}
+
+	fmt.Printf("✓ Schedule '%s' %sd successfully\n", scheduleID, verb)
+	return nil
+}
+
 func runScheduleAdd(cmd *cobra.Command, args []string) error {
 	// Parse options
 	opts := &ScheduleAddOptions{
@@ -189,19 +230,9 @@ func runScheduleAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize scheduler
-	cfg := GetConfig()
-	log := GetLogger()
-	engine := backup.NewEngine(&backup.Config{
-		TempDirectory:      cfg.Backup.TempDirectory,
-		ParallelOperations: cfg.Backup.ParallelOperations,
-		DefaultCompression: cfg.Backup.DefaultCompression,
-		EnableEncryption:   cfg.Backup.Encryption.Enabled,
-		EncryptionKey:      "",
-	})
-
-	sched, err := scheduler.NewScheduler(engine, log, nil)
+	sched, err := newSchedulerEngine()
 	if err != nil {
-		return fmt.Errorf("failed to create scheduler: %w", err)
+		return err
 	}
 
 	// Add job
@@ -219,19 +250,9 @@ func runScheduleList(cmd *cobra.Command, args []string) error {
 	format := flagString(cmd, "format")
 
 	// Initialize scheduler
-	cfg := GetConfig()
-	log := GetLogger()
-	engine := backup.NewEngine(&backup.Config{
-		TempDirectory:      cfg.Backup.TempDirectory,
-		ParallelOperations: cfg.Backup.ParallelOperations,
-		DefaultCompression: cfg.Backup.DefaultCompression,
-		EnableEncryption:   cfg.Backup.Encryption.Enabled,
-		EncryptionKey:      "",
-	})
-
-	sched, err := scheduler.NewScheduler(engine, log, nil)
+	sched, err := newSchedulerEngine()
 	if err != nil {
-		return fmt.Errorf("failed to create scheduler: %w", err)
+		return err
 	}
 
 	jobs := sched.ListJobs()
@@ -275,103 +296,23 @@ func runScheduleList(cmd *cobra.Command, args []string) error {
 }
 
 func runScheduleRemove(cmd *cobra.Command, args []string) error {
-	scheduleID := args[0]
-
-	// Initialize scheduler
-	cfg := GetConfig()
-	log := GetLogger()
-	engine := backup.NewEngine(&backup.Config{
-		TempDirectory:      cfg.Backup.TempDirectory,
-		ParallelOperations: cfg.Backup.ParallelOperations,
-		DefaultCompression: cfg.Backup.DefaultCompression,
-		EnableEncryption:   cfg.Backup.Encryption.Enabled,
-		EncryptionKey:      "",
-	})
-
-	sched, err := scheduler.NewScheduler(engine, log, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create scheduler: %w", err)
-	}
-
-	if err := sched.RemoveJob(scheduleID); err != nil {
-		return fmt.Errorf("failed to remove schedule: %w", err)
-	}
-
-	fmt.Printf("✓ Schedule '%s' removed successfully\n", scheduleID)
-	return nil
+	return runScheduleJobAction(args, "remove", (*scheduler.Scheduler).RemoveJob)
 }
 
 func runScheduleEnable(cmd *cobra.Command, args []string) error {
-	scheduleID := args[0]
-
-	// Initialize scheduler
-	cfg := GetConfig()
-	log := GetLogger()
-	engine := backup.NewEngine(&backup.Config{
-		TempDirectory:      cfg.Backup.TempDirectory,
-		ParallelOperations: cfg.Backup.ParallelOperations,
-		DefaultCompression: cfg.Backup.DefaultCompression,
-		EnableEncryption:   cfg.Backup.Encryption.Enabled,
-		EncryptionKey:      "",
-	})
-
-	sched, err := scheduler.NewScheduler(engine, log, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create scheduler: %w", err)
-	}
-
-	if err := sched.EnableJob(scheduleID); err != nil {
-		return fmt.Errorf("failed to enable schedule: %w", err)
-	}
-
-	fmt.Printf("✓ Schedule '%s' enabled successfully\n", scheduleID)
-	return nil
+	return runScheduleJobAction(args, "enable", (*scheduler.Scheduler).EnableJob)
 }
 
 func runScheduleDisable(cmd *cobra.Command, args []string) error {
-	scheduleID := args[0]
-
-	// Initialize scheduler
-	cfg := GetConfig()
-	log := GetLogger()
-	engine := backup.NewEngine(&backup.Config{
-		TempDirectory:      cfg.Backup.TempDirectory,
-		ParallelOperations: cfg.Backup.ParallelOperations,
-		DefaultCompression: cfg.Backup.DefaultCompression,
-		EnableEncryption:   cfg.Backup.Encryption.Enabled,
-		EncryptionKey:      "",
-	})
-
-	sched, err := scheduler.NewScheduler(engine, log, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create scheduler: %w", err)
-	}
-
-	if err := sched.DisableJob(scheduleID); err != nil {
-		return fmt.Errorf("failed to disable schedule: %w", err)
-	}
-
-	fmt.Printf("✓ Schedule '%s' disabled successfully\n", scheduleID)
-	return nil
+	return runScheduleJobAction(args, "disable", (*scheduler.Scheduler).DisableJob)
 }
 
 func runScheduleRun(cmd *cobra.Command, args []string) error {
 	scheduleID := args[0]
 
-	// Initialize scheduler
-	cfg := GetConfig()
-	log := GetLogger()
-	engine := backup.NewEngine(&backup.Config{
-		TempDirectory:      cfg.Backup.TempDirectory,
-		ParallelOperations: cfg.Backup.ParallelOperations,
-		DefaultCompression: cfg.Backup.DefaultCompression,
-		EnableEncryption:   cfg.Backup.Encryption.Enabled,
-		EncryptionKey:      "",
-	})
-
-	sched, err := scheduler.NewScheduler(engine, log, nil)
+	sched, err := newSchedulerEngine()
 	if err != nil {
-		return fmt.Errorf("failed to create scheduler: %w", err)
+		return err
 	}
 
 	fmt.Printf("Running schedule '%s'...\n", scheduleID)

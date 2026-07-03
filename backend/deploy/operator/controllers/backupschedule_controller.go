@@ -195,24 +195,8 @@ func (r *BackupScheduleReconciler) reconcileDelete(ctx context.Context, schedule
 
 		// Cancel any active backup jobs
 		log.Info("Canceling active backup jobs", "schedule", schedule.Name, "activeJobs", len(schedule.Status.ActiveJobs))
-		for _, activeJob := range schedule.Status.ActiveJobs {
-			job := &batchv1.Job{}
-			err := r.Get(ctx, client.ObjectKey{
-				Name:      activeJob.Name,
-				Namespace: activeJob.Namespace,
-			}, job)
-			if err == nil {
-				log.Info("Canceling active backup job", "job", activeJob.Name)
-				propagationPolicy := metav1.DeletePropagationBackground
-				if err = r.Delete(ctx, job, &client.DeleteOptions{
-					PropagationPolicy: &propagationPolicy,
-				}); err != nil && !errors.IsNotFound(err) {
-					log.Error(err, "Failed to delete active job", "job", activeJob.Name)
-				}
-			} else if !errors.IsNotFound(err) {
-				log.Error(err, "Failed to get active job", "job", activeJob.Name)
-			}
-		}
+		r.cancelActiveJobs(ctx, schedule.Status.ActiveJobs,
+			"Canceling active backup job", "Failed to delete active job", "Failed to get active job")
 
 		// Optionally clean up job history
 		if schedule.Spec.CleanupOnDelete {
@@ -374,24 +358,8 @@ func (r *BackupScheduleReconciler) canRunBackup(schedule *backupv1.BackupSchedul
 			// Create a background context for job deletion
 			ctx := context.Background()
 
-			for _, activeJob := range schedule.Status.ActiveJobs {
-				job := &batchv1.Job{}
-				err := r.Get(ctx, client.ObjectKey{
-					Name:      activeJob.Name,
-					Namespace: activeJob.Namespace,
-				}, job)
-				if err == nil {
-					log.Info("Canceling existing job due to Replace policy", "job", activeJob.Name)
-					propagationPolicy := metav1.DeletePropagationBackground
-					if err = r.Delete(ctx, job, &client.DeleteOptions{
-						PropagationPolicy: &propagationPolicy,
-					}); err != nil && !errors.IsNotFound(err) {
-						log.Error(err, "Failed to delete existing job", "job", activeJob.Name)
-					}
-				} else if !errors.IsNotFound(err) {
-					log.Error(err, "Failed to get existing job", "job", activeJob.Name)
-				}
-			}
+			r.cancelActiveJobs(ctx, schedule.Status.ActiveJobs,
+				"Canceling existing job due to Replace policy", "Failed to delete existing job", "Failed to get existing job")
 
 			// Clear active jobs list
 			schedule.Status.ActiveJobs = []backupv1.ActiveJob{}
@@ -694,32 +662,34 @@ func getJobCompletionTime(job *batchv1.Job) *metav1.Time {
 	return job.Status.StartTime
 }
 
-// updateCondition updates a condition in the schedule status.
-func (r *BackupScheduleReconciler) updateCondition(schedule *backupv1.BackupSchedule, conditionType string, status metav1.ConditionStatus, reason, message string) {
-	condition := metav1.Condition{
-		Type:               conditionType,
-		Status:             status,
-		ObservedGeneration: schedule.Generation,
-		LastTransitionTime: metav1.Now(),
-		Reason:             reason,
-		Message:            message,
-	}
-
-	// Find and update existing condition or append new one
-	found := false
-	for i, cond := range schedule.Status.Conditions {
-		if cond.Type == conditionType {
-			if cond.Status != status {
-				schedule.Status.Conditions[i] = condition
+// cancelActiveJobs deletes the given active jobs using background propagation.
+// cancelMsg, deleteErrMsg and getErrMsg parameterize the log messages emitted
+// for the cancel action, delete failures and get failures respectively.
+func (r *BackupScheduleReconciler) cancelActiveJobs(ctx context.Context, activeJobs []backupv1.ActiveJob, cancelMsg, deleteErrMsg, getErrMsg string) {
+	log := log.FromContext(ctx)
+	for _, activeJob := range activeJobs {
+		job := &batchv1.Job{}
+		err := r.Get(ctx, client.ObjectKey{
+			Name:      activeJob.Name,
+			Namespace: activeJob.Namespace,
+		}, job)
+		if err == nil {
+			log.Info(cancelMsg, "job", activeJob.Name)
+			propagationPolicy := metav1.DeletePropagationBackground
+			if err = r.Delete(ctx, job, &client.DeleteOptions{
+				PropagationPolicy: &propagationPolicy,
+			}); err != nil && !errors.IsNotFound(err) {
+				log.Error(err, deleteErrMsg, "job", activeJob.Name)
 			}
-			found = true
-			break
+		} else if !errors.IsNotFound(err) {
+			log.Error(err, getErrMsg, "job", activeJob.Name)
 		}
 	}
+}
 
-	if !found {
-		schedule.Status.Conditions = append(schedule.Status.Conditions, condition)
-	}
+// updateCondition updates a condition in the schedule status.
+func (r *BackupScheduleReconciler) updateCondition(schedule *backupv1.BackupSchedule, conditionType string, status metav1.ConditionStatus, reason, message string) {
+	schedule.Status.Conditions = upsertCondition(schedule.Status.Conditions, schedule.Generation, conditionType, status, reason, message)
 }
 
 // SetupWithManager sets up the controller with the Manager.
