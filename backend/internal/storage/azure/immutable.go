@@ -10,8 +10,53 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
 
+	st "github.com/sanskarpan/db-backup/internal/storage"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
+
+// SetRetention locks the blob until the given time using the given mode,
+// satisfying storage.ImmutableProvider. GOVERNANCE maps to Azure's Unlocked
+// (modifiable) policy and COMPLIANCE to Azure's Locked policy. It is a thin
+// adapter over SetBlobImmutabilityPolicy.
+func (p *AzureProvider) SetRetention(ctx context.Context, remotePath string, until time.Time, mode string) error {
+	policyMode := ImmutabilityPolicyModeUnlocked
+	if mode == st.LockModeCompliance {
+		policyMode = ImmutabilityPolicyModeLocked
+	}
+	return p.SetBlobImmutabilityPolicy(ctx, remotePath, until, policyMode)
+}
+
+// GetRetention returns the retention expiry and mode for the blob, satisfying
+// storage.ImmutableProvider. Azure's Locked policy maps to COMPLIANCE and
+// Unlocked to GOVERNANCE. It returns storage.ErrNoRetention when the blob has
+// no immutability policy.
+func (p *AzureProvider) GetRetention(ctx context.Context, remotePath string) (time.Time, string, error) {
+	info, err := p.GetBlobImmutabilityPolicy(ctx, remotePath)
+	if err != nil {
+		return time.Time{}, "", err
+	}
+	if info.ImmutabilityExpiresOn == nil {
+		return time.Time{}, "", st.ErrNoRetention
+	}
+
+	mode := st.LockModeGovernance
+	if info.ImmutabilityPolicyMode == string(ImmutabilityPolicyModeLocked) {
+		mode = st.LockModeCompliance
+	}
+	return *info.ImmutabilityExpiresOn, mode, nil
+}
+
+// SetLegalHold turns a legal hold on or off for the blob, satisfying
+// storage.ImmutableProvider. It is a thin adapter over SetBlobLegalHold.
+func (p *AzureProvider) SetLegalHold(ctx context.Context, remotePath string, on bool) error {
+	return p.SetBlobLegalHold(ctx, remotePath, on)
+}
+
+// GetLegalHold reports whether a legal hold is on for the blob, satisfying
+// storage.ImmutableProvider. It is a thin adapter over GetBlobLegalHold.
+func (p *AzureProvider) GetLegalHold(ctx context.Context, remotePath string) (bool, error) {
+	return p.GetBlobLegalHold(ctx, remotePath)
+}
 
 // ImmutabilityPolicyMode defines the immutability policy mode.
 type ImmutabilityPolicyMode string

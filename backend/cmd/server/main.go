@@ -26,6 +26,7 @@ import (
 	notifyFactory "github.com/sanskarpan/db-backup/internal/notification/factory"
 	"github.com/sanskarpan/db-backup/internal/restore"
 	"github.com/sanskarpan/db-backup/internal/security/ransomware"
+	"github.com/sanskarpan/db-backup/internal/security/siem"
 	"github.com/sanskarpan/db-backup/internal/storage"
 	storageAzure "github.com/sanskarpan/db-backup/internal/storage/azure"
 	storageGCS "github.com/sanskarpan/db-backup/internal/storage/gcs"
@@ -127,6 +128,21 @@ func main() {
 	// Initialize ransomware detector with default config
 	detector := ransomware.NewDetector(nil)
 
+	// Wire the detector into the restore engine as its artifact scanner so that
+	// every restore is preceded by a malware/ransomware scan of the backup
+	// artifact and aborts (fail-closed) when a threat is detected.
+	restoreEngine.SetArtifactScanner(detector)
+
+	// Construct the SIEM exporter used to push detected threat events to a
+	// SIEM/EDR sink. When SIEM export is disabled or lacks an endpoint the
+	// exporter reports Enabled()==false and threat export is skipped.
+	siemExporter := buildSIEMExporter(cfg)
+	if siemExporter.Enabled() {
+		log.Info("SIEM threat export enabled", map[string]interface{}{
+			"format": cfg.Security.SIEM.Format,
+		})
+	}
+
 	// Initialize catalog search engine (with nil indexer for now)
 	// TODO: Initialize Elasticsearch client when available
 	catalogIndexer, err := catalog.NewCatalogIndexer(nil)
@@ -206,7 +222,7 @@ func main() {
 		EnableSwagger: true,
 		JWTSecret:     jwtSecret,
 		ScanBaseDir:   os.Getenv("SCAN_BASE_DIR"),
-	}, backupEngine, restoreEngine, sched, healthChecker, detector, searchEngine, jwtService, oauth2Service, oauth2Handler, dbStore, storageStore, approvalStore, muaEnabled, wsHub, log)
+	}, backupEngine, restoreEngine, sched, healthChecker, detector, searchEngine, jwtService, oauth2Service, oauth2Handler, dbStore, storageStore, approvalStore, muaEnabled, storageProvider, siemExporter, wsHub, log)
 
 	// Setup Gin router
 	if cfg.Logging.Level != "debug" {
@@ -263,6 +279,24 @@ func main() {
 	}
 
 	log.Info("Server exited")
+}
+
+// buildSIEMExporter constructs a SIEM threat exporter from configuration. When
+// SIEM export is disabled or has no endpoint the returned exporter reports
+// Enabled()==false so that threat export is safely skipped.
+func buildSIEMExporter(cfg *config.Config) *siem.SIEMExporter {
+	sc := cfg.Security.SIEM
+	if !sc.Enabled {
+		return siem.NewExporter(siem.Config{})
+	}
+	return siem.NewExporter(siem.Config{
+		Endpoint:   sc.Endpoint,
+		Format:     siem.Format(sc.Format),
+		AuthToken:  sc.AuthToken,
+		Source:     sc.Source,
+		SourceType: sc.SourceType,
+		Index:      sc.Index,
+	})
 }
 
 // buildStorageProvider constructs a storage provider from the configuration.

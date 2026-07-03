@@ -33,6 +33,21 @@ type BackupMetadata struct {
 	Metadata        map[string]interface{} `json:"metadata,omitempty"`
 	StorageLocation string                 `json:"storage_location"`
 	BackupPath      string                 `json:"backup_path"`
+
+	// Immutable indicates the backup was stored with object-lock (WORM)
+	// protection, so it cannot be deleted or altered before its retention
+	// expires.
+	Immutable bool `json:"immutable,omitempty"`
+	// ImmutableUntil is the retention expiry: the backup is protected from
+	// deletion until this time. It is a pointer so it is omitted for
+	// non-immutable backups.
+	ImmutableUntil *time.Time `json:"immutable_until,omitempty"`
+	// LockMode is the object-lock retention mode (GOVERNANCE or COMPLIANCE)
+	// applied to an immutable backup.
+	LockMode string `json:"lock_mode,omitempty"`
+	// LegalHold indicates an indefinite legal hold is applied, preventing
+	// deletion regardless of the retention expiry.
+	LegalHold bool `json:"legal_hold,omitempty"`
 }
 
 // BackupStatus represents the status of a backup operation.

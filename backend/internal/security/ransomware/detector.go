@@ -134,6 +134,10 @@ type ThreatReport struct {
 	Entropy     float64
 	Indicators  []string
 	Recommended string
+
+	// MITRETechniques holds the MITRE ATT&CK techniques mapped from this
+	// report's threat type and indicators. It is populated by EnrichWithMITRE.
+	MITRETechniques []MITRETechnique
 }
 
 // ScanFile scans a single file for ransomware indicators.

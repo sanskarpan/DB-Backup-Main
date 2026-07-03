@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -81,6 +82,22 @@ type CreateOptions struct {
 	// Metadata
 	Name string
 	Tags map[string]string
+
+	// Immutability (WORM / object-lock) options. When Immutable is true the
+	// uploaded artifact is locked so it cannot be deleted before its retention
+	// expires. This requires a storage provider that implements
+	// storage.ImmutableProvider; otherwise the backup fails (fail-closed).
+	Immutable bool
+	// RetentionUntil is the point in time until which an immutable backup is
+	// protected from deletion. Required (in the future) when Immutable is true
+	// unless LegalHold is set.
+	RetentionUntil time.Time
+	// LockMode is the object-lock retention mode (storage.LockModeGovernance or
+	// storage.LockModeCompliance). Defaults to GOVERNANCE when empty.
+	LockMode string
+	// LegalHold, when true, applies an indefinite legal hold to an immutable
+	// backup in addition to (or instead of) a retention period.
+	LegalHold bool
 
 	// Callbacks
 	ProgressCallback func(progress Progress)
@@ -352,6 +369,12 @@ func (e *Engine) createBackup(ctx context.Context, opts *CreateOptions) (*models
 // backup stays in the local temp directory and the local path is recorded.
 func (e *Engine) storeArtifact(ctx context.Context, metadata *models.BackupMetadata, backupID, backupFileName, backupPath, checksum string, opts *CreateOptions) error {
 	if e.provider == nil {
+		// Fail closed: never silently keep a non-immutable local copy when
+		// immutability was required.
+		if opts.Immutable {
+			return pkgErrors.New(pkgErrors.ErrorTypeStorage,
+				"immutable backup requested but no storage provider is configured")
+		}
 		metadata.StorageLocation = backupPath
 		return nil
 	}
@@ -383,10 +406,139 @@ func (e *Engine) storeArtifact(ctx context.Context, metadata *models.BackupMetad
 		return pkgErrors.ErrStorageUpload(err)
 	}
 
+	// Apply immutability (object-lock) protection to the just-uploaded object.
+	// This fails closed: if immutability was requested but cannot be applied,
+	// the whole backup fails rather than being stored unprotected.
+	if err := e.applyImmutability(ctx, metadata, remotePath, opts); err != nil {
+		return err
+	}
+
 	// Record provider type + remote path. BackupPath keeps pointing at the
 	// local temp copy so callers can still read it before cleanup.
 	metadata.StorageLocation = fmt.Sprintf("%s://%s", e.provider.GetType(), remotePath)
 	return nil
+}
+
+// applyImmutability applies object-lock retention and/or legal hold to the
+// uploaded object at remotePath when opts.Immutable is set, and records the
+// applied protection on the metadata. It fails closed: if the configured
+// provider does not implement storage.ImmutableProvider, or the retention
+// request is invalid, the backup fails so an unprotected artifact is never
+// reported as an immutable success. It is a no-op when immutability is not
+// requested.
+func (e *Engine) applyImmutability(ctx context.Context, metadata *models.BackupMetadata, remotePath string, opts *CreateOptions) error {
+	if !opts.Immutable {
+		return nil
+	}
+
+	imm, ok := e.provider.(storage.ImmutableProvider)
+	if !ok {
+		return pkgErrors.New(pkgErrors.ErrorTypeStorage,
+			fmt.Sprintf("immutable backup requested but storage provider %q does not support object lock",
+				e.provider.GetType()))
+	}
+
+	mode := opts.LockMode
+	if mode == "" {
+		mode = storage.LockModeGovernance
+	}
+	if !storage.ValidLockMode(mode) {
+		return pkgErrors.New(pkgErrors.ErrorTypeValidation,
+			fmt.Sprintf("invalid object-lock mode: %q (want %s or %s)",
+				mode, storage.LockModeGovernance, storage.LockModeCompliance))
+	}
+
+	hasRetention := !opts.RetentionUntil.IsZero()
+	if !hasRetention && !opts.LegalHold {
+		return pkgErrors.New(pkgErrors.ErrorTypeValidation,
+			"immutable backup requested but neither a retention period nor a legal hold was specified")
+	}
+
+	if hasRetention {
+		if !opts.RetentionUntil.After(time.Now()) {
+			return pkgErrors.New(pkgErrors.ErrorTypeValidation,
+				"immutable backup retention must be in the future")
+		}
+		if err := imm.SetRetention(ctx, remotePath, opts.RetentionUntil, mode); err != nil {
+			return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
+				"failed to apply object-lock retention")
+		}
+		until := opts.RetentionUntil
+		metadata.ImmutableUntil = &until
+		metadata.LockMode = mode
+	}
+
+	if opts.LegalHold {
+		if err := imm.SetLegalHold(ctx, remotePath, true); err != nil {
+			return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
+				"failed to apply legal hold")
+		}
+		metadata.LegalHold = true
+	}
+
+	metadata.Immutable = true
+	return nil
+}
+
+// GetBackupImmutability reports the current object-lock protection for a
+// backup. When the configured provider implements storage.ImmutableProvider it
+// queries the provider for authoritative status; otherwise it falls back to the
+// protection recorded on the metadata. A missing retention is not an error: it
+// yields a zero until time.
+func (e *Engine) GetBackupImmutability(ctx context.Context, metadata *models.BackupMetadata) (until time.Time, mode string, legalHold bool, err error) {
+	imm, ok := e.provider.(storage.ImmutableProvider)
+	remotePath, remote := parseRemotePath(metadata.StorageLocation)
+	if e.provider == nil || !ok || !remote {
+		// Fall back to recorded metadata.
+		if metadata.ImmutableUntil != nil {
+			until = *metadata.ImmutableUntil
+		}
+		return until, metadata.LockMode, metadata.LegalHold, nil
+	}
+
+	until, mode, err = imm.GetRetention(ctx, remotePath)
+	if err != nil {
+		if !errors.Is(err, storage.ErrNoRetention) {
+			return time.Time{}, "", false, err
+		}
+		until, mode = time.Time{}, ""
+	}
+
+	legalHold, err = imm.GetLegalHold(ctx, remotePath)
+	if err != nil {
+		return time.Time{}, "", false, err
+	}
+	return until, mode, legalHold, nil
+}
+
+// ApplyLegalHold turns a legal hold on or off for a stored backup and persists
+// the change on the metadata. It requires a provider that implements
+// storage.ImmutableProvider and a remotely stored artifact; otherwise it
+// returns an error. Object-lock allows extending protection, so enabling a
+// legal hold is always permitted.
+func (e *Engine) ApplyLegalHold(ctx context.Context, metadata *models.BackupMetadata, on bool) error {
+	imm, ok := e.provider.(storage.ImmutableProvider)
+	if e.provider == nil || !ok {
+		return pkgErrors.New(pkgErrors.ErrorTypeStorage,
+			"legal hold requires a storage provider that supports object lock")
+	}
+
+	remotePath, remote := parseRemotePath(metadata.StorageLocation)
+	if !remote {
+		return pkgErrors.New(pkgErrors.ErrorTypeValidation,
+			fmt.Sprintf("backup is not stored remotely: %s", metadata.StorageLocation))
+	}
+
+	if err := imm.SetLegalHold(ctx, remotePath, on); err != nil {
+		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
+			"failed to update legal hold")
+	}
+
+	metadata.LegalHold = on
+	if on {
+		metadata.Immutable = true
+	}
+	return e.saveMetadata(metadata)
 }
 
 // ValidateBackup validates a backup file.

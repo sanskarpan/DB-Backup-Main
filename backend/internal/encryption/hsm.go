@@ -9,6 +9,18 @@ import (
 	"fmt"
 )
 
+// HSM provider type identifiers accepted by HSMConfig.Provider.
+const (
+	// HSMProviderAWSCloudHSM selects the in-memory AWS CloudHSM mock provider.
+	HSMProviderAWSCloudHSM = "aws-cloudhsm"
+	// HSMProviderAzureKeyVault selects the in-memory Azure Key Vault mock provider.
+	HSMProviderAzureKeyVault = "azure-keyvault"
+	// HSMProviderPKCS11 selects the in-memory PKCS#11 mock provider.
+	HSMProviderPKCS11 = "pkcs11"
+	// HSMProviderVaultTransit selects the real HashiCorp Vault Transit provider.
+	HSMProviderVaultTransit = "vault-transit"
+)
+
 // HSMProvider defines the interface for HSM providers.
 type HSMProvider interface {
 	GenerateKey(keyID string, keySize int) error
@@ -18,14 +30,23 @@ type HSMProvider interface {
 	Decrypt(keyID string, ciphertext []byte) ([]byte, error)
 	DeleteKey(keyID string) error
 	ListKeys() ([]string, error)
+	ExportPublicKey(keyID string) (*rsa.PublicKey, error)
 }
 
 // HSMConfig holds HSM configuration.
 type HSMConfig struct {
-	Provider      string // aws-cloudhsm, azure-keyvault, pkcs11
+	Provider      string // aws-cloudhsm, azure-keyvault, pkcs11, vault-transit
 	Endpoint      string
 	Credentials   map[string]string
 	PKCS11Library string // For PKCS#11 provider
+
+	// Vault Transit provider configuration (used when Provider is
+	// vault-transit). The Transit secrets engine performs sign/verify and
+	// encrypt/decrypt server-side; private keys never leave Vault.
+	VaultAddress   string // Vault server address, e.g. https://vault:8200
+	VaultToken     string // Vault token used to authenticate
+	VaultMountPath string // Transit engine mount path (default: "transit")
+	VaultNamespace string // Vault namespace (Vault Enterprise; optional)
 }
 
 // HSMManager manages Hardware Security Module operations.
@@ -44,12 +65,14 @@ func NewHSMManager(config *HSMConfig) (*HSMManager, error) {
 	var err error
 
 	switch config.Provider {
-	case "aws-cloudhsm":
+	case HSMProviderAWSCloudHSM:
 		provider = newAWSCloudHSMProvider(config)
-	case "azure-keyvault":
+	case HSMProviderAzureKeyVault:
 		provider = newAzureKeyVaultProvider(config)
-	case "pkcs11":
+	case HSMProviderPKCS11:
 		provider, err = newPKCS11Provider(config)
+	case HSMProviderVaultTransit:
+		provider, err = newVaultTransitProvider(config)
 	default:
 		return nil, fmt.Errorf("unsupported HSM provider: %s", config.Provider)
 	}
@@ -99,7 +122,10 @@ func (m *HSMManager) ListKeys() ([]string, error) {
 	return m.provider.ListKeys()
 }
 
-// AWS CloudHSM Provider (mock implementation).
+// awsCloudHSMProvider is an IN-MEMORY MOCK. It generates and holds RSA keys in
+// process memory and is NOT backed by a real AWS CloudHSM. Do not use it for
+// production key custody; configure HSMProviderVaultTransit for a real,
+// server-side key store where private keys never leave the backend.
 type awsCloudHSMProvider struct {
 	config *HSMConfig
 	keys   map[string]*rsa.PrivateKey
@@ -166,7 +192,18 @@ func (p *awsCloudHSMProvider) ListKeys() ([]string, error) {
 	return keys, nil
 }
 
-// Azure Key Vault Provider (mock implementation).
+func (p *awsCloudHSMProvider) ExportPublicKey(keyID string) (*rsa.PublicKey, error) {
+	key, exists := p.keys[keyID]
+	if !exists {
+		return nil, fmt.Errorf("key not found: %s", keyID)
+	}
+	return &key.PublicKey, nil
+}
+
+// azureKeyVaultProvider is an IN-MEMORY MOCK. It generates and holds RSA keys in
+// process memory and is NOT backed by a real Azure Key Vault. Do not use it for
+// production key custody; configure HSMProviderVaultTransit for a real,
+// server-side key store where private keys never leave the backend.
 type azureKeyVaultProvider struct {
 	config *HSMConfig
 	keys   map[string]*rsa.PrivateKey
@@ -233,7 +270,18 @@ func (p *azureKeyVaultProvider) ListKeys() ([]string, error) {
 	return keys, nil
 }
 
-// PKCS#11 Provider (mock implementation).
+func (p *azureKeyVaultProvider) ExportPublicKey(keyID string) (*rsa.PublicKey, error) {
+	key, exists := p.keys[keyID]
+	if !exists {
+		return nil, fmt.Errorf("key not found: %s", keyID)
+	}
+	return &key.PublicKey, nil
+}
+
+// pkcs11Provider is an IN-MEMORY MOCK. It generates and holds RSA keys in
+// process memory and is NOT backed by a real PKCS#11 token/HSM. Do not use it
+// for production key custody; configure HSMProviderVaultTransit for a real,
+// server-side key store where private keys never leave the backend.
 type pkcs11Provider struct {
 	config *HSMConfig
 	keys   map[string]*rsa.PrivateKey
@@ -303,11 +351,17 @@ func (p *pkcs11Provider) ListKeys() ([]string, error) {
 	return keys, nil
 }
 
-// ExportPublicKey exports a public key from HSM.
+func (p *pkcs11Provider) ExportPublicKey(keyID string) (*rsa.PublicKey, error) {
+	key, exists := p.keys[keyID]
+	if !exists {
+		return nil, fmt.Errorf("key not found: %s", keyID)
+	}
+	return &key.PublicKey, nil
+}
+
+// ExportPublicKey exports a public key from the HSM.
 func (m *HSMManager) ExportPublicKey(keyID string) (*rsa.PublicKey, error) {
-	// This is a simplified implementation
-	// In a real HSM, public keys would be exported properly
-	return nil, errors.New("not implemented")
+	return m.provider.ExportPublicKey(keyID)
 }
 
 // ImportKey imports a key into HSM.

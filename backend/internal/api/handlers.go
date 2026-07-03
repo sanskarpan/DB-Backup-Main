@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/sanskarpan/db-backup/internal/restore"
 	"github.com/sanskarpan/db-backup/internal/scheduler"
+	"github.com/sanskarpan/db-backup/internal/security/ransomware"
 	"github.com/sanskarpan/db-backup/pkg/validation"
 )
 
@@ -32,6 +34,9 @@ const (
 	dbTypeMongo      = "mongo"
 	dbTypeSQLite     = "sqlite"
 )
+
+// msgBackupNotFound is the standard 404 message for a missing backup.
+const msgBackupNotFound = "Backup not found"
 
 // handleRoot handles the root endpoint.
 func (s *Server) handleRoot(c *gin.Context) {
@@ -93,6 +98,21 @@ type CreateBackupRequest struct {
 	EncryptionKey string            `json:"encryption_key"`
 	StorageType   string            `json:"storage_type"`
 	Tags          map[string]string `json:"tags"`
+
+	// Immutability (WORM / object-lock) options. When Immutable is true the
+	// backup is written with object-lock protection and the request fails
+	// (fail-closed) if the storage provider cannot enforce it.
+	Immutable bool `json:"immutable"`
+	// RetentionUntil is an RFC3339 timestamp until which an immutable backup is
+	// protected from deletion. Takes precedence over RetentionDays.
+	RetentionUntil string `json:"retention_until"`
+	// RetentionDays sets the immutable retention window as a number of days from
+	// now. Used only when RetentionUntil is empty.
+	RetentionDays int `json:"retention_days"`
+	// LockMode is the object-lock retention mode (GOVERNANCE or COMPLIANCE).
+	LockMode string `json:"lock_mode"`
+	// LegalHold applies an indefinite legal hold to an immutable backup.
+	LegalHold bool `json:"legal_hold"`
 }
 
 func (s *Server) handleCreateBackup(c *gin.Context) {
@@ -144,22 +164,34 @@ func (s *Server) handleCreateBackup(c *gin.Context) {
 		}
 	}
 
+	// Resolve immutable retention window: an explicit RFC3339 timestamp takes
+	// precedence over a relative day count.
+	retentionUntil, err := resolveRetentionUntil(req.RetentionUntil, req.RetentionDays)
+	if err != nil {
+		s.respondError(c, http.StatusBadRequest, err, "Invalid retention_until")
+		return
+	}
+
 	// Create backup options
 	opts := &backup.CreateOptions{
-		DatabaseType:  dbType,
-		Host:          req.Host,
-		Port:          req.Port,
-		Username:      req.Username,
-		Password:      req.Password,
-		Database:      req.Database,
-		Databases:     req.Databases,
-		AllDatabases:  req.AllDatabases,
-		Tables:        req.Tables,
-		ExcludeTables: req.ExcludeTables,
-		Compression:   database.CompressionType(req.Compression),
-		Encrypt:       req.Encrypt,
-		EncryptionKey: req.EncryptionKey,
-		Tags:          req.Tags,
+		DatabaseType:   dbType,
+		Host:           req.Host,
+		Port:           req.Port,
+		Username:       req.Username,
+		Password:       req.Password,
+		Database:       req.Database,
+		Databases:      req.Databases,
+		AllDatabases:   req.AllDatabases,
+		Tables:         req.Tables,
+		ExcludeTables:  req.ExcludeTables,
+		Compression:    database.CompressionType(req.Compression),
+		Encrypt:        req.Encrypt,
+		EncryptionKey:  req.EncryptionKey,
+		Tags:           req.Tags,
+		Immutable:      req.Immutable,
+		RetentionUntil: retentionUntil,
+		LockMode:       req.LockMode,
+		LegalHold:      req.LegalHold,
 	}
 
 	// Create backup
@@ -199,7 +231,7 @@ func (s *Server) handleGetBackup(c *gin.Context) {
 
 	metadata, err := s.backupEngine.GetBackup(ctx, backupID)
 	if err != nil {
-		s.respondError(c, http.StatusNotFound, err, "Backup not found")
+		s.respondError(c, http.StatusNotFound, err, msgBackupNotFound)
 		return
 	}
 
@@ -329,6 +361,9 @@ type RestoreBackupRequest struct {
 	Tables         []string `json:"tables"`
 	DropExisting   bool     `json:"drop_existing"`
 	PointInTime    string   `json:"point_in_time"` // RFC3339 format
+	// SkipMalwareScan disables the pre-restore malware/ransomware scan for this
+	// restore even when the server has a scanner configured.
+	SkipMalwareScan bool `json:"skip_malware_scan"`
 }
 
 func (s *Server) handleRestoreBackup(c *gin.Context) {
@@ -346,24 +381,26 @@ func (s *Server) handleRestoreBackup(c *gin.Context) {
 
 	metadata, err := s.backupEngine.GetBackup(ctx, backupID)
 	if err != nil {
-		s.respondError(c, http.StatusNotFound, err, "Backup not found")
+		s.respondError(c, http.StatusNotFound, err, msgBackupNotFound)
 		return
 	}
 
 	// Create restore options
 	opts := &restore.RestoreOptions{
-		TargetHost:     req.TargetHost,
-		TargetPort:     req.TargetPort,
-		TargetUsername: req.TargetUsername,
-		TargetPassword: req.TargetPassword,
-		TargetDatabase: req.TargetDatabase,
-		Tables:         req.Tables,
-		DropExisting:   req.DropExisting,
+		TargetHost:      req.TargetHost,
+		TargetPort:      req.TargetPort,
+		TargetUsername:  req.TargetUsername,
+		TargetPassword:  req.TargetPassword,
+		TargetDatabase:  req.TargetDatabase,
+		Tables:          req.Tables,
+		DropExisting:    req.DropExisting,
+		SkipMalwareScan: req.SkipMalwareScan,
 	}
 
 	// Perform restore
 	var result *restore.RestoreResult
-	if req.PointInTime != "" {
+	switch {
+	case req.PointInTime != "":
 		// PITR restore
 		targetTime, parseErr := time.Parse(time.RFC3339, req.PointInTime)
 		if parseErr != nil {
@@ -371,17 +408,46 @@ func (s *Server) handleRestoreBackup(c *gin.Context) {
 			return
 		}
 		result, err = s.restoreEngine.RestorePointInTime(ctx, metadata, targetTime, opts)
-	} else {
+	case len(req.Tables) > 0:
+		// Selective restore of the named tables only.
+		result, err = s.restoreEngine.RestoreTables(ctx, metadata, req.Tables, opts)
+	default:
 		// Full restore
 		result, err = s.restoreEngine.RestoreBackup(ctx, metadata, opts)
 	}
 
 	if err != nil {
+		// A pre-restore malware detection aborts the restore; surface it clearly
+		// (409 Conflict) along with the threat report rather than a generic 500.
+		if errors.Is(err, restore.ErrMalwareDetected) {
+			s.respondMalwareAbort(c, err, result)
+			return
+		}
 		s.respondError(c, http.StatusInternalServerError, err, "Failed to restore backup")
 		return
 	}
 
 	s.respondSuccessWithMessage(c, "Restore completed successfully", result)
+}
+
+// respondMalwareAbort writes a 409 response describing an aborted restore due to
+// a pre-restore malware/ransomware detection, including the threat report when
+// one is available so callers can audit the finding.
+func (s *Server) respondMalwareAbort(c *gin.Context, err error, result *restore.RestoreResult) {
+	details := map[string]interface{}{}
+	if result != nil && result.ThreatReport != nil {
+		details["threat_report"] = result.ThreatReport
+	}
+	if s.logger != nil {
+		s.logger.Error("Restore aborted by malware scan", err, map[string]interface{}{
+			"path": c.Request.URL.Path,
+		})
+	}
+	c.JSON(http.StatusConflict, ErrorResponse{
+		Error:   err.Error(),
+		Message: "Restore aborted: malware detected in backup artifact",
+		Details: details,
+	})
 }
 
 func (s *Server) handleDownloadBackup(c *gin.Context) {
@@ -397,7 +463,7 @@ func (s *Server) handleDownloadBackup(c *gin.Context) {
 	// Load backup metadata.
 	metadata, err := s.backupEngine.GetBackup(ctx, backupID)
 	if err != nil {
-		s.respondError(c, http.StatusNotFound, err, "Backup not found")
+		s.respondError(c, http.StatusNotFound, err, msgBackupNotFound)
 		return
 	}
 
@@ -807,7 +873,27 @@ func (s *Server) handleScanFile(c *gin.Context) {
 		return
 	}
 
+	// Enrich the report with MITRE ATT&CK techniques and best-effort export any
+	// real detection to the configured SIEM sink.
+	ransomware.EnrichWithMITRE(report)
+	s.exportThreat(ctx, report)
+
 	s.respondSuccess(c, report)
+}
+
+// exportThreat pushes a single detected threat to the configured SIEM sink on a
+// best-effort basis. Clean reports and an unconfigured/disabled exporter are
+// no-ops; a genuine export failure is logged but never fails the scan request.
+func (s *Server) exportThreat(ctx context.Context, report *ransomware.ThreatReport) {
+	if report == nil || !s.siemExporter.Enabled() {
+		return
+	}
+	if report.ThreatLevel == ransomware.ThreatLevelNone {
+		return
+	}
+	if err := s.siemExporter.Export(ctx, report); err != nil && s.logger != nil {
+		s.logger.Warn("Failed to export threat event to SIEM: " + err.Error())
+	}
 }
 
 // handleScanDirectory scans a directory for ransomware.
@@ -836,6 +922,13 @@ func (s *Server) handleScanDirectory(c *gin.Context) {
 	if err != nil {
 		s.respondError(c, http.StatusInternalServerError, err, "Failed to scan directory")
 		return
+	}
+
+	// Enrich each report with MITRE ATT&CK techniques and best-effort export
+	// genuine detections to the configured SIEM sink.
+	for _, report := range reports {
+		ransomware.EnrichWithMITRE(report)
+		s.exportThreat(ctx, report)
 	}
 
 	s.respondSuccess(c, gin.H{
