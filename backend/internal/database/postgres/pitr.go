@@ -39,7 +39,7 @@ func (p *PITRManager) BackupWALFiles(ctx context.Context, outputDir string, sinc
 	}
 
 	// Force a WAL switch to ensure current WAL is complete
-	if err := p.switchWAL(ctx); err != nil {
+	if err = p.switchWAL(ctx); err != nil {
 		return err
 	}
 
@@ -229,6 +229,7 @@ func (p *PITRManager) restoreBaseBackup(ctx context.Context, opts *PITRRestoreOp
 	}
 
 	// Extract base backup to data directory
+	//nolint:gosec // G204: pg_restore invoked with controlled config values and a caller-provided backup path
 	cmd := exec.CommandContext(
 		ctx, "pg_restore",
 		"-h", p.driver.config.Host,
@@ -440,7 +441,7 @@ func copyFile(src, dst string) error {
 }
 
 // CreateBaseBackup creates a base backup using pg_basebackup.
-func (p *PITRManager) CreateBaseBackup(ctx context.Context, outputDir string, format string) error {
+func (p *PITRManager) CreateBaseBackup(ctx context.Context, outputDir, format string) error {
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return err
 	}

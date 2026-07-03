@@ -21,6 +21,7 @@ type Scheduler struct {
 	jobsMux sync.RWMutex
 	engine  *backup.Engine
 	logger  *logger.Logger
+	config  *Config
 	ctx     context.Context
 	cancel  context.CancelFunc
 	running bool
@@ -98,6 +99,7 @@ func NewScheduler(engine *backup.Engine, log *logger.Logger, cfg *Config) (*Sche
 		jobs:   make(map[string]*ScheduledJob),
 		engine: engine,
 		logger: log,
+		config: cfg,
 		ctx:    ctx,
 		cancel: cancel,
 	}, nil
@@ -180,13 +182,13 @@ func (s *Scheduler) AddJob(job *ScheduledJob) error {
 	job.UpdatedAt = time.Now()
 
 	if job.Retries == 0 {
-		job.Retries = 3
+		job.Retries = s.config.DefaultRetries
 	}
 	if job.RetryDelay == 0 {
-		job.RetryDelay = 5 * time.Minute
+		job.RetryDelay = s.config.DefaultRetryDelay
 	}
 	if job.Timeout == 0 {
-		job.Timeout = 24 * time.Hour
+		job.Timeout = s.config.JobTimeout
 	}
 
 	// Add to cron if enabled

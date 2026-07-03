@@ -564,7 +564,7 @@ func (m *Manager) deliver(sub *Subscription, payload []byte) error {
 	}
 
 	// Create request
-	req, err := http.NewRequestWithContext(m.ctx, "POST", sub.URL, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(m.ctx, http.MethodPost, sub.URL, bytes.NewReader(payload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}

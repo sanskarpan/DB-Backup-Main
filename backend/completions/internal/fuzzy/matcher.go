@@ -34,8 +34,8 @@ func (m *Matcher) WithCaseSensitive(enabled bool) *Matcher {
 }
 
 // WithMaxResults sets the maximum number of results.
-func (m *Matcher) WithMaxResults(max int) *Matcher {
-	m.maxResults = max
+func (m *Matcher) WithMaxResults(n int) *Matcher {
+	m.maxResults = n
 	return m
 }
 
@@ -183,10 +183,10 @@ func LevenshteinDistance(s1, s2 string) int {
 		return 0
 	}
 
-	if len(s1) == 0 {
+	if s1 == "" {
 		return len(s2)
 	}
-	if len(s2) == 0 {
+	if s2 == "" {
 		return len(s1)
 	}
 
@@ -232,24 +232,4 @@ func SimilarityRatio(s1, s2 string) float64 {
 
 	distance := LevenshteinDistance(s1, s2)
 	return 1.0 - float64(distance)/float64(maxLen)
-}
-
-func min(a, b, c int) int {
-	if a < b {
-		if a < c {
-			return a
-		}
-		return c
-	}
-	if b < c {
-		return b
-	}
-	return c
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

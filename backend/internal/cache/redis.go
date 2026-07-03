@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -53,7 +54,7 @@ func (r *RedisCache) Get(ctx context.Context, key string, dest interface{}) erro
 	fullKey := r.makeKey(key)
 
 	data, err := r.client.Get(ctx, fullKey).Bytes()
-	if err == redis.Nil {
+	if errors.Is(err, redis.Nil) {
 		return ErrCacheMiss
 	}
 	if err != nil {
@@ -141,7 +142,7 @@ func (r *RedisCache) GetOrSet(ctx context.Context, key string, dest interface{},
 	if err == nil {
 		return nil // Cache hit
 	}
-	if err != ErrCacheMiss {
+	if !errors.Is(err, ErrCacheMiss) {
 		// Real error occurred
 		return err
 	}
@@ -153,8 +154,9 @@ func (r *RedisCache) GetOrSet(ctx context.Context, key string, dest interface{},
 	}
 
 	// Store in cache
-	if err := r.Set(ctx, key, value); err != nil {
-		// Log error but don't fail - we have the computed value
+	if setErr := r.Set(ctx, key, value); setErr != nil {
+		// Cache write failure is non-fatal - we already have the computed value.
+		//nolint:nilerr // best-effort cache write; computed value is still returned to caller
 		return nil
 	}
 

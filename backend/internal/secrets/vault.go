@@ -459,7 +459,7 @@ func (v *VaultClient) EncryptData(ctx context.Context, key string, plaintext []b
 //
 // Vault's transit decrypt endpoint returns the plaintext as a base64-encoded
 // string, which is decoded back into the original raw bytes.
-func (v *VaultClient) DecryptData(ctx context.Context, key string, ciphertext string) ([]byte, error) {
+func (v *VaultClient) DecryptData(ctx context.Context, key, ciphertext string) ([]byte, error) {
 	path := fmt.Sprintf("transit/decrypt/%s", key)
 
 	data := map[string]interface{}{
@@ -486,7 +486,7 @@ func (v *VaultClient) DecryptData(ctx context.Context, key string, ciphertext st
 // getFullPath constructs the full path for a secret.
 func (v *VaultClient) getFullPath(path string) string {
 	// Remove leading/trailing slashes
-	if len(path) > 0 && path[0] == '/' {
+	if path != "" && path[0] == '/' {
 		path = path[1:]
 	}
 	return path

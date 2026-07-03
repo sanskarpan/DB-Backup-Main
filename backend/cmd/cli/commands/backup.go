@@ -120,7 +120,7 @@ func init() {
 	backupCmd.Flags().Bool("dry-run", false, "simulate backup without execution")
 
 	// Mark required flags
-	backupCmd.MarkFlagRequired("type")
+	cobra.CheckErr(backupCmd.MarkFlagRequired("type"))
 }
 
 func runBackup(cmd *cobra.Command, args []string) error {
@@ -128,38 +128,38 @@ func runBackup(cmd *cobra.Command, args []string) error {
 	opts := &BackupOptions{}
 
 	// Database connection
-	opts.Type, _ = cmd.Flags().GetString("type")
-	opts.Host, _ = cmd.Flags().GetString("host")
-	opts.Port, _ = cmd.Flags().GetInt("port")
-	opts.User, _ = cmd.Flags().GetString("user")
-	opts.Password, _ = cmd.Flags().GetString("password")
-	opts.Database, _ = cmd.Flags().GetString("database")
+	opts.Type = flagString(cmd, "type")
+	opts.Host = flagString(cmd, "host")
+	opts.Port = flagInt(cmd, "port")
+	opts.User = flagString(cmd, "user")
+	opts.Password = flagString(cmd, "password")
+	opts.Database = flagString(cmd, "database")
 
 	// Multiple databases
-	opts.Databases, _ = cmd.Flags().GetStringSlice("databases")
-	opts.AllDatabases, _ = cmd.Flags().GetBool("all-databases")
-	opts.Tables, _ = cmd.Flags().GetStringSlice("tables")
-	opts.ExcludeTables, _ = cmd.Flags().GetStringSlice("exclude-tables")
+	opts.Databases = flagStringSlice(cmd, "databases")
+	opts.AllDatabases = flagBool(cmd, "all-databases")
+	opts.Tables = flagStringSlice(cmd, "tables")
+	opts.ExcludeTables = flagStringSlice(cmd, "exclude-tables")
 
 	// Compression
-	opts.Compression, _ = cmd.Flags().GetString("compression")
-	opts.CompressionLevel, _ = cmd.Flags().GetInt("compress-level")
+	opts.Compression = flagString(cmd, "compression")
+	opts.CompressionLevel = flagInt(cmd, "compress-level")
 
 	// Encryption
-	opts.Encrypt, _ = cmd.Flags().GetBool("encrypt")
-	opts.EncryptionKey, _ = cmd.Flags().GetString("encryption-key")
+	opts.Encrypt = flagBool(cmd, "encrypt")
+	opts.EncryptionKey = flagString(cmd, "encryption-key")
 
 	// Storage
-	opts.Storage, _ = cmd.Flags().GetString("storage")
-	opts.StoragePath, _ = cmd.Flags().GetString("storage-path")
+	opts.Storage = flagString(cmd, "storage")
+	opts.StoragePath = flagString(cmd, "storage-path")
 
 	// Metadata
-	opts.Name, _ = cmd.Flags().GetString("name")
-	opts.Tags, _ = cmd.Flags().GetStringSlice("tags")
+	opts.Name = flagString(cmd, "name")
+	opts.Tags = flagStringSlice(cmd, "tags")
 
 	// Flags
-	opts.Notify, _ = cmd.Flags().GetBool("notify")
-	opts.DryRun, _ = cmd.Flags().GetBool("dry-run")
+	opts.Notify = flagBool(cmd, "notify")
+	opts.DryRun = flagBool(cmd, "dry-run")
 
 	// Validate options
 	if err := validateBackupOptions(opts); err != nil {

@@ -22,6 +22,8 @@ type Plugin struct {
 }
 
 // PluginResponse represents a plugin's completion response.
+//
+//nolint:revive // keeps public name stable across packages
 type PluginResponse struct {
 	Suggestions []string          `json:"suggestions"`
 	Metadata    map[string]string `json:"metadata"`
@@ -29,6 +31,8 @@ type PluginResponse struct {
 }
 
 // PluginSystem manages completion plugins.
+//
+//nolint:revive // keeps public name stable across packages
 type PluginSystem struct {
 	mu         sync.RWMutex
 	pluginDir  string
@@ -96,7 +100,7 @@ func (ps *PluginSystem) Save() error {
 		return err
 	}
 
-	return os.WriteFile(ps.configFile, data, 0o644)
+	return os.WriteFile(ps.configFile, data, 0o600)
 }
 
 // Register registers a new plugin.
@@ -242,13 +246,13 @@ func (ps *PluginSystem) executePlugin(plugin *Plugin, command string, args []str
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("plugin execution failed: %v, output: %s", err, output)
+		return nil, fmt.Errorf("plugin execution failed: %w, output: %s", err, output)
 	}
 
 	// Parse response
 	var response PluginResponse
 	if err := json.Unmarshal(output, &response); err != nil {
-		return nil, fmt.Errorf("failed to parse plugin response: %v", err)
+		return nil, fmt.Errorf("failed to parse plugin response: %w", err)
 	}
 
 	if response.Error != "" {
@@ -307,6 +311,7 @@ if __name__ == '__main__':
 `
 
 	pluginPath := filepath.Join(pluginDir, "example-plugin.py")
+	//nolint:gosec // G306: plugin script must be executable to run as a subprocess
 	if err := os.WriteFile(pluginPath, []byte(exampleScript), 0o755); err != nil {
 		return err
 	}

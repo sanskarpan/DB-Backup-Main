@@ -23,6 +23,15 @@ const (
 	BackupTypeSynthetic   BackupType = "synthetic"   // Synthetic full backup
 )
 
+// compressionGzip is the identifier for gzip-compressed backup artifacts.
+const compressionGzip = "gzip"
+
+// Backup manifest status values.
+const (
+	backupStatusCompleted = "completed"
+	backupStatusFailed    = "failed"
+)
+
 // BackupManifest represents metadata for a backup.
 type BackupManifest struct {
 	ID             string
@@ -59,6 +68,8 @@ type BackupBlock struct {
 }
 
 // IncrementalForeverStrategy implements the incremental forever backup strategy.
+//
+//nolint:revive // keeps public name stable across packages
 type IncrementalForeverStrategy struct {
 	mu                 sync.RWMutex
 	tracker            *ChangeTracker
@@ -188,7 +199,7 @@ func (ifs *IncrementalForeverStrategy) PerformFullBackup(sourcePath, databaseID,
 	}
 
 	if ifs.compressionEnabled {
-		manifest.Compression = "gzip"
+		manifest.Compression = compressionGzip
 	}
 
 	// Create backup path
@@ -198,7 +209,7 @@ func (ifs *IncrementalForeverStrategy) PerformFullBackup(sourcePath, databaseID,
 	// Create snapshot
 	snapshot, err := ifs.tracker.CreateSnapshot(sourcePath)
 	if err != nil {
-		manifest.Status = "failed"
+		manifest.Status = backupStatusFailed
 		manifest.Error = err.Error()
 		return manifest, fmt.Errorf("failed to create snapshot: %w", err)
 	}
@@ -212,7 +223,7 @@ func (ifs *IncrementalForeverStrategy) PerformFullBackup(sourcePath, databaseID,
 	// Copy file to backup location
 	err = ifs.copyWithCompression(sourcePath, manifest.BackupPath, manifest.Compression)
 	if err != nil {
-		manifest.Status = "failed"
+		manifest.Status = backupStatusFailed
 		manifest.Error = err.Error()
 		return manifest, fmt.Errorf("failed to copy file: %w", err)
 	}
@@ -225,7 +236,7 @@ func (ifs *IncrementalForeverStrategy) PerformFullBackup(sourcePath, databaseID,
 
 	manifest.CompletedAt = time.Now()
 	manifest.Duration = manifest.CompletedAt.Sub(manifest.CreatedAt)
-	manifest.Status = "completed"
+	manifest.Status = backupStatusCompleted
 
 	// Save manifest
 	err = ifs.saveManifest(manifest)
@@ -241,7 +252,7 @@ func (ifs *IncrementalForeverStrategy) PerformFullBackup(sourcePath, databaseID,
 }
 
 // PerformIncrementalBackup performs an incremental backup.
-func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, databaseID, databaseName string, baseBackupID string) (*BackupManifest, error) {
+func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, databaseID, databaseName, baseBackupID string) (*BackupManifest, error) {
 	// Find base backup
 	ifs.mu.RLock()
 	baseManifest, exists := ifs.manifests[baseBackupID]
@@ -267,7 +278,7 @@ func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, data
 	}
 
 	if ifs.compressionEnabled {
-		manifest.Compression = "gzip"
+		manifest.Compression = compressionGzip
 	}
 
 	// Create backup path
@@ -277,7 +288,7 @@ func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, data
 	// Detect changes
 	changeSet, err := ifs.tracker.DetectChanges(sourcePath, baseManifest.SnapshotID)
 	if err != nil {
-		manifest.Status = "failed"
+		manifest.Status = backupStatusFailed
 		manifest.Error = err.Error()
 		return manifest, fmt.Errorf("failed to detect changes: %w", err)
 	}
@@ -297,7 +308,7 @@ func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, data
 	// Extract changed block data
 	changedData, err := ifs.tracker.GetChangedBlockData(sourcePath, changeSet)
 	if err != nil {
-		manifest.Status = "failed"
+		manifest.Status = backupStatusFailed
 		manifest.Error = err.Error()
 		return manifest, fmt.Errorf("failed to get changed blocks: %w", err)
 	}
@@ -305,7 +316,7 @@ func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, data
 	// Save incremental backup (changed blocks only)
 	err = ifs.saveIncrementalBackup(manifest.BackupPath, changedData, changeSet, manifest.Compression)
 	if err != nil {
-		manifest.Status = "failed"
+		manifest.Status = backupStatusFailed
 		manifest.Error = err.Error()
 		return manifest, fmt.Errorf("failed to save incremental backup: %w", err)
 	}
@@ -318,7 +329,7 @@ func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, data
 
 	manifest.CompletedAt = time.Now()
 	manifest.Duration = manifest.CompletedAt.Sub(manifest.CreatedAt)
-	manifest.Status = "completed"
+	manifest.Status = backupStatusCompleted
 
 	// Save manifest
 	err = ifs.saveManifest(manifest)
@@ -482,7 +493,7 @@ func (ifs *IncrementalForeverStrategy) saveIncrementalBackup(backupPath string, 
 	}
 	defer file.Close()
 
-	if compression == "gzip" {
+	if compression == compressionGzip {
 		gzipWriter := gzip.NewWriter(file)
 		defer gzipWriter.Close()
 
@@ -501,7 +512,7 @@ func (ifs *IncrementalForeverStrategy) saveIncrementalBackup(backupPath string, 
 }
 
 // loadIncrementalBackup loads an incremental backup.
-func (ifs *IncrementalForeverStrategy) loadIncrementalBackup(backupPath string, compression string) (map[int64][]byte, error) {
+func (ifs *IncrementalForeverStrategy) loadIncrementalBackup(backupPath, compression string) (map[int64][]byte, error) {
 	file, err := os.Open(backupPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open backup file: %w", err)
@@ -510,10 +521,10 @@ func (ifs *IncrementalForeverStrategy) loadIncrementalBackup(backupPath string, 
 
 	var reader io.Reader = file
 
-	if compression == "gzip" {
-		gzipReader, err := gzip.NewReader(file)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+	if compression == compressionGzip {
+		gzipReader, gzErr := gzip.NewReader(file)
+		if gzErr != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %w", gzErr)
 		}
 		defer gzipReader.Close()
 		reader = gzipReader
@@ -560,7 +571,7 @@ func (ifs *IncrementalForeverStrategy) copyWithCompression(sourcePath, destPath,
 	}
 	defer destFile.Close()
 
-	if compression == "gzip" {
+	if compression == compressionGzip {
 		gzipWriter := gzip.NewWriter(destFile)
 		defer gzipWriter.Close()
 
@@ -592,13 +603,14 @@ func (ifs *IncrementalForeverStrategy) extractWithDecompression(sourcePath, dest
 	}
 	defer destFile.Close()
 
-	if compression == "gzip" {
-		gzipReader, err := gzip.NewReader(sourceFile)
-		if err != nil {
-			return fmt.Errorf("failed to create gzip reader: %w", err)
+	if compression == compressionGzip {
+		gzipReader, gzErr := gzip.NewReader(sourceFile)
+		if gzErr != nil {
+			return fmt.Errorf("failed to create gzip reader: %w", gzErr)
 		}
 		defer gzipReader.Close()
 
+		//nolint:gosec // G110: decompressing our own trusted backup artifacts, not untrusted input
 		_, err = io.Copy(destFile, gzipReader)
 		if err != nil {
 			return fmt.Errorf("failed to extract with decompression: %w", err)

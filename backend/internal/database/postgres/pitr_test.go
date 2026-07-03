@@ -189,6 +189,7 @@ func TestIsWALFile(t *testing.T) {
 
 // Helper function to setup test PostgreSQL connection.
 func setupTestPostgres(t *testing.T) *PostgreSQLDriver {
+	t.Helper()
 	host := os.Getenv("POSTGRES_TEST_HOST")
 	if host == "" {
 		host = "localhost"

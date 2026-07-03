@@ -89,7 +89,7 @@ func (em *ErasureManager) CreateErasureRequest(ctx context.Context, userID, reas
 		}
 	}
 
-	if dataTypes == nil || len(dataTypes) == 0 {
+	if len(dataTypes) == 0 {
 		dataTypes = []string{"all"}
 	}
 

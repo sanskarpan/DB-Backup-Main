@@ -18,6 +18,8 @@ func createTestDB() (*sql.DB, error) {
 }
 
 // Helper function to create a test connection pool.
+//
+//nolint:gocritic // hugeParam: PoolConfig passed by value mirrors the constructor signature under test.
 func createTestPool(t *testing.T, config PoolConfig) *ConnectionPool {
 	t.Helper()
 

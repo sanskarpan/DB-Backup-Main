@@ -210,8 +210,9 @@ func TestRateLimiting(t *testing.T) {
 	}
 
 	// First 5 requests should succeed (burst size)
+	var decision *PolicyDecision
 	for i := 0; i < 5; i++ {
-		decision, err := manager.EvaluateConnection(context.Background(), conn)
+		decision, err = manager.EvaluateConnection(context.Background(), conn)
 		if err != nil {
 			t.Fatalf("Request %d failed: %v", i+1, err)
 		}
@@ -221,7 +222,7 @@ func TestRateLimiting(t *testing.T) {
 	}
 
 	// 6th request should be rate limited
-	decision, err := manager.EvaluateConnection(context.Background(), conn)
+	decision, err = manager.EvaluateConnection(context.Background(), conn)
 	if err != nil {
 		t.Fatalf("Rate limit test failed: %v", err)
 	}
@@ -252,8 +253,9 @@ func TestConnectionLimits(t *testing.T) {
 	}
 
 	// First 3 connections should succeed
+	var decision *PolicyDecision
 	for i := 0; i < 3; i++ {
-		decision, err := manager.EvaluateConnection(context.Background(), conn)
+		decision, err = manager.EvaluateConnection(context.Background(), conn)
 		if err != nil {
 			t.Fatalf("Connection %d failed: %v", i+1, err)
 		}
@@ -263,7 +265,7 @@ func TestConnectionLimits(t *testing.T) {
 	}
 
 	// 4th connection should be denied
-	decision, err := manager.EvaluateConnection(context.Background(), conn)
+	decision, err = manager.EvaluateConnection(context.Background(), conn)
 	if err != nil {
 		t.Fatalf("Connection limit test failed: %v", err)
 	}
@@ -494,7 +496,7 @@ func TestHTTPMiddleware(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/test", nil)
+			req := httptest.NewRequest("GET", "/test", http.NoBody)
 			req.RemoteAddr = tt.remoteAddr
 
 			rr := httptest.NewRecorder()
@@ -542,7 +544,7 @@ func TestGetClientIP(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/test", nil)
+			req := httptest.NewRequest("GET", "/test", http.NoBody)
 			req.RemoteAddr = tt.remoteAddr
 			if tt.xff != "" {
 				req.Header.Set("X-Forwarded-For", tt.xff)

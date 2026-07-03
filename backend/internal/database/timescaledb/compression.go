@@ -70,7 +70,7 @@ func (m *CompressionManager) BackupCompressionPolicies(ctx context.Context, outp
 		var policy CompressionPolicy
 		var segmentBy, orderBy, compressAfter *string
 
-		err := rows.Scan(
+		err = rows.Scan(
 			&policy.Hypertable,
 			&policy.Schema,
 			&segmentBy,
@@ -133,38 +133,40 @@ func (m *CompressionManager) RestoreCompressionPolicies(ctx context.Context, bac
 	// Restore each compression policy
 	for _, policy := range policies {
 		// Enable compression on hypertable
-		if policy.CompressionEnabled {
-			alterQuery := fmt.Sprintf(
-				"ALTER TABLE %s SET (timescaledb.compress",
+		if !policy.CompressionEnabled {
+			continue
+		}
+
+		alterQuery := fmt.Sprintf(
+			"ALTER TABLE %s SET (timescaledb.compress",
+			policy.Hypertable,
+		)
+
+		if policy.SegmentBy != "" {
+			alterQuery += fmt.Sprintf(", timescaledb.compress_segmentby = '%s'", policy.SegmentBy)
+		}
+		if policy.OrderBy != "" {
+			alterQuery += fmt.Sprintf(", timescaledb.compress_orderby = '%s'", policy.OrderBy)
+		}
+
+		alterQuery += ")"
+
+		if _, err := m.driver.pool.Exec(ctx, alterQuery); err != nil {
+			// Continue even if one fails
+			continue
+		}
+
+		// Add compression policy if compress_after is specified
+		if policy.CompressAfter != "" {
+			policyQuery := fmt.Sprintf(
+				"SELECT add_compression_policy('%s', INTERVAL '%s')",
 				policy.Hypertable,
+				policy.CompressAfter,
 			)
 
-			if policy.SegmentBy != "" {
-				alterQuery += fmt.Sprintf(", timescaledb.compress_segmentby = '%s'", policy.SegmentBy)
-			}
-			if policy.OrderBy != "" {
-				alterQuery += fmt.Sprintf(", timescaledb.compress_orderby = '%s'", policy.OrderBy)
-			}
-
-			alterQuery += ")"
-
-			if _, err := m.driver.pool.Exec(ctx, alterQuery); err != nil {
+			if _, err := m.driver.pool.Exec(ctx, policyQuery); err != nil {
 				// Continue even if one fails
 				continue
-			}
-
-			// Add compression policy if compress_after is specified
-			if policy.CompressAfter != "" {
-				policyQuery := fmt.Sprintf(
-					"SELECT add_compression_policy('%s', INTERVAL '%s')",
-					policy.Hypertable,
-					policy.CompressAfter,
-				)
-
-				if _, err := m.driver.pool.Exec(ctx, policyQuery); err != nil {
-					// Continue even if one fails
-					continue
-				}
 			}
 		}
 	}

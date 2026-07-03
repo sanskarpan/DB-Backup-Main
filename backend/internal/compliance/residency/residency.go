@@ -36,6 +36,8 @@ const (
 )
 
 // ResidencyPolicy defines where data can be stored and processed.
+//
+//nolint:revive // keeps public name stable; renaming would break other packages
 type ResidencyPolicy struct {
 	ID                   string             `json:"id"`
 	Name                 string             `json:"name"`
@@ -54,6 +56,8 @@ type ResidencyPolicy struct {
 }
 
 // ResidencyViolation represents a data residency policy violation.
+//
+//nolint:revive // keeps public name stable; renaming would break other packages
 type ResidencyViolation struct {
 	ID                string     `json:"id"`
 	PolicyID          string     `json:"policy_id"`
@@ -98,7 +102,12 @@ const (
 	TransferStatusFailed    TransferStatus = "failed"
 )
 
+// violationStatusResolved is the status marking a violation as resolved.
+const violationStatusResolved = "resolved"
+
 // ResidencyManager manages data residency policies and compliance.
+//
+//nolint:revive // keeps public name stable; renaming would break other packages
 type ResidencyManager struct {
 	policyStore    PolicyStore
 	violationStore ViolationStore
@@ -190,7 +199,7 @@ func (rm *ResidencyManager) GetAllPolicies(ctx context.Context) ([]*ResidencyPol
 }
 
 // ValidateResidency checks if a resource complies with residency policies.
-func (rm *ResidencyManager) ValidateResidency(ctx context.Context, resourceType, resourceID string, policyID string) (bool, error) {
+func (rm *ResidencyManager) ValidateResidency(ctx context.Context, resourceType, resourceID, policyID string) (bool, error) {
 	policy, err := rm.policyStore.Get(ctx, policyID)
 	if err != nil {
 		return false, err
@@ -222,7 +231,9 @@ func (rm *ResidencyManager) ValidateResidency(ctx context.Context, resourceType,
 				DetectedAt:     time.Now(),
 				Status:         "detected",
 			}
-			_ = rm.violationStore.Save(ctx, violation)
+			if err := rm.violationStore.Save(ctx, violation); err != nil {
+				return false, fmt.Errorf("resource in restricted region %s (failed to record violation: %w)", currentRegion, err)
+			}
 			return false, fmt.Errorf("resource in restricted region: %s", currentRegion)
 		}
 	}
@@ -250,7 +261,9 @@ func (rm *ResidencyManager) ValidateResidency(ctx context.Context, resourceType,
 				DetectedAt:     time.Now(),
 				Status:         "detected",
 			}
-			_ = rm.violationStore.Save(ctx, violation)
+			if err := rm.violationStore.Save(ctx, violation); err != nil {
+				return false, fmt.Errorf("resource not in allowed region %s (failed to record violation: %w)", currentRegion, err)
+			}
 			return false, fmt.Errorf("resource not in allowed region: %s", currentRegion)
 		}
 	}
@@ -351,7 +364,7 @@ func (rm *ResidencyManager) ResolveViolation(ctx context.Context, violationID, r
 		return err
 	}
 
-	violation.Status = "resolved"
+	violation.Status = violationStatusResolved
 	violation.RemediationAction = remediationAction
 	now := time.Now()
 	violation.ResolvedAt = &now
@@ -360,7 +373,7 @@ func (rm *ResidencyManager) ResolveViolation(ctx context.Context, violationID, r
 }
 
 // GetRegionCompliance checks compliance for all resources in a region.
-func (rm *ResidencyManager) GetRegionCompliance(ctx context.Context, region Region) (bool, int, int, error) {
+func (rm *ResidencyManager) GetRegionCompliance(ctx context.Context, region Region) (compliant bool, compliantCount, totalCount int, err error) {
 	policies, err := rm.policyStore.GetByRegion(ctx, region)
 	if err != nil {
 		return false, 0, 0, err
@@ -381,7 +394,7 @@ func (rm *ResidencyManager) GetRegionCompliance(ctx context.Context, region Regi
 
 		hasUnresolvedViolations := false
 		for _, v := range violations {
-			if v.Status != "resolved" && v.Status != "false_positive" {
+			if v.Status != violationStatusResolved && v.Status != "false_positive" {
 				hasUnresolvedViolations = true
 				break
 			}

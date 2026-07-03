@@ -144,12 +144,20 @@ func TestTracker_Stats(t *testing.T) {
 
 	stats := tracker.Stats()
 
-	if stats["unique_commands"].(int) != 2 {
-		t.Errorf("Expected 2 unique commands, got %v", stats["unique_commands"])
+	uniqueCommands, ok := stats["unique_commands"].(int)
+	if !ok {
+		t.Fatalf("Expected unique_commands to be int, got %T", stats["unique_commands"])
+	}
+	if uniqueCommands != 2 {
+		t.Errorf("Expected 2 unique commands, got %v", uniqueCommands)
 	}
 
-	if stats["total_executions"].(int) != 3 {
-		t.Errorf("Expected 3 total executions, got %v", stats["total_executions"])
+	totalExecutions, ok := stats["total_executions"].(int)
+	if !ok {
+		t.Fatalf("Expected total_executions to be int, got %T", stats["total_executions"])
+	}
+	if totalExecutions != 3 {
+		t.Errorf("Expected 3 total executions, got %v", totalExecutions)
 	}
 }
 

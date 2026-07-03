@@ -328,6 +328,7 @@ func TestClusterDriver_BackupCluster(t *testing.T) {
 // Helper functions
 
 func setupTestDriver(t *testing.T) *RedisDriver {
+	t.Helper()
 	skipIfRedisUnavailable(t)
 	driver := NewRedisDriver()
 	config := &database.ConnectionConfig{

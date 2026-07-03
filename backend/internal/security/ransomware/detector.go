@@ -154,15 +154,15 @@ func (d *Detector) ScanFile(ctx context.Context, filePath string) (*ThreatReport
 
 	// Calculate file hash
 	hasher := sha256.New()
-	if _, err := io.Copy(hasher, file); err != nil {
-		return nil, pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
+	if _, copyErr := io.Copy(hasher, file); copyErr != nil {
+		return nil, pkgErrors.Wrap(copyErr, pkgErrors.ErrorTypeStorage,
 			"failed to calculate file hash")
 	}
 	fileHash := fmt.Sprintf("%x", hasher.Sum(nil))
 
 	// Reset file pointer for entropy calculation
-	if _, err := file.Seek(0, 0); err != nil {
-		return nil, pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
+	if _, seekErr := file.Seek(0, 0); seekErr != nil {
+		return nil, pkgErrors.Wrap(seekErr, pkgErrors.ErrorTypeStorage,
 			"failed to reset file pointer")
 	}
 
@@ -221,12 +221,9 @@ func (d *Detector) ScanFile(ctx context.Context, filePath string) (*ThreatReport
 				match.Family.Name, match.Family.Description)
 
 			// Add all matched indicators
-			for _, indicator := range match.MatchedIndicators {
-				report.Indicators = append(report.Indicators, indicator)
-			}
+			report.Indicators = append(report.Indicators, match.MatchedIndicators...)
 			report.Indicators = append(report.Indicators,
-				fmt.Sprintf("Confidence: %d%%", match.ConfidenceScore))
-			report.Indicators = append(report.Indicators,
+				fmt.Sprintf("Confidence: %d%%", match.ConfidenceScore),
 				fmt.Sprintf("Family: %s", match.Family.Name))
 			if len(match.Family.Aliases) > 0 {
 				report.Indicators = append(report.Indicators,
@@ -287,8 +284,8 @@ func (d *Detector) ScanDirectory(ctx context.Context, dirPath string) ([]*Threat
 		// Scan file
 		report, err := d.ScanFile(ctx, path)
 		if err != nil {
-			// Log error but continue scanning
-			return nil
+			// Intentionally continue scanning remaining files on a per-file error.
+			return nil //nolint:nilerr // per-file scan errors must not abort the directory walk
 		}
 
 		// Only add reports with threats

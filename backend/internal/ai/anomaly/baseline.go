@@ -89,6 +89,8 @@ func NewBaselineTrainer(windowDays int) *BaselineTrainer {
 }
 
 // AddMetric adds a backup metric to the training dataset.
+//
+//nolint:gocritic // hugeParam: keeps public API signature stable (pass-by-value)
 func (bt *BaselineTrainer) AddMetric(metric BackupMetric) {
 	bt.mu.Lock()
 	defer bt.mu.Unlock()
@@ -191,8 +193,8 @@ func (bt *BaselineTrainer) trainDatabase(dbName string, metrics []BackupMetric) 
 	// Calculate size statistics
 	model.SizeMean = mean(sizes)
 	model.SizeStdDev = stdDev(sizes, model.SizeMean)
-	model.SizeMin = min(sizes)
-	model.SizeMax = max(sizes)
+	model.SizeMin = minFloat(sizes)
+	model.SizeMax = maxFloat(sizes)
 	model.SizeP50 = percentile(sizes, 0.50)
 	model.SizeP95 = percentile(sizes, 0.95)
 	model.SizeP99 = percentile(sizes, 0.99)
@@ -200,8 +202,8 @@ func (bt *BaselineTrainer) trainDatabase(dbName string, metrics []BackupMetric) 
 	// Calculate duration statistics
 	model.DurationMean = mean(durations)
 	model.DurationStdDev = stdDev(durations, model.DurationMean)
-	model.DurationMin = min(durations)
-	model.DurationMax = max(durations)
+	model.DurationMin = minFloat(durations)
+	model.DurationMax = maxFloat(durations)
 	model.DurationP50 = percentile(durations, 0.50)
 	model.DurationP95 = percentile(durations, 0.95)
 	model.DurationP99 = percentile(durations, 0.99)
@@ -323,7 +325,7 @@ func stdDev(values []float64, mean float64) float64 {
 	return math.Sqrt(variance)
 }
 
-func min(values []float64) float64 {
+func minFloat(values []float64) float64 {
 	if len(values) == 0 {
 		return 0
 	}
@@ -338,7 +340,7 @@ func min(values []float64) float64 {
 	return minVal
 }
 
-func max(values []float64) float64 {
+func maxFloat(values []float64) float64 {
 	if len(values) == 0 {
 		return 0
 	}

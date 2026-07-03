@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -46,7 +47,7 @@ type SubscriptionKeys struct {
 }
 
 // NotificationPreferences defines user preferences for notifications.
-type NotificationPreferences struct {
+type NotificationPreferences struct { //nolint:revive // keeps public name stable across packages
 	BackupSuccess   bool `json:"backup_success"`
 	BackupFailed    bool `json:"backup_failed"`
 	ComplianceAlert bool `json:"compliance_alert"`
@@ -74,7 +75,7 @@ type PushNotification struct {
 }
 
 // NotificationAction represents an action button in the notification.
-type NotificationAction struct {
+type NotificationAction struct { //nolint:revive // keeps public name stable across packages
 	Action string `json:"action"`
 	Title  string `json:"title"`
 	Icon   string `json:"icon,omitempty"`
@@ -130,7 +131,7 @@ func generateVAPIDKeys() (privateKey, publicKey string, err error) {
 	privateKey = base64.RawURLEncoding.EncodeToString(privateKeyBytes)
 
 	// Encode public key (uncompressed point format)
-	publicKeyBytes := elliptic.Marshal(curve, key.PublicKey.X, key.PublicKey.Y)
+	publicKeyBytes := elliptic.Marshal(curve, key.PublicKey.X, key.PublicKey.Y) //nolint:staticcheck // SA1019: uncompressed point encoding required for VAPID public key; crypto/ecdh migration deferred
 	publicKey = base64.RawURLEncoding.EncodeToString(publicKeyBytes)
 
 	return privateKey, publicKey, nil
@@ -284,9 +285,11 @@ func (s *PushService) SendNotification(ctx context.Context, endpoint string, not
 	s.mu.Unlock()
 
 	// Handle response status
-	if resp.StatusCode == 410 || resp.StatusCode == 404 {
+	if resp.StatusCode == http.StatusGone || resp.StatusCode == http.StatusNotFound {
 		// Subscription is no longer valid, deactivate it
-		s.Unsubscribe(ctx, endpoint)
+		if err := s.Unsubscribe(ctx, endpoint); err != nil {
+			return fmt.Errorf("subscription expired and failed to unsubscribe: %w", err)
+		}
 		return fmt.Errorf("subscription expired or not found")
 	}
 

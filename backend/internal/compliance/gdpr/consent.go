@@ -130,7 +130,9 @@ func (cm *ConsentManager) GrantConsent(ctx context.Context, userID string, purpo
 		NewState:      string(ConsentStatusGranted),
 	}
 
-	_ = cm.store.SaveRecord(ctx, record)
+	if err := cm.store.SaveRecord(ctx, record); err != nil {
+		return nil, err
+	}
 
 	return consent, nil
 }
@@ -166,7 +168,9 @@ func (cm *ConsentManager) RevokeConsent(ctx context.Context, consentID, reason s
 		Reason:        reason,
 	}
 
-	_ = cm.store.SaveRecord(ctx, record)
+	if err := cm.store.SaveRecord(ctx, record); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -191,7 +195,9 @@ func (cm *ConsentManager) CheckConsent(ctx context.Context, userID string, purpo
 	if consent.ExpiresAt != nil && time.Now().After(*consent.ExpiresAt) {
 		// Auto-expire the consent
 		consent.Status = ConsentStatusExpired
-		_ = cm.store.Update(ctx, consent)
+		if err := cm.store.Update(ctx, consent); err != nil {
+			return false, err
+		}
 		return false, nil
 	}
 
@@ -231,7 +237,7 @@ func (cm *ConsentManager) ExportUserConsents(ctx context.Context, userID string)
 }
 
 // ValidateConsent checks if a consent is still valid.
-func (cm *ConsentManager) ValidateConsent(consent *Consent) (bool, string) {
+func (cm *ConsentManager) ValidateConsent(consent *Consent) (valid bool, reason string) {
 	if consent.Status != ConsentStatusGranted {
 		return false, "consent not granted"
 	}

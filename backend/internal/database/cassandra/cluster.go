@@ -106,7 +106,7 @@ func (m *MultiDCDriver) BackupAllDatacenters(ctx context.Context, opts *database
 	wg.Wait()
 	close(errors)
 
-	var backupErrors []string
+	backupErrors := make([]string, 0, len(m.sessions))
 	for err := range errors {
 		backupErrors = append(backupErrors, err.Error())
 	}

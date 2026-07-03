@@ -87,7 +87,7 @@ func (sbg *SyntheticBackupGenerator) GenerateSyntheticFull(latestIncrementalID s
 	// Copy restored file to backup location with compression
 	err = sbg.strategy.copyWithCompression(tempRestorePath, syntheticManifest.BackupPath, syntheticManifest.Compression)
 	if err != nil {
-		syntheticManifest.Status = "failed"
+		syntheticManifest.Status = backupStatusFailed
 		syntheticManifest.Error = err.Error()
 		return syntheticManifest, fmt.Errorf("failed to create synthetic backup: %w", err)
 	}
@@ -95,7 +95,7 @@ func (sbg *SyntheticBackupGenerator) GenerateSyntheticFull(latestIncrementalID s
 	// Create snapshot of synthetic backup
 	snapshot, err := sbg.strategy.tracker.CreateSnapshot(tempRestorePath)
 	if err != nil {
-		syntheticManifest.Status = "failed"
+		syntheticManifest.Status = backupStatusFailed
 		syntheticManifest.Error = err.Error()
 		return syntheticManifest, fmt.Errorf("failed to create snapshot: %w", err)
 	}
@@ -113,7 +113,7 @@ func (sbg *SyntheticBackupGenerator) GenerateSyntheticFull(latestIncrementalID s
 
 	syntheticManifest.CompletedAt = time.Now()
 	syntheticManifest.Duration = syntheticManifest.CompletedAt.Sub(syntheticManifest.CreatedAt)
-	syntheticManifest.Status = "completed"
+	syntheticManifest.Status = backupStatusCompleted
 
 	// Save manifest
 	err = sbg.strategy.saveManifest(syntheticManifest)
@@ -181,19 +181,20 @@ func (sbg *SyntheticBackupGenerator) GetSyntheticBackupRecommendation(latestBack
 	recommendation["base_backup_age"] = time.Since(baseManifest.CreatedAt).Hours()
 
 	// Recommendation logic
-	if incrementalCount >= 10 {
+	switch {
+	case incrementalCount >= 10:
 		recommendation["recommended"] = true
 		recommendation["reason"] = "Long incremental chain (10+)"
 		recommendation["priority"] = "high"
-	} else if incrementalCount >= 5 {
+	case incrementalCount >= 5:
 		recommendation["recommended"] = true
 		recommendation["reason"] = "Moderate incremental chain (5+)"
 		recommendation["priority"] = "medium"
-	} else if time.Since(baseManifest.CreatedAt) > 7*24*time.Hour {
+	case time.Since(baseManifest.CreatedAt) > 7*24*time.Hour:
 		recommendation["recommended"] = true
 		recommendation["reason"] = "Base backup older than 7 days"
 		recommendation["priority"] = "low"
-	} else {
+	default:
 		recommendation["recommended"] = false
 		recommendation["reason"] = "Chain is still optimal"
 	}

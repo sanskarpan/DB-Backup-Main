@@ -194,7 +194,7 @@ func (c *Collector) RecordStorageUpload(provider string, duration time.Duration,
 }
 
 // RecordStorageDownload records a storage download.
-func (c *Collector) RecordStorageDownload(provider string, status string) {
+func (c *Collector) RecordStorageDownload(provider, status string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -266,7 +266,7 @@ func RecordStorageUpload(provider string, duration time.Duration, status string)
 }
 
 // RecordStorageDownload is a convenience function to record a storage download using the global collector.
-func RecordStorageDownload(provider string, status string) {
+func RecordStorageDownload(provider, status string) {
 	globalCollector.RecordStorageDownload(provider, status)
 }
 

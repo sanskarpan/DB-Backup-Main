@@ -88,7 +88,7 @@ func (tm *TemplateManager) saveUnlocked() error {
 		return err
 	}
 
-	return os.WriteFile(tm.templateFile, data, 0o644)
+	return os.WriteFile(tm.templateFile, data, 0o600)
 }
 
 // AddTemplate adds a new template.

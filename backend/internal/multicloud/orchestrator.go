@@ -104,6 +104,8 @@ type BackupResult struct {
 }
 
 // MultiCloudOrchestrator manages multi-cloud backup operations.
+//
+//nolint:revive // keeps public name stable; renaming would break other packages
 type MultiCloudOrchestrator struct {
 	mu            sync.RWMutex
 	destinations  map[string]*BackupDestination
@@ -298,6 +300,19 @@ func (mco *MultiCloudOrchestrator) executeUpload(ctx context.Context, job *Backu
 		maxRetries = 3
 	}
 
+	// attemptUpload performs a single upload attempt. It is a closure so that
+	// any per-attempt context cancellation is deferred within the attempt scope
+	// rather than accumulating across the retry loop.
+	attemptUpload := func() (string, error) {
+		uploadCtx := ctx
+		if dest.Timeout > 0 {
+			var cancel context.CancelFunc
+			uploadCtx, cancel = context.WithTimeout(ctx, dest.Timeout)
+			defer cancel()
+		}
+		return uploader.Upload(uploadCtx, dest, job.BackupData, job.Metadata)
+	}
+
 	// Retry loop
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
@@ -312,16 +327,8 @@ func (mco *MultiCloudOrchestrator) executeUpload(ctx context.Context, job *Backu
 			}
 		}
 
-		// Create upload context with timeout
-		uploadCtx := ctx
-		if dest.Timeout > 0 {
-			var cancel context.CancelFunc
-			uploadCtx, cancel = context.WithTimeout(ctx, dest.Timeout)
-			defer cancel()
-		}
-
 		// Execute upload
-		location, err := uploader.Upload(uploadCtx, dest, job.BackupData, job.Metadata)
+		location, err := attemptUpload()
 		if err == nil {
 			// Success
 			result.Success = true

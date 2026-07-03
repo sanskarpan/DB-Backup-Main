@@ -18,7 +18,16 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/utils"
 )
 
+// Backup type identifiers and sentinel values used across the Redis driver.
+const (
+	backupTypeRDB = "rdb"
+	backupTypeAOF = "aof"
+	unknownValue  = "unknown"
+)
+
 // RedisDriver implements the database.Driver interface for Redis.
+//
+//nolint:revive // RedisDriver is a stable public name referenced by other packages.
 type RedisDriver struct {
 	client      *redis.Client
 	config      *database.ConnectionConfig
@@ -109,14 +118,14 @@ func (d *RedisDriver) Backup(ctx context.Context, opts *database.BackupOptions) 
 	// Choose backup method based on configuration
 	backupType := opts.BackupType
 	if backupType == "" {
-		backupType = "rdb" // Default to RDB snapshot
+		backupType = backupTypeRDB // Default to RDB snapshot
 	}
 
 	var err error
 	switch backupType {
-	case "rdb":
+	case backupTypeRDB:
 		err = d.backupRDB(ctx, opts, result)
-	case "aof":
+	case backupTypeAOF:
 		err = d.backupAOF(ctx, opts, result)
 	case "both":
 		// Backup both RDB and AOF
@@ -165,17 +174,21 @@ func (d *RedisDriver) backupRDB(ctx context.Context, opts *database.BackupOption
 
 	var rdbDir, rdbFilename string
 	if len(configDir) >= 2 {
-		rdbDir = configDir[1].(string)
+		if s, ok := configDir[1].(string); ok {
+			rdbDir = s
+		}
 	}
 	if len(configDBFilename) >= 2 {
-		rdbFilename = configDBFilename[1].(string)
+		if s, ok := configDBFilename[1].(string); ok {
+			rdbFilename = s
+		}
 	}
 
 	rdbPath := filepath.Join(rdbDir, rdbFilename)
 
 	// Copy RDB file to backup location
 	backupPath := filepath.Join(opts.OutputDir, fmt.Sprintf("%s.rdb", result.ID))
-	if err := copyFile(rdbPath, backupPath); err != nil {
+	if err = copyFile(rdbPath, backupPath); err != nil {
 		return fmt.Errorf("failed to copy RDB file: %w", err)
 	}
 
@@ -187,7 +200,7 @@ func (d *RedisDriver) backupRDB(ctx context.Context, opts *database.BackupOption
 
 	result.BackupPath = backupPath
 	result.BackupSize = fileInfo.Size()
-	result.Metadata["backup_type"] = "rdb"
+	result.Metadata["backup_type"] = backupTypeRDB
 	result.Metadata["rdb_version"] = d.getRDBVersion(ctx)
 
 	return nil
@@ -208,27 +221,31 @@ func (d *RedisDriver) backupAOF(ctx context.Context, opts *database.BackupOption
 
 	var aofDir, aofFilename string
 	if len(configDir) >= 2 {
-		aofDir = configDir[1].(string)
+		if s, ok := configDir[1].(string); ok {
+			aofDir = s
+		}
 	}
 	if len(configAOFFilename) >= 2 {
-		aofFilename = configAOFFilename[1].(string)
+		if s, ok := configAOFFilename[1].(string); ok {
+			aofFilename = s
+		}
 	}
 
 	aofPath := filepath.Join(aofDir, aofFilename)
 
 	// Trigger AOF rewrite for consistent backup
-	if err := d.client.BgRewriteAOF(ctx).Err(); err != nil {
+	if err = d.client.BgRewriteAOF(ctx).Err(); err != nil {
 		return fmt.Errorf("failed to trigger BGREWRITEAOF: %w", err)
 	}
 
 	// Wait for rewrite to complete
-	if err := d.waitForAOFRewrite(ctx); err != nil {
+	if err = d.waitForAOFRewrite(ctx); err != nil {
 		return fmt.Errorf("AOF rewrite failed: %w", err)
 	}
 
 	// Copy AOF file to backup location
 	backupPath := filepath.Join(opts.OutputDir, fmt.Sprintf("%s.aof", result.ID))
-	if err := copyFile(aofPath, backupPath); err != nil {
+	if err = copyFile(aofPath, backupPath); err != nil {
 		return fmt.Errorf("failed to copy AOF file: %w", err)
 	}
 
@@ -240,7 +257,7 @@ func (d *RedisDriver) backupAOF(ctx context.Context, opts *database.BackupOption
 
 	result.BackupPath = backupPath
 	result.BackupSize = fileInfo.Size()
-	result.Metadata["backup_type"] = "aof"
+	result.Metadata["backup_type"] = backupTypeAOF
 
 	return nil
 }
@@ -254,16 +271,16 @@ func (d *RedisDriver) Restore(ctx context.Context, opts *database.RestoreOptions
 	}
 
 	// Determine backup type from file extension
-	backupType := "rdb"
+	backupType := backupTypeRDB
 	if strings.HasSuffix(opts.BackupPath, ".aof") {
-		backupType = "aof"
+		backupType = backupTypeAOF
 	}
 
 	var err error
 	switch backupType {
-	case "rdb":
+	case backupTypeRDB:
 		err = d.restoreRDB(ctx, opts, result)
-	case "aof":
+	case backupTypeAOF:
 		err = d.restoreAOF(ctx, opts, result)
 	default:
 		err = fmt.Errorf("unsupported backup type")
@@ -296,10 +313,14 @@ func (d *RedisDriver) restoreRDB(ctx context.Context, opts *database.RestoreOpti
 
 	var rdbDir, rdbFilename string
 	if len(configDir) >= 2 {
-		rdbDir = configDir[1].(string)
+		if s, ok := configDir[1].(string); ok {
+			rdbDir = s
+		}
 	}
 	if len(configDBFilename) >= 2 {
-		rdbFilename = configDBFilename[1].(string)
+		if s, ok := configDBFilename[1].(string); ok {
+			rdbFilename = s
+		}
 	}
 
 	targetPath := filepath.Join(rdbDir, rdbFilename)
@@ -325,7 +346,7 @@ func (d *RedisDriver) restoreRDB(ctx context.Context, opts *database.RestoreOpti
 	// Redis will automatically load the RDB file on restart
 	// In production, you would restart Redis server here
 
-	result.Metadata["backup_type"] = "rdb"
+	result.Metadata["backup_type"] = backupTypeRDB
 	return nil
 }
 
@@ -344,10 +365,14 @@ func (d *RedisDriver) restoreAOF(ctx context.Context, opts *database.RestoreOpti
 
 	var aofDir, aofFilename string
 	if len(configDir) >= 2 {
-		aofDir = configDir[1].(string)
+		if s, ok := configDir[1].(string); ok {
+			aofDir = s
+		}
 	}
 	if len(configAOFFilename) >= 2 {
-		aofFilename = configAOFFilename[1].(string)
+		if s, ok := configAOFFilename[1].(string); ok {
+			aofFilename = s
+		}
 	}
 
 	targetPath := filepath.Join(aofDir, aofFilename)
@@ -367,7 +392,7 @@ func (d *RedisDriver) restoreAOF(ctx context.Context, opts *database.RestoreOpti
 	// Restart Redis to load AOF
 	// In production, restart Redis server here
 
-	result.Metadata["backup_type"] = "aof"
+	result.Metadata["backup_type"] = backupTypeAOF
 	return nil
 }
 
@@ -386,7 +411,9 @@ func (d *RedisDriver) GetDatabaseSize(ctx context.Context) (int64, error) {
 			parts := strings.Split(line, ":")
 			if len(parts) == 2 {
 				var size int64
-				fmt.Sscanf(parts[1], "%d", &size)
+				if _, err := fmt.Sscanf(parts[1], "%d", &size); err != nil {
+					return 0, fmt.Errorf("failed to parse used_memory %q: %w", parts[1], err)
+				}
 				return size, nil
 			}
 		}
@@ -412,7 +439,7 @@ func (d *RedisDriver) GetVersion(ctx context.Context) (string, error) {
 		}
 	}
 
-	return "unknown", nil
+	return unknownValue, nil
 }
 
 // GetBackupSize estimates the size of a backup.
@@ -448,7 +475,7 @@ func (d *RedisDriver) GetTables(ctx context.Context, database string) ([]string,
 
 // GetTableSize returns the size of a table (not applicable for Redis).
 func (d *RedisDriver) GetTableSize(ctx context.Context, database, table string) (int64, error) {
-	return 0, fmt.Errorf("Redis does not have tables")
+	return 0, fmt.Errorf("redis does not have tables")
 }
 
 // GetType returns the database type.
@@ -542,7 +569,7 @@ func (d *RedisDriver) waitForAOFRewrite(ctx context.Context) error {
 func (d *RedisDriver) getRDBVersion(ctx context.Context) string {
 	info, err := d.client.Info(ctx, "persistence").Result()
 	if err != nil {
-		return "unknown"
+		return unknownValue
 	}
 
 	lines := strings.Split(info, "\r\n")
@@ -552,7 +579,7 @@ func (d *RedisDriver) getRDBVersion(ctx context.Context) string {
 		}
 	}
 
-	return "unknown"
+	return unknownValue
 }
 
 // copyFile copies a file from src to dst.

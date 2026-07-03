@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -25,11 +26,12 @@ import (
 )
 
 // InfluxDBDriver implements the database.Driver interface for InfluxDB.
+//
+//nolint:revive // InfluxDBDriver is a public name used by other packages; keep stable.
 type InfluxDBDriver struct {
 	client       influxdb2.Client
 	config       *database.ConnectionConfig
 	queryAPI     api.QueryAPI
-	writeAPI     api.WriteAPI
 	version      string
 	organization string
 }
@@ -48,9 +50,10 @@ func NewInfluxDBDriver() *InfluxDBDriver {
 // Connect establishes a connection to InfluxDB.
 func (d *InfluxDBDriver) Connect(ctx context.Context, config *database.ConnectionConfig) error {
 	// Build InfluxDB connection URL
-	url := fmt.Sprintf("http://%s:%d", config.Host, config.Port)
+	hostPort := net.JoinHostPort(config.Host, strconv.Itoa(config.Port))
+	url := "http://" + hostPort
 	if config.SSLMode == "enable" || config.SSLMode == "require" {
-		url = fmt.Sprintf("https://%s:%d", config.Host, config.Port)
+		url = "https://" + hostPort
 	}
 
 	// Get token (password) and organization
@@ -188,12 +191,14 @@ func (d *InfluxDBDriver) backupV1(ctx context.Context, opts *database.BackupOpti
 
 	// Get backup size
 	var size int64
-	filepath.Walk(backupDir, func(path string, info os.FileInfo, err error) error {
+	if walkErr := filepath.Walk(backupDir, func(_ string, info os.FileInfo, err error) error {
 		if err == nil && !info.IsDir() {
 			size += info.Size()
 		}
 		return nil
-	})
+	}); walkErr != nil {
+		size = 0
+	}
 
 	result.BackupPath = backupDir
 	result.BackupSize = size
@@ -408,8 +413,9 @@ func (d *InfluxDBDriver) backupMetadata(ctx context.Context, backupDir string) e
 	if err != nil {
 		return fmt.Errorf("failed to list tasks: %w", err)
 	}
-	var taskList []map[string]interface{}
-	for _, task := range tasks {
+	taskList := make([]map[string]interface{}, 0, len(tasks))
+	for i := range tasks {
+		task := &tasks[i]
 		taskData := map[string]interface{}{
 			"id":     task.Id,
 			"name":   task.Name,
@@ -440,7 +446,7 @@ func (d *InfluxDBDriver) backupMetadata(ctx context.Context, backupDir string) e
 					"orgID":       bucket.OrgID,
 					"description": bucket.Description,
 				}
-				if bucket.RetentionRules != nil && len(bucket.RetentionRules) > 0 {
+				if len(bucket.RetentionRules) > 0 {
 					bucketData["retention_period"] = bucket.RetentionRules[0].EverySeconds
 				}
 				bucketList = append(bucketList, bucketData)
@@ -477,7 +483,7 @@ func (d *InfluxDBDriver) getBucketsToBackup(ctx context.Context, opts *database.
 		return nil, err
 	}
 
-	var bucketNames []string
+	bucketNames := make([]string, 0, len(*buckets))
 	for _, bucket := range *buckets {
 		// Skip system buckets
 		if strings.HasPrefix(bucket.Name, "_") {
@@ -661,7 +667,7 @@ func (d *InfluxDBDriver) GetDatabases(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 
-	var bucketNames []string
+	bucketNames := make([]string, 0, len(*buckets))
 	for _, bucket := range *buckets {
 		bucketNames = append(bucketNames, bucket.Name)
 	}

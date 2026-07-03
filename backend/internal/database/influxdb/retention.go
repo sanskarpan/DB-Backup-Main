@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/influxdata/influxdb-client-go/v2/api"
@@ -24,9 +26,10 @@ type RetentionPolicyManager struct {
 
 // NewRetentionPolicyManager creates a new retention policy manager.
 func NewRetentionPolicyManager(driver *InfluxDBDriver) *RetentionPolicyManager {
-	url := fmt.Sprintf("http://%s:%d", driver.config.Host, driver.config.Port)
+	hostPort := net.JoinHostPort(driver.config.Host, strconv.Itoa(driver.config.Port))
+	url := "http://" + hostPort
 	if driver.config.SSLMode == "enable" || driver.config.SSLMode == "require" {
-		url = fmt.Sprintf("https://%s:%d", driver.config.Host, driver.config.Port)
+		url = "https://" + hostPort
 	}
 	return &RetentionPolicyManager{
 		driver:   driver,
@@ -116,8 +119,9 @@ func (m *RetentionPolicyManager) BackupTasks(ctx context.Context, outputDir stri
 	defer file.Close()
 
 	// Convert to our Task struct
-	var taskList []Task
-	for _, task := range tasks {
+	taskList := make([]Task, 0, len(tasks))
+	for i := range tasks {
+		task := &tasks[i]
 		every := ""
 		if task.Every != nil {
 			every = *task.Every
@@ -202,7 +206,7 @@ func (m *RetentionPolicyManager) RestoreRetentionPolicies(ctx context.Context, d
 
 			// Try ALTER query
 			if alterErr := m.executeQuery(ctx, alterQuery); alterErr != nil {
-				return fmt.Errorf("failed to create or alter retention policy %s: create error: %w, alter error: %v", policy.Name, err, alterErr)
+				return fmt.Errorf("failed to create or alter retention policy %s: create error: %w, alter error: %w", policy.Name, err, alterErr)
 			}
 		}
 	}
@@ -253,7 +257,7 @@ func (m *RetentionPolicyManager) RestoreContinuousQueries(ctx context.Context, d
 			// If CQ already exists, drop it first and recreate
 			dropQuery := fmt.Sprintf("DROP CONTINUOUS QUERY %q ON %q", cq.Name, database)
 			if dropErr := m.executeQuery(ctx, dropQuery); dropErr != nil {
-				return fmt.Errorf("failed to create continuous query %s: %w (drop also failed: %v)", cq.Name, err, dropErr)
+				return fmt.Errorf("failed to create continuous query %s: %w (drop also failed: %w)", cq.Name, err, dropErr)
 			}
 
 			// Try creating again after drop
@@ -293,11 +297,12 @@ func (m *RetentionPolicyManager) RestoreTasks(ctx context.Context, backupDir str
 		var createdTask *domain.Task
 		var createErr error
 
-		if task.Cron != "" {
+		switch {
+		case task.Cron != "":
 			createdTask, createErr = tasksAPI.CreateTaskWithCron(ctx, task.Name, task.Flux, task.Cron, orgID)
-		} else if task.Every != "" {
+		case task.Every != "":
 			createdTask, createErr = tasksAPI.CreateTaskWithEvery(ctx, task.Name, task.Flux, task.Every, orgID)
-		} else {
+		default:
 			createdTask, createErr = tasksAPI.CreateTaskByFlux(ctx, task.Flux, orgID)
 		}
 
@@ -307,7 +312,7 @@ func (m *RetentionPolicyManager) RestoreTasks(ctx context.Context, backupDir str
 				OrgName: orgID,
 			})
 			if listErr != nil {
-				return fmt.Errorf("failed to create task %s: %w (list also failed: %v)", task.Name, createErr, listErr)
+				return fmt.Errorf("failed to create task %s: %w (list also failed: %w)", task.Name, createErr, listErr)
 			}
 
 			if len(existingTasks) > 0 {
@@ -318,7 +323,7 @@ func (m *RetentionPolicyManager) RestoreTasks(ctx context.Context, backupDir str
 					existingTask.Status = &status
 				}
 				if _, updateErr := tasksAPI.UpdateTask(ctx, &existingTask); updateErr != nil {
-					return fmt.Errorf("failed to create or update task %s: create error: %w, update error: %v", task.Name, createErr, updateErr)
+					return fmt.Errorf("failed to create or update task %s: create error: %w, update error: %w", task.Name, createErr, updateErr)
 				}
 			} else {
 				return fmt.Errorf("failed to create task %s: %w", task.Name, createErr)
@@ -335,7 +340,7 @@ func (m *RetentionPolicyManager) RestoreTasks(ctx context.Context, backupDir str
 func (m *RetentionPolicyManager) queryRetentionPolicies(ctx context.Context, query string) ([]RetentionPolicy, error) {
 	// Use HTTP API to execute query
 	endpoint := fmt.Sprintf("%s/query", m.URL)
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, strings.NewReader(fmt.Sprintf("q=%s", url.QueryEscape(query))))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(fmt.Sprintf("q=%s", url.QueryEscape(query))))
 	if err != nil {
 		return nil, err
 	}
@@ -368,46 +373,52 @@ func (m *RetentionPolicyManager) queryRetentionPolicies(ctx context.Context, que
 	if len(result.Results) > 0 && len(result.Results[0].Series) > 0 {
 		series := result.Results[0].Series[0]
 		for _, row := range series.Values {
-			policy := RetentionPolicy{}
-			for i, col := range series.Columns {
-				if i >= len(row) {
-					continue
-				}
-				switch col {
-				case "name":
-					if v, ok := row[i].(string); ok {
-						policy.Name = v
-					}
-				case "duration":
-					if v, ok := row[i].(string); ok {
-						policy.Duration = v
-					}
-				case "shardGroupDuration":
-					if v, ok := row[i].(string); ok {
-						policy.ShardGroupDuration = v
-					}
-				case "replicaN":
-					if v, ok := row[i].(float64); ok {
-						policy.ReplicaN = int(v)
-					}
-				case "default":
-					if v, ok := row[i].(bool); ok {
-						policy.Default = v
-					}
-				}
-			}
-			policies = append(policies, policy)
+			policies = append(policies, parseRetentionPolicyRow(series.Columns, row))
 		}
 	}
 
 	return policies, nil
 }
 
+// parseRetentionPolicyRow maps a single InfluxQL result row (aligned with the
+// given column names) into a RetentionPolicy.
+func parseRetentionPolicyRow(columns []string, row []interface{}) RetentionPolicy {
+	policy := RetentionPolicy{}
+	for i, col := range columns {
+		if i >= len(row) {
+			continue
+		}
+		switch col {
+		case "name":
+			if v, ok := row[i].(string); ok {
+				policy.Name = v
+			}
+		case "duration":
+			if v, ok := row[i].(string); ok {
+				policy.Duration = v
+			}
+		case "shardGroupDuration":
+			if v, ok := row[i].(string); ok {
+				policy.ShardGroupDuration = v
+			}
+		case "replicaN":
+			if v, ok := row[i].(float64); ok {
+				policy.ReplicaN = int(v)
+			}
+		case "default":
+			if v, ok := row[i].(bool); ok {
+				policy.Default = v
+			}
+		}
+	}
+	return policy
+}
+
 // Helper function to query continuous queries.
 func (m *RetentionPolicyManager) queryContinuousQueries(ctx context.Context, database string) ([]ContinuousQuery, error) {
 	query := "SHOW CONTINUOUS QUERIES"
 	endpoint := fmt.Sprintf("%s/query", m.URL)
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, strings.NewReader(fmt.Sprintf("q=%s", url.QueryEscape(query))))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(fmt.Sprintf("q=%s", url.QueryEscape(query))))
 	if err != nil {
 		return nil, err
 	}
@@ -445,22 +456,7 @@ func (m *RetentionPolicyManager) queryContinuousQueries(ctx context.Context, dat
 				continue
 			}
 			for _, row := range series.Values {
-				cq := ContinuousQuery{Database: database}
-				for i, col := range series.Columns {
-					if i >= len(row) {
-						continue
-					}
-					switch col {
-					case "name":
-						if v, ok := row[i].(string); ok {
-							cq.Name = v
-						}
-					case "query":
-						if v, ok := row[i].(string); ok {
-							cq.Query = v
-						}
-					}
-				}
+				cq := parseContinuousQueryRow(series.Columns, row, database)
 				if cq.Name != "" {
 					cqs = append(cqs, cq)
 				}
@@ -471,10 +467,32 @@ func (m *RetentionPolicyManager) queryContinuousQueries(ctx context.Context, dat
 	return cqs, nil
 }
 
+// parseContinuousQueryRow maps a single InfluxQL result row (aligned with the
+// given column names) into a ContinuousQuery for the supplied database.
+func parseContinuousQueryRow(columns []string, row []interface{}, database string) ContinuousQuery {
+	cq := ContinuousQuery{Database: database}
+	for i, col := range columns {
+		if i >= len(row) {
+			continue
+		}
+		switch col {
+		case "name":
+			if v, ok := row[i].(string); ok {
+				cq.Name = v
+			}
+		case "query":
+			if v, ok := row[i].(string); ok {
+				cq.Query = v
+			}
+		}
+	}
+	return cq
+}
+
 // Helper function to execute InfluxDB queries.
 func (m *RetentionPolicyManager) executeQuery(ctx context.Context, query string) error {
 	endpoint := fmt.Sprintf("%s/query", m.URL)
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint,
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint,
 		strings.NewReader(fmt.Sprintf("q=%s", url.QueryEscape(query))))
 	if err != nil {
 		return err
@@ -495,8 +513,7 @@ func (m *RetentionPolicyManager) executeQuery(ctx context.Context, query string)
 		var errResp struct {
 			Error string `json:"error"`
 		}
-		json.NewDecoder(resp.Body).Decode(&errResp)
-		if errResp.Error != "" {
+		if decErr := json.NewDecoder(resp.Body).Decode(&errResp); decErr == nil && errResp.Error != "" {
 			return fmt.Errorf("query failed: %s", errResp.Error)
 		}
 		return fmt.Errorf("query failed with status: %d", resp.StatusCode)

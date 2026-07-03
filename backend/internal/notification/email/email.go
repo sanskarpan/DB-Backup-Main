@@ -14,6 +14,8 @@ import (
 )
 
 // EmailNotifier implements email notifications via SMTP.
+//
+//nolint:revive // keeps public name stable; NewEmailNotifier is part of the exported API
 type EmailNotifier struct {
 	smtpHost string
 	smtpPort int

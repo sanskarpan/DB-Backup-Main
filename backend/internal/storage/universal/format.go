@@ -23,7 +23,7 @@ const (
 )
 
 // UniversalBackup represents a cloud-agnostic backup.
-type UniversalBackup struct {
+type UniversalBackup struct { //nolint:revive // keeps public name stable across packages
 	Manifest *BackupManifest
 	Metadata *BackupMetadata
 	Chunks   []*BackupChunk
@@ -115,7 +115,7 @@ type BackupStatistics struct {
 }
 
 // UniversalBackupWriter writes backups in universal format.
-type UniversalBackupWriter struct {
+type UniversalBackupWriter struct { //nolint:revive // keeps public name stable across packages
 	outputDir   string
 	manifest    *BackupManifest
 	metadata    *BackupMetadata
@@ -125,7 +125,7 @@ type UniversalBackupWriter struct {
 }
 
 // NewUniversalBackupWriter creates a new universal backup writer.
-func NewUniversalBackupWriter(outputDir string, databaseType, databaseName string, chunkSize int64) *UniversalBackupWriter {
+func NewUniversalBackupWriter(outputDir, databaseType, databaseName string, chunkSize int64) *UniversalBackupWriter {
 	return &UniversalBackupWriter{
 		outputDir: outputDir,
 		manifest: &BackupManifest{
@@ -250,7 +250,7 @@ func (w *UniversalBackupWriter) Finalize() error {
 	// Write chunks
 	for _, chunk := range w.chunks {
 		chunkPath := filepath.Join(chunksDir, fmt.Sprintf("chunk-%04d.dat", chunk.Sequence))
-		if err := os.WriteFile(chunkPath, chunk.Data, 0o644); err != nil {
+		if err := os.WriteFile(chunkPath, chunk.Data, 0o600); err != nil {
 			return fmt.Errorf("failed to write chunk %s: %w", chunk.ID, err)
 		}
 	}
@@ -264,7 +264,7 @@ func (w *UniversalBackupWriter) Finalize() error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal manifest: %w", err)
 	}
-	if err := os.WriteFile(manifestPath, manifestData, 0o644); err != nil {
+	if err := os.WriteFile(manifestPath, manifestData, 0o600); err != nil {
 		return fmt.Errorf("failed to write manifest: %w", err)
 	}
 
@@ -274,7 +274,7 @@ func (w *UniversalBackupWriter) Finalize() error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal metadata: %w", err)
 	}
-	if err := os.WriteFile(metadataPath, metadataData, 0o644); err != nil {
+	if err := os.WriteFile(metadataPath, metadataData, 0o600); err != nil {
 		return fmt.Errorf("failed to write metadata: %w", err)
 	}
 
@@ -291,7 +291,7 @@ func (w *UniversalBackupWriter) calculateOverallChecksum() string {
 }
 
 // UniversalBackupReader reads backups in universal format.
-type UniversalBackupReader struct {
+type UniversalBackupReader struct { //nolint:revive // keeps public name stable across packages
 	inputDir string
 	manifest *BackupManifest
 	metadata *BackupMetadata
@@ -310,7 +310,7 @@ func NewUniversalBackupReader(inputDir string) (*UniversalBackupReader, error) {
 		return nil, fmt.Errorf("failed to read manifest: %w", err)
 	}
 
-	if err := json.Unmarshal(manifestData, &reader.manifest); err != nil {
+	if err = json.Unmarshal(manifestData, &reader.manifest); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal manifest: %w", err)
 	}
 

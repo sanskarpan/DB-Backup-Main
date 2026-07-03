@@ -55,11 +55,11 @@ func NewEngine(cfg *Config, notifier EventNotifier) *Engine {
 }
 
 // RecordBackup records a backup completion event.
-func (e *Engine) RecordBackup(ctx context.Context, userID string, backupData *BackupData) (*GamificationResult, error) {
+func (e *Engine) RecordBackup(ctx context.Context, userID string, backupData *BackupData) (*Result, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	result := &GamificationResult{
+	result := &Result{
 		UserID:        userID,
 		Timestamp:     time.Now(),
 		Achievements:  make([]*Achievement, 0),
@@ -101,19 +101,25 @@ func (e *Engine) RecordBackup(ctx context.Context, userID string, backupData *Ba
 		}
 	}
 
-	// Send notifications
+	// Send notifications (best-effort: notification failures must not fail the backup recording)
 	if e.notifier != nil {
 		for _, achievement := range newAchievements {
-			_ = e.notifier.NotifyAchievement(ctx, userID, achievement)
+			if err := e.notifier.NotifyAchievement(ctx, userID, achievement); err != nil {
+				result.NotificationErrors = append(result.NotificationErrors, err)
+			}
 		}
 
 		if result.LevelUps > 0 {
-			_ = e.notifier.NotifyLevelUp(ctx, userID, result.CurrentLevel)
+			if err := e.notifier.NotifyLevelUp(ctx, userID, result.CurrentLevel); err != nil {
+				result.NotificationErrors = append(result.NotificationErrors, err)
+			}
 		}
 
 		// Notify on streak milestones (every 7 days)
 		if streak%7 == 0 && streak > 0 {
-			_ = e.notifier.NotifyStreakMilestone(ctx, userID, streak)
+			if err := e.notifier.NotifyStreakMilestone(ctx, userID, streak); err != nil {
+				result.NotificationErrors = append(result.NotificationErrors, err)
+			}
 		}
 	}
 
@@ -235,8 +241,8 @@ type BackupData struct {
 	DatabaseType     string
 }
 
-// GamificationResult contains the results of a gamification event.
-type GamificationResult struct {
+// Result contains the results of a gamification event.
+type Result struct {
 	UserID              string
 	Timestamp           time.Time
 	XPGained            int
@@ -246,6 +252,9 @@ type GamificationResult struct {
 	CurrentStreak       int
 	CompletedChallenges []*Challenge
 	RewardsEarned       []*Reward
+	// NotificationErrors holds any best-effort notification failures; they do not
+	// fail the event recording.
+	NotificationErrors []error
 }
 
 // UserProgress represents comprehensive user progress.

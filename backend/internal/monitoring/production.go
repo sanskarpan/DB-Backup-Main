@@ -70,9 +70,9 @@ func DefaultMonitorConfig() MonitorConfig {
 }
 
 // NewProductionMonitor creates a new production monitor.
-func NewProductionMonitor(config MonitorConfig) *ProductionMonitor {
+func NewProductionMonitor(config *MonitorConfig) *ProductionMonitor {
 	return &ProductionMonitor{
-		config:             config,
+		config:             *config,
 		alertManager:       NewAlertManager(config),
 		errorTracker:       NewErrorTracker(),
 		performanceMonitor: NewPerformanceMonitor(),

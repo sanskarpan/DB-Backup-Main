@@ -12,6 +12,8 @@ import (
 )
 
 // AnomalyType represents the type of anomaly detected.
+//
+//nolint:revive // keeps public name stable across dependent packages
 type AnomalyType string
 
 const (
@@ -30,6 +32,8 @@ const (
 )
 
 // AnomalySeverity represents the severity of an anomaly.
+//
+//nolint:revive // keeps public name stable across dependent packages
 type AnomalySeverity string
 
 const (
@@ -44,6 +48,8 @@ const (
 )
 
 // AnomalyReport represents a detected anomaly.
+//
+//nolint:revive // keeps public name stable across dependent packages
 type AnomalyReport struct {
 	ID             string
 	DatabaseName   string
@@ -127,12 +133,14 @@ func (d *Detector) RegisterAlertCallback(callback func(AnomalyReport)) {
 }
 
 // Detect detects anomalies in a backup metric.
+//
+//nolint:gocritic // hugeParam: keeps public API signature stable (pass-by-value)
 func (d *Detector) Detect(ctx context.Context, metric BackupMetric) ([]AnomalyReport, error) {
 	// Get baseline model for this database
 	baseline, err := d.trainer.GetModel(metric.DatabaseName)
 	if err != nil {
 		// No baseline yet - not an error, just can't detect anomalies
-		return nil, nil
+		return nil, nil //nolint:nilerr // absence of a baseline model is not a detection error
 	}
 
 	if baseline.SampleCount < d.config.MinSamplesForDetection {
@@ -144,40 +152,40 @@ func (d *Detector) Detect(ctx context.Context, metric BackupMetric) ([]AnomalyRe
 
 	// Track failures for cluster detection
 	if !metric.Success {
-		d.trackFailure(metric)
+		d.trackFailure(&metric)
 	}
 
 	// Check for size anomalies
-	if sizeAnomaly := d.detectSizeAnomaly(metric, baseline); sizeAnomaly != nil {
+	if sizeAnomaly := d.detectSizeAnomaly(&metric, baseline); sizeAnomaly != nil {
 		anomalies = append(anomalies, *sizeAnomaly)
 	}
 
 	// Check for duration anomalies
-	if durationAnomaly := d.detectDurationAnomaly(metric, baseline); durationAnomaly != nil {
+	if durationAnomaly := d.detectDurationAnomaly(&metric, baseline); durationAnomaly != nil {
 		anomalies = append(anomalies, *durationAnomaly)
 	}
 
 	// Check for failure clusters
-	if failureCluster := d.detectFailureCluster(metric, baseline); failureCluster != nil {
+	if failureCluster := d.detectFailureCluster(&metric, baseline); failureCluster != nil {
 		anomalies = append(anomalies, *failureCluster)
 	}
 
 	// Check for unusual timing
-	if timingAnomaly := d.detectUnusualTiming(metric, baseline); timingAnomaly != nil {
+	if timingAnomaly := d.detectUnusualTiming(&metric, baseline); timingAnomaly != nil {
 		anomalies = append(anomalies, *timingAnomaly)
 	}
 
 	// Store anomalies and trigger callbacks
-	for _, anomaly := range anomalies {
-		d.recordAnomaly(anomaly)
-		d.triggerCallbacks(anomaly)
+	for i := range anomalies {
+		d.recordAnomaly(&anomalies[i])
+		d.triggerCallbacks(&anomalies[i])
 	}
 
 	return anomalies, nil
 }
 
 // detectSizeAnomaly detects size-related anomalies.
-func (d *Detector) detectSizeAnomaly(metric BackupMetric, baseline *BaselineModel) *AnomalyReport {
+func (d *Detector) detectSizeAnomaly(metric *BackupMetric, baseline *BaselineModel) *AnomalyReport {
 	if baseline.SizeStdDev == 0 {
 		return nil // No variance in historical data
 	}
@@ -213,7 +221,7 @@ func (d *Detector) detectSizeAnomaly(metric BackupMetric, baseline *BaselineMode
 		Severity:     severity,
 		Score:        score,
 		DetectedAt:   time.Now(),
-		Metric:       metric,
+		Metric:       *metric,
 		Baseline:     baseline,
 		Deviations: map[string]float64{
 			"size": deviation,
@@ -224,7 +232,7 @@ func (d *Detector) detectSizeAnomaly(metric BackupMetric, baseline *BaselineMode
 }
 
 // detectDurationAnomaly detects duration-related anomalies.
-func (d *Detector) detectDurationAnomaly(metric BackupMetric, baseline *BaselineModel) *AnomalyReport {
+func (d *Detector) detectDurationAnomaly(metric *BackupMetric, baseline *BaselineModel) *AnomalyReport {
 	if baseline.DurationStdDev == 0 {
 		return nil
 	}
@@ -249,7 +257,7 @@ func (d *Detector) detectDurationAnomaly(metric BackupMetric, baseline *Baseline
 		Severity:     severity,
 		Score:        score,
 		DetectedAt:   time.Now(),
-		Metric:       metric,
+		Metric:       *metric,
 		Baseline:     baseline,
 		Deviations: map[string]float64{
 			"duration": deviation,
@@ -260,7 +268,7 @@ func (d *Detector) detectDurationAnomaly(metric BackupMetric, baseline *Baseline
 }
 
 // detectFailureCluster detects clusters of backup failures.
-func (d *Detector) detectFailureCluster(metric BackupMetric, baseline *BaselineModel) *AnomalyReport {
+func (d *Detector) detectFailureCluster(metric *BackupMetric, baseline *BaselineModel) *AnomalyReport {
 	if metric.Success {
 		return nil // Only check for failed backups
 	}
@@ -284,7 +292,7 @@ func (d *Detector) detectFailureCluster(metric BackupMetric, baseline *BaselineM
 		Severity:     AnomalySeverityCritical,
 		Score:        90.0,
 		DetectedAt:   time.Now(),
-		Metric:       metric,
+		Metric:       *metric,
 		Baseline:     baseline,
 		Deviations: map[string]float64{
 			"failure_count": float64(failureCount),
@@ -295,7 +303,7 @@ func (d *Detector) detectFailureCluster(metric BackupMetric, baseline *BaselineM
 }
 
 // detectUnusualTiming detects backups at unusual times.
-func (d *Detector) detectUnusualTiming(metric BackupMetric, baseline *BaselineModel) *AnomalyReport {
+func (d *Detector) detectUnusualTiming(metric *BackupMetric, baseline *BaselineModel) *AnomalyReport {
 	hour := metric.Timestamp.Hour()
 	dayOfWeek := int(metric.Timestamp.Weekday())
 
@@ -319,7 +327,7 @@ func (d *Detector) detectUnusualTiming(metric BackupMetric, baseline *BaselineMo
 			Severity:     AnomalySeverityLow,
 			Score:        30.0,
 			DetectedAt:   time.Now(),
-			Metric:       metric,
+			Metric:       *metric,
 			Baseline:     baseline,
 			Deviations: map[string]float64{
 				"hourly_deviation": avgHourlyCount - float64(hourlyCount),
@@ -333,11 +341,11 @@ func (d *Detector) detectUnusualTiming(metric BackupMetric, baseline *BaselineMo
 }
 
 // trackFailure tracks recent backup failures.
-func (d *Detector) trackFailure(metric BackupMetric) {
+func (d *Detector) trackFailure(metric *BackupMetric) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	d.recentFailures = append(d.recentFailures, metric)
+	d.recentFailures = append(d.recentFailures, *metric)
 
 	// Remove old failures outside window
 	cutoff := time.Now().Add(-d.config.FailureClusterWindow)
@@ -353,11 +361,11 @@ func (d *Detector) trackFailure(metric BackupMetric) {
 }
 
 // recordAnomaly records an anomaly in history.
-func (d *Detector) recordAnomaly(anomaly AnomalyReport) {
+func (d *Detector) recordAnomaly(anomaly *AnomalyReport) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	d.anomalyHistory = append(d.anomalyHistory, anomaly)
+	d.anomalyHistory = append(d.anomalyHistory, *anomaly)
 
 	// Keep last 1000 anomalies
 	if len(d.anomalyHistory) > 1000 {
@@ -366,14 +374,15 @@ func (d *Detector) recordAnomaly(anomaly AnomalyReport) {
 }
 
 // triggerCallbacks triggers all registered alert callbacks.
-func (d *Detector) triggerCallbacks(anomaly AnomalyReport) {
+func (d *Detector) triggerCallbacks(anomaly *AnomalyReport) {
 	d.mu.RLock()
 	callbacks := make([]func(AnomalyReport), len(d.alertCallbacks))
 	copy(callbacks, d.alertCallbacks)
 	d.mu.RUnlock()
 
+	report := *anomaly
 	for _, callback := range callbacks {
-		go callback(anomaly)
+		go callback(report)
 	}
 }
 
@@ -397,15 +406,16 @@ func (d *Detector) GetAnomalyHistory(limit int) []AnomalyReport {
 func (d *Detector) calculateSeverity(deviation float64) AnomalySeverity {
 	absDeviation := math.Abs(deviation)
 
-	if absDeviation >= 5.0 {
+	switch {
+	case absDeviation >= 5.0:
 		return AnomalySeverityCritical
-	} else if absDeviation >= 4.0 {
+	case absDeviation >= 4.0:
 		return AnomalySeverityHigh
-	} else if absDeviation >= 3.0 {
+	case absDeviation >= 3.0:
 		return AnomalySeverityMedium
+	default:
+		return AnomalySeverityLow
 	}
-
-	return AnomalySeverityLow
 }
 
 // calculateScore calculates anomaly score (0-100).
@@ -418,15 +428,16 @@ func (d *Detector) calculateScore(deviation float64) float64 {
 	// 4-5 sigma: 70-90
 	// 5+ sigma: 90-100
 
-	if absDeviation <= 3.0 {
+	switch {
+	case absDeviation <= 3.0:
 		return (absDeviation / 3.0) * 50.0
-	} else if absDeviation <= 4.0 {
+	case absDeviation <= 4.0:
 		return 50.0 + ((absDeviation-3.0)/1.0)*20.0
-	} else if absDeviation <= 5.0 {
+	case absDeviation <= 5.0:
 		return 70.0 + ((absDeviation-4.0)/1.0)*20.0
+	default:
+		return math.Min(90.0+((absDeviation-5.0)/2.0)*10.0, 100.0)
 	}
-
-	return math.Min(90.0+((absDeviation-5.0)/2.0)*10.0, 100.0)
 }
 
 // generateAnomalyID generates a unique ID for an anomaly.

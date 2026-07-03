@@ -140,7 +140,7 @@ func TestScanFile_SuspiciousExtension(t *testing.T) {
 	defer os.Remove(tmpFile.Name())
 
 	// Write low entropy data (so it doesn't trigger entropy check)
-	_, err = tmpFile.Write([]byte(strings.Repeat("normal text ", 100)))
+	_, err = tmpFile.WriteString(strings.Repeat("normal text ", 100))
 	require.NoError(t, err)
 	tmpFile.Close()
 
@@ -164,7 +164,7 @@ func TestScanFile_CleanFile(t *testing.T) {
 	defer os.Remove(tmpFile.Name())
 
 	// Write normal text data
-	_, err = tmpFile.Write([]byte("This is normal text content for testing purposes.\n"))
+	_, err = tmpFile.WriteString("This is normal text content for testing purposes.\n")
 	require.NoError(t, err)
 	tmpFile.Close()
 
@@ -499,6 +499,8 @@ func TestThreatReport(t *testing.T) {
 		assert.NotEmpty(t, report.FileHash)
 		assert.Equal(t, 7.5, report.Entropy)
 		assert.NotEmpty(t, report.Indicators)
+		assert.Equal(t, "High entropy detected", report.Description)
+		assert.Equal(t, "Investigate file", report.Recommended)
 	})
 }
 

@@ -657,6 +657,7 @@ func TestInfluxDB_GetBackupSize(t *testing.T) {
 // Helper functions
 
 func setupTestDriver(t *testing.T) *InfluxDBDriver {
+	t.Helper()
 	skipIfInfluxDBUnavailable(t)
 	driver := NewInfluxDBDriver()
 	config := &database.ConnectionConfig{

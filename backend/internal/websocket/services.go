@@ -37,7 +37,7 @@ func (t *BackupProgressTracker) StartBackup(backupID, databaseID string) {
 }
 
 // CompleteBackup notifies about backup completion.
-func (t *BackupProgressTracker) CompleteBackup(backupID, databaseID string, bytesProcessed int64, elapsedTime int64) {
+func (t *BackupProgressTracker) CompleteBackup(backupID, databaseID string, bytesProcessed, elapsedTime int64) {
 	progress := &BackupProgress{
 		BackupID:       backupID,
 		DatabaseID:     databaseID,
@@ -153,7 +153,7 @@ func (n *NotificationBroadcaster) Broadcast(notification *Notification) {
 // Info sends an info notification.
 func (n *NotificationBroadcaster) Info(title, message string) {
 	n.Broadcast(&Notification{
-		Type:     "info",
+		Type:     notifTypeInfo,
 		Title:    title,
 		Message:  message,
 		Priority: 5,
@@ -163,7 +163,7 @@ func (n *NotificationBroadcaster) Info(title, message string) {
 // Success sends a success notification.
 func (n *NotificationBroadcaster) Success(title, message string) {
 	n.Broadcast(&Notification{
-		Type:     "success",
+		Type:     notifTypeSuccess,
 		Title:    title,
 		Message:  message,
 		Priority: 5,
@@ -173,7 +173,7 @@ func (n *NotificationBroadcaster) Success(title, message string) {
 // Warning sends a warning notification.
 func (n *NotificationBroadcaster) Warning(title, message string) {
 	n.Broadcast(&Notification{
-		Type:     "warning",
+		Type:     notifTypeWarning,
 		Title:    title,
 		Message:  message,
 		Priority: 7,
@@ -183,7 +183,7 @@ func (n *NotificationBroadcaster) Warning(title, message string) {
 // Error sends an error notification.
 func (n *NotificationBroadcaster) Error(title, message string) {
 	n.Broadcast(&Notification{
-		Type:     "error",
+		Type:     notifTypeError,
 		Title:    title,
 		Message:  message,
 		Priority: 10,
@@ -197,16 +197,16 @@ func (n *NotificationBroadcaster) BackupNotification(backupID, status, message s
 
 	switch status {
 	case "started":
-		notifType = "info"
+		notifType = notifTypeInfo
 		priority = 5
 	case "completed":
-		notifType = "success"
+		notifType = notifTypeSuccess
 		priority = 6
 	case "failed":
-		notifType = "error"
+		notifType = notifTypeError
 		priority = 10
 	default:
-		notifType = "info"
+		notifType = notifTypeInfo
 		priority = 5
 	}
 
@@ -226,16 +226,16 @@ func (n *NotificationBroadcaster) RestoreNotification(restoreID, status, message
 
 	switch status {
 	case "started":
-		notifType = "info"
+		notifType = notifTypeInfo
 		priority = 6
 	case "completed":
-		notifType = "success"
+		notifType = notifTypeSuccess
 		priority = 8
 	case "failed":
-		notifType = "error"
+		notifType = notifTypeError
 		priority = 10
 	default:
-		notifType = "info"
+		notifType = notifTypeInfo
 		priority = 5
 	}
 

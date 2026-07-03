@@ -132,10 +132,14 @@ func (p *PITRManager) CreatePITRCheckpoint(ctx context.Context, outputDir string
 
 	var aofDir, aofFilename string
 	if len(configDir) >= 2 {
-		aofDir = configDir[1].(string)
+		if s, ok := configDir[1].(string); ok {
+			aofDir = s
+		}
 	}
 	if len(configAOFFilename) >= 2 {
-		aofFilename = configAOFFilename[1].(string)
+		if s, ok := configAOFFilename[1].(string); ok {
+			aofFilename = s
+		}
 	}
 
 	aofPath := filepath.Join(aofDir, aofFilename)

@@ -21,6 +21,8 @@ import (
 )
 
 // S3Provider implements AWS S3 storage.
+//
+//nolint:revive // keeps public name stable across packages
 type S3Provider struct {
 	client     *s3.Client
 	uploader   *manager.Uploader

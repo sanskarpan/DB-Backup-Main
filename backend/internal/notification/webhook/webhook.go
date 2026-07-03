@@ -14,6 +14,8 @@ import (
 )
 
 // WebhookNotifier implements generic webhook notifications.
+//
+//nolint:revive // keeps public name stable; used by other packages
 type WebhookNotifier struct {
 	url           string
 	method        string
@@ -88,11 +90,12 @@ func NewWebhookNotifier(cfg *Config) (*WebhookNotifier, error) {
 		}
 
 		// Add auth header if not custom
-		if authType == "bearer" {
+		switch {
+		case authType == "bearer":
 			headers["Authorization"] = fmt.Sprintf("Bearer %s", authToken)
-		} else if authType == "basic" {
+		case authType == "basic":
 			headers["Authorization"] = fmt.Sprintf("Basic %s", authToken)
-		} else if cfg.AuthHeader != "" {
+		case cfg.AuthHeader != "":
 			headers[cfg.AuthHeader] = authToken
 		}
 	}
@@ -181,6 +184,8 @@ func (w *WebhookNotifier) ValidateConfig() error {
 }
 
 // WebhookPayload represents the webhook JSON payload.
+//
+//nolint:revive // keeps public name stable; used by other packages
 type WebhookPayload struct {
 	Event     string                 `json:"event"`
 	Level     string                 `json:"level"`

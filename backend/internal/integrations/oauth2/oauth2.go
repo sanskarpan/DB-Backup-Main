@@ -15,6 +15,8 @@ import (
 )
 
 // OAuth2Client provides OAuth2 authentication with automatic token refresh.
+//
+//nolint:revive // OAuth2Client is a stable public API name used by other packages.
 type OAuth2Client struct {
 	config         *integrations.OAuthConfig
 	client         *http.Client
@@ -154,7 +156,7 @@ func (c *OAuth2Client) AuthenticateWithClientCredentials(ctx context.Context, sc
 }
 
 // AuthenticateWithAuthorizationCode performs OAuth2 authorization code flow.
-func (c *OAuth2Client) AuthenticateWithAuthorizationCode(ctx context.Context, code string, redirectURI string) error {
+func (c *OAuth2Client) AuthenticateWithAuthorizationCode(ctx context.Context, code, redirectURI string) error {
 	if c.config.TokenURL == "" {
 		return fmt.Errorf("token URL is required")
 	}
@@ -296,7 +298,7 @@ func (c *OAuth2Client) SetToken(token *TokenResponse) {
 
 // requestToken makes a token request to the OAuth2 provider.
 func (c *OAuth2Client) requestToken(ctx context.Context, data url.Values) (*TokenResponse, error) {
-	req, err := http.NewRequestWithContext(ctx, "POST", c.config.TokenURL, strings.NewReader(data.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.config.TokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -426,8 +428,8 @@ func (rt *oauth2RoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 		resp.Body.Close()
 
 		// Try to refresh the token
-		if err := rt.client.RefreshToken(req.Context()); err != nil {
-			return nil, fmt.Errorf("failed to refresh token after 401: %w", err)
+		if refreshErr := rt.client.RefreshToken(req.Context()); refreshErr != nil {
+			return nil, fmt.Errorf("failed to refresh token after 401: %w", refreshErr)
 		}
 
 		// Get the new token

@@ -63,7 +63,7 @@ type Integration interface {
 	GetIncident(ctx context.Context, incidentID string) (*IncidentResponse, error)
 
 	// CloseIncident closes an incident/ticket
-	CloseIncident(ctx context.Context, incidentID string, resolution string) error
+	CloseIncident(ctx context.Context, incidentID, resolution string) error
 
 	// SendNotification sends a notification
 	SendNotification(ctx context.Context, notification *Notification) error

@@ -10,7 +10,7 @@ import (
 )
 
 // MaskingStrategy represents a data masking strategy.
-type MaskingStrategy string
+type MaskingStrategy string //nolint:revive // keeps public API name stable across packages
 
 const (
 	StrategyRedaction        MaskingStrategy = "redaction"
@@ -23,7 +23,7 @@ const (
 )
 
 // MaskingConfig represents configuration for a masking operation.
-type MaskingConfig struct {
+type MaskingConfig struct { //nolint:revive // keeps public API name stable across packages
 	Strategy        MaskingStrategy
 	PreserveLength  bool
 	PreserveFormat  bool
@@ -107,7 +107,7 @@ func (hm *HashingMasker) Mask(value string, config *MaskingConfig) (string, erro
 		if len(hashed) > len(value) {
 			hashed = hashed[:len(value)]
 		} else {
-			hashed = hashed + strings.Repeat("0", len(value)-len(hashed))
+			hashed += strings.Repeat("0", len(value)-len(hashed))
 		}
 	}
 
@@ -196,7 +196,7 @@ func (pm *PseudonymizationMasker) preserveFormatPseudonym(value, hash string) st
 	}
 
 	// Phone format (XXX-XXX-XXXX)
-	if matched, _ := regexp.MatchString(`\d{3}-\d{3}-\d{4}`, value); matched {
+	if matched, err := regexp.MatchString(`\d{3}-\d{3}-\d{4}`, value); err == nil && matched {
 		return fmt.Sprintf("%s-%s-%s", hash[:3], hash[3:6], hash[6:10])
 	}
 
@@ -251,9 +251,9 @@ func (sm *SyntheticMasker) IsReversible() bool {
 	return false
 }
 
-// secureRandInt generates a cryptographically secure random integer in range [0, max).
-func (sm *SyntheticMasker) secureRandInt(max int) int {
-	if max <= 0 {
+// secureRandInt generates a cryptographically secure random integer in range [0, maxVal).
+func (sm *SyntheticMasker) secureRandInt(maxVal int) int {
+	if maxVal <= 0 {
 		return 0
 	}
 	// Read random bytes
@@ -266,8 +266,9 @@ func (sm *SyntheticMasker) secureRandInt(max int) int {
 	// Convert bytes to uint64
 	n := uint64(b[0]) | uint64(b[1])<<8 | uint64(b[2])<<16 | uint64(b[3])<<24 |
 		uint64(b[4])<<32 | uint64(b[5])<<40 | uint64(b[6])<<48 | uint64(b[7])<<56
-	// Return modulo max
-	return int(n % uint64(max))
+	// Return modulo maxVal; result is bounded by maxVal (a positive int), so the
+	// conversion cannot overflow.
+	return int(n % uint64(maxVal)) //nolint:gosec // G115: modulo result is bounded by maxVal (>0), no overflow
 }
 
 func (sm *SyntheticMasker) generateEmail() string {
@@ -334,7 +335,10 @@ func (sm *SyntheticMasker) generateCreditCard() string {
 	prefix := "4"
 	// Generate 14 random digits using crypto/rand
 	var middleBytes [8]byte
-	rand.Read(middleBytes[:])
+	if _, err := rand.Read(middleBytes[:]); err != nil {
+		// crypto/rand should never fail; fall back to zeroed bytes.
+		middleBytes = [8]byte{}
+	}
 	middleNum := uint64(middleBytes[0]) | uint64(middleBytes[1])<<8 | uint64(middleBytes[2])<<16 |
 		uint64(middleBytes[3])<<24 | uint64(middleBytes[4])<<32 | uint64(middleBytes[5])<<40 |
 		uint64(middleBytes[6])<<48 | uint64(middleBytes[7])<<56

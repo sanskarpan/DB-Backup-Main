@@ -31,7 +31,7 @@ func (m *mockPolicyStore) Get(ctx context.Context, policyID string) (*ResidencyP
 }
 
 func (m *mockPolicyStore) GetAll(ctx context.Context) ([]*ResidencyPolicy, error) {
-	var result []*ResidencyPolicy
+	result := make([]*ResidencyPolicy, 0, len(m.policies))
 	for _, policy := range m.policies {
 		result = append(result, policy)
 	}

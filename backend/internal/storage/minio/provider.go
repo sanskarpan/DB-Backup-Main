@@ -19,8 +19,8 @@ import (
 	"github.com/sanskarpan/db-backup/internal/storage"
 )
 
-// MinIOProvider implements the storage.Provider interface for MinIO.
-type MinIOProvider struct {
+// Provider implements the storage.Provider interface for MinIO.
+type Provider struct {
 	client     *s3.Client
 	uploader   *manager.Uploader
 	downloader *manager.Downloader
@@ -29,28 +29,15 @@ type MinIOProvider struct {
 }
 
 // NewMinIOProvider creates a new MinIO storage provider.
-func NewMinIOProvider(cfg *storage.MinIOConfig) (*MinIOProvider, error) {
+func NewMinIOProvider(cfg *storage.MinIOConfig) (*Provider, error) {
 	if err := validateConfig(cfg); err != nil {
 		return nil, err
 	}
-
-	// Create custom resolver for MinIO endpoint
-	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-		if service == s3.ServiceID {
-			return aws.Endpoint{
-				URL:               buildEndpointURL(cfg),
-				SigningRegion:     cfg.Region,
-				HostnameImmutable: true,
-			}, nil
-		}
-		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
-	})
 
 	// Build AWS config for MinIO
 	awsCfg, err := config.LoadDefaultConfig(
 		context.Background(),
 		config.WithRegion(cfg.Region),
-		config.WithEndpointResolverWithOptions(customResolver),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
 			cfg.AccessKey,
 			cfg.SecretKey,
@@ -61,8 +48,11 @@ func NewMinIOProvider(cfg *storage.MinIOConfig) (*MinIOProvider, error) {
 		return nil, fmt.Errorf("failed to create MinIO config: %w", err)
 	}
 
-	// Create S3 client with path-style addressing (required for MinIO)
+	// Create S3 client pointed at the MinIO endpoint with path-style
+	// addressing (required for MinIO). BaseEndpoint replaces the deprecated
+	// global endpoint resolver interface.
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(buildEndpointURL(cfg))
 		o.UsePathStyle = cfg.UsePathStyle
 	})
 
@@ -70,7 +60,7 @@ func NewMinIOProvider(cfg *storage.MinIOConfig) (*MinIOProvider, error) {
 	uploader := manager.NewUploader(client)
 	downloader := manager.NewDownloader(client)
 
-	return &MinIOProvider{
+	return &Provider{
 		client:     client,
 		uploader:   uploader,
 		downloader: downloader,
@@ -112,7 +102,7 @@ func validateConfig(cfg *storage.MinIOConfig) error {
 }
 
 // Upload uploads a file to MinIO.
-func (p *MinIOProvider) Upload(ctx context.Context, localPath, remotePath string, opts *storage.UploadOptions) error {
+func (p *Provider) Upload(ctx context.Context, localPath, remotePath string, opts *storage.UploadOptions) error {
 	file, err := os.Open(localPath)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
@@ -123,7 +113,7 @@ func (p *MinIOProvider) Upload(ctx context.Context, localPath, remotePath string
 }
 
 // UploadStream uploads data from a reader to MinIO.
-func (p *MinIOProvider) UploadStream(ctx context.Context, reader io.Reader, remotePath string, opts *storage.UploadOptions) error {
+func (p *Provider) UploadStream(ctx context.Context, reader io.Reader, remotePath string, opts *storage.UploadOptions) error {
 	if opts == nil {
 		opts = &storage.UploadOptions{}
 	}
@@ -164,7 +154,7 @@ func (p *MinIOProvider) UploadStream(ctx context.Context, reader io.Reader, remo
 }
 
 // Download downloads a file from MinIO.
-func (p *MinIOProvider) Download(ctx context.Context, remotePath, localPath string) error {
+func (p *Provider) Download(ctx context.Context, remotePath, localPath string) error {
 	// Create local directory if it doesn't exist
 	dir := filepath.Dir(localPath)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -191,7 +181,7 @@ func (p *MinIOProvider) Download(ctx context.Context, remotePath, localPath stri
 }
 
 // DownloadStream downloads data to a reader.
-func (p *MinIOProvider) DownloadStream(ctx context.Context, remotePath string) (io.ReadCloser, error) {
+func (p *Provider) DownloadStream(ctx context.Context, remotePath string) (io.ReadCloser, error) {
 	output, err := p.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(p.bucket),
 		Key:    aws.String(remotePath),
@@ -204,7 +194,7 @@ func (p *MinIOProvider) DownloadStream(ctx context.Context, remotePath string) (
 }
 
 // Delete deletes a file from MinIO.
-func (p *MinIOProvider) Delete(ctx context.Context, remotePath string) error {
+func (p *Provider) Delete(ctx context.Context, remotePath string) error {
 	_, err := p.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(p.bucket),
 		Key:    aws.String(remotePath),
@@ -217,7 +207,7 @@ func (p *MinIOProvider) Delete(ctx context.Context, remotePath string) error {
 }
 
 // Exists checks if a file exists in MinIO.
-func (p *MinIOProvider) Exists(ctx context.Context, remotePath string) (bool, error) {
+func (p *Provider) Exists(ctx context.Context, remotePath string) (bool, error) {
 	_, err := p.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(p.bucket),
 		Key:    aws.String(remotePath),
@@ -234,7 +224,7 @@ func (p *MinIOProvider) Exists(ctx context.Context, remotePath string) (bool, er
 }
 
 // GetMetadata retrieves file metadata from MinIO.
-func (p *MinIOProvider) GetMetadata(ctx context.Context, remotePath string) (*storage.FileMetadata, error) {
+func (p *Provider) GetMetadata(ctx context.Context, remotePath string) (*storage.FileMetadata, error) {
 	output, err := p.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(p.bucket),
 		Key:    aws.String(remotePath),
@@ -262,7 +252,7 @@ func (p *MinIOProvider) GetMetadata(ctx context.Context, remotePath string) (*st
 }
 
 // List lists files with a given prefix in MinIO.
-func (p *MinIOProvider) List(ctx context.Context, prefix string) ([]*storage.FileMetadata, error) {
+func (p *Provider) List(ctx context.Context, prefix string) ([]*storage.FileMetadata, error) {
 	var files []*storage.FileMetadata
 
 	paginator := s3.NewListObjectsV2Paginator(p.client, &s3.ListObjectsV2Input{
@@ -299,17 +289,17 @@ func (p *MinIOProvider) List(ctx context.Context, prefix string) ([]*storage.Fil
 }
 
 // GetType returns the provider type.
-func (p *MinIOProvider) GetType() storage.ProviderType {
+func (p *Provider) GetType() storage.ProviderType {
 	return storage.ProviderTypeMinIO
 }
 
 // ValidateConfig validates the provider configuration.
-func (p *MinIOProvider) ValidateConfig() error {
+func (p *Provider) ValidateConfig() error {
 	return validateConfig(p.config)
 }
 
 // CreateBucket creates a bucket in MinIO.
-func (p *MinIOProvider) CreateBucket(ctx context.Context) error {
+func (p *Provider) CreateBucket(ctx context.Context) error {
 	_, err := p.client.CreateBucket(ctx, &s3.CreateBucketInput{
 		Bucket: aws.String(p.bucket),
 	})
@@ -325,7 +315,7 @@ func (p *MinIOProvider) CreateBucket(ctx context.Context) error {
 }
 
 // DeleteBucket deletes a bucket from MinIO.
-func (p *MinIOProvider) DeleteBucket(ctx context.Context) error {
+func (p *Provider) DeleteBucket(ctx context.Context) error {
 	_, err := p.client.DeleteBucket(ctx, &s3.DeleteBucketInput{
 		Bucket: aws.String(p.bucket),
 	})
@@ -337,7 +327,7 @@ func (p *MinIOProvider) DeleteBucket(ctx context.Context) error {
 }
 
 // SetVersioning enables or disables versioning for the bucket.
-func (p *MinIOProvider) SetVersioning(ctx context.Context, enabled bool) error {
+func (p *Provider) SetVersioning(ctx context.Context, enabled bool) error {
 	status := types.BucketVersioningStatusSuspended
 	if enabled {
 		status = types.BucketVersioningStatusEnabled
@@ -357,7 +347,7 @@ func (p *MinIOProvider) SetVersioning(ctx context.Context, enabled bool) error {
 }
 
 // GetVersioning returns the versioning status of the bucket.
-func (p *MinIOProvider) GetVersioning(ctx context.Context) (bool, error) {
+func (p *Provider) GetVersioning(ctx context.Context) (bool, error) {
 	output, err := p.client.GetBucketVersioning(ctx, &s3.GetBucketVersioningInput{
 		Bucket: aws.String(p.bucket),
 	})
@@ -369,7 +359,7 @@ func (p *MinIOProvider) GetVersioning(ctx context.Context) (bool, error) {
 }
 
 // SetReplication configures replication for the bucket.
-func (p *MinIOProvider) SetReplication(ctx context.Context, destinationBucket, destinationRegion string) error {
+func (p *Provider) SetReplication(ctx context.Context, destinationBucket, destinationRegion string) error {
 	// MinIO uses the same replication config as S3
 	replicationConfig := &types.ReplicationConfiguration{
 		Role: aws.String("arn:aws:iam::minioadmin:role/replication"),
@@ -398,7 +388,7 @@ func (p *MinIOProvider) SetReplication(ctx context.Context, destinationBucket, d
 }
 
 // GetReplication returns the replication configuration of the bucket.
-func (p *MinIOProvider) GetReplication(ctx context.Context) (*types.ReplicationConfiguration, error) {
+func (p *Provider) GetReplication(ctx context.Context) (*types.ReplicationConfiguration, error) {
 	output, err := p.client.GetBucketReplication(ctx, &s3.GetBucketReplicationInput{
 		Bucket: aws.String(p.bucket),
 	})
@@ -410,7 +400,7 @@ func (p *MinIOProvider) GetReplication(ctx context.Context) (*types.ReplicationC
 }
 
 // SetLifecyclePolicy sets a lifecycle policy for the bucket.
-func (p *MinIOProvider) SetLifecyclePolicy(ctx context.Context, rules []types.LifecycleRule) error {
+func (p *Provider) SetLifecyclePolicy(ctx context.Context, rules []types.LifecycleRule) error {
 	_, err := p.client.PutBucketLifecycleConfiguration(ctx, &s3.PutBucketLifecycleConfigurationInput{
 		Bucket: aws.String(p.bucket),
 		LifecycleConfiguration: &types.BucketLifecycleConfiguration{
@@ -425,7 +415,7 @@ func (p *MinIOProvider) SetLifecyclePolicy(ctx context.Context, rules []types.Li
 }
 
 // GetLifecyclePolicy returns the lifecycle policy of the bucket.
-func (p *MinIOProvider) GetLifecyclePolicy(ctx context.Context) ([]types.LifecycleRule, error) {
+func (p *Provider) GetLifecyclePolicy(ctx context.Context) ([]types.LifecycleRule, error) {
 	output, err := p.client.GetBucketLifecycleConfiguration(ctx, &s3.GetBucketLifecycleConfigurationInput{
 		Bucket: aws.String(p.bucket),
 	})

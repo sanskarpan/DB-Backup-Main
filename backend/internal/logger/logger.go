@@ -37,6 +37,8 @@ type Logger struct {
 }
 
 // New creates a new logger instance.
+//
+//nolint:gocritic // hugeParam: New is a public constructor; keeping value receiver preserves the exported API used across packages.
 func New(config Config) *Logger {
 	// Set default time format if not specified
 	if config.TimeFormat == "" {
@@ -54,9 +56,7 @@ func New(config Config) *Logger {
 	switch config.Output {
 	case "file":
 		writer = createFileWriter(config.File)
-	case "stdout":
-		fallthrough
-	default:
+	default: // stdout and any unspecified output
 		if config.Format == "text" {
 			writer = zerolog.ConsoleWriter{
 				Out:        os.Stdout,

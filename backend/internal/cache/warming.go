@@ -17,6 +17,8 @@ type WarmingStrategy interface {
 }
 
 // CacheWarmer handles cache warming operations.
+//
+//nolint:revive // keeps public name stable across packages
 type CacheWarmer struct {
 	cache     Cache
 	strategy  WarmingStrategy

@@ -127,13 +127,14 @@ func (pir *PostgreSQLIndexRecommender) ValidateIndex(ctx context.Context, table 
 	validation.IsValid = true
 
 	// High selectivity = beneficial index
-	if selectivity > 0.01 && selectivity < 0.9 {
+	switch {
+	case selectivity > 0.01 && selectivity < 0.9:
 		validation.IsBeneficial = true
 		validation.ExpectedGain = (1.0 - selectivity) * 100
-	} else if selectivity >= 0.9 {
+	case selectivity >= 0.9:
 		validation.IsBeneficial = false
 		validation.Warnings = append(validation.Warnings, "Low selectivity - index may not be beneficial")
-	} else {
+	default:
 		validation.IsBeneficial = true
 		validation.ExpectedGain = 80.0 // High selectivity = good gain
 	}
@@ -287,6 +288,7 @@ func (pir *PostgreSQLIndexRecommender) estimateSelectivity(ctx context.Context, 
 	}
 
 	// Simple selectivity estimation — identifiers are validated above.
+	//nolint:gosec // G201: table and column identifiers are validated by ValidateTableName above
 	query := fmt.Sprintf("SELECT COUNT(DISTINCT %s)::float / COUNT(*)::float FROM %s", columns[0], table)
 
 	var selectivity float64

@@ -9,6 +9,8 @@ import (
 )
 
 // SLALevel represents the criticality level of an SLA.
+//
+//nolint:revive // keeps public SLA-prefixed API stable across packages
 type SLALevel string
 
 const (
@@ -19,6 +21,8 @@ const (
 )
 
 // SLADefinition defines the SLA requirements for a database.
+//
+//nolint:revive // keeps public SLA-prefixed API stable across packages
 type SLADefinition struct {
 	ID                   string
 	DatabaseID           string
@@ -39,6 +43,8 @@ type SLADefinition struct {
 }
 
 // SLAMetrics represents the actual metrics for a database.
+//
+//nolint:revive // keeps public SLA-prefixed API stable across packages
 type SLAMetrics struct {
 	DatabaseID             string
 	DatabaseName           string
@@ -86,6 +92,8 @@ type RPOMetrics struct {
 }
 
 // SLAViolation represents an SLA violation event.
+//
+//nolint:revive // keeps public SLA-prefixed API stable across packages
 type SLAViolation struct {
 	ID                string
 	DatabaseID        string
@@ -104,6 +112,8 @@ type SLAViolation struct {
 }
 
 // SLAMonitor monitors and tracks SLA compliance.
+//
+//nolint:revive // keeps public SLA-prefixed API stable across packages
 type SLAMonitor struct {
 	mu               sync.RWMutex
 	definitions      map[string]*SLADefinition
@@ -369,6 +379,7 @@ func (sm *SLAMonitor) recordViolation(databaseID, violationType, severity, descr
 	// Trigger alerts if enabled
 	if def.AlertOnViolation {
 		for _, handler := range sm.alertHandlers {
+			//nolint:errcheck // alert handler errors are non-fatal and fired asynchronously
 			go handler(violation)
 		}
 	}

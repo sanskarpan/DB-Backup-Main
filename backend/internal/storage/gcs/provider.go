@@ -3,6 +3,7 @@ package gcs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -17,6 +18,8 @@ import (
 )
 
 // GCSProvider implements Google Cloud Storage.
+//
+//nolint:revive // keeps public name (gcs.GCSProvider) stable for external callers
 type GCSProvider struct {
 	client *storage.Client
 	bucket *storage.BucketHandle
@@ -135,7 +138,7 @@ func (p *GCSProvider) DownloadStream(ctx context.Context, remotePath string) (io
 	obj := p.bucket.Object(remotePath)
 	reader, err := obj.NewReader(ctx)
 	if err != nil {
-		if err == storage.ErrObjectNotExist {
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			return nil, pkgErrors.New(pkgErrors.ErrorTypeNotFound, "object not found in GCS")
 		}
 		return nil, pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage, "failed to create GCS reader")
@@ -148,7 +151,7 @@ func (p *GCSProvider) DownloadStream(ctx context.Context, remotePath string) (io
 func (p *GCSProvider) Delete(ctx context.Context, remotePath string) error {
 	obj := p.bucket.Object(remotePath)
 	if err := obj.Delete(ctx); err != nil {
-		if err == storage.ErrObjectNotExist {
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			return pkgErrors.New(pkgErrors.ErrorTypeNotFound, "object not found in GCS")
 		}
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage, "failed to delete from GCS")
@@ -162,7 +165,7 @@ func (p *GCSProvider) Exists(ctx context.Context, remotePath string) (bool, erro
 	obj := p.bucket.Object(remotePath)
 	_, err := obj.Attrs(ctx)
 	if err != nil {
-		if err == storage.ErrObjectNotExist {
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			return false, nil
 		}
 		return false, pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage, "failed to check GCS object")
@@ -176,7 +179,7 @@ func (p *GCSProvider) GetMetadata(ctx context.Context, remotePath string) (*st.F
 	obj := p.bucket.Object(remotePath)
 	attrs, err := obj.Attrs(ctx)
 	if err != nil {
-		if err == storage.ErrObjectNotExist {
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			return nil, pkgErrors.New(pkgErrors.ErrorTypeNotFound, "object not found in GCS")
 		}
 		return nil, pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage, "failed to get GCS metadata")
@@ -212,7 +215,7 @@ func (p *GCSProvider) List(ctx context.Context, prefix string) ([]*st.FileMetada
 
 	for {
 		attrs, err := it.Next()
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			break
 		}
 		if err != nil {

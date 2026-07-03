@@ -136,6 +136,8 @@ type pooledConnection struct {
 }
 
 // NewConnectionPool creates a new connection pool.
+//
+//nolint:gocritic // hugeParam: PoolConfig passed by value to keep the exported API stable.
 func NewConnectionPool(config PoolConfig, connFunc func(context.Context) (*sql.DB, error)) (*ConnectionPool, error) {
 	if config.MinConnections < 1 {
 		return nil, errors.New("minimum connections must be at least 1")
@@ -255,7 +257,10 @@ func (p *ConnectionPool) Put(db *sql.DB) error {
 
 // Stats returns current pool statistics.
 func (p *ConnectionPool) Stats() PoolStats {
-	stats := p.stats.Load().(*PoolStats)
+	stats, ok := p.stats.Load().(*PoolStats)
+	if !ok {
+		stats = &PoolStats{}
+	}
 
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -498,7 +503,10 @@ func (p *ConnectionPool) healthCheck() {
 				go func() {
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
-					p.createConnection(ctx)
+					if err := p.createConnection(ctx); err != nil {
+						// Replacement failed; the next health check will retry.
+						return
+					}
 				}()
 				conn.mu.Unlock()
 				continue
@@ -532,7 +540,7 @@ func (p *ConnectionPool) healthCheck() {
 				toRemove = append(toRemove, conn)
 
 				// Attempt to create replacement connection
-				go p.reconnect(conn)
+				go p.reconnect()
 			}
 		} else {
 			conn.healthy = true
@@ -549,7 +557,7 @@ func (p *ConnectionPool) healthCheck() {
 }
 
 // reconnect attempts to reconnect a failed connection.
-func (p *ConnectionPool) reconnect(oldConn *pooledConnection) {
+func (p *ConnectionPool) reconnect() {
 	p.updateStats(func(s *PoolStats) {
 		atomic.AddInt64(&s.ReconnectAttempts, 1)
 	})
@@ -634,8 +642,12 @@ func (p *ConnectionPool) autoScale() {
 	// Scale up if utilization is high (already holding p.mu)
 	if utilization >= p.config.ScaleUpThreshold && len(p.connections) < p.config.MaxConnections {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		p.createConnectionLocked(ctx)
+		err := p.createConnectionLocked(ctx)
 		cancel()
+		if err != nil {
+			// Scale-up failed; the pool will retry on the next cycle.
+			return
+		}
 	}
 
 	// Scale down if utilization is low
@@ -657,7 +669,10 @@ func (p *ConnectionPool) autoScale() {
 // updateStats updates pool statistics atomically.
 func (p *ConnectionPool) updateStats(fn func(*PoolStats)) {
 	for {
-		oldStats := p.stats.Load().(*PoolStats)
+		oldStats, ok := p.stats.Load().(*PoolStats)
+		if !ok {
+			oldStats = &PoolStats{}
+		}
 		newStats := *oldStats
 		fn(&newStats)
 		if p.stats.CompareAndSwap(oldStats, &newStats) {
@@ -674,6 +689,8 @@ type MultiTenantPool struct {
 }
 
 // NewMultiTenantPool creates a new multi-tenant pool manager.
+//
+//nolint:gocritic // hugeParam: PoolConfig passed by value to keep the exported API stable.
 func NewMultiTenantPool(config PoolConfig) *MultiTenantPool {
 	return &MultiTenantPool{
 		pools:  make(map[string]*ConnectionPool),
@@ -695,7 +712,7 @@ func (m *MultiTenantPool) GetPool(tenantID string, connFunc func(context.Context
 	defer m.mu.Unlock()
 
 	// Double-check after acquiring write lock
-	if pool, exists := m.pools[tenantID]; exists {
+	if pool, exists = m.pools[tenantID]; exists {
 		return pool, nil
 	}
 

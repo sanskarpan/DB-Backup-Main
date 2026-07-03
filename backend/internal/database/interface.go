@@ -10,7 +10,7 @@ import (
 )
 
 // DatabaseType represents the type of database.
-type DatabaseType string
+type DatabaseType string //nolint:revive // exported name kept stable; used across packages
 
 const (
 	DatabaseTypeMySQL      DatabaseType = "mysql"

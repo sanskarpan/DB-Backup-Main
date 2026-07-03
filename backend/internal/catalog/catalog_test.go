@@ -1,42 +1,9 @@
 package catalog
 
 import (
-	"context"
 	"testing"
 	"time"
 )
-
-// Mock Elasticsearch client for testing.
-type mockESClient struct {
-	documents map[string]map[string]interface{}
-	indices   map[string]bool
-}
-
-func newMockESClient() *mockESClient {
-	return &mockESClient{
-		documents: make(map[string]map[string]interface{}),
-		indices:   make(map[string]bool),
-	}
-}
-
-func (m *mockESClient) Ping(ctx context.Context) error {
-	return nil
-}
-
-func (m *mockESClient) CreateIndex(ctx context.Context, indexName string, mapping map[string]interface{}) error {
-	m.indices[indexName] = true
-	return nil
-}
-
-func (m *mockESClient) IndexExists(ctx context.Context, indexName string) (bool, error) {
-	return m.indices[indexName], nil
-}
-
-func (m *mockESClient) IndexDocument(ctx context.Context, indexName, documentID string, document interface{}) error {
-	fullKey := indexName + ":" + documentID
-	m.documents[fullKey] = document.(map[string]interface{})
-	return nil
-}
 
 // Tests for ElasticsearchClient
 
@@ -112,6 +79,62 @@ func TestBackupDocument(t *testing.T) {
 
 	if len(backup.Tables) != 3 {
 		t.Errorf("Expected 3 tables, got %d", len(backup.Tables))
+	}
+
+	if backup.DatabaseType != "postgres" {
+		t.Errorf("Expected DatabaseType='postgres', got %s", backup.DatabaseType)
+	}
+
+	if backup.BackupType != "full" {
+		t.Errorf("Expected BackupType='full', got %s", backup.BackupType)
+	}
+
+	if backup.Status != "success" {
+		t.Errorf("Expected Status='success', got %s", backup.Status)
+	}
+
+	if backup.CompressedSize != 500*1024*1024 {
+		t.Errorf("Expected CompressedSize=500MB, got %d", backup.CompressedSize)
+	}
+
+	if backup.Duration != 120.5 {
+		t.Errorf("Expected Duration=120.5, got %f", backup.Duration)
+	}
+
+	if backup.StorageProvider != "s3" {
+		t.Errorf("Expected StorageProvider='s3', got %s", backup.StorageProvider)
+	}
+
+	if backup.StoragePath == "" {
+		t.Error("StoragePath should not be empty")
+	}
+
+	if !backup.CreatedAt.Equal(now) {
+		t.Error("Expected CreatedAt to equal now")
+	}
+
+	if backup.ExpiresAt == nil || !backup.ExpiresAt.Equal(expires) {
+		t.Error("Expected ExpiresAt to equal expires")
+	}
+
+	if backup.ChecksumType != "sha256" {
+		t.Errorf("Expected ChecksumType='sha256', got %s", backup.ChecksumType)
+	}
+
+	if backup.Checksum == "" {
+		t.Error("Checksum should not be empty")
+	}
+
+	if len(backup.Schemas) != 1 {
+		t.Errorf("Expected 1 schema, got %d", len(backup.Schemas))
+	}
+
+	if backup.RestoreCount != 0 {
+		t.Errorf("Expected RestoreCount=0, got %d", backup.RestoreCount)
+	}
+
+	if backup.AccessCount != 0 {
+		t.Errorf("Expected AccessCount=0, got %d", backup.AccessCount)
 	}
 }
 
@@ -202,6 +225,58 @@ func TestSearchQuery(t *testing.T) {
 	if query.SortBy != "created_at" {
 		t.Errorf("Expected SortBy='created_at', got %s", query.SortBy)
 	}
+
+	if len(query.DatabaseTypes) != 2 {
+		t.Errorf("Expected 2 database types, got %d", len(query.DatabaseTypes))
+	}
+
+	if len(query.BackupTypes) != 1 {
+		t.Errorf("Expected 1 backup type, got %d", len(query.BackupTypes))
+	}
+
+	if len(query.Status) != 1 {
+		t.Errorf("Expected 1 status, got %d", len(query.Status))
+	}
+
+	if len(query.StorageProviders) != 1 {
+		t.Errorf("Expected 1 storage provider, got %d", len(query.StorageProviders))
+	}
+
+	if query.DateFrom == nil || query.DateTo == nil {
+		t.Error("Expected DateFrom and DateTo to be set")
+	}
+
+	if query.MinSize == nil || *query.MinSize != minSize {
+		t.Error("Expected MinSize to be set")
+	}
+
+	if query.MaxSize == nil || *query.MaxSize != maxSize {
+		t.Error("Expected MaxSize to be set")
+	}
+
+	if len(query.Tables) != 1 {
+		t.Errorf("Expected 1 table, got %d", len(query.Tables))
+	}
+
+	if len(query.Schemas) != 1 {
+		t.Errorf("Expected 1 schema, got %d", len(query.Schemas))
+	}
+
+	if query.ParentBackupID != "" {
+		t.Errorf("Expected empty ParentBackupID, got %s", query.ParentBackupID)
+	}
+
+	if query.IncludeExpired {
+		t.Error("Expected IncludeExpired to be false")
+	}
+
+	if query.Offset != 0 {
+		t.Errorf("Expected Offset=0, got %d", query.Offset)
+	}
+
+	if query.SortOrder != "desc" {
+		t.Errorf("Expected SortOrder='desc', got %s", query.SortOrder)
+	}
 }
 
 func TestParseQueryString(t *testing.T) {
@@ -246,6 +321,18 @@ func TestCatalogStats(t *testing.T) {
 
 	if stats.TotalBackups != 1000 {
 		t.Errorf("Expected TotalBackups=1000, got %d", stats.TotalBackups)
+	}
+
+	if stats.TotalSize != 1024*1024*1024*1024 {
+		t.Errorf("Expected TotalSize=1TB, got %d", stats.TotalSize)
+	}
+
+	if stats.AverageSize != 1024*1024*1024 {
+		t.Errorf("Expected AverageSize=1GB, got %d", stats.AverageSize)
+	}
+
+	if stats.AverageDuration != 120.5 {
+		t.Errorf("Expected AverageDuration=120.5, got %f", stats.AverageDuration)
 	}
 
 	if stats.ByStatus["success"] != 950 {
@@ -309,6 +396,18 @@ func TestTimelineEntry(t *testing.T) {
 	if len(entry.Metadata) != 2 {
 		t.Errorf("Expected 2 metadata entries, got %d", len(entry.Metadata))
 	}
+
+	if entry.SizeBytes != 1024*1024*1024 {
+		t.Errorf("Expected SizeBytes=1GB, got %d", entry.SizeBytes)
+	}
+
+	if entry.Duration != 120.5 {
+		t.Errorf("Expected Duration=120.5, got %f", entry.Duration)
+	}
+
+	if !entry.Timestamp.Equal(now) {
+		t.Error("Expected Timestamp to equal now")
+	}
 }
 
 func TestTimeline(t *testing.T) {
@@ -355,6 +454,14 @@ func TestTimeline(t *testing.T) {
 
 	if timeline.Entries[1].BackupType != "incremental" {
 		t.Errorf("Expected second entry to be incremental backup, got %s", timeline.Entries[1].BackupType)
+	}
+
+	if !timeline.StartDate.Equal(startDate) {
+		t.Error("Expected StartDate to equal startDate")
+	}
+
+	if !timeline.EndDate.Equal(endDate) {
+		t.Error("Expected EndDate to equal endDate")
 	}
 }
 
@@ -437,6 +544,10 @@ func TestBackupDependency(t *testing.T) {
 	if len(dependency.MissingBackups) != 0 {
 		t.Errorf("Expected no missing backups, got %d", len(dependency.MissingBackups))
 	}
+
+	if len(dependency.RequiredBy) != 0 {
+		t.Errorf("Expected no required-by entries, got %d", len(dependency.RequiredBy))
+	}
 }
 
 func TestBackupDependencyWithMissing(t *testing.T) {
@@ -458,6 +569,18 @@ func TestBackupDependencyWithMissing(t *testing.T) {
 
 	if dependency.MissingBackups[0] != "backup-002" {
 		t.Errorf("Expected missing backup='backup-002', got %s", dependency.MissingBackups[0])
+	}
+
+	if dependency.BackupID != "backup-003" {
+		t.Errorf("Expected BackupID='backup-003', got %s", dependency.BackupID)
+	}
+
+	if len(dependency.DependsOn) != 2 {
+		t.Errorf("Expected 2 dependencies, got %d", len(dependency.DependsOn))
+	}
+
+	if len(dependency.RequiredBy) != 0 {
+		t.Errorf("Expected no required-by entries, got %d", len(dependency.RequiredBy))
 	}
 }
 
@@ -507,6 +630,26 @@ func TestDatabaseTimeline(t *testing.T) {
 	// Verify full + incremental = total
 	if dbTimeline.FullBackups+dbTimeline.IncrBackups != dbTimeline.TotalBackups {
 		t.Error("Full backups + incremental backups should equal total backups")
+	}
+
+	if !dbTimeline.FirstBackup.Equal(firstBackup) {
+		t.Error("Expected FirstBackup to equal firstBackup")
+	}
+
+	if !dbTimeline.LastBackup.Equal(lastBackup) {
+		t.Error("Expected LastBackup to equal lastBackup")
+	}
+
+	if dbTimeline.AverageSize != 500*1024*1024 {
+		t.Errorf("Expected AverageSize=500MB, got %d", dbTimeline.AverageSize)
+	}
+
+	if dbTimeline.TotalSize != 50*1024*1024*1024 {
+		t.Errorf("Expected TotalSize=50GB, got %d", dbTimeline.TotalSize)
+	}
+
+	if dbTimeline.Timeline == nil {
+		t.Error("Expected Timeline to be initialized")
 	}
 }
 

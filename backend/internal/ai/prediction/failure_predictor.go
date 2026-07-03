@@ -106,6 +106,8 @@ type FailurePrediction struct {
 }
 
 // PredictionSeverity represents prediction severity.
+//
+//nolint:revive // keeps public name stable; PredictionSeverity is part of the package API
 type PredictionSeverity string
 
 const (
@@ -156,6 +158,8 @@ func DefaultPredictorConfig() *PredictorConfig {
 }
 
 // AddBackupEvent adds a historical backup event.
+//
+//nolint:gocritic // hugeParam: BackupEvent is passed by value to keep the public API stable
 func (fp *FailurePredictor) AddBackupEvent(event BackupEvent) {
 	fp.mu.Lock()
 	defer fp.mu.Unlock()
@@ -168,10 +172,11 @@ func (fp *FailurePredictor) AddBackupEvent(event BackupEvent) {
 
 	// Keep only recent history (last 90 days)
 	cutoff := time.Now().AddDate(0, 0, -90)
+	events := fp.historicalData[event.DatabaseName]
 	filtered := make([]BackupEvent, 0)
-	for _, e := range fp.historicalData[event.DatabaseName] {
-		if e.Timestamp.After(cutoff) {
-			filtered = append(filtered, e)
+	for i := range events {
+		if events[i].Timestamp.After(cutoff) {
+			filtered = append(filtered, events[i])
 		}
 	}
 	fp.historicalData[event.DatabaseName] = filtered
@@ -205,10 +210,10 @@ func (fp *FailurePredictor) AnalyzePatterns(ctx context.Context) error {
 
 		// Calculate failure frequency
 		failures := 0
-		for _, e := range events {
-			if !e.Success {
+		for i := range events {
+			if !events[i].Success {
 				failures++
-				pattern.LastOccurrence = e.Timestamp
+				pattern.LastOccurrence = events[i].Timestamp
 			}
 		}
 
@@ -219,7 +224,7 @@ func (fp *FailurePredictor) AnalyzePatterns(ctx context.Context) error {
 		pattern.PatternType, pattern.Confidence = fp.determinePatternType(events, pattern)
 
 		// Calculate risk factors
-		pattern.RiskFactors = fp.calculateRiskFactors(events, pattern)
+		pattern.RiskFactors = fp.calculateRiskFactors(pattern)
 
 		fp.patterns[dbName] = pattern
 	}
@@ -233,10 +238,10 @@ func (fp *FailurePredictor) analyzeTimePatterns(events []BackupEvent) *TimePatte
 	dayFailures := make(map[time.Weekday]int)
 	hourFailures := make(map[int]int)
 
-	for _, e := range events {
-		if !e.Success {
-			dayFailures[e.DayOfWeek]++
-			hourFailures[e.HourOfDay]++
+	for i := range events {
+		if !events[i].Success {
+			dayFailures[events[i].DayOfWeek]++
+			hourFailures[events[i].HourOfDay]++
 		}
 	}
 
@@ -279,12 +284,12 @@ func (fp *FailurePredictor) analyzeTimePatterns(events []BackupEvent) *TimePatte
 func (fp *FailurePredictor) analyzeResourcePatterns(events []BackupEvent) *ResourcePattern {
 	var failedDisk, failedLoad, failedNetwork []float64
 
-	for _, e := range events {
-		if !e.Success {
-			failedDisk = append(failedDisk, e.DiskUsage)
-			failedLoad = append(failedLoad, e.SystemLoad)
-			if e.NetworkLatency > 0 {
-				failedNetwork = append(failedNetwork, float64(e.NetworkLatency.Milliseconds()))
+	for i := range events {
+		if !events[i].Success {
+			failedDisk = append(failedDisk, events[i].DiskUsage)
+			failedLoad = append(failedLoad, events[i].SystemLoad)
+			if events[i].NetworkLatency > 0 {
+				failedNetwork = append(failedNetwork, float64(events[i].NetworkLatency.Milliseconds()))
 			}
 		}
 	}
@@ -318,15 +323,15 @@ func (fp *FailurePredictor) analyzeResourcePatterns(events []BackupEvent) *Resou
 
 // analyzeErrorPatterns analyzes common error patterns.
 func (fp *FailurePredictor) analyzeErrorPatterns(events []BackupEvent, pattern *FailurePattern) {
-	for _, e := range events {
-		if !e.Success && e.ErrorType != "" {
-			pattern.CommonErrors[e.ErrorType]++
+	for i := range events {
+		if !events[i].Success && events[i].ErrorType != "" {
+			pattern.CommonErrors[events[i].ErrorType]++
 		}
 	}
 }
 
 // determinePatternType determines the type of failure pattern.
-func (fp *FailurePredictor) determinePatternType(events []BackupEvent, pattern *FailurePattern) (PatternType, float64) {
+func (fp *FailurePredictor) determinePatternType(events []BackupEvent, pattern *FailurePattern) (patternType PatternType, patternConfidence float64) {
 	// Calculate recent failure rate vs historical
 	recentEvents := 0
 	recentFailures := 0
@@ -335,14 +340,14 @@ func (fp *FailurePredictor) determinePatternType(events []BackupEvent, pattern *
 	totalEvents := len(events)
 	totalFailures := 0
 
-	for _, e := range events {
-		if e.Timestamp.After(cutoff) {
+	for i := range events {
+		if events[i].Timestamp.After(cutoff) {
 			recentEvents++
-			if !e.Success {
+			if !events[i].Success {
 				recentFailures++
 			}
 		}
-		if !e.Success {
+		if !events[i].Success {
 			totalFailures++
 		}
 	}
@@ -386,7 +391,7 @@ func (fp *FailurePredictor) determinePatternType(events []BackupEvent, pattern *
 }
 
 // calculateRiskFactors calculates risk factors for failures.
-func (fp *FailurePredictor) calculateRiskFactors(events []BackupEvent, pattern *FailurePattern) []RiskFactor {
+func (fp *FailurePredictor) calculateRiskFactors(pattern *FailurePattern) []RiskFactor {
 	factors := make([]RiskFactor, 0)
 
 	// High failure frequency
@@ -538,7 +543,7 @@ func (fp *FailurePredictor) evaluateTimeWindow(t time.Time, pattern *FailurePatt
 
 	prediction.RiskScore = prediction.Confidence
 	prediction.Severity = fp.determineSeverity(prediction.RiskScore)
-	prediction.PreventiveActions = fp.generatePreventiveActions(pattern, prediction)
+	prediction.PreventiveActions = fp.generatePreventiveActions(pattern)
 
 	return prediction
 }
@@ -576,7 +581,7 @@ func (fp *FailurePredictor) evaluateResourceRisk(pattern *FailurePattern) *Failu
 
 	prediction.RiskScore = confidence
 	prediction.Severity = fp.determineSeverity(prediction.RiskScore)
-	prediction.PreventiveActions = fp.generatePreventiveActions(pattern, prediction)
+	prediction.PreventiveActions = fp.generatePreventiveActions(pattern)
 
 	return prediction
 }
@@ -598,25 +603,27 @@ func (fp *FailurePredictor) evaluateTrendRisk(pattern *FailurePattern) *FailureP
 
 	prediction.RiskScore = pattern.Confidence
 	prediction.Severity = fp.determineSeverity(prediction.RiskScore)
-	prediction.PreventiveActions = fp.generatePreventiveActions(pattern, prediction)
+	prediction.PreventiveActions = fp.generatePreventiveActions(pattern)
 
 	return prediction
 }
 
 // determineSeverity determines prediction severity based on risk score.
 func (fp *FailurePredictor) determineSeverity(riskScore float64) PredictionSeverity {
-	if riskScore >= 90.0 {
+	switch {
+	case riskScore >= 90.0:
 		return PredictionSeverityCritical
-	} else if riskScore >= 75.0 {
+	case riskScore >= 75.0:
 		return PredictionSeverityHigh
-	} else if riskScore >= 60.0 {
+	case riskScore >= 60.0:
 		return PredictionSeverityMedium
+	default:
+		return PredictionSeverityLow
 	}
-	return PredictionSeverityLow
 }
 
 // generatePreventiveActions generates suggested preventive actions.
-func (fp *FailurePredictor) generatePreventiveActions(pattern *FailurePattern, prediction *FailurePrediction) []PreventiveAction {
+func (fp *FailurePredictor) generatePreventiveActions(pattern *FailurePattern) []PreventiveAction {
 	actions := make([]PreventiveAction, 0)
 
 	// Time-based actions

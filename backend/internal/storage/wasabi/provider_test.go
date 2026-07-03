@@ -41,7 +41,7 @@ func TestWasabiProvider_NewProvider_InvalidConfig(t *testing.T) {
 		{
 			name:   "nil config",
 			config: nil,
-			errMsg: "Wasabi config is required",
+			errMsg: "wasabi config is required",
 		},
 		{
 			name: "missing access key",
@@ -50,7 +50,7 @@ func TestWasabiProvider_NewProvider_InvalidConfig(t *testing.T) {
 				Bucket:    "bucket",
 				Region:    "us-east-1",
 			},
-			errMsg: "Wasabi access key is required",
+			errMsg: "wasabi access key is required",
 		},
 		{
 			name: "missing secret key",
@@ -59,7 +59,7 @@ func TestWasabiProvider_NewProvider_InvalidConfig(t *testing.T) {
 				Bucket:    "bucket",
 				Region:    "us-east-1",
 			},
-			errMsg: "Wasabi secret key is required",
+			errMsg: "wasabi secret key is required",
 		},
 		{
 			name: "missing bucket",
@@ -68,7 +68,7 @@ func TestWasabiProvider_NewProvider_InvalidConfig(t *testing.T) {
 				SecretKey: "secret",
 				Region:    "us-east-1",
 			},
-			errMsg: "Wasabi bucket is required",
+			errMsg: "wasabi bucket is required",
 		},
 	}
 
@@ -372,7 +372,7 @@ func TestWasabiProvider_List(t *testing.T) {
 		remotePath := prefix + file
 		err := provider.UploadStream(ctx, bytes.NewReader([]byte("content")), remotePath, nil)
 		require.NoError(t, err)
-		defer provider.Delete(ctx, remotePath)
+		t.Cleanup(func() { provider.Delete(ctx, remotePath) })
 	}
 
 	// List files
@@ -600,6 +600,7 @@ func setupTestProvider(t *testing.T) *WasabiProvider {
 }
 
 func createTestFile(t *testing.T, content string) string {
+	t.Helper()
 	tmpFile, err := os.CreateTemp("", "wasabi-test-*.txt")
 	require.NoError(t, err)
 

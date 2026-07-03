@@ -82,13 +82,17 @@ func (m *MockWebhookServer) handleRequest(w http.ResponseWriter, r *http.Request
 	if m.shouldFail {
 		if m.failAfter > 0 && len(m.requests)-1 >= m.failAfter {
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"error": "simulated failure"}`))
+			if _, err := w.Write([]byte(`{"error": "simulated failure"}`)); err != nil {
+				log.Debug().Err(err).Msg("Failed to write mock response")
+			}
 			return
 		}
 		if m.failCount > 0 {
 			m.failCount--
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"error": "simulated failure"}`))
+			if _, err := w.Write([]byte(`{"error": "simulated failure"}`)); err != nil {
+				log.Debug().Err(err).Msg("Failed to write mock response")
+			}
 			return
 		}
 	}
@@ -96,7 +100,9 @@ func (m *MockWebhookServer) handleRequest(w http.ResponseWriter, r *http.Request
 	// Send response
 	w.WriteHeader(m.responseCode)
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"status": "received"}`))
+	if _, err := w.Write([]byte(`{"status": "received"}`)); err != nil {
+		log.Debug().Err(err).Msg("Failed to write mock response")
+	}
 }
 
 // URL returns the server URL.

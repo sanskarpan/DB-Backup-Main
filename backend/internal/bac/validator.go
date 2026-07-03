@@ -153,7 +153,8 @@ func (v *Validator) validateSpec(spec *BackupSpec, result *ValidationResult) {
 func (v *Validator) validateDatabases(databases []DatabaseConfig, result *ValidationResult) {
 	dbIDs := make(map[string]bool)
 
-	for i, db := range databases {
+	for i := range databases {
+		db := &databases[i]
 		prefix := fmt.Sprintf("spec.databases[%d]", i)
 
 		// Check for duplicate IDs
@@ -236,8 +237,8 @@ func (v *Validator) validateConnection(conn *ConnectionConfig, prefix string, re
 // validateSchedules validates schedule configurations.
 func (v *Validator) validateSchedules(schedules []ScheduleConfig, databases []DatabaseConfig, result *ValidationResult) {
 	dbIDs := make(map[string]bool)
-	for _, db := range databases {
-		dbIDs[db.ID] = true
+	for i := range databases {
+		dbIDs[databases[i].ID] = true
 	}
 
 	for i, schedule := range schedules {
@@ -329,7 +330,8 @@ func (v *Validator) validateWindow(window *Window, prefix string, result *Valida
 
 // validatePolicies validates policy configurations.
 func (v *Validator) validatePolicies(policies []PolicyConfig, result *ValidationResult) {
-	for i, policy := range policies {
+	for i := range policies {
+		policy := &policies[i]
 		prefix := fmt.Sprintf("spec.policies[%d]", i)
 
 		if policy.Name == "" {
@@ -450,17 +452,15 @@ func (v *Validator) validateNotification(notif *NotificationConfig, prefix strin
 			Message: "notification endpoint is required",
 			Code:    "REQUIRED_FIELD",
 		})
-	} else {
+	} else if notif.Type == "webhook" || notif.Type == "slack" {
 		// Validate URL format for webhook types
-		if notif.Type == "webhook" || notif.Type == "slack" {
-			_, err := url.ParseRequestURI(notif.Endpoint)
-			if err != nil {
-				result.Errors = append(result.Errors, ValidationError{
-					Field:   prefix + ".endpoint",
-					Message: "invalid URL format",
-					Code:    "INVALID_FORMAT",
-				})
-			}
+		_, err := url.ParseRequestURI(notif.Endpoint)
+		if err != nil {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:   prefix + ".endpoint",
+				Message: "invalid URL format",
+				Code:    "INVALID_FORMAT",
+			})
 		}
 	}
 
@@ -642,13 +642,11 @@ func (v *Validator) validateGitOps(gitops *GitOpsConfig, result *ValidationResul
 			Message: "repository URL is required when GitOps is enabled",
 			Code:    "REQUIRED_FIELD",
 		})
-	} else {
+	} else if !strings.HasPrefix(gitops.Repository, "http://") &&
+		!strings.HasPrefix(gitops.Repository, "https://") &&
+		!strings.HasPrefix(gitops.Repository, "git@") {
 		// Validate repository URL format
-		if !strings.HasPrefix(gitops.Repository, "http://") &&
-			!strings.HasPrefix(gitops.Repository, "https://") &&
-			!strings.HasPrefix(gitops.Repository, "git@") {
-			result.Warnings = append(result.Warnings, prefix+".repository: URL format may not be recognized")
-		}
+		result.Warnings = append(result.Warnings, prefix+".repository: URL format may not be recognized")
 	}
 
 	if gitops.Branch == "" {
@@ -709,7 +707,7 @@ func (v *Validator) ValidateScheduleConflicts(schedules []ScheduleConfig) []stri
 	for dbID, scheds := range dbSchedules {
 		for i := 0; i < len(scheds); i++ {
 			for j := i + 1; j < len(scheds); j++ {
-				if v.schedulesOverlap(scheds[i], scheds[j]) {
+				if v.schedulesOverlap(&scheds[i], &scheds[j]) {
 					conflicts = append(conflicts, fmt.Sprintf("Schedules '%s' and '%s' may overlap for database '%s'",
 						scheds[i].Name, scheds[j].Name, dbID))
 				}
@@ -721,7 +719,7 @@ func (v *Validator) ValidateScheduleConflicts(schedules []ScheduleConfig) []stri
 }
 
 // schedulesOverlap checks if two schedules might overlap.
-func (v *Validator) schedulesOverlap(s1, s2 ScheduleConfig) bool {
+func (v *Validator) schedulesOverlap(s1, s2 *ScheduleConfig) bool {
 	// If both have windows, check for time overlap
 	if s1.Window != nil && s2.Window != nil {
 		return v.windowsOverlap(s1.Window, s2.Window)

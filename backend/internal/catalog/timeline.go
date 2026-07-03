@@ -101,8 +101,18 @@ func (te *TimelineEngine) GetTimeline(ctx context.Context, options *TimelineOpti
 
 	// Add database filter if specified
 	if options.DatabaseName != "" {
-		boolQuery := query["query"].(map[string]interface{})["bool"].(map[string]interface{})
-		filters := boolQuery["filter"].([]map[string]interface{})
+		queryMap, ok := query["query"].(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("unexpected timeline query structure")
+		}
+		boolQuery, ok := queryMap["bool"].(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("unexpected timeline query structure")
+		}
+		filters, ok := boolQuery["filter"].([]map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("unexpected timeline query structure")
+		}
 		filters = append(filters, map[string]interface{}{
 			"term": map[string]interface{}{
 				"database_name.keyword": options.DatabaseName,
@@ -285,8 +295,8 @@ func (te *TimelineEngine) GetBackupDependencies(ctx context.Context, backupID st
 			dependency.DependsOn = append(dependency.DependsOn, current.ParentBackupID)
 
 			// Check if parent exists
-			parent, err := te.indexer.GetBackup(ctx, current.ParentBackupID)
-			if err != nil {
+			parent, perr := te.indexer.GetBackup(ctx, current.ParentBackupID)
+			if perr != nil {
 				dependency.MissingBackups = append(dependency.MissingBackups, current.ParentBackupID)
 				dependency.IsRestoreable = false
 				break
@@ -413,53 +423,69 @@ func (te *TimelineEngine) GetDatabaseTimeline(ctx context.Context, databaseName 
 	}
 
 	// Parse aggregations
-	if aggs := response.Aggregations; aggs != nil {
-		// Backup counts by type
-		if byType := parseTermsAggregation(aggs, "by_type"); byType != nil {
-			dbTimeline.FullBackups = byType["full"]
-			dbTimeline.IncrBackups = byType["incremental"]
-			dbTimeline.BackupChains = int(byType["full"]) // Approximate
-		}
-
-		// Success rate
-		if byStatus := parseTermsAggregation(aggs, "by_status"); byStatus != nil {
-			success := byStatus["success"]
-			total := timeline.TotalCount
-			if total > 0 {
-				dbTimeline.SuccessRate = float64(success) / float64(total) * 100
-			}
-		}
-
-		// Size statistics
-		if totalSize, ok := aggs["total_size"].(map[string]interface{}); ok {
-			if value, ok := totalSize["value"].(float64); ok {
-				dbTimeline.TotalSize = int64(value)
-			}
-		}
-		if avgSize, ok := aggs["avg_size"].(map[string]interface{}); ok {
-			if value, ok := avgSize["value"].(float64); ok {
-				dbTimeline.AverageSize = int64(value)
-			}
-		}
-
-		// First and last backup timestamps
-		if firstBackup, ok := aggs["first_backup"].(map[string]interface{}); ok {
-			if value, ok := firstBackup["value_as_string"].(string); ok {
-				if t, err := time.Parse(time.RFC3339, value); err == nil {
-					dbTimeline.FirstBackup = t
-				}
-			}
-		}
-		if lastBackup, ok := aggs["last_backup"].(map[string]interface{}); ok {
-			if value, ok := lastBackup["value_as_string"].(string); ok {
-				if t, err := time.Parse(time.RFC3339, value); err == nil {
-					dbTimeline.LastBackup = t
-				}
-			}
-		}
-	}
+	applyDatabaseAggregations(dbTimeline, response.Aggregations, timeline.TotalCount)
 
 	return dbTimeline, nil
+}
+
+// applyDatabaseAggregations parses the Elasticsearch aggregation response and
+// populates the derived statistics on dbTimeline.
+func applyDatabaseAggregations(dbTimeline *DatabaseTimeline, aggs map[string]interface{}, totalCount int64) {
+	if aggs == nil {
+		return
+	}
+
+	// Backup counts by type
+	if byType := parseTermsAggregation(aggs, "by_type"); byType != nil {
+		dbTimeline.FullBackups = byType["full"]
+		dbTimeline.IncrBackups = byType["incremental"]
+		dbTimeline.BackupChains = int(byType["full"]) // Approximate
+	}
+
+	// Success rate
+	if byStatus := parseTermsAggregation(aggs, "by_status"); byStatus != nil && totalCount > 0 {
+		dbTimeline.SuccessRate = float64(byStatus["success"]) / float64(totalCount) * 100
+	}
+
+	// Size statistics
+	dbTimeline.TotalSize = aggMetricInt64(aggs, "total_size")
+	dbTimeline.AverageSize = aggMetricInt64(aggs, "avg_size")
+
+	// First and last backup timestamps
+	dbTimeline.FirstBackup = aggMetricTime(aggs, "first_backup")
+	dbTimeline.LastBackup = aggMetricTime(aggs, "last_backup")
+}
+
+// aggMetricInt64 extracts a numeric single-value metric aggregation, returning
+// 0 when the aggregation is absent.
+func aggMetricInt64(aggs map[string]interface{}, name string) int64 {
+	m, ok := aggs[name].(map[string]interface{})
+	if !ok {
+		return 0
+	}
+	value, ok := m["value"].(float64)
+	if !ok {
+		return 0
+	}
+	return int64(value)
+}
+
+// aggMetricTime extracts an RFC3339 timestamp from a single-value metric
+// aggregation, returning the zero time when absent or unparseable.
+func aggMetricTime(aggs map[string]interface{}, name string) time.Time {
+	m, ok := aggs[name].(map[string]interface{})
+	if !ok {
+		return time.Time{}
+	}
+	value, ok := m["value_as_string"].(string)
+	if !ok {
+		return time.Time{}
+	}
+	t, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
 }
 
 // CompareDatabases compares backup timelines across multiple databases.

@@ -117,12 +117,13 @@ func (agm *AirGapManager) CreateAirGapCopy(ctx context.Context, originalBackupID
 
 	// Immediate verification
 	verified, err := agm.storage.Verify(ctx, airGapBackup.ID)
-	if err != nil {
+	switch {
+	case err != nil:
 		airGapBackup.VerificationState = VerificationStateFailed
-	} else if verified {
+	case verified:
 		airGapBackup.VerificationState = VerificationStateVerified
 		airGapBackup.VerifiedAt = time.Now()
-	} else {
+	default:
 		airGapBackup.VerificationState = VerificationStateCorrupted
 	}
 
@@ -256,12 +257,13 @@ func (agm *AirGapManager) VerifyAllBackups(ctx context.Context) (verified, faile
 
 	for _, backup := range backups {
 		ok, err := agm.VerifyAirGapCopy(ctx, backup.ID)
-		if err != nil {
+		switch {
+		case err != nil:
 			failed++
 			errors = append(errors, fmt.Errorf("backup %s: %w", backup.ID, err))
-		} else if ok {
+		case ok:
 			verified++
-		} else {
+		default:
 			failed++
 			errors = append(errors, fmt.Errorf("backup %s: verification failed", backup.ID))
 		}

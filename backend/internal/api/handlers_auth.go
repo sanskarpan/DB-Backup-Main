@@ -8,6 +8,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// roleAdmin is the administrator role/username identifier.
+const roleAdmin = "admin"
+
 // LoginRequest represents a login request.
 type LoginRequest struct {
 	Username string `json:"username" binding:"required"`
@@ -62,12 +65,12 @@ func (s *Server) handleLogin(c *gin.Context) {
 	var storedHash string
 
 	switch req.Username {
-	case "admin":
+	case roleAdmin:
 		storedHash = adminHash
-		userID = "admin"
+		userID = roleAdmin
 		email = "admin@db-backup.local"
 		name = "Admin User"
-		roles = []string{"admin", "user"}
+		roles = []string{roleAdmin, "user"}
 	case "user":
 		storedHash = userHash
 		userID = "user"

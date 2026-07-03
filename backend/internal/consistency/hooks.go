@@ -2,6 +2,7 @@ package consistency
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,6 +14,9 @@ import (
 
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
+
+// hookOnErrorFail is the OnError policy that aborts execution when a hook fails.
+const hookOnErrorFail = "fail"
 
 // Command whitelist for security - only these commands are allowed
 // For production use, configure this via environment or config file.
@@ -223,7 +227,7 @@ func (hm *HookManager) RegisterHook(hook *Hook) error {
 	}
 
 	if hook.OnError == "" {
-		hook.OnError = "fail"
+		hook.OnError = hookOnErrorFail
 	}
 
 	if hook.Environment == nil {
@@ -277,7 +281,7 @@ func (hm *HookManager) ExecuteHooks(ctx context.Context, hookType HookType, meta
 	case ExecutionModeFailFast:
 		return hm.executeFailFast(execCtx, enabledHooks, metadata)
 	case ExecutionModeBestEffort:
-		return hm.executeBestEffort(execCtx, enabledHooks, metadata)
+		return hm.executeBestEffort(execCtx, enabledHooks, metadata), nil
 	default:
 		return hm.executeSequential(execCtx, enabledHooks, metadata)
 	}
@@ -295,8 +299,8 @@ func (hm *HookManager) executeSequential(ctx context.Context, hooks []*Hook, met
 		hm.results = append(hm.results, result)
 		hm.mu.Unlock()
 
-		if !result.Success && hook.OnError == "fail" {
-			return results, fmt.Errorf("hook %s failed: %v", hook.ID, result.Error)
+		if !result.Success && hook.OnError == hookOnErrorFail {
+			return results, fmt.Errorf("hook %s failed: %w", hook.ID, result.Error)
 		}
 	}
 
@@ -325,8 +329,8 @@ func (hm *HookManager) executeParallel(ctx context.Context, hooks []*Hook, metad
 			hm.results = append(hm.results, result)
 			hm.mu.Unlock()
 
-			if !result.Success && h.OnError == "fail" {
-				errChan <- fmt.Errorf("hook %s failed: %v", h.ID, result.Error)
+			if !result.Success && h.OnError == hookOnErrorFail {
+				errChan <- fmt.Errorf("hook %s failed: %w", h.ID, result.Error)
 			}
 		}(i, hook)
 	}
@@ -364,7 +368,7 @@ func (hm *HookManager) executeFailFast(ctx context.Context, hooks []*Hook, metad
 
 		if !result.Success {
 			cancel()
-			return results, fmt.Errorf("hook %s failed: %v", hook.ID, result.Error)
+			return results, fmt.Errorf("hook %s failed: %w", hook.ID, result.Error)
 		}
 	}
 
@@ -372,7 +376,7 @@ func (hm *HookManager) executeFailFast(ctx context.Context, hooks []*Hook, metad
 }
 
 // executeBestEffort executes all hooks regardless of failures.
-func (hm *HookManager) executeBestEffort(ctx context.Context, hooks []*Hook, metadata map[string]string) ([]*HookResult, error) {
+func (hm *HookManager) executeBestEffort(ctx context.Context, hooks []*Hook, metadata map[string]string) []*HookResult {
 	results := make([]*HookResult, len(hooks))
 	var wg sync.WaitGroup
 
@@ -395,7 +399,7 @@ func (hm *HookManager) executeBestEffort(ctx context.Context, hooks []*Hook, met
 	}
 
 	wg.Wait()
-	return results, nil
+	return results
 }
 
 // executeHook executes a single hook with retry logic.
@@ -444,13 +448,15 @@ func (hm *HookManager) executeHook(ctx context.Context, hook *Hook, metadata map
 }
 
 // runCommand runs the hook command.
-func (hm *HookManager) runCommand(ctx context.Context, hook *Hook, metadata map[string]string) (int, string, string, error) {
+func (hm *HookManager) runCommand(ctx context.Context, hook *Hook, metadata map[string]string) (code int, stdoutStr, stderrStr string, runErr error) {
 	// SECURITY: Validate command before execution to prevent command injection
 	if err := validateCommand(hook.Command, hook.Args); err != nil {
 		return -1, "", "", fmt.Errorf("command validation failed: %w", err)
 	}
 
-	// Build command - Now safe after validation
+	// Build command - safe after validateCommand enforces the whitelist and
+	// rejects dangerous argument characters.
+	//nolint:gosec // G204: command and args are validated by validateCommand against a whitelist
 	cmd := exec.CommandContext(ctx, hook.Command, hook.Args...)
 
 	// Set working directory
@@ -483,7 +489,8 @@ func (hm *HookManager) runCommand(ctx context.Context, hook *Hook, metadata map[
 	exitCode := 0
 
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
 			exitCode = exitErr.ExitCode()
 		} else {
 			exitCode = -1
@@ -586,7 +593,7 @@ func (hm *HookManager) LoadHooksFromDirectory(dir string) error {
 			Command: scriptPath,
 			Enabled: true,
 			Timeout: 5 * time.Minute,
-			OnError: "fail",
+			OnError: hookOnErrorFail,
 		}
 
 		if err := hm.RegisterHook(hook); err != nil {

@@ -12,6 +12,9 @@ import (
 	"time"
 )
 
+// syncStatusFailure marks a sync record as failed.
+const syncStatusFailure = "failure"
+
 // GitOpsController manages GitOps workflow for backup configurations.
 type GitOpsController struct {
 	mu              sync.RWMutex
@@ -83,8 +86,8 @@ func NewGitOpsController(
 	gitConfig *GitOpsConfig,
 	localRepoPath string,
 ) *GitOpsController {
-	syncInterval, _ := time.ParseDuration(gitConfig.SyncInterval)
-	if syncInterval == 0 {
+	syncInterval, err := time.ParseDuration(gitConfig.SyncInterval)
+	if err != nil || syncInterval == 0 {
 		syncInterval = 5 * time.Minute // Default 5 minutes
 	}
 
@@ -182,6 +185,7 @@ func (gc *GitOpsController) cloneRepository() error {
 
 // pullRepository pulls latest changes from Git.
 func (gc *GitOpsController) pullRepository() error {
+	//nolint:gosec // G204: git args come from trusted GitOps config, not user input
 	cmd := exec.Command("git", "-C", gc.localRepoPath, "pull", "origin", gc.gitConfig.Branch)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -220,7 +224,7 @@ func (gc *GitOpsController) Sync() error {
 
 	// Pull latest changes
 	if err := gc.pullRepository(); err != nil {
-		record.Status = "failure"
+		record.Status = syncStatusFailure
 		record.Errors = append(record.Errors, err.Error())
 		gc.addSyncRecord(record)
 		return fmt.Errorf("failed to pull repository: %w", err)
@@ -229,7 +233,7 @@ func (gc *GitOpsController) Sync() error {
 	// Get current commit hash
 	commitHash, err := gc.getCurrentCommitHash()
 	if err != nil {
-		record.Status = "failure"
+		record.Status = syncStatusFailure
 		record.Errors = append(record.Errors, err.Error())
 		gc.addSyncRecord(record)
 		return fmt.Errorf("failed to get commit hash: %w", err)
@@ -244,7 +248,7 @@ func (gc *GitOpsController) Sync() error {
 
 	gitConfigs := make(map[string]*BackupConfig)
 	if err := gc.loadGitConfigs(configPath, gitConfigs); err != nil {
-		record.Status = "failure"
+		record.Status = syncStatusFailure
 		record.Errors = append(record.Errors, err.Error())
 		gc.addSyncRecord(record)
 		return fmt.Errorf("failed to load Git configs: %w", err)
@@ -320,65 +324,96 @@ func (gc *GitOpsController) reconcileConfigs(
 
 	// Add or update configs from Git
 	for name, gitConfig := range gitConfigs {
-		// Validate configuration
-		validationResult := gc.validator.Validate(gitConfig)
-		if !validationResult.Valid {
-			errors = append(errors, fmt.Sprintf("Config %s validation failed: %d errors", name, len(validationResult.Errors)))
-			continue
-		}
-
-		localConfig, exists := localConfigs[name]
-
-		if !exists {
-			// New configuration from Git
-			if gc.gitConfig.DryRun {
-				fmt.Printf("DRY RUN: Would add config: %s\n", name)
-			} else if gc.gitConfig.AutoApply {
-				if err := gc.configManager.RegisterConfig(gitConfig); err != nil {
-					errors = append(errors, fmt.Sprintf("Failed to register %s: %v", name, err))
-				} else {
-					added++
-				}
-			}
-		} else {
-			// Check if config has changed
-			if gc.configChanged(gitConfig, localConfig) {
-				// Resolve conflict
-				resolvedConfig, err := gc.conflictHandler.ResolveConflict(gitConfig, localConfig)
-				if err != nil {
-					errors = append(errors, fmt.Sprintf("Failed to resolve conflict for %s: %v", name, err))
-					continue
-				}
-
-				if gc.gitConfig.DryRun {
-					fmt.Printf("DRY RUN: Would update config: %s\n", name)
-				} else if gc.gitConfig.AutoApply {
-					if err := gc.configManager.UpdateConfig(resolvedConfig); err != nil {
-						errors = append(errors, fmt.Sprintf("Failed to update %s: %v", name, err))
-					} else {
-						updated++
-					}
-				}
-			}
-		}
+		a, u, errs := gc.reconcileGitConfig(name, gitConfig, localConfigs)
+		added += a
+		updated += u
+		errors = append(errors, errs...)
 	}
 
 	// Delete configs removed from Git
 	for name := range localConfigs {
-		if _, exists := gitConfigs[name]; !exists {
-			if gc.gitConfig.DryRun {
-				fmt.Printf("DRY RUN: Would delete config: %s\n", name)
-			} else if gc.gitConfig.AutoApply {
-				if err := gc.configManager.UnregisterConfig(name); err != nil {
-					errors = append(errors, fmt.Sprintf("Failed to unregister %s: %v", name, err))
-				} else {
-					deleted++
-				}
+		if _, exists := gitConfigs[name]; exists {
+			continue
+		}
+		d, errs := gc.reconcileDeletion(name)
+		deleted += d
+		errors = append(errors, errs...)
+	}
+
+	return added, updated, deleted, errors
+}
+
+// reconcileGitConfig reconciles a single config sourced from Git.
+func (gc *GitOpsController) reconcileGitConfig(
+	name string,
+	gitConfig *BackupConfig,
+	localConfigs map[string]*BackupConfig,
+) (added, updated int, errors []string) {
+	// Validate configuration
+	validationResult := gc.validator.Validate(gitConfig)
+	if !validationResult.Valid {
+		errors = append(errors, fmt.Sprintf("Config %s validation failed: %d errors", name, len(validationResult.Errors)))
+		return added, updated, errors
+	}
+
+	localConfig, exists := localConfigs[name]
+	if !exists {
+		// New configuration from Git
+		if gc.gitConfig.DryRun {
+			fmt.Printf("DRY RUN: Would add config: %s\n", name)
+			return added, updated, errors
+		}
+		if gc.gitConfig.AutoApply {
+			if err := gc.configManager.RegisterConfig(gitConfig); err != nil {
+				errors = append(errors, fmt.Sprintf("Failed to register %s: %v", name, err))
+			} else {
+				added++
 			}
+		}
+		return added, updated, errors
+	}
+
+	// Existing config: check if it changed
+	if !gc.configChanged(gitConfig, localConfig) {
+		return added, updated, errors
+	}
+
+	// Resolve conflict
+	resolvedConfig, err := gc.conflictHandler.ResolveConflict(gitConfig, localConfig)
+	if err != nil {
+		errors = append(errors, fmt.Sprintf("Failed to resolve conflict for %s: %v", name, err))
+		return added, updated, errors
+	}
+
+	if gc.gitConfig.DryRun {
+		fmt.Printf("DRY RUN: Would update config: %s\n", name)
+		return added, updated, errors
+	}
+	if gc.gitConfig.AutoApply {
+		if err := gc.configManager.UpdateConfig(resolvedConfig); err != nil {
+			errors = append(errors, fmt.Sprintf("Failed to update %s: %v", name, err))
+		} else {
+			updated++
 		}
 	}
 
-	return
+	return added, updated, errors
+}
+
+// reconcileDeletion removes a local config that no longer exists in Git.
+func (gc *GitOpsController) reconcileDeletion(name string) (deleted int, errors []string) {
+	if gc.gitConfig.DryRun {
+		fmt.Printf("DRY RUN: Would delete config: %s\n", name)
+		return deleted, errors
+	}
+	if gc.gitConfig.AutoApply {
+		if err := gc.configManager.UnregisterConfig(name); err != nil {
+			errors = append(errors, fmt.Sprintf("Failed to unregister %s: %v", name, err))
+		} else {
+			deleted++
+		}
+	}
+	return deleted, errors
 }
 
 // configChanged checks if a configuration has changed.
@@ -399,7 +434,7 @@ func (gc *GitOpsController) computeConfigHash(config *BackupConfig) string {
 	configCopy.Metadata.UpdatedAt = time.Time{}
 
 	// Serialize to YAML
-	data, _ := marshalYAML(&configCopy)
+	data := marshalYAML(&configCopy)
 
 	// Compute SHA256 hash
 	hash := sha256.Sum256(data)
@@ -407,13 +442,13 @@ func (gc *GitOpsController) computeConfigHash(config *BackupConfig) string {
 }
 
 // marshalYAML is a helper to marshal configuration.
-func marshalYAML(config *BackupConfig) ([]byte, error) {
-	// Import yaml at the top of the file
-	return []byte(fmt.Sprintf("%+v", config)), nil
+func marshalYAML(config *BackupConfig) []byte {
+	return []byte(fmt.Sprintf("%+v", config))
 }
 
 // getCurrentCommitHash gets the current Git commit hash.
 func (gc *GitOpsController) getCurrentCommitHash() (string, error) {
+	//nolint:gosec // G204: git args come from trusted GitOps config, not user input
 	cmd := exec.Command("git", "-C", gc.localRepoPath, "rev-parse", "HEAD")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -488,18 +523,21 @@ func (gc *GitOpsController) PushConfig(config *BackupConfig, commitMessage strin
 	}
 
 	// Git add
+	//nolint:gosec // G204: git args come from trusted GitOps config, not user input
 	cmd := exec.Command("git", "-C", gc.localRepoPath, "add", configPath)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git add failed: %s - %w", string(output), err)
 	}
 
 	// Git commit
+	//nolint:gosec // G204: git args come from trusted GitOps config, not user input
 	cmd = exec.Command("git", "-C", gc.localRepoPath, "commit", "-m", commitMessage)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git commit failed: %s - %w", string(output), err)
 	}
 
 	// Git push
+	//nolint:gosec // G204: git args come from trusted GitOps config, not user input
 	cmd = exec.Command("git", "-C", gc.localRepoPath, "push", "origin", gc.gitConfig.Branch)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git push failed: %s - %w", string(output), err)
@@ -526,6 +564,7 @@ func (gc *GitOpsController) ValidateRepository() error {
 
 // testRepositoryAccess tests if the repository is accessible.
 func (gc *GitOpsController) testRepositoryAccess() error {
+	//nolint:gosec // G204: git args come from trusted GitOps config, not user input
 	cmd := exec.Command("git", "ls-remote", gc.gitConfig.Repository)
 
 	if gc.gitConfig.SSHKeyRef != "" {

@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"log"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -88,14 +89,21 @@ func (c *ClusterDriver) BackupCluster(ctx context.Context, opts *database.Backup
 			parts := strings.Split(addr, ":")
 			if len(parts) == 2 {
 				nodeConfig.Host = parts[0]
-				fmt.Sscanf(parts[1], "%d", &nodeConfig.Port)
+				if _, err := fmt.Sscanf(parts[1], "%d", &nodeConfig.Port); err != nil {
+					errors <- fmt.Errorf("node %s: invalid port %q: %w", id, parts[1], err)
+					return
+				}
 			}
 
 			if err := nodeDriver.Connect(ctx, &nodeConfig); err != nil {
 				errors <- fmt.Errorf("node %s: %w", id, err)
 				return
 			}
-			defer nodeDriver.Disconnect()
+			defer func() {
+				if derr := nodeDriver.Disconnect(); derr != nil {
+					log.Printf("redis cluster: failed to disconnect node %s: %v", id, derr)
+				}
+			}()
 
 			// Backup this node
 			nodeOpts := *opts
@@ -116,7 +124,7 @@ func (c *ClusterDriver) BackupCluster(ctx context.Context, opts *database.Backup
 	close(errors)
 
 	// Check for errors
-	var backupErrors []string
+	backupErrors := make([]string, 0, len(nodes))
 	for err := range errors {
 		backupErrors = append(backupErrors, err.Error())
 	}
@@ -165,14 +173,21 @@ func (c *ClusterDriver) RestoreCluster(ctx context.Context, opts *database.Resto
 			parts := strings.Split(addr, ":")
 			if len(parts) == 2 {
 				nodeConfig.Host = parts[0]
-				fmt.Sscanf(parts[1], "%d", &nodeConfig.Port)
+				if _, err := fmt.Sscanf(parts[1], "%d", &nodeConfig.Port); err != nil {
+					errors <- fmt.Errorf("node %s: invalid port %q: %w", id, parts[1], err)
+					return
+				}
 			}
 
 			if err := nodeDriver.Connect(ctx, &nodeConfig); err != nil {
 				errors <- fmt.Errorf("node %s: %w", id, err)
 				return
 			}
-			defer nodeDriver.Disconnect()
+			defer func() {
+				if derr := nodeDriver.Disconnect(); derr != nil {
+					log.Printf("redis cluster: failed to disconnect node %s: %v", id, derr)
+				}
+			}()
 
 			// Restore this node
 			nodeOpts := *opts
@@ -189,7 +204,7 @@ func (c *ClusterDriver) RestoreCluster(ctx context.Context, opts *database.Resto
 	close(errors)
 
 	// Check for errors
-	var restoreErrors []string
+	restoreErrors := make([]string, 0, len(nodes))
 	for err := range errors {
 		restoreErrors = append(restoreErrors, err.Error())
 	}

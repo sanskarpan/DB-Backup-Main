@@ -62,7 +62,7 @@ func NewZeroKnowledgeEncryptor(alg Algorithm) (*ZeroKnowledgeEncryptor, error) {
 // DeriveKey derives an encryption key from a password using Argon2id
 // This ensures the server never sees the actual encryption key.
 func (e *ZeroKnowledgeEncryptor) DeriveKey(password string, salt []byte, params *KeyDerivationParams) ([]byte, error) {
-	if len(password) == 0 {
+	if password == "" {
 		return nil, errors.New("password cannot be empty")
 	}
 	if len(salt) < 16 {
@@ -96,7 +96,7 @@ func (e *ZeroKnowledgeEncryptor) GenerateSalt() ([]byte, error) {
 
 // Encrypt encrypts data using client-side encryption
 // The server never sees the plaintext or encryption key.
-func (e *ZeroKnowledgeEncryptor) Encrypt(plaintext []byte, key []byte) ([]byte, error) {
+func (e *ZeroKnowledgeEncryptor) Encrypt(plaintext, key []byte) ([]byte, error) {
 	if len(plaintext) == 0 {
 		return nil, errors.New("plaintext cannot be empty")
 	}
@@ -115,7 +115,7 @@ func (e *ZeroKnowledgeEncryptor) Encrypt(plaintext []byte, key []byte) ([]byte, 
 }
 
 // Decrypt decrypts data that was encrypted with zero-knowledge encryption.
-func (e *ZeroKnowledgeEncryptor) Decrypt(ciphertext []byte, key []byte) ([]byte, error) {
+func (e *ZeroKnowledgeEncryptor) Decrypt(ciphertext, key []byte) ([]byte, error) {
 	if len(ciphertext) == 0 {
 		return nil, errors.New("ciphertext cannot be empty")
 	}
@@ -134,7 +134,7 @@ func (e *ZeroKnowledgeEncryptor) Decrypt(ciphertext []byte, key []byte) ([]byte,
 }
 
 // encryptAESGCM encrypts using AES-256-GCM.
-func (e *ZeroKnowledgeEncryptor) encryptAESGCM(plaintext []byte, key []byte) ([]byte, error) {
+func (e *ZeroKnowledgeEncryptor) encryptAESGCM(plaintext, key []byte) ([]byte, error) {
 	// Ensure key is 32 bytes for AES-256
 	if len(key) != 32 {
 		key = e.deriveAESKey(key)
@@ -162,7 +162,7 @@ func (e *ZeroKnowledgeEncryptor) encryptAESGCM(plaintext []byte, key []byte) ([]
 }
 
 // decryptAESGCM decrypts using AES-256-GCM.
-func (e *ZeroKnowledgeEncryptor) decryptAESGCM(ciphertext []byte, key []byte) ([]byte, error) {
+func (e *ZeroKnowledgeEncryptor) decryptAESGCM(ciphertext, key []byte) ([]byte, error) {
 	// Ensure key is 32 bytes for AES-256
 	if len(key) != 32 {
 		key = e.deriveAESKey(key)
@@ -193,7 +193,7 @@ func (e *ZeroKnowledgeEncryptor) decryptAESGCM(ciphertext []byte, key []byte) ([
 }
 
 // encryptChaCha20Poly1305 encrypts using ChaCha20-Poly1305.
-func (e *ZeroKnowledgeEncryptor) encryptChaCha20Poly1305(plaintext []byte, key []byte) ([]byte, error) {
+func (e *ZeroKnowledgeEncryptor) encryptChaCha20Poly1305(plaintext, key []byte) ([]byte, error) {
 	// Ensure key is 32 bytes
 	if len(key) != 32 {
 		key = e.deriveAESKey(key)
@@ -216,7 +216,7 @@ func (e *ZeroKnowledgeEncryptor) encryptChaCha20Poly1305(plaintext []byte, key [
 }
 
 // decryptChaCha20Poly1305 decrypts using ChaCha20-Poly1305.
-func (e *ZeroKnowledgeEncryptor) decryptChaCha20Poly1305(ciphertext []byte, key []byte) ([]byte, error) {
+func (e *ZeroKnowledgeEncryptor) decryptChaCha20Poly1305(ciphertext, key []byte) ([]byte, error) {
 	// Ensure key is 32 bytes
 	if len(key) != 32 {
 		key = e.deriveAESKey(key)
@@ -346,7 +346,7 @@ func (eb *EncryptedBackup) ToBase64() string {
 }
 
 // VerifyIntegrity verifies the integrity of encrypted data.
-func (e *ZeroKnowledgeEncryptor) VerifyIntegrity(ciphertext []byte, key []byte) (bool, error) {
+func (e *ZeroKnowledgeEncryptor) VerifyIntegrity(ciphertext, key []byte) (bool, error) {
 	// Try to decrypt - if it fails, integrity check fails
 	_, err := e.Decrypt(ciphertext, key)
 	return err == nil, err

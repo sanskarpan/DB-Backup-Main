@@ -19,6 +19,8 @@ import (
 )
 
 // MySQLDriver implements the database.Driver interface for MySQL.
+//
+//nolint:revive // keeps public name stable across packages
 type MySQLDriver struct {
 	db          *sql.DB
 	config      *database.ConnectionConfig
@@ -129,7 +131,7 @@ func (d *MySQLDriver) Backup(ctx context.Context, opts *database.BackupOptions) 
 	}
 
 	// Start command
-	if err := cmd.Start(); err != nil {
+	if err = cmd.Start(); err != nil {
 		result.Status = database.BackupStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseBackup(err).WithMetadata("command", "mysqldump")
@@ -142,7 +144,7 @@ func (d *MySQLDriver) Backup(ctx context.Context, opts *database.BackupOptions) 
 	}
 
 	// Wait for command to complete
-	if err := cmd.Wait(); err != nil {
+	if err = cmd.Wait(); err != nil {
 		result.Status = database.BackupStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseBackup(err).WithMetadata("stderr", string(stderrOutput))
@@ -156,11 +158,17 @@ func (d *MySQLDriver) Backup(ctx context.Context, opts *database.BackupOptions) 
 		return result, err
 	}
 
-	// Get database version
-	version, _ := d.GetVersion(ctx)
+	// Get database version (best-effort; failure should not fail the backup)
+	version, verErr := d.GetVersion(ctx)
+	if verErr != nil {
+		version = "unknown"
+	}
 
-	// Get table information
-	tables, _ := d.getTableInfo(ctx, opts.Database)
+	// Get table information (best-effort; failure should not fail the backup)
+	tables, tblErr := d.getTableInfo(ctx, opts.Database)
+	if tblErr != nil {
+		tables = nil
+	}
 
 	// Complete result
 	result.EndTime = time.Now()
@@ -394,7 +402,11 @@ func (d *MySQLDriver) GetDatabases(ctx context.Context) ([]string, error) {
 
 // GetTables returns list of tables in a database.
 func (d *MySQLDriver) GetTables(ctx context.Context, database string) ([]string, error) {
-	query := "SHOW TABLES FROM " + database
+	// Identifiers cannot be parameterized in SHOW TABLES, so validate first.
+	if err := validation.ValidateDatabaseName(database); err != nil {
+		return nil, err
+	}
+	query := "SHOW TABLES FROM " + database //nolint:gosec // G202: database name validated above
 	rows, err := d.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -485,9 +497,10 @@ func (d *MySQLDriver) buildMySQLDumpArgs(opts *database.BackupOptions) ([]string
 	}
 
 	// Database selection
-	if opts.AllDatabases {
+	switch {
+	case opts.AllDatabases:
 		args = append(args, "--all-databases")
-	} else if len(opts.Databases) > 0 {
+	case len(opts.Databases) > 0:
 		// Validate all database names
 		for _, db := range opts.Databases {
 			if err := validation.ValidateDatabaseName(db); err != nil {
@@ -496,7 +509,7 @@ func (d *MySQLDriver) buildMySQLDumpArgs(opts *database.BackupOptions) ([]string
 		}
 		args = append(args, "--databases")
 		args = append(args, opts.Databases...)
-	} else if opts.Database != "" {
+	case opts.Database != "":
 		// Validate single database name
 		if err := validation.ValidateDatabaseName(opts.Database); err != nil {
 			return nil, fmt.Errorf("invalid database name %q: %w", opts.Database, err)

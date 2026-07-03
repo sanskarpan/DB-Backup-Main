@@ -72,7 +72,7 @@ func (c *BackupConverter) FromUniversalFormat(ctx context.Context, inputDir, out
 	}
 
 	// Verify integrity
-	if err := reader.VerifyIntegrity(); err != nil {
+	if err = reader.VerifyIntegrity(); err != nil {
 		return fmt.Errorf("backup integrity check failed: %w", err)
 	}
 
@@ -83,7 +83,7 @@ func (c *BackupConverter) FromUniversalFormat(ctx context.Context, inputDir, out
 	}
 
 	// Write to output file
-	if err := os.WriteFile(outputFile, data, 0o644); err != nil {
+	if err := os.WriteFile(outputFile, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write output file: %w", err)
 	}
 

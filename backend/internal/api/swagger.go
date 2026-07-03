@@ -69,7 +69,9 @@ func SetupSwaggerRoutes(mux *http.ServeMux) {
 		// In the future, you could convert YAML to JSON
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotImplemented)
-		w.Write([]byte(`{"error":"OpenAPI JSON endpoint not yet implemented. Please use /swagger.yaml"}`))
+		if _, err := w.Write([]byte(`{"error":"OpenAPI JSON endpoint not yet implemented. Please use /swagger.yaml"}`)); err != nil {
+			return
+		}
 	})
 }
 

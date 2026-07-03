@@ -210,13 +210,13 @@ func (p *AzureProvider) GetBlobImmutabilityPolicy(ctx context.Context, blobName 
 
 // ListImmutableBlobs lists all blobs with immutability information.
 func (p *AzureProvider) ListImmutableBlobs(ctx context.Context, prefix string) ([]AzureImmutableBlobInfo, error) {
-	var blobs []AzureImmutableBlobInfo
-
 	// Use the List method from the base provider to get blobs
 	files, err := p.List(ctx, prefix)
 	if err != nil {
 		return nil, err
 	}
+
+	blobs := make([]AzureImmutableBlobInfo, 0, len(files))
 
 	// For each blob, get immutability info
 	for _, file := range files {
@@ -256,6 +256,8 @@ func (p *AzureProvider) ListImmutableBlobs(ctx context.Context, prefix string) (
 }
 
 // AzureImmutableBlobInfo represents information about an immutable blob.
+//
+//nolint:revive // AzureImmutableBlobInfo keeps the public API stable across packages
 type AzureImmutableBlobInfo struct {
 	BlobName               string
 	LastModified           *time.Time

@@ -2,6 +2,7 @@ package enhanced
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"os"
 	"sync"
@@ -107,7 +108,7 @@ func (ai *AIEngine) Save() error {
 		return err
 	}
 
-	return os.WriteFile(ai.modelFile, data, 0o644)
+	return os.WriteFile(ai.modelFile, data, 0o600)
 }
 
 // CalculateRelevance calculates how relevant a notification is to a user (0-1).
@@ -238,7 +239,11 @@ func (ai *AIEngine) LearnFromDelivery(notification *Notification, results []Deli
 
 	// Auto-save periodically
 	if pattern.TotalNotifications%10 == 0 {
-		go ai.Save()
+		go func() {
+			if err := ai.Save(); err != nil {
+				fmt.Printf("Error saving AI model: %v\n", err)
+			}
+		}()
 	}
 }
 
@@ -253,7 +258,7 @@ func (ai *AIEngine) LearnFromEngagement(userID string, notification *Notificatio
 	}
 
 	switch action {
-	case "read":
+	case string(StatusRead):
 		// Update type engagement
 		current := pattern.TypeEngagement[notification.Type]
 		pattern.TypeEngagement[notification.Type] = ai.lerp(current, 1.0, 0.15)
@@ -295,7 +300,11 @@ func (ai *AIEngine) LearnFromEngagement(userID string, notification *Notificatio
 
 	pattern.LastUpdated = time.Now()
 
-	go ai.Save()
+	go func() {
+		if err := ai.Save(); err != nil {
+			fmt.Printf("Error saving AI model: %v\n", err)
+		}
+	}()
 }
 
 // SuggestQuietHours suggests optimal quiet hours based on user patterns.

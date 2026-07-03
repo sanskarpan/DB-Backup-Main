@@ -224,10 +224,10 @@ func TestBackupChain(t *testing.T) {
 	currentPath := basePath
 	for i := 1; i <= 3; i++ {
 		nextPath := filepath.Join(tempDir, "version-"+string(rune('0'+i))+".txt")
-		nextData := append(baseData, []byte(" - Update "+string(rune('0'+i)))...)
+		nextData := bytes.Join([][]byte{baseData, []byte(" - Update " + string(rune('0'+i)))}, nil)
 		os.WriteFile(nextPath, nextData, 0o644)
 
-		_, err := manager.CreateDelta(currentPath, nextPath, baseID)
+		_, err = manager.CreateDelta(currentPath, nextPath, baseID)
 		if err != nil {
 			t.Fatalf("Failed to create delta %d: %v", i, err)
 		}
@@ -284,7 +284,7 @@ func TestRestoreFromChain(t *testing.T) {
 		nextPath := filepath.Join(tempDir, "v"+string(rune('0'+i))+".txt")
 		os.WriteFile(nextPath, []byte(versions[i]), 0o644)
 
-		_, err := manager.CreateDelta(prevPath, nextPath, baseID)
+		_, err = manager.CreateDelta(prevPath, nextPath, baseID)
 		if err != nil {
 			t.Fatalf("Failed to create delta: %v", err)
 		}

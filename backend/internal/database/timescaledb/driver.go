@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,6 +22,8 @@ import (
 )
 
 // TimescaleDBDriver implements the database.Driver interface for TimescaleDB.
+//
+//nolint:revive // keeps public name stable; referenced by other packages
 type TimescaleDBDriver struct {
 	pool               *pgxpool.Pool
 	config             *database.ConnectionConfig
@@ -53,7 +56,11 @@ func (d *TimescaleDBDriver) Connect(ctx context.Context, config *database.Connec
 
 	// Set pool settings
 	if config.MaxConnections > 0 {
-		poolConfig.MaxConns = int32(config.MaxConnections)
+		maxConns := config.MaxConnections
+		if maxConns > math.MaxInt32 {
+			maxConns = math.MaxInt32
+		}
+		poolConfig.MaxConns = int32(maxConns)
 	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
@@ -62,7 +69,7 @@ func (d *TimescaleDBDriver) Connect(ctx context.Context, config *database.Connec
 	}
 
 	// Test connection
-	if err := pool.Ping(ctx); err != nil {
+	if err = pool.Ping(ctx); err != nil {
 		pool.Close()
 		return pkgErrors.ErrDatabaseConnection(err)
 	}
@@ -196,8 +203,9 @@ func (d *TimescaleDBDriver) Backup(ctx context.Context, opts *database.BackupOpt
 	}
 
 	// Add directory size for metadata
-	dirSize, _ := internalUtils.GetDirectorySize(backupDir)
-	result.BackupSize = dirSize
+	if dirSize, dirErr := internalUtils.GetDirectorySize(backupDir); dirErr == nil {
+		result.BackupSize = dirSize
+	}
 
 	result.BackupPath = backupDir
 	result.Status = database.BackupStatusCompleted
@@ -272,7 +280,9 @@ func (d *TimescaleDBDriver) backupHypertableMetadata(ctx context.Context, backup
 	}
 	defer file.Close()
 
-	file.WriteString("-- TimescaleDB Hypertable Metadata\n\n")
+	if _, err := file.WriteString("-- TimescaleDB Hypertable Metadata\n\n"); err != nil {
+		return err
+	}
 
 	for rows.Next() {
 		var tableName, schemaName, columnName string
@@ -289,7 +299,9 @@ func (d *TimescaleDBDriver) backupHypertableMetadata(ctx context.Context, backup
 			schemaName, tableName, numChunks, numDimensions,
 			schemaName, tableName, columnName, intervalLength,
 		)
-		file.WriteString(createStmt)
+		if _, err := file.WriteString(createStmt); err != nil {
+			return err
+		}
 	}
 
 	return rows.Err()
@@ -318,7 +330,9 @@ func (d *TimescaleDBDriver) backupContinuousAggregates(ctx context.Context, back
 	}
 	defer file.Close()
 
-	file.WriteString("-- TimescaleDB Continuous Aggregates\n\n")
+	if _, err := file.WriteString("-- TimescaleDB Continuous Aggregates\n\n"); err != nil {
+		return err
+	}
 
 	for rows.Next() {
 		var schema, name, definition string
@@ -326,8 +340,12 @@ func (d *TimescaleDBDriver) backupContinuousAggregates(ctx context.Context, back
 			continue
 		}
 
-		file.WriteString(fmt.Sprintf("-- Continuous Aggregate: %s.%s\n", schema, name))
-		file.WriteString(definition + ";\n\n")
+		if _, err := fmt.Fprintf(file, "-- Continuous Aggregate: %s.%s\n", schema, name); err != nil {
+			return err
+		}
+		if _, err := file.WriteString(definition + ";\n\n"); err != nil {
+			return err
+		}
 	}
 
 	return rows.Err()

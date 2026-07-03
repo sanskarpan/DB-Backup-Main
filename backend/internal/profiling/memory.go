@@ -120,6 +120,10 @@ const (
 	SeverityCritical Severity = "critical"
 )
 
+// trendInsufficientData is the trend result returned when there are not enough
+// snapshots to compute a meaningful growth trend.
+const trendInsufficientData = "insufficient_data"
+
 // NewMemoryProfiler creates a new memory profiler.
 func NewMemoryProfiler(config *MemoryProfilerConfig) (*MemoryProfiler, error) {
 	if config == nil {
@@ -240,13 +244,19 @@ func (p *MemoryProfiler) monitorLoop(ctx context.Context) {
 
 			// Write profiles if enabled
 			if p.config.HeapProfile {
-				p.writeHeapProfile()
+				if err := p.writeHeapProfile(); err != nil {
+					fmt.Printf("[PROFILING] failed to write heap profile: %v\n", err)
+				}
 			}
 			if p.config.GoroutineProfile {
-				p.writeGoroutineProfile()
+				if err := p.writeGoroutineProfile(); err != nil {
+					fmt.Printf("[PROFILING] failed to write goroutine profile: %v\n", err)
+				}
 			}
 			if p.config.AllocProfile {
-				p.writeAllocProfile()
+				if err := p.writeAllocProfile(); err != nil {
+					fmt.Printf("[PROFILING] failed to write alloc profile: %v\n", err)
+				}
 			}
 
 			// Check for leaks if enabled
@@ -289,7 +299,8 @@ func (p *MemoryProfiler) takeSnapshot() *MemorySnapshot {
 		NumCgoCall:   runtime.NumCgoCall(),
 		GCCycles:     m.NumGC,
 		NextGC:       m.NextGC,
-		LastGC:       time.Unix(0, int64(m.LastGC)),
+		//nolint:gosec // G115: m.LastGC is a runtime nanosecond timestamp that fits in int64
+		LastGC: time.Unix(0, int64(m.LastGC)),
 	}
 
 	p.mu.Lock()
@@ -331,6 +342,7 @@ func (p *MemoryProfiler) detectLeaks() {
 	firstSnap := windowSnapshots[0]
 	lastSnap := windowSnapshots[len(windowSnapshots)-1]
 
+	//nolint:gosec // G115: heap sizes are well within int64 range; subtraction yields signed growth
 	heapGrowth := int64(lastSnap.HeapAlloc) - int64(firstSnap.HeapAlloc)
 	goroutineGrowth := lastSnap.NumGoroutine - firstSnap.NumGoroutine
 
@@ -345,17 +357,18 @@ func (p *MemoryProfiler) detectLeaks() {
 			GoroutineGrowth: goroutineGrowth,
 		}
 
-		if memoryLeak && goroutineLeak {
+		switch {
+		case memoryLeak && goroutineLeak:
 			leak.LeakType = LeakTypeBoth
 			leak.Description = fmt.Sprintf("Both memory and goroutine leaks detected. Heap grew by %d MB, goroutines grew by %d",
 				heapGrowth/(1024*1024), goroutineGrowth)
 			leak.Severity = SeverityCritical
-		} else if memoryLeak {
+		case memoryLeak:
 			leak.LeakType = LeakTypeMemory
 			leak.Description = fmt.Sprintf("Memory leak detected. Heap grew by %d MB in %v",
 				heapGrowth/(1024*1024), p.config.LeakDetectionWindow)
 			leak.Severity = p.calculateSeverity(heapGrowth, 0)
-		} else {
+		default:
 			leak.LeakType = LeakTypeGoroutine
 			leak.Description = fmt.Sprintf("Goroutine leak detected. Count grew by %d in %v",
 				goroutineGrowth, p.config.LeakDetectionWindow)
@@ -538,6 +551,7 @@ func (p *MemoryProfiler) GetMemoryGrowth() (heapGrowth int64, goroutineGrowth in
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
+	//nolint:gosec // G115: heap sizes are well within int64 range; subtraction yields signed growth
 	heapGrowth = int64(current.HeapAlloc) - int64(p.baselineHeap)
 	goroutineGrowth = current.NumGoroutine - p.baselineGoroutines
 	duration = time.Since(p.baselineTimestamp)
@@ -551,7 +565,7 @@ func (p *MemoryProfiler) AnalyzeGrowthTrend() (memoryTrend, goroutineTrend strin
 	defer p.mu.RUnlock()
 
 	if len(p.snapshots) < 10 {
-		return "insufficient_data", "insufficient_data"
+		return trendInsufficientData, trendInsufficientData
 	}
 
 	// Take last 10 snapshots
@@ -601,14 +615,14 @@ func (p *MemoryProfiler) calculateSlope(snapshots []*MemorySnapshot, getValue fu
 
 // classifyTrend classifies the trend based on slope.
 func (p *MemoryProfiler) classifyTrend(slope float64) string {
-	if slope > 1000000 { // >1MB per snapshot
+	switch {
+	case slope > 1000000: // >1MB per snapshot
 		return "rapidly_increasing"
-	} else if slope > 100000 { // >100KB per snapshot
+	case slope > 100000: // >100KB per snapshot
 		return "increasing"
-	} else if slope > -100000 && slope < 100000 {
-		return "stable"
-	} else if slope < -100000 {
+	case slope < -100000:
 		return "decreasing"
+	default:
+		return "stable"
 	}
-	return "stable"
 }

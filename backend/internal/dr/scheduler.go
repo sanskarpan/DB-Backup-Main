@@ -13,6 +13,9 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
+// statusFailed is the textual status used across DR notifications for a failed test.
+const statusFailed = "FAILED"
+
 // TestSchedule represents a DR test schedule.
 type TestSchedule struct {
 	ID                       string
@@ -269,8 +272,8 @@ func (s *Scheduler) executeScheduledTest(ctx context.Context, schedule *TestSche
 
 	// Calculate next run
 	if schedule.Enabled {
-		nextRun, err := calculateNextRun(schedule.CronExpression, now)
-		if err == nil {
+		nextRun, nextErr := calculateNextRun(schedule.CronExpression, now)
+		if nextErr == nil {
 			s.mu.Lock()
 			schedule.NextRun = &nextRun
 			s.mu.Unlock()
@@ -305,7 +308,7 @@ func (s *Scheduler) sendNotification(schedule *TestSchedule, result *TestResult,
 	status := "SUCCESS"
 
 	if err != nil || (result != nil && !result.Success) {
-		status = "FAILED"
+		status = statusFailed
 		level = notification.LevelError
 	} else {
 		level = notification.LevelSuccess
@@ -386,11 +389,11 @@ func (s *Scheduler) sendNotification(schedule *TestSchedule, result *TestResult,
 		if len(result.Validations) > 0 {
 			validationSummary := ""
 			for _, v := range result.Validations {
-				status := "✓"
+				vStatus := "✓"
 				if !v.Success {
-					status = "✗"
+					vStatus = "✗"
 				}
-				validationSummary += fmt.Sprintf("%s %s\n", status, v.Name)
+				validationSummary += fmt.Sprintf("%s %s\n", vStatus, v.Name)
 			}
 			fields = append(fields, &notification.Field{
 				Title: "Validations",
@@ -402,7 +405,7 @@ func (s *Scheduler) sendNotification(schedule *TestSchedule, result *TestResult,
 
 	// Set color based on status
 	color := "#36a64f" // Green for success
-	if status == "FAILED" {
+	if status == statusFailed {
 		color = "#ff0000" // Red for failure
 	}
 

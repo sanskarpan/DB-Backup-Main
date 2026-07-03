@@ -2,10 +2,10 @@ package cassandra
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -330,7 +330,7 @@ func TestCassandraDriver_SnapshotOperations(t *testing.T) {
 
 	// Create snapshot
 	snapshotName := "test_snapshot_" + time.Now().Format("20060102_150405")
-	err := driver.createSnapshot(ctx, snapshotName, tmpDir, nil)
+	err := driver.createSnapshot(ctx, snapshotName, nil)
 	assert.NoError(t, err)
 
 	// Verify snapshot directory exists
@@ -381,7 +381,7 @@ func skipIfCassandraUnavailable(t *testing.T) {
 	t.Helper()
 	host := getEnv("CASSANDRA_HOST", "localhost")
 	port := getEnvInt("CASSANDRA_PORT", 9042)
-	addr := fmt.Sprintf("%s:%d", host, port)
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
 	if err != nil {
 		t.Skipf("Cassandra not available at %s: %v", addr, err)
@@ -390,6 +390,7 @@ func skipIfCassandraUnavailable(t *testing.T) {
 }
 
 func setupTestDriver(t *testing.T) *CassandraDriver {
+	t.Helper()
 	skipIfCassandraUnavailable(t)
 	driver := NewCassandraDriver()
 	config := &database.ConnectionConfig{
@@ -413,6 +414,7 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
+//nolint:unparam // test helper mirrors getEnv; default may vary for future callers
 func getEnvInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		// Simple conversion, in production use strconv

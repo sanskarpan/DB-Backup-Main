@@ -116,7 +116,8 @@ func (im *IsolationManager) SetNotificationCallback(callback func(*IsolatedBacku
 // ScanAndIsolate scans a backup and isolates if threats are detected.
 func (im *IsolationManager) ScanAndIsolate(ctx context.Context, backupPath string) (*ThreatReport, error) {
 	if !im.policy.Enabled {
-		return nil, nil
+		// Isolation disabled: no report and no error is the intended no-op result.
+		return nil, nil //nolint:nilnil // disabled policy is a valid no-op, not an error
 	}
 
 	// Scan for threats
@@ -252,7 +253,7 @@ func (im *IsolationManager) blockAccess(backupPath string) error {
 }
 
 // RestoreFromQuarantine restores a backup from quarantine.
-func (im *IsolationManager) RestoreFromQuarantine(originalPath string, destinationPath string) error {
+func (im *IsolationManager) RestoreFromQuarantine(originalPath, destinationPath string) error {
 	im.mu.Lock()
 	defer im.mu.Unlock()
 

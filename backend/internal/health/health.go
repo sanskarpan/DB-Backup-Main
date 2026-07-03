@@ -56,7 +56,7 @@ func (c *Checker) Register(check Check) {
 }
 
 // CheckAll runs all registered health checks.
-func (c *Checker) CheckAll(ctx context.Context) *HealthReport {
+func (c *Checker) CheckAll(ctx context.Context) *Report {
 	c.mu.RLock()
 	checks := make([]Check, len(c.checks))
 	copy(checks, c.checks)
@@ -105,16 +105,16 @@ func (c *Checker) CheckByName(ctx context.Context, name string) *CheckResult {
 	}
 }
 
-// HealthReport represents the overall health status.
-type HealthReport struct {
+// Report represents the overall health status.
+type Report struct {
 	Status    Status         `json:"status"`
 	Timestamp time.Time      `json:"timestamp"`
 	Checks    []*CheckResult `json:"checks"`
-	Summary   *HealthSummary `json:"summary"`
+	Summary   *Summary       `json:"summary"`
 }
 
-// HealthSummary provides a summary of health checks.
-type HealthSummary struct {
+// Summary provides a summary of health checks.
+type Summary struct {
 	Total     int `json:"total"`
 	Healthy   int `json:"healthy"`
 	Degraded  int `json:"degraded"`
@@ -122,8 +122,8 @@ type HealthSummary struct {
 }
 
 // newHealthReport creates a new health report from check results.
-func newHealthReport(results []*CheckResult) *HealthReport {
-	summary := &HealthSummary{
+func newHealthReport(results []*CheckResult) *Report {
+	summary := &Summary{
 		Total: len(results),
 	}
 
@@ -144,7 +144,7 @@ func newHealthReport(results []*CheckResult) *HealthReport {
 		}
 	}
 
-	return &HealthReport{
+	return &Report{
 		Status:    overallStatus,
 		Timestamp: time.Now(),
 		Checks:    results,
@@ -301,13 +301,14 @@ func (d *DiskSpaceCheck) Check(ctx context.Context) *CheckResult {
 		"path":            d.path,
 	}
 
-	if available >= d.thresholdBytes {
+	switch {
+	case available >= d.thresholdBytes:
 		result.Status = StatusHealthy
 		result.Message = fmt.Sprintf("%.2f GB available", float64(available)/(1024*1024*1024))
-	} else if available >= d.thresholdBytes/2 {
+	case available >= d.thresholdBytes/2:
 		result.Status = StatusDegraded
 		result.Message = fmt.Sprintf("low disk space: %.2f GB available", float64(available)/(1024*1024*1024))
-	} else {
+	default:
 		result.Status = StatusUnhealthy
 		result.Message = fmt.Sprintf("critical: only %.2f GB available", float64(available)/(1024*1024*1024))
 	}

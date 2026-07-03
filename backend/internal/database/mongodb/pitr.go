@@ -143,7 +143,7 @@ func (p *PITRManager) buildOplogDumpArgs(outputDir string, since *time.Time) []s
 	if since != nil {
 		// Convert time to MongoDB timestamp (seconds + increment)
 		ts := primitive.Timestamp{
-			T: uint32(since.Unix()),
+			T: uint32(since.Unix()), //nolint:gosec // G115: Unix seconds are non-negative and fit in uint32 until 2106
 			I: 0,
 		}
 		query := fmt.Sprintf(`{"ts":{"$gte":{"$timestamp":{"t":%d,"i":%d}}}}`, ts.T, ts.I)
@@ -231,7 +231,7 @@ func (p *PITRManager) applyOplog(ctx context.Context, opts *PITRRestoreOptions) 
 
 	// Calculate target timestamp
 	targetTimestamp := primitive.Timestamp{
-		T: uint32(opts.TargetTime.Unix()),
+		T: uint32(opts.TargetTime.Unix()), //nolint:gosec // G115: Unix seconds are non-negative and fit in uint32 until 2106
 		I: 0,
 	}
 
@@ -319,13 +319,12 @@ func (p *PITRManager) verifyTimestamp(ctx context.Context, opts *PITRRestoreOpti
 	currentPos, err := p.getCurrentOplogPosition(ctx)
 	if err != nil {
 		// Oplog verification is optional - may not be available after restore
-		return nil
+		return nil //nolint:nilerr // best-effort check; absence of oplog is not a failure
 	}
 
 	// Convert target time to timestamp
 	targetTimestamp := primitive.Timestamp{
-		T: uint32(opts.TargetTime.Unix()),
-		I: 0,
+		T: uint32(opts.TargetTime.Unix()), //nolint:gosec // G115: Unix seconds are non-negative and fit in uint32 until 2106
 	}
 
 	// Verify we didn't go past the target time
@@ -341,7 +340,7 @@ func (p *PITRManager) verifyTimestamp(ctx context.Context, opts *PITRRestoreOpti
 }
 
 // BackupWithOplog creates a backup with oplog for PITR.
-func (p *PITRManager) BackupWithOplog(ctx context.Context, outputDir string, database string) error {
+func (p *PITRManager) BackupWithOplog(ctx context.Context, outputDir, database string) error {
 	// Create mongodump with --oplog flag
 	args := []string{
 		"--host", p.driver.config.Host,
@@ -398,7 +397,7 @@ func (o *OplogPosition) String() string {
 // TimeToTimestamp converts a time.Time to MongoDB timestamp.
 func TimeToTimestamp(t time.Time) primitive.Timestamp {
 	return primitive.Timestamp{
-		T: uint32(t.Unix()),
+		T: uint32(t.Unix()), //nolint:gosec // G115: Unix seconds are non-negative and fit in uint32 until 2106
 		I: 0,
 	}
 }

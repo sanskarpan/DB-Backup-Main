@@ -18,6 +18,9 @@ import (
 	"github.com/sanskarpan/db-backup/internal/config"
 )
 
+// providerGoogle is the identifier for the Google OAuth2 provider.
+const providerGoogle = "google"
+
 // OAuth2Service handles OAuth2 authentication operations.
 type OAuth2Service struct {
 	config     *config.OAuth2Config
@@ -170,7 +173,11 @@ func (s *OAuth2Service) GetUserInfo(ctx context.Context, providerName string, to
 	client := provider.Client(ctx, token)
 
 	// Fetch user info
-	resp, err := client.Get(providerCfg.UserInfoURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, providerCfg.UserInfoURL, http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build user info request: %w", err)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch user info: %w", err)
 	}
@@ -282,91 +289,85 @@ func mapUserInfo(provider string, raw map[string]interface{}) *UserInfo {
 	}
 
 	switch provider {
-	case "google":
-		if sub, ok := raw["sub"].(string); ok {
-			userInfo.ID = sub
-		}
-		if email, ok := raw["email"].(string); ok {
-			userInfo.Email = email
-		}
-		if name, ok := raw["name"].(string); ok {
-			userInfo.Name = name
-		}
-		if picture, ok := raw["picture"].(string); ok {
-			userInfo.Picture = picture
-		}
-
+	case providerGoogle:
+		mapGoogleUserInfo(userInfo, raw)
 	case "github":
-		if id, ok := raw["id"].(float64); ok {
-			userInfo.ID = fmt.Sprintf("%d", int64(id))
-		}
-		if email, ok := raw["email"].(string); ok {
-			userInfo.Email = email
-		}
-		if name, ok := raw["name"].(string); ok {
-			userInfo.Name = name
-		}
-		if login, ok := raw["login"].(string); ok && userInfo.Name == "" {
-			userInfo.Name = login
-		}
-		if avatarURL, ok := raw["avatar_url"].(string); ok {
-			userInfo.Picture = avatarURL
-		}
-
+		mapGithubUserInfo(userInfo, raw)
 	case "microsoft", "azure":
-		if id, ok := raw["id"].(string); ok {
-			userInfo.ID = id
-		}
-		if upn, ok := raw["userPrincipalName"].(string); ok {
-			userInfo.Email = upn
-		}
-		if displayName, ok := raw["displayName"].(string); ok {
-			userInfo.Name = displayName
-		}
-
+		mapMicrosoftUserInfo(userInfo, raw)
 	case "facebook":
-		if id, ok := raw["id"].(string); ok {
-			userInfo.ID = id
-		}
-		if email, ok := raw["email"].(string); ok {
-			userInfo.Email = email
-		}
-		if name, ok := raw["name"].(string); ok {
-			userInfo.Name = name
-		}
-		if picture, ok := raw["picture"].(map[string]interface{}); ok {
-			if data, ok := picture["data"].(map[string]interface{}); ok {
-				if url, ok := data["url"].(string); ok {
-					userInfo.Picture = url
-				}
-			}
-		}
-
+		mapFacebookUserInfo(userInfo, raw)
 	default:
-		// Generic mapping - try common field names
-		if id, ok := raw["id"].(string); ok {
-			userInfo.ID = id
-		} else if sub, ok := raw["sub"].(string); ok {
-			userInfo.ID = sub
-		}
-		if email, ok := raw["email"].(string); ok {
-			userInfo.Email = email
-		}
-		if name, ok := raw["name"].(string); ok {
-			userInfo.Name = name
-		}
-		if picture, ok := raw["picture"].(string); ok {
-			userInfo.Picture = picture
-		}
+		mapGenericUserInfo(userInfo, raw)
 	}
 
 	return userInfo
 }
 
+// rawString returns the string value for key in raw, or "" if absent/not a string.
+func rawString(raw map[string]interface{}, key string) string {
+	if v, ok := raw[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// mapGoogleUserInfo populates userInfo from Google's user info payload.
+func mapGoogleUserInfo(userInfo *UserInfo, raw map[string]interface{}) {
+	userInfo.ID = rawString(raw, "sub")
+	userInfo.Email = rawString(raw, "email")
+	userInfo.Name = rawString(raw, "name")
+	userInfo.Picture = rawString(raw, "picture")
+}
+
+// mapGithubUserInfo populates userInfo from GitHub's user info payload.
+func mapGithubUserInfo(userInfo *UserInfo, raw map[string]interface{}) {
+	if id, ok := raw["id"].(float64); ok {
+		userInfo.ID = fmt.Sprintf("%d", int64(id))
+	}
+	userInfo.Email = rawString(raw, "email")
+	userInfo.Name = rawString(raw, "name")
+	if userInfo.Name == "" {
+		userInfo.Name = rawString(raw, "login")
+	}
+	userInfo.Picture = rawString(raw, "avatar_url")
+}
+
+// mapMicrosoftUserInfo populates userInfo from Microsoft/Azure's user info payload.
+func mapMicrosoftUserInfo(userInfo *UserInfo, raw map[string]interface{}) {
+	userInfo.ID = rawString(raw, "id")
+	userInfo.Email = rawString(raw, "userPrincipalName")
+	userInfo.Name = rawString(raw, "displayName")
+}
+
+// mapFacebookUserInfo populates userInfo from Facebook's user info payload.
+func mapFacebookUserInfo(userInfo *UserInfo, raw map[string]interface{}) {
+	userInfo.ID = rawString(raw, "id")
+	userInfo.Email = rawString(raw, "email")
+	userInfo.Name = rawString(raw, "name")
+	if picture, ok := raw["picture"].(map[string]interface{}); ok {
+		if data, ok := picture["data"].(map[string]interface{}); ok {
+			userInfo.Picture = rawString(data, "url")
+		}
+	}
+}
+
+// mapGenericUserInfo populates userInfo using common field names.
+func mapGenericUserInfo(userInfo *UserInfo, raw map[string]interface{}) {
+	if id := rawString(raw, "id"); id != "" {
+		userInfo.ID = id
+	} else {
+		userInfo.ID = rawString(raw, "sub")
+	}
+	userInfo.Email = rawString(raw, "email")
+	userInfo.Name = rawString(raw, "name")
+	userInfo.Picture = rawString(raw, "picture")
+}
+
 // GetPresetProvider returns preset OAuth2 configuration for popular providers.
 func GetPresetProvider(providerName string) *config.OAuth2Provider {
 	presets := map[string]*config.OAuth2Provider{
-		"google": {
+		providerGoogle: {
 			AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth",
 			TokenURL:    "https://oauth2.googleapis.com/token",
 			UserInfoURL: "https://www.googleapis.com/oauth2/v2/userinfo",

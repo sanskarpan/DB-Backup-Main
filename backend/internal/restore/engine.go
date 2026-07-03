@@ -35,6 +35,8 @@ type Config struct {
 }
 
 // RestoreOptions holds options for restoring a backup.
+//
+//nolint:revive // keeps public name stable; renaming would break other packages
 type RestoreOptions struct {
 	// Backup to restore
 	BackupID string
@@ -74,6 +76,8 @@ type Progress struct {
 }
 
 // RestoreResult contains the result of a restore operation.
+//
+//nolint:revive // keeps public name stable; renaming would break other packages
 type RestoreResult struct {
 	BackupID       string
 	StartTime      time.Time
@@ -178,12 +182,17 @@ func (e *Engine) RestoreBackup(ctx context.Context, backupMetadata *models.Backu
 		})
 	}
 
-	if err := driver.Connect(ctx, connConfig); err != nil {
+	if err = driver.Connect(ctx, connConfig); err != nil {
 		result.Status = database.RestoreStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseConnection(err)
 	}
-	defer driver.Disconnect()
+	defer func() {
+		// Best-effort disconnect; the restore result already reflects the outcome.
+		if derr := driver.Disconnect(); derr != nil {
+			_ = derr
+		}
+	}()
 
 	// Prepare restore options
 	restoreOpts := &database.RestoreOptions{
@@ -199,7 +208,7 @@ func (e *Engine) RestoreBackup(ctx context.Context, backupMetadata *models.Backu
 
 	// Validate restore if required
 	if !opts.SkipValidation {
-		if err := driver.ValidateRestore(ctx, restoreOpts); err != nil {
+		if err = driver.ValidateRestore(ctx, restoreOpts); err != nil {
 			result.Status = database.RestoreStatusFailed
 			result.Error = err
 			return result, err

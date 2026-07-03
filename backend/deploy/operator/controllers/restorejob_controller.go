@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -54,7 +55,7 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Add finalizer if it doesn't exist
 	if !controllerutil.ContainsFinalizer(restoreJob, restoreJobFinalizer) {
 		controllerutil.AddFinalizer(restoreJob, restoreJobFinalizer)
-		if err := r.Update(ctx, restoreJob); err != nil {
+		if err = r.Update(ctx, restoreJob); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -68,7 +69,7 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	restoreJob.Status.ObservedGeneration = restoreJob.Generation
 
 	// If job is completed or failed, don't reconcile
-	if restoreJob.Status.Phase == "Completed" || restoreJob.Status.Phase == "Failed" {
+	if restoreJob.Status.Phase == "Completed" || restoreJob.Status.Phase == phaseFailed {
 		return ctrl.Result{}, nil
 	}
 
@@ -81,15 +82,15 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 		r.updateCondition(restoreJob, "Initialized", metav1.ConditionTrue, "JobCreated", "Restore job initialized")
 
-		if err := r.Status().Update(ctx, restoreJob); err != nil {
+		if err = r.Status().Update(ctx, restoreJob); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
 
 	// Validate restore job configuration
-	if err := r.validateRestoreJob(restoreJob); err != nil {
+	if err = r.validateRestoreJob(restoreJob); err != nil {
 		log.Error(err, "Invalid restore job configuration")
-		restoreJob.Status.Phase = "Failed"
+		restoreJob.Status.Phase = phaseFailed
 		restoreJob.Status.LastError = err.Error()
 		r.updateCondition(restoreJob, "Valid", metav1.ConditionFalse, "ValidationFailed", err.Error())
 
@@ -106,7 +107,7 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	job, err := r.createRestoreJob(ctx, restoreJob)
 	if err != nil {
 		log.Error(err, "Failed to create restore job")
-		restoreJob.Status.Phase = "Failed"
+		restoreJob.Status.Phase = phaseFailed
 		restoreJob.Status.LastError = err.Error()
 		restoreJob.Status.Attempts++
 
@@ -167,7 +168,7 @@ func (r *RestoreJobReconciler) reconcileDelete(ctx context.Context, restoreJob *
 			// Job exists, delete it
 			log.Info("Canceling running restore job", "job", jobName)
 			propagationPolicy := metav1.DeletePropagationBackground
-			if err := r.Delete(ctx, job, &client.DeleteOptions{
+			if err = r.Delete(ctx, job, &client.DeleteOptions{
 				PropagationPolicy: &propagationPolicy,
 			}); err != nil && !errors.IsNotFound(err) {
 				log.Error(err, "Failed to delete restore job")
@@ -186,9 +187,10 @@ func (r *RestoreJobReconciler) reconcileDelete(ctx context.Context, restoreJob *
 		if err := r.List(ctx, configMapList,
 			client.InNamespace(restoreJob.Namespace),
 			client.MatchingLabels{"restore-job": restoreJob.Name}); err == nil {
-			for _, cm := range configMapList.Items {
+			for i := range configMapList.Items {
+				cm := &configMapList.Items[i]
 				log.Info("Deleting temporary ConfigMap", "name", cm.Name)
-				if err := r.Delete(ctx, &cm); err != nil && !errors.IsNotFound(err) {
+				if err := r.Delete(ctx, cm); err != nil && !errors.IsNotFound(err) {
 					log.Error(err, "Failed to delete ConfigMap", "name", cm.Name)
 				}
 			}
@@ -199,9 +201,10 @@ func (r *RestoreJobReconciler) reconcileDelete(ctx context.Context, restoreJob *
 		if err := r.List(ctx, pvcList,
 			client.InNamespace(restoreJob.Namespace),
 			client.MatchingLabels{"restore-job": restoreJob.Name}); err == nil {
-			for _, pvc := range pvcList.Items {
+			for i := range pvcList.Items {
+				pvc := &pvcList.Items[i]
 				log.Info("Deleting temporary PVC", "name", pvc.Name)
-				if err := r.Delete(ctx, &pvc); err != nil && !errors.IsNotFound(err) {
+				if err := r.Delete(ctx, pvc); err != nil && !errors.IsNotFound(err) {
 					log.Error(err, "Failed to delete PVC", "name", pvc.Name)
 				}
 			}
@@ -382,8 +385,11 @@ func (r *RestoreJobReconciler) createRestoreJob(ctx context.Context, restoreJob 
 
 	// Determine backoff limit
 	backoffLimit := int32(0)
-	if restoreJob.Spec.RetryPolicy != nil && restoreJob.Spec.RetryPolicy.MaxAttempts > 0 {
-		backoffLimit = int32(restoreJob.Spec.RetryPolicy.MaxAttempts)
+	if restoreJob.Spec.RetryPolicy != nil {
+		maxAttempts := restoreJob.Spec.RetryPolicy.MaxAttempts
+		if maxAttempts > 0 && maxAttempts <= math.MaxInt32 {
+			backoffLimit = int32(maxAttempts)
+		}
 	}
 
 	// Create job
@@ -458,7 +464,7 @@ func (r *RestoreJobReconciler) checkJobStatus(ctx context.Context, restoreJob *b
 
 	// Check if job failed
 	if currentJob.Status.Failed > 0 {
-		restoreJob.Status.Phase = "Failed"
+		restoreJob.Status.Phase = phaseFailed
 		restoreJob.Status.LastError = "Restore job failed"
 		restoreJob.Status.Attempts++
 

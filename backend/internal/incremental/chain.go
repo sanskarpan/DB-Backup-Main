@@ -7,6 +7,13 @@ import (
 	"time"
 )
 
+// Chain health status values.
+const (
+	statusHealthy  = "healthy"
+	statusWarning  = "warning"
+	statusCritical = "critical"
+)
+
 // ChainPolicy defines policies for backup chain management.
 type ChainPolicy struct {
 	MaxChainLength          int           // Maximum number of incrementals before synthetic
@@ -127,7 +134,7 @@ func (bcm *BackupChainManager) ValidateChain(backupID string) (*ChainHealth, err
 
 	health := &ChainHealth{
 		ChainID:         backupID,
-		Status:          "healthy",
+		Status:          statusHealthy,
 		ChainLength:     len(chain),
 		Issues:          make([]string, 0),
 		Recommendations: make([]string, 0),
@@ -135,7 +142,7 @@ func (bcm *BackupChainManager) ValidateChain(backupID string) (*ChainHealth, err
 	}
 
 	if len(chain) == 0 {
-		health.Status = "critical"
+		health.Status = statusCritical
 		health.Issues = append(health.Issues, "Empty backup chain")
 		return health, nil
 	}
@@ -143,7 +150,7 @@ func (bcm *BackupChainManager) ValidateChain(backupID string) (*ChainHealth, err
 	// Check base backup
 	baseBackup := chain[0]
 	if baseBackup.Type != BackupTypeFull && baseBackup.Type != BackupTypeSynthetic {
-		health.Status = "critical"
+		health.Status = statusCritical
 		health.Issues = append(health.Issues, "First backup in chain is not a full or synthetic backup")
 	}
 
@@ -153,12 +160,12 @@ func (bcm *BackupChainManager) ValidateChain(backupID string) (*ChainHealth, err
 		previous := chain[i-1]
 
 		if current.ParentBackupID != previous.ID {
-			health.Status = "critical"
+			health.Status = statusCritical
 			health.Issues = append(health.Issues, fmt.Sprintf("Broken chain: backup %s does not reference previous backup %s", current.ID, previous.ID))
 		}
 
 		if current.CreatedAt.Before(previous.CreatedAt) {
-			health.Status = "critical"
+			health.Status = statusCritical
 			health.Issues = append(health.Issues, fmt.Sprintf("Backup timestamps out of order at position %d", i))
 		}
 	}
@@ -167,7 +174,7 @@ func (bcm *BackupChainManager) ValidateChain(backupID string) (*ChainHealth, err
 	for _, manifest := range chain {
 		err := bcm.strategy.VerifyBackup(manifest.ID)
 		if err != nil {
-			health.Status = "critical"
+			health.Status = statusCritical
 			health.Issues = append(health.Issues, fmt.Sprintf("Backup %s verification failed: %v", manifest.ID, err))
 		}
 	}
@@ -184,16 +191,16 @@ func (bcm *BackupChainManager) ValidateChain(backupID string) (*ChainHealth, err
 	}
 
 	if incrementalCount >= bcm.policy.MaxChainLength {
-		if health.Status == "healthy" {
-			health.Status = "warning"
+		if health.Status == statusHealthy {
+			health.Status = statusWarning
 		}
 		health.Issues = append(health.Issues, fmt.Sprintf("Chain has %d incrementals (max recommended: %d)", incrementalCount, bcm.policy.MaxChainLength))
 		health.Recommendations = append(health.Recommendations, "Consider creating a synthetic full backup")
 	}
 
 	if health.ChainAge > bcm.policy.MaxChainAge {
-		if health.Status == "healthy" {
-			health.Status = "warning"
+		if health.Status == statusHealthy {
+			health.Status = statusWarning
 		}
 		health.Issues = append(health.Issues, fmt.Sprintf("Base backup is %v old (max recommended: %v)", health.ChainAge, bcm.policy.MaxChainAge))
 		health.Recommendations = append(health.Recommendations, "Consider creating a synthetic full backup or new full backup")
@@ -409,11 +416,11 @@ func (bcm *BackupChainManager) GetStatistics() map[string]interface{} {
 
 	for _, health := range bcm.chainHealth {
 		switch health.Status {
-		case "healthy":
+		case statusHealthy:
 			healthyChains++
-		case "warning":
+		case statusWarning:
 			warningChains++
-		case "critical":
+		case statusCritical:
 			criticalChains++
 		}
 	}
@@ -446,24 +453,25 @@ func (bcm *BackupChainManager) PerformHealthCheck() (map[string]interface{}, err
 		return nil, fmt.Errorf("failed to monitor chains: %w", err)
 	}
 
+	healthy, warning, critical := 0, 0, 0
+	for _, health := range healthReports {
+		switch health.Status {
+		case statusHealthy:
+			healthy++
+		case statusWarning:
+			warning++
+		case statusCritical:
+			critical++
+		}
+	}
+
 	result := map[string]interface{}{
 		"timestamp":    time.Now(),
 		"total_chains": len(healthReports),
-		"healthy":      0,
-		"warning":      0,
-		"critical":     0,
+		statusHealthy:  healthy,
+		statusWarning:  warning,
+		statusCritical: critical,
 		"chains":       healthReports,
-	}
-
-	for _, health := range healthReports {
-		switch health.Status {
-		case "healthy":
-			result["healthy"] = result["healthy"].(int) + 1
-		case "warning":
-			result["warning"] = result["warning"].(int) + 1
-		case "critical":
-			result["critical"] = result["critical"].(int) + 1
-		}
 	}
 
 	return result, nil

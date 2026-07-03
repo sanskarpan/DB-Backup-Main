@@ -162,8 +162,7 @@ func (es *ElasticsearchClient) CreateIndex(ctx context.Context, indexName string
 	defer res.Body.Close()
 
 	if res.IsError() {
-		bodyBytes, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), string(bodyBytes))
+		return fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), readBody(res.Body))
 	}
 
 	return nil
@@ -183,7 +182,7 @@ func (es *ElasticsearchClient) IndexExists(ctx context.Context, indexName string
 	}
 	defer res.Body.Close()
 
-	return res.StatusCode == 200, nil
+	return res.StatusCode == http.StatusOK, nil
 }
 
 // DeleteIndex deletes an index.
@@ -201,8 +200,7 @@ func (es *ElasticsearchClient) DeleteIndex(ctx context.Context, indexName string
 	defer res.Body.Close()
 
 	if res.IsError() {
-		bodyBytes, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), string(bodyBytes))
+		return fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), readBody(res.Body))
 	}
 
 	return nil
@@ -231,8 +229,7 @@ func (es *ElasticsearchClient) IndexDocument(ctx context.Context, indexName, doc
 	defer res.Body.Close()
 
 	if res.IsError() {
-		bodyBytes, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), string(bodyBytes))
+		return fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), readBody(res.Body))
 	}
 
 	return nil
@@ -255,7 +252,10 @@ func (es *ElasticsearchClient) BulkIndex(ctx context.Context, indexName string, 
 				"_id":    doc.ID,
 			},
 		}
-		actionBytes, _ := json.Marshal(action)
+		actionBytes, err := json.Marshal(action)
+		if err != nil {
+			return fmt.Errorf("failed to marshal bulk action for %s: %w", doc.ID, err)
+		}
 		buf.Write(actionBytes)
 		buf.WriteByte('\n')
 
@@ -280,8 +280,7 @@ func (es *ElasticsearchClient) BulkIndex(ctx context.Context, indexName string, 
 	defer res.Body.Close()
 
 	if res.IsError() {
-		bodyBytes, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), string(bodyBytes))
+		return fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), readBody(res.Body))
 	}
 
 	// Parse response to check for individual failures
@@ -319,11 +318,10 @@ func (es *ElasticsearchClient) GetDocument(ctx context.Context, indexName, docum
 	defer res.Body.Close()
 
 	if res.IsError() {
-		if res.StatusCode == 404 {
+		if res.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("document not found")
 		}
-		bodyBytes, _ := io.ReadAll(res.Body)
-		return nil, fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), string(bodyBytes))
+		return nil, fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), readBody(res.Body))
 	}
 
 	var response GetResponse
@@ -350,9 +348,8 @@ func (es *ElasticsearchClient) DeleteDocument(ctx context.Context, indexName, do
 	}
 	defer res.Body.Close()
 
-	if res.IsError() && res.StatusCode != 404 {
-		bodyBytes, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), string(bodyBytes))
+	if res.IsError() && res.StatusCode != http.StatusNotFound {
+		return fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), readBody(res.Body))
 	}
 
 	return nil
@@ -379,8 +376,7 @@ func (es *ElasticsearchClient) Search(ctx context.Context, indexName string, que
 	defer res.Body.Close()
 
 	if res.IsError() {
-		bodyBytes, _ := io.ReadAll(res.Body)
-		return nil, fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), string(bodyBytes))
+		return nil, fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), readBody(res.Body))
 	}
 
 	var response SearchResponse
@@ -412,8 +408,7 @@ func (es *ElasticsearchClient) Count(ctx context.Context, indexName string, quer
 	defer res.Body.Close()
 
 	if res.IsError() {
-		bodyBytes, _ := io.ReadAll(res.Body)
-		return 0, fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), string(bodyBytes))
+		return 0, fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), readBody(res.Body))
 	}
 
 	var response CountResponse
@@ -439,11 +434,20 @@ func (es *ElasticsearchClient) Refresh(ctx context.Context, indexName string) er
 	defer res.Body.Close()
 
 	if res.IsError() {
-		bodyBytes, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), string(bodyBytes))
+		return fmt.Errorf("elasticsearch returned error: %s - %s", res.Status(), readBody(res.Body))
 	}
 
 	return nil
+}
+
+// readBody reads the response body, returning an empty string on error.
+// It is used to enrich error messages with the Elasticsearch response payload.
+func readBody(r io.Reader) string {
+	b, err := io.ReadAll(r)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 // getIndexName returns the full index name with prefix.

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -305,18 +306,19 @@ func (ct *ChangeTracker) CompareSnapshots(baseSnapshotID, newSnapshotID string) 
 	for _, newBlock := range newSnapshot.Blocks {
 		baseBlock, exists := baseBlockMap[newBlock.Offset]
 
-		if !exists {
+		switch {
+		case !exists:
 			// This is a new block (file grew)
 			newBlock.Changed = true
 			changeSet.NewBlocks = append(changeSet.NewBlocks, newBlock)
 			changeSet.TotalNew += newBlock.Size
-		} else if newBlock.Checksum != baseBlock.Checksum {
+		case newBlock.Checksum != baseBlock.Checksum:
 			// Block changed
 			newBlock.Changed = true
 			changeSet.ChangedBlocks = append(changeSet.ChangedBlocks, newBlock)
 			changeSet.TotalChanged += newBlock.Size
 			delete(baseBlockMap, newBlock.Offset)
-		} else {
+		default:
 			// Block unchanged
 			newBlock.Changed = false
 			delete(baseBlockMap, newBlock.Offset)
@@ -344,7 +346,7 @@ func (ct *ChangeTracker) CompareSnapshots(baseSnapshotID, newSnapshotID string) 
 }
 
 // DetectChanges detects changes in a file compared to its last snapshot.
-func (ct *ChangeTracker) DetectChanges(filePath string, lastSnapshotID string) (*ChangeSet, error) {
+func (ct *ChangeTracker) DetectChanges(filePath, lastSnapshotID string) (*ChangeSet, error) {
 	// Create new snapshot
 	newSnapshot, err := ct.CreateSnapshot(filePath)
 	if err != nil {
@@ -528,7 +530,7 @@ func (ct *ChangeTracker) GetChangedBlockData(filePath string, changeSet *ChangeS
 		}
 
 		n, err := file.Read(data)
-		if err != nil && err != io.EOF {
+		if err != nil && !errors.Is(err, io.EOF) {
 			return nil, fmt.Errorf("failed to read block at offset %d: %w", block.Offset, err)
 		}
 
@@ -545,7 +547,7 @@ func (ct *ChangeTracker) GetChangedBlockData(filePath string, changeSet *ChangeS
 		}
 
 		n, err := file.Read(data)
-		if err != nil && err != io.EOF {
+		if err != nil && !errors.Is(err, io.EOF) {
 			return nil, fmt.Errorf("failed to read block at offset %d: %w", block.Offset, err)
 		}
 

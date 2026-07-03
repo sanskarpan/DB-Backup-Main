@@ -6,7 +6,7 @@ import (
 )
 
 // MaskingRule represents a rule for masking a specific column.
-type MaskingRule struct {
+type MaskingRule struct { //nolint:revive // keeps public API name stable across packages
 	ID             string
 	Table          string
 	Column         string
@@ -32,7 +32,7 @@ type ReferentialIntegrityRule struct {
 }
 
 // MaskingJob represents a masking operation job.
-type MaskingJob struct {
+type MaskingJob struct { //nolint:revive // keeps public API name stable across packages
 	ID            string
 	Database      string
 	Tables        []string
@@ -48,7 +48,7 @@ type MaskingJob struct {
 }
 
 // MaskingManager manages data masking operations.
-type MaskingManager struct {
+type MaskingManager struct { //nolint:revive // keeps public API name stable across packages
 	mu                          sync.RWMutex
 	detector                    *PIIDetector
 	factory                     *MaskerFactory

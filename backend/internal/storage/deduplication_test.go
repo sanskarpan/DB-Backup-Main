@@ -373,7 +373,7 @@ func TestDeleteManifest(t *testing.T) {
 	testFile := filepath.Join(tempDir, "test.txt")
 	chunk1 := bytes.Repeat([]byte("A"), 100)
 	chunk2 := bytes.Repeat([]byte("B"), 100)
-	testData := append(chunk1, chunk2...)
+	testData := bytes.Join([][]byte{chunk1, chunk2}, nil)
 	os.WriteFile(testFile, testData, 0o644)
 
 	manifest, err := manager.StoreFile(testFile)

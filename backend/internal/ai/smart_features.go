@@ -23,8 +23,6 @@ type SmartFeaturesManager struct {
 	aiAdvisor             *AIAdvisor
 	troubleshootingEngine *AutomatedTroubleshootingEngine
 	failurePredictorAPI   *FailurePredictionAPI
-
-	mu sync.RWMutex
 }
 
 // NewSmartFeaturesManager creates a new smart features manager.
@@ -395,9 +393,7 @@ func (ps *PredictiveScheduler) GetRecommendation(ctx context.Context, database s
 // ==================== 2. Backup Quality Scoring ====================
 
 // BackupQualityScorer calculates a comprehensive quality score (0-100) for backups.
-type BackupQualityScorer struct {
-	mu sync.RWMutex
-}
+type BackupQualityScorer struct{}
 
 // QualityScore represents a backup's quality assessment.
 type QualityScore struct {
@@ -593,16 +589,17 @@ func (bqs *BackupQualityScorer) scoreFreshness(metrics *BackupMetrics, score *Qu
 
 	ageHours := metrics.Age.Hours()
 
-	if ageHours < 24 {
+	switch {
+	case ageHours < 24:
 		score.Strengths = append(score.Strengths, "Backup is fresh (< 24 hours old)")
-	} else if ageHours < 7*24 {
+	case ageHours < 7*24:
 		points -= 3.0
 		score.Issues = append(score.Issues, "Backup is 1-7 days old")
-	} else if ageHours < 30*24 {
+	case ageHours < 30*24:
 		points -= 6.0
 		score.Issues = append(score.Issues, "Backup is 1-4 weeks old")
 		score.Recommendations = append(score.Recommendations, "Run new backup soon")
-	} else {
+	default:
 		points -= 10.0
 		score.Issues = append(score.Issues, "Backup is over 30 days old")
 		score.Recommendations = append(score.Recommendations, "Urgently run new backup")
@@ -615,15 +612,16 @@ func (bqs *BackupQualityScorer) scoreFreshness(metrics *BackupMetrics, score *Qu
 func (bqs *BackupQualityScorer) scoreRedundancy(metrics *BackupMetrics, score *QualityScore) float64 {
 	points := 5.0
 
-	if metrics.RedundancyLevel == 0 {
+	switch {
+	case metrics.RedundancyLevel == 0:
 		points = 0
 		score.Issues = append(score.Issues, "No backup redundancy")
 		score.Recommendations = append(score.Recommendations, "Enable backup replication for redundancy")
-	} else if metrics.RedundancyLevel == 1 {
+	case metrics.RedundancyLevel == 1:
 		points = 2.5
 		score.Issues = append(score.Issues, "Single backup copy only")
 		score.Recommendations = append(score.Recommendations, "Consider additional backup copies")
-	} else if metrics.RedundancyLevel >= 3 {
+	case metrics.RedundancyLevel >= 3:
 		score.Strengths = append(score.Strengths, fmt.Sprintf("%d backup copies available", metrics.RedundancyLevel))
 	}
 

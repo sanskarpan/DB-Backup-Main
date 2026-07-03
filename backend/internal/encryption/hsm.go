@@ -45,9 +45,9 @@ func NewHSMManager(config *HSMConfig) (*HSMManager, error) {
 
 	switch config.Provider {
 	case "aws-cloudhsm":
-		provider, err = newAWSCloudHSMProvider(config)
+		provider = newAWSCloudHSMProvider(config)
 	case "azure-keyvault":
-		provider, err = newAzureKeyVaultProvider(config)
+		provider = newAzureKeyVaultProvider(config)
 	case "pkcs11":
 		provider, err = newPKCS11Provider(config)
 	default:
@@ -105,11 +105,11 @@ type awsCloudHSMProvider struct {
 	keys   map[string]*rsa.PrivateKey
 }
 
-func newAWSCloudHSMProvider(config *HSMConfig) (*awsCloudHSMProvider, error) {
+func newAWSCloudHSMProvider(config *HSMConfig) *awsCloudHSMProvider {
 	return &awsCloudHSMProvider{
 		config: config,
 		keys:   make(map[string]*rsa.PrivateKey),
-	}, nil
+	}
 }
 
 func (p *awsCloudHSMProvider) GenerateKey(keyID string, keySize int) error {
@@ -172,11 +172,11 @@ type azureKeyVaultProvider struct {
 	keys   map[string]*rsa.PrivateKey
 }
 
-func newAzureKeyVaultProvider(config *HSMConfig) (*azureKeyVaultProvider, error) {
+func newAzureKeyVaultProvider(config *HSMConfig) *azureKeyVaultProvider {
 	return &azureKeyVaultProvider{
 		config: config,
 		keys:   make(map[string]*rsa.PrivateKey),
-	}, nil
+	}
 }
 
 func (p *azureKeyVaultProvider) GenerateKey(keyID string, keySize int) error {

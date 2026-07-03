@@ -116,11 +116,11 @@ func (m *KeyRotationManager) RegisterKey(keyID, path string) error {
 		}
 	} else {
 		// Load existing key
-		currentKey, _ := existingKey["current_key"].(string)
-		previousKey, _ := existingKey["previous_key"].(string)
-		currentVersion, _ := existingKey["current_version"].(float64)
-		previousVersion, _ := existingKey["previous_version"].(float64)
-		lastRotation, _ := existingKey["last_rotation"].(float64)
+		currentKey := stringField(existingKey, "current_key")
+		previousKey := stringField(existingKey, "previous_key")
+		currentVersion := floatField(existingKey, "current_version")
+		previousVersion := floatField(existingKey, "previous_version")
+		lastRotation := floatField(existingKey, "last_rotation")
 
 		m.keys[keyID] = &RotatableKey{
 			ID:              keyID,
@@ -135,6 +135,24 @@ func (m *KeyRotationManager) RegisterKey(keyID, path string) error {
 	}
 
 	return nil
+}
+
+// stringField returns the string value for key, or "" if absent or of a
+// different type.
+func stringField(m map[string]interface{}, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// floatField returns the float64 value for key, or 0 if absent or of a
+// different type.
+func floatField(m map[string]interface{}, key string) float64 {
+	if v, ok := m[key].(float64); ok {
+		return v
+	}
+	return 0
 }
 
 // GetKey retrieves the current key.
@@ -412,7 +430,7 @@ func NewEncryptionKeyManager(config *KeyRotationConfig, vault *VaultClient) *Enc
 }
 
 // GetEncryptionKey gets the current encryption key for a purpose.
-func (m *EncryptionKeyManager) GetEncryptionKey(purpose string) (string, int, error) {
+func (m *EncryptionKeyManager) GetEncryptionKey(purpose string) (key string, version int, err error) {
 	keyID := fmt.Sprintf("encryption/%s", purpose)
 
 	// Ensure key is registered
@@ -421,7 +439,7 @@ func (m *EncryptionKeyManager) GetEncryptionKey(purpose string) (string, int, er
 		// Key might already be registered, that's okay
 	}
 
-	key, err := m.rotationManager.GetKey(keyID)
+	key, err = m.rotationManager.GetKey(keyID)
 	if err != nil {
 		return "", 0, err
 	}

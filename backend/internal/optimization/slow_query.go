@@ -1,7 +1,7 @@
 package optimization
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"fmt"
 	"sync"
 	"time"
@@ -218,18 +218,21 @@ func (sqd *SlowQueryDetector) generateRecommendations(executionTime time.Duratio
 	recommendations := make([]string, 0)
 
 	if executionTime > 10*time.Second {
-		recommendations = append(recommendations, "Consider adding appropriate indexes")
-		recommendations = append(recommendations, "Review query for N+1 problems")
+		recommendations = append(recommendations,
+			"Consider adding appropriate indexes",
+			"Review query for N+1 problems")
 	}
 
 	if executionTime > 30*time.Second {
-		recommendations = append(recommendations, "Consider query pagination")
-		recommendations = append(recommendations, "Review table statistics and vacuum")
+		recommendations = append(recommendations,
+			"Consider query pagination",
+			"Review table statistics and vacuum")
 	}
 
 	if executionTime > 60*time.Second {
-		recommendations = append(recommendations, "Consider breaking query into smaller parts")
-		recommendations = append(recommendations, "Review execution plan for table scans")
+		recommendations = append(recommendations,
+			"Consider breaking query into smaller parts",
+			"Review execution plan for table scans")
 	}
 
 	return recommendations
@@ -248,7 +251,7 @@ type QueryStatsSummary struct {
 
 // calculateQueryHash calculates a hash for a query.
 func calculateQueryHash(query string) string {
-	hash := md5.Sum([]byte(query))
+	hash := sha256.Sum256([]byte(query))
 	return fmt.Sprintf("%x", hash)
 }
 

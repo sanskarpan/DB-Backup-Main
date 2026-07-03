@@ -241,14 +241,21 @@ func (e *Engine) createBackup(ctx context.Context, opts *CreateOptions) (*models
 
 	reportProgress(opts, "connecting", 10, "Connecting to database...")
 
-	if err := driver.Connect(ctx, connConfig); err != nil {
+	if err = driver.Connect(ctx, connConfig); err != nil {
 		metadata.Status = database.BackupStatusFailed
 		return metadata, pkgErrors.ErrDatabaseConnection(err)
 	}
-	defer driver.Disconnect()
+	defer func() {
+		if derr := driver.Disconnect(); derr != nil {
+			log.Printf("failed to disconnect database driver: %v", derr)
+		}
+	}()
 
 	// Get database version
-	version, _ := driver.GetVersion(ctx)
+	version, verr := driver.GetVersion(ctx)
+	if verr != nil {
+		log.Printf("failed to get database version: %v", verr)
+	}
 	metadata.DatabaseVersion = version
 
 	// Ensure temp directory exists

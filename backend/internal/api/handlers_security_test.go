@@ -19,6 +19,7 @@ import (
 )
 
 func setupSecurityTestServer(t *testing.T) (*Server, *gin.Engine) {
+	t.Helper()
 	gin.SetMode(gin.TestMode)
 
 	log := logger.New(logger.Config{
@@ -46,7 +47,7 @@ func TestHandleGetSecurityStats(t *testing.T) {
 	server, router := setupSecurityTestServer(t)
 	router.GET("/security/stats", server.handleGetSecurityStats)
 
-	req := httptest.NewRequest("GET", "/security/stats", nil)
+	req := httptest.NewRequest(http.MethodGet, "/security/stats", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -91,7 +92,7 @@ func TestHandleScanFile_Success(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest("POST", "/security/scan/file", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/security/scan/file", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -112,7 +113,7 @@ func TestHandleScanFile_InvalidRequest(t *testing.T) {
 	router.POST("/security/scan/file", server.handleScanFile)
 
 	// Send invalid JSON
-	req := httptest.NewRequest("POST", "/security/scan/file", bytes.NewReader([]byte("invalid")))
+	req := httptest.NewRequest(http.MethodPost, "/security/scan/file", bytes.NewReader([]byte("invalid")))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -137,7 +138,7 @@ func TestHandleScanFile_FileNotFound(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest("POST", "/security/scan/file", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/security/scan/file", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -169,7 +170,7 @@ func TestHandleScanDirectory_Success(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest("POST", "/security/scan/directory", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/security/scan/directory", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -193,7 +194,7 @@ func TestHandleListThreatAlerts(t *testing.T) {
 	server, router := setupSecurityTestServer(t)
 	router.GET("/security/alerts", server.handleListThreatAlerts)
 
-	req := httptest.NewRequest("GET", "/security/alerts", nil)
+	req := httptest.NewRequest(http.MethodGet, "/security/alerts", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -240,7 +241,7 @@ func TestHandleListThreatAlerts_WithFilters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/security/alerts"+tt.query, nil)
+			req := httptest.NewRequest(http.MethodGet, "/security/alerts"+tt.query, http.NoBody)
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
@@ -259,7 +260,7 @@ func TestHandleGetThreatAlert(t *testing.T) {
 	server, router := setupSecurityTestServer(t)
 	router.GET("/security/alerts/:id", server.handleGetThreatAlert)
 
-	req := httptest.NewRequest("GET", "/security/alerts/123", nil)
+	req := httptest.NewRequest(http.MethodGet, "/security/alerts/123", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -279,7 +280,7 @@ func TestHandleUpdateThreatAlert_NotFound(t *testing.T) {
 	bodyBytes, err := json.Marshal(requestBody)
 	require.NoError(t, err)
 
-	req := httptest.NewRequest("PUT", "/security/alerts/123", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPut, "/security/alerts/123", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -298,7 +299,7 @@ func TestHandleUpdateThreatAlert_InvalidStatus(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest("PUT", "/security/alerts/123", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPut, "/security/alerts/123", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 

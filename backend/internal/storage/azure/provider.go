@@ -19,6 +19,8 @@ import (
 )
 
 // AzureProvider implements Azure Blob Storage.
+//
+//nolint:revive // AzureProvider is a public type used by other packages; renaming would break them
 type AzureProvider struct {
 	client    *azblob.Client
 	container *container.Client
@@ -252,42 +254,47 @@ func (p *AzureProvider) List(ctx context.Context, prefix string) ([]*st.FileMeta
 				continue
 			}
 
-			metadata := &st.FileMetadata{
-				Path: *item.Name,
-			}
-
-			if item.Properties != nil {
-				if item.Properties.ContentLength != nil {
-					metadata.Size = *item.Properties.ContentLength
-				}
-				if item.Properties.LastModified != nil {
-					metadata.LastModified = *item.Properties.LastModified
-				}
-				if item.Properties.ContentType != nil {
-					metadata.ContentType = *item.Properties.ContentType
-				}
-				// Azure provides MD5 for integrity checking (not cryptographic security)
-				if item.Properties.ContentMD5 != nil {
-					metadata.Checksum = fmt.Sprintf("md5:%x", item.Properties.ContentMD5)
-				}
-			}
-
-			// Convert metadata from map[string]*string to map[string]string
-			if item.Metadata != nil {
-				stringMetadata := make(map[string]string)
-				for k, v := range item.Metadata {
-					if v != nil {
-						stringMetadata[k] = *v
-					}
-				}
-				metadata.Metadata = stringMetadata
-			}
-
-			files = append(files, metadata)
+			files = append(files, blobItemToMetadata(item))
 		}
 	}
 
 	return files, nil
+}
+
+// blobItemToMetadata converts an Azure blob list item into FileMetadata.
+func blobItemToMetadata(item *container.BlobItem) *st.FileMetadata {
+	metadata := &st.FileMetadata{
+		Path: *item.Name,
+	}
+
+	if item.Properties != nil {
+		if item.Properties.ContentLength != nil {
+			metadata.Size = *item.Properties.ContentLength
+		}
+		if item.Properties.LastModified != nil {
+			metadata.LastModified = *item.Properties.LastModified
+		}
+		if item.Properties.ContentType != nil {
+			metadata.ContentType = *item.Properties.ContentType
+		}
+		// Azure provides MD5 for integrity checking (not cryptographic security)
+		if item.Properties.ContentMD5 != nil {
+			metadata.Checksum = fmt.Sprintf("md5:%x", item.Properties.ContentMD5)
+		}
+	}
+
+	// Convert metadata from map[string]*string to map[string]string
+	if item.Metadata != nil {
+		stringMetadata := make(map[string]string)
+		for k, v := range item.Metadata {
+			if v != nil {
+				stringMetadata[k] = *v
+			}
+		}
+		metadata.Metadata = stringMetadata
+	}
+
+	return metadata
 }
 
 // GetType returns the provider type.

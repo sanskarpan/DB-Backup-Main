@@ -58,6 +58,8 @@ type AdvancedCache interface {
 }
 
 // CacheStats holds cache statistics.
+//
+//nolint:revive // keeps public name stable across packages
 type CacheStats struct {
 	Hits          int64
 	Misses        int64
@@ -71,6 +73,8 @@ type CacheStats struct {
 }
 
 // CacheType represents the type of cache backend.
+//
+//nolint:revive // keeps public name stable across packages
 type CacheType string
 
 const (

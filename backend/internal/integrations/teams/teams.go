@@ -15,6 +15,8 @@ import (
 )
 
 // TeamsIntegration implements the Integration interface for Microsoft Teams.
+//
+//nolint:revive // keeps public name stable across integration packages
 type TeamsIntegration struct {
 	*integrations.BaseIntegration
 	client     *http.Client
@@ -105,7 +107,7 @@ func (t *TeamsIntegration) HealthCheck(ctx context.Context) error {
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", t.webhookURL, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.webhookURL, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -123,7 +125,12 @@ func (t *TeamsIntegration) HealthCheck(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.GetMetrics().RecordError(err)
+		t.SetStatus(integrations.StatusError)
+		return fmt.Errorf("failed to read response: %w", err)
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		err := fmt.Errorf("health check failed with status: %d, body: %s", resp.StatusCode, string(body))
@@ -173,14 +180,17 @@ func (t *TeamsIntegration) CreateIncident(ctx context.Context, incident *integra
 
 	// Add tags if present
 	if len(incident.Tags) > 0 {
-		sections := payload["sections"].([]map[string]interface{})
-		facts := sections[0]["facts"].([]map[string]string)
-		facts = append(facts, map[string]string{
-			"name":  "Tags",
-			"value": fmt.Sprintf("%v", incident.Tags),
-		})
-		sections[0]["facts"] = facts
-		payload["sections"] = sections
+		sections, ok := payload["sections"].([]map[string]interface{})
+		if ok && len(sections) > 0 {
+			if facts, ok := sections[0]["facts"].([]map[string]string); ok {
+				facts = append(facts, map[string]string{
+					"name":  "Tags",
+					"value": fmt.Sprintf("%v", incident.Tags),
+				})
+				sections[0]["facts"] = facts
+				payload["sections"] = sections
+			}
+		}
 	}
 
 	bodyBytes, err := json.Marshal(payload)
@@ -188,7 +198,7 @@ func (t *TeamsIntegration) CreateIncident(ctx context.Context, incident *integra
 		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", t.webhookURL, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.webhookURL, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -266,14 +276,17 @@ func (t *TeamsIntegration) UpdateIncident(ctx context.Context, incidentID string
 	}
 
 	if update.Comment != "" {
-		sections := payload["sections"].([]map[string]interface{})
-		facts := sections[0]["facts"].([]map[string]string)
-		facts = append(facts, map[string]string{
-			"name":  "Comment",
-			"value": update.Comment,
-		})
-		sections[0]["facts"] = facts
-		payload["sections"] = sections
+		sections, ok := payload["sections"].([]map[string]interface{})
+		if ok && len(sections) > 0 {
+			if facts, ok := sections[0]["facts"].([]map[string]string); ok {
+				facts = append(facts, map[string]string{
+					"name":  "Comment",
+					"value": update.Comment,
+				})
+				sections[0]["facts"] = facts
+				payload["sections"] = sections
+			}
+		}
 	}
 
 	bodyBytes, err := json.Marshal(payload)
@@ -281,7 +294,7 @@ func (t *TeamsIntegration) UpdateIncident(ctx context.Context, incidentID string
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", t.webhookURL, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.webhookURL, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -299,7 +312,11 @@ func (t *TeamsIntegration) UpdateIncident(ctx context.Context, incidentID string
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			t.GetMetrics().RecordError(readErr)
+			return fmt.Errorf("failed to read response: %w", readErr)
+		}
 		err := fmt.Errorf("failed to send update, status: %d, body: %s", resp.StatusCode, string(body))
 		t.GetMetrics().RecordError(err)
 		return err
@@ -321,7 +338,7 @@ func (t *TeamsIntegration) GetIncident(ctx context.Context, incidentID string) (
 }
 
 // CloseIncident closes an incident (sends a closure message).
-func (t *TeamsIntegration) CloseIncident(ctx context.Context, incidentID string, resolution string) error {
+func (t *TeamsIntegration) CloseIncident(ctx context.Context, incidentID, resolution string) error {
 	if err := t.Validate(); err != nil {
 		return err
 	}
@@ -350,7 +367,7 @@ func (t *TeamsIntegration) CloseIncident(ctx context.Context, incidentID string,
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", t.webhookURL, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.webhookURL, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -368,7 +385,11 @@ func (t *TeamsIntegration) CloseIncident(ctx context.Context, incidentID string,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			t.GetMetrics().RecordError(readErr)
+			return fmt.Errorf("failed to read response: %w", readErr)
+		}
 		err := fmt.Errorf("failed to send closure message, status: %d, body: %s", resp.StatusCode, string(body))
 		t.GetMetrics().RecordError(err)
 		return err
@@ -433,7 +454,7 @@ func (t *TeamsIntegration) SendNotification(ctx context.Context, notification *i
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", t.webhookURL, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.webhookURL, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -451,7 +472,11 @@ func (t *TeamsIntegration) SendNotification(ctx context.Context, notification *i
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			t.GetMetrics().RecordError(readErr)
+			return fmt.Errorf("failed to read response: %w", readErr)
+		}
 		err := fmt.Errorf("failed to send notification, status: %d, body: %s", resp.StatusCode, string(body))
 		t.GetMetrics().RecordError(err)
 		return err

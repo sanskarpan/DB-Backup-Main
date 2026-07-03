@@ -18,7 +18,15 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/utils"
 )
 
+const (
+	snapshotBackupType = "snapshot"
+	cassandraDataDir   = "/var/lib/cassandra/data"
+	scyllaDataDir      = "/var/lib/scylla/data"
+)
+
 // CassandraDriver implements the database.Driver interface for Cassandra/ScyllaDB.
+//
+//nolint:revive // keeps public name stable across dependent packages
 type CassandraDriver struct {
 	session        *gocql.Session
 	config         *database.ConnectionConfig
@@ -112,15 +120,15 @@ func (d *CassandraDriver) Backup(ctx context.Context, opts *database.BackupOptio
 	// Determine backup type
 	backupType := opts.BackupType
 	if backupType == "" {
-		backupType = "snapshot"
+		backupType = snapshotBackupType
 	}
 
 	var err error
 	switch backupType {
-	case "snapshot":
+	case snapshotBackupType:
 		err = d.backupSnapshot(ctx, opts, result)
 	case "incremental":
-		err = d.backupIncremental(ctx, opts, result)
+		err = d.backupIncremental(opts, result)
 	default:
 		err = fmt.Errorf("unsupported backup type: %s", backupType)
 	}
@@ -145,7 +153,7 @@ func (d *CassandraDriver) backupSnapshot(ctx context.Context, opts *database.Bac
 	args := []string{"snapshot"}
 
 	// Add keyspace if specified
-	if opts.IncludeSchemas != nil && len(opts.IncludeSchemas) > 0 {
+	if len(opts.IncludeSchemas) > 0 {
 		args = append(args, "-kt", strings.Join(opts.IncludeSchemas, ","))
 	}
 
@@ -159,13 +167,13 @@ func (d *CassandraDriver) backupSnapshot(ctx context.Context, opts *database.Bac
 	}
 
 	// Copy snapshot files to backup location
-	dataDir := "/var/lib/cassandra/data" // Default Cassandra data directory
+	dataDir := cassandraDataDir // Default Cassandra data directory
 	if d.isScyllaDB {
-		dataDir = "/var/lib/scylla/data"
+		dataDir = scyllaDataDir
 	}
 
 	backupDir := filepath.Join(opts.OutputDir, result.ID)
-	if err := os.MkdirAll(backupDir, 0o755); err != nil {
+	if err = os.MkdirAll(backupDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
@@ -184,12 +192,14 @@ func (d *CassandraDriver) backupSnapshot(ctx context.Context, opts *database.Bac
 
 	// Get backup size
 	var totalSize int64
-	filepath.Walk(backupDir, func(path string, info os.FileInfo, err error) error {
+	if walkErr := filepath.Walk(backupDir, func(_ string, info os.FileInfo, err error) error {
 		if err == nil && !info.IsDir() {
 			totalSize += info.Size()
 		}
 		return nil
-	})
+	}); walkErr != nil {
+		return fmt.Errorf("failed to calculate backup size: %w", walkErr)
+	}
 
 	result.BackupPath = backupDir
 	result.BackupSize = totalSize
@@ -201,14 +211,14 @@ func (d *CassandraDriver) backupSnapshot(ctx context.Context, opts *database.Bac
 }
 
 // backupIncremental creates an incremental backup.
-func (d *CassandraDriver) backupIncremental(ctx context.Context, opts *database.BackupOptions, result *database.BackupResult) error {
+func (d *CassandraDriver) backupIncremental(opts *database.BackupOptions, result *database.BackupResult) error {
 	// Cassandra incremental backups are enabled via configuration
 	// and create hard links in the backups directory
 
 	// Get incremental backup directory
-	dataDir := "/var/lib/cassandra/data"
+	dataDir := cassandraDataDir
 	if d.isScyllaDB {
-		dataDir = "/var/lib/scylla/data"
+		dataDir = scyllaDataDir
 	}
 
 	backupsDir := filepath.Join(dataDir, "backups")
@@ -221,12 +231,14 @@ func (d *CassandraDriver) backupIncremental(ctx context.Context, opts *database.
 
 	// Get backup size
 	var totalSize int64
-	filepath.Walk(outputDir, func(path string, info os.FileInfo, err error) error {
+	if walkErr := filepath.Walk(outputDir, func(_ string, info os.FileInfo, err error) error {
 		if err == nil && !info.IsDir() {
 			totalSize += info.Size()
 		}
 		return nil
-	})
+	}); walkErr != nil {
+		return fmt.Errorf("failed to calculate backup size: %w", walkErr)
+	}
 
 	result.BackupPath = outputDir
 	result.BackupSize = totalSize
@@ -335,9 +347,9 @@ func (d *CassandraDriver) Restore(ctx context.Context, opts *database.RestoreOpt
 	// This is a simplified implementation
 
 	// Copy backup files to data directory
-	dataDir := "/var/lib/cassandra/data"
+	dataDir := cassandraDataDir
 	if d.isScyllaDB {
-		dataDir = "/var/lib/scylla/data"
+		dataDir = scyllaDataDir
 	}
 
 	// Copy files
@@ -517,12 +529,12 @@ func (d *CassandraDriver) testSSHConnection(ctx context.Context) error {
 }
 
 // createSnapshot creates a Cassandra snapshot.
-func (d *CassandraDriver) createSnapshot(ctx context.Context, snapshotName, outputDir string, keyspaces []string) error {
+func (d *CassandraDriver) createSnapshot(ctx context.Context, snapshotName string, keyspaces []string) error {
 	// Execute nodetool snapshot command
 	args := []string{"snapshot"}
 
 	// Add keyspace if specified
-	if keyspaces != nil && len(keyspaces) > 0 {
+	if len(keyspaces) > 0 {
 		args = append(args, "-kt", strings.Join(keyspaces, ","))
 	}
 

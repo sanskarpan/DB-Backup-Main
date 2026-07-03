@@ -33,7 +33,12 @@ type CompletionResponse struct {
 	Metadata     map[string]interface{}
 }
 
+// sourceLive is the completion source label used before a specific strategy wins.
+const sourceLive = "live"
+
 // AdvancedManager integrates all advanced completion features.
+//
+//nolint:revive // keeps public name stable; renaming would break other packages
 type AdvancedManager struct {
 	cache     *cache.MultiLevelCache
 	fuzzy     *fuzzy.Matcher
@@ -106,7 +111,7 @@ func (am *AdvancedManager) GetCompletions(req *CompletionRequest) *CompletionRes
 	}
 
 	var suggestions []string
-	source := "live"
+	source := sourceLive
 
 	// Try different strategies in order of preference
 
@@ -131,7 +136,7 @@ func (am *AdvancedManager) GetCompletions(req *CompletionRequest) *CompletionRes
 	// 3. Plugin suggestions
 	pluginSuggestions := am.plugins.GetCompletions(req.Command, req.Args, req.Context)
 	suggestions = append(suggestions, pluginSuggestions...)
-	if len(pluginSuggestions) > 0 && source == "live" {
+	if len(pluginSuggestions) > 0 && source == sourceLive {
 		source = "plugin"
 	}
 
@@ -150,14 +155,16 @@ func (am *AdvancedManager) GetCompletions(req *CompletionRequest) *CompletionRes
 		for _, match := range matches {
 			suggestions = append(suggestions, match.Text)
 		}
-		if source == "live" {
+		if source == sourceLive {
 			source = "fuzzy"
 		}
 	}
 
-	// Cache the results
+	// Cache the results. Caching is best-effort: a write failure must not break
+	// completions, so the error is recorded in metadata rather than returned.
+	var cacheErr error
 	if len(suggestions) > 0 {
-		am.cache.Set(cacheKey, suggestions)
+		cacheErr = am.cache.Set(cacheKey, suggestions)
 	}
 
 	responseTime := time.Since(startTime).Milliseconds()
@@ -172,6 +179,9 @@ func (am *AdvancedManager) GetCompletions(req *CompletionRequest) *CompletionRes
 		Metadata: map[string]interface{}{
 			"count": len(suggestions),
 		},
+	}
+	if cacheErr != nil {
+		response.Metadata["cache_error"] = cacheErr.Error()
 	}
 
 	// Add preview if template
@@ -189,8 +199,8 @@ func (am *AdvancedManager) GetPreview(command string, args []string) string {
 	// Check if it's a template
 	for _, arg := range args {
 		if template, exists := am.templates.GetTemplate(arg); exists {
-			preview, _ := am.templates.Preview(arg, nil)
-			if preview != nil {
+			preview, err := am.templates.Preview(arg, nil)
+			if err == nil && preview != nil {
 				if expanded, ok := preview["expanded"].(string); ok {
 					return fmt.Sprintf("Template: %s\nWill execute: %s", template.Description, expanded)
 				}
@@ -217,10 +227,15 @@ func (am *AdvancedManager) RecordExecution(command string, args []string, contex
 	// Record in learning system
 	am.learning.Learn(command, args, context, execTime)
 
-	// Save asynchronously
+	// Save asynchronously. Persistence is best-effort here; failures are captured
+	// and re-recorded in analytics so they are not silently swallowed.
 	go func() {
-		am.history.Save()
-		am.learning.Save()
+		if err := am.history.Save(); err != nil {
+			am.analytics.TrackError("history_save", err.Error())
+		}
+		if err := am.learning.Save(); err != nil {
+			am.analytics.TrackError("learning_save", err.Error())
+		}
 	}()
 }
 

@@ -28,11 +28,15 @@ func NewOPAClient(baseURL string) *OPAClient {
 }
 
 // PolicyEvaluationRequest represents a policy evaluation request.
+//
+//nolint:revive // keeps public name stable across packages
 type PolicyEvaluationRequest struct {
 	Input map[string]interface{} `json:"input"`
 }
 
 // PolicyEvaluationResponse represents a policy evaluation response.
+//
+//nolint:revive // keeps public name stable across packages
 type PolicyEvaluationResponse struct {
 	Result     interface{} `json:"result"`
 	DecisionID string      `json:"decision_id,omitempty"`
@@ -57,7 +61,7 @@ func (c *OPAClient) EvaluatePolicy(ctx context.Context, policyPath string, input
 	}
 
 	url := fmt.Sprintf("%s/v1/data/%s", c.baseURL, policyPath)
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -71,12 +75,15 @@ func (c *OPAClient) EvaluatePolicy(ctx context.Context, policyPath string, input
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("OPA returned status %d (failed to read body: %w)", resp.StatusCode, readErr)
+		}
 		return nil, fmt.Errorf("OPA returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var evalResp PolicyEvaluationResponse
-	if err := json.NewDecoder(resp.Body).Decode(&evalResp); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&evalResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
@@ -95,9 +102,9 @@ func (c *OPAClient) EvaluatePolicy(ctx context.Context, policyPath string, input
 }
 
 // LoadPolicy loads a policy into OPA.
-func (c *OPAClient) LoadPolicy(ctx context.Context, policyID string, policyContent string) error {
+func (c *OPAClient) LoadPolicy(ctx context.Context, policyID, policyContent string) error {
 	url := fmt.Sprintf("%s/v1/policies/%s", c.baseURL, policyID)
-	req, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBufferString(policyContent))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBufferString(policyContent))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -111,7 +118,10 @@ func (c *OPAClient) LoadPolicy(ctx context.Context, policyID string, policyConte
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return fmt.Errorf("OPA returned status %d (failed to read body: %w)", resp.StatusCode, readErr)
+		}
 		return fmt.Errorf("OPA returned status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -121,7 +131,7 @@ func (c *OPAClient) LoadPolicy(ctx context.Context, policyID string, policyConte
 // DeletePolicy deletes a policy from OPA.
 func (c *OPAClient) DeletePolicy(ctx context.Context, policyID string) error {
 	url := fmt.Sprintf("%s/v1/policies/%s", c.baseURL, policyID)
-	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -133,7 +143,10 @@ func (c *OPAClient) DeletePolicy(ctx context.Context, policyID string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return fmt.Errorf("OPA returned status %d (failed to read body: %w)", resp.StatusCode, readErr)
+		}
 		return fmt.Errorf("OPA returned status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -143,7 +156,7 @@ func (c *OPAClient) DeletePolicy(ctx context.Context, policyID string) error {
 // GetPolicies retrieves all loaded policies.
 func (c *OPAClient) GetPolicies(ctx context.Context) ([]string, error) {
 	url := fmt.Sprintf("%s/v1/policies", c.baseURL)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -155,18 +168,21 @@ func (c *OPAClient) GetPolicies(ctx context.Context) ([]string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("OPA returned status %d (failed to read body: %w)", resp.StatusCode, readErr)
+		}
 		return nil, fmt.Errorf("OPA returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	policies := []string{}
-	if result, ok := result["result"].(map[string]interface{}); ok {
-		for policyID := range result {
+	if resultMap, ok := result["result"].(map[string]interface{}); ok {
+		for policyID := range resultMap {
 			policies = append(policies, policyID)
 		}
 	}
@@ -177,7 +193,7 @@ func (c *OPAClient) GetPolicies(ctx context.Context) ([]string, error) {
 // HealthCheck checks if OPA is healthy.
 func (c *OPAClient) HealthCheck(ctx context.Context) error {
 	url := fmt.Sprintf("%s/health", c.baseURL)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -196,6 +212,8 @@ func (c *OPAClient) HealthCheck(ctx context.Context) error {
 }
 
 // PolicyManager manages policies and their evaluation.
+//
+//nolint:revive // keeps public name stable across packages
 type PolicyManager struct {
 	opaClient *OPAClient
 }
@@ -208,7 +226,7 @@ func NewPolicyManager(opaBaseURL string) *PolicyManager {
 }
 
 // CheckBackupPermission checks if a user can perform a backup operation.
-func (pm *PolicyManager) CheckBackupPermission(ctx context.Context, userID, operation, databaseID string, metadata map[string]interface{}) (bool, string, error) {
+func (pm *PolicyManager) CheckBackupPermission(ctx context.Context, userID, operation, databaseID string, metadata map[string]interface{}) (allowed bool, reason string, err error) {
 	input := map[string]interface{}{
 		"user_id":     userID,
 		"operation":   operation,
@@ -225,7 +243,7 @@ func (pm *PolicyManager) CheckBackupPermission(ctx context.Context, userID, oper
 }
 
 // CheckStoragePolicy checks if storage configuration complies with policy.
-func (pm *PolicyManager) CheckStoragePolicy(ctx context.Context, storageType, region string, encrypted bool, metadata map[string]interface{}) (bool, string, error) {
+func (pm *PolicyManager) CheckStoragePolicy(ctx context.Context, storageType, region string, encrypted bool, metadata map[string]interface{}) (allowed bool, reason string, err error) {
 	input := map[string]interface{}{
 		"storage_type": storageType,
 		"region":       region,
@@ -242,7 +260,7 @@ func (pm *PolicyManager) CheckStoragePolicy(ctx context.Context, storageType, re
 }
 
 // CheckSecurityPolicy checks if an action complies with security policy.
-func (pm *PolicyManager) CheckSecurityPolicy(ctx context.Context, action, resource, userRole string, ipAddress string) (bool, string, error) {
+func (pm *PolicyManager) CheckSecurityPolicy(ctx context.Context, action, resource, userRole, ipAddress string) (allowed bool, reason string, err error) {
 	input := map[string]interface{}{
 		"action":     action,
 		"resource":   resource,
@@ -259,7 +277,7 @@ func (pm *PolicyManager) CheckSecurityPolicy(ctx context.Context, action, resour
 }
 
 // CheckDataResidencyPolicy checks if data residency requirements are met.
-func (pm *PolicyManager) CheckDataResidencyPolicy(ctx context.Context, dataType, sourceRegion, targetRegion string, classification string) (bool, string, error) {
+func (pm *PolicyManager) CheckDataResidencyPolicy(ctx context.Context, dataType, sourceRegion, targetRegion, classification string) (allowed bool, reason string, err error) {
 	input := map[string]interface{}{
 		"data_type":      dataType,
 		"source_region":  sourceRegion,

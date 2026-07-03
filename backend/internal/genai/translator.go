@@ -2,6 +2,7 @@ package genai
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -87,9 +88,13 @@ func (t *Translator) translateListBackups(parsed *ParsedQuery, result *Translati
 
 	// Add date range if specified
 	if dateRange, exists := parsed.GetEntityValue("date_range"); exists {
-		t.addDateRangeParams(dateRange.(string), params)
+		if s, ok := dateRange.(string); ok {
+			t.addDateRangeParams(s, params)
+		}
 	} else if date, exists := parsed.GetEntityValue("date"); exists {
-		t.addDateParams(date.(string), params)
+		if s, ok := date.(string); ok {
+			t.addDateParams(s, params)
+		}
 	}
 
 	// Add time range if specified
@@ -121,7 +126,7 @@ func (t *Translator) translateListBackups(parsed *ParsedQuery, result *Translati
 	}
 
 	result.APICalls = append(result.APICalls, APICall{
-		Method:     "GET",
+		Method:     http.MethodGet,
 		Endpoint:   t.baseURL + "/api/v1/backups",
 		Parameters: params,
 		Headers:    map[string]string{"Accept": "application/json"},
@@ -137,10 +142,15 @@ func (t *Translator) translateCreateBackup(parsed *ParsedQuery, result *Translat
 	// Get database
 	dbID := ""
 	if id, exists := parsed.GetEntityValue("database_id"); exists {
-		dbID = id.(string)
-		params["database_id"] = dbID
+		if s, ok := id.(string); ok {
+			dbID = s
+			params["database_id"] = s
+		}
 	} else if db, exists := parsed.GetEntityValue("database"); exists {
-		params["database_name"] = db.(string)
+		if s, ok := db.(string); ok {
+			dbID = s
+			params["database_name"] = s
+		}
 	} else {
 		result.RequiresConfirmation = true
 		result.ConfirmationMessage = "Which database would you like to backup?"
@@ -150,12 +160,14 @@ func (t *Translator) translateCreateBackup(parsed *ParsedQuery, result *Translat
 	// Get backup type
 	backupType := "full"
 	if bType, exists := parsed.GetEntityValue("backup_type"); exists {
-		backupType = strings.ToLower(bType.(string))
+		if s, ok := bType.(string); ok {
+			backupType = strings.ToLower(s)
+		}
 	}
 	params["type"] = backupType
 
 	result.APICalls = append(result.APICalls, APICall{
-		Method:     "POST",
+		Method:     http.MethodPost,
 		Endpoint:   t.baseURL + "/api/v1/backups",
 		Parameters: params,
 		Headers: map[string]string{
@@ -190,7 +202,7 @@ func (t *Translator) translateRestoreBackup(parsed *ParsedQuery, result *Transla
 	}
 
 	result.APICalls = append(result.APICalls, APICall{
-		Method:     "POST",
+		Method:     http.MethodPost,
 		Endpoint:   t.baseURL + "/api/v1/restore",
 		Parameters: params,
 		Headers: map[string]string{
@@ -214,7 +226,7 @@ func (t *Translator) translateDeleteBackup(parsed *ParsedQuery, result *Translat
 	}
 
 	result.APICalls = append(result.APICalls, APICall{
-		Method:     "DELETE",
+		Method:     http.MethodDelete,
 		Endpoint:   t.baseURL + "/api/v1/backups",
 		Parameters: params,
 		Headers:    map[string]string{},
@@ -232,7 +244,7 @@ func (t *Translator) translateGetStatus(parsed *ParsedQuery, result *Translation
 	// Get specific database status or overall status
 	if dbID, exists := parsed.GetEntityValue("database_id"); exists {
 		result.APICalls = append(result.APICalls, APICall{
-			Method:     "GET",
+			Method:     http.MethodGet,
 			Endpoint:   fmt.Sprintf("%s/api/v1/databases/%s/status", t.baseURL, dbID),
 			Parameters: params,
 			Headers:    map[string]string{"Accept": "application/json"},
@@ -240,7 +252,7 @@ func (t *Translator) translateGetStatus(parsed *ParsedQuery, result *Translation
 		result.Explanation = fmt.Sprintf("Getting status for database: %s", dbID)
 	} else {
 		result.APICalls = append(result.APICalls, APICall{
-			Method:     "GET",
+			Method:     http.MethodGet,
 			Endpoint:   t.baseURL + "/api/v1/status",
 			Parameters: params,
 			Headers:    map[string]string{"Accept": "application/json"},
@@ -263,13 +275,15 @@ func (t *Translator) translateSearchBackups(parsed *ParsedQuery, result *Transla
 	}
 
 	if dateRange, exists := parsed.GetEntityValue("date_range"); exists {
-		t.addDateRangeParams(dateRange.(string), params)
+		if s, ok := dateRange.(string); ok {
+			t.addDateRangeParams(s, params)
+		}
 	}
 
 	params["limit"] = 50
 
 	result.APICalls = append(result.APICalls, APICall{
-		Method:     "GET",
+		Method:     http.MethodGet,
 		Endpoint:   t.baseURL + "/api/v1/backups/search",
 		Parameters: params,
 		Headers:    map[string]string{"Accept": "application/json"},
@@ -290,7 +304,7 @@ func (t *Translator) translateGetStatistics(parsed *ParsedQuery, result *Transla
 	}
 
 	result.APICalls = append(result.APICalls, APICall{
-		Method:     "GET",
+		Method:     http.MethodGet,
 		Endpoint:   t.baseURL + "/api/v1/statistics",
 		Parameters: params,
 		Headers:    map[string]string{"Accept": "application/json"},
@@ -300,27 +314,27 @@ func (t *Translator) translateGetStatistics(parsed *ParsedQuery, result *Transla
 }
 
 // translateTroubleshoot translates troubleshoot intent.
-func (t *Translator) translateTroubleshoot(parsed *ParsedQuery, result *TranslationResult) {
+func (t *Translator) translateTroubleshoot(_ *ParsedQuery, result *TranslationResult) {
 	params := make(map[string]interface{})
 
 	// Get recent errors
 	params["level"] = "error"
 	params["limit"] = 20
 
-	result.APICalls = append(result.APICalls, APICall{
-		Method:     "GET",
-		Endpoint:   t.baseURL + "/api/v1/logs",
-		Parameters: params,
-		Headers:    map[string]string{"Accept": "application/json"},
-	})
-
-	// Also get system health
-	result.APICalls = append(result.APICalls, APICall{
-		Method:     "GET",
-		Endpoint:   t.baseURL + "/api/v1/health",
-		Parameters: map[string]interface{}{},
-		Headers:    map[string]string{"Accept": "application/json"},
-	})
+	result.APICalls = append(result.APICalls,
+		APICall{
+			Method:     http.MethodGet,
+			Endpoint:   t.baseURL + "/api/v1/logs",
+			Parameters: params,
+			Headers:    map[string]string{"Accept": "application/json"},
+		},
+		// Also get system health
+		APICall{
+			Method:     http.MethodGet,
+			Endpoint:   t.baseURL + "/api/v1/health",
+			Parameters: map[string]interface{}{},
+			Headers:    map[string]string{"Accept": "application/json"},
+		})
 
 	result.Explanation = "Analyzing system for issues and gathering diagnostic information"
 }
@@ -345,7 +359,7 @@ func (t *Translator) translateConfigureSchedule(parsed *ParsedQuery, result *Tra
 	}
 
 	result.APICalls = append(result.APICalls, APICall{
-		Method:     "POST",
+		Method:     http.MethodPost,
 		Endpoint:   t.baseURL + "/api/v1/schedules",
 		Parameters: params,
 		Headers: map[string]string{
@@ -359,7 +373,7 @@ func (t *Translator) translateConfigureSchedule(parsed *ParsedQuery, result *Tra
 }
 
 // translateGetHelp translates get help intent.
-func (t *Translator) translateGetHelp(parsed *ParsedQuery, result *TranslationResult) {
+func (t *Translator) translateGetHelp(_ *ParsedQuery, result *TranslationResult) {
 	result.Explanation = `Available commands:
 - "List all backups" - Show all available backups
 - "Create a backup of database X" - Create a new backup
@@ -475,7 +489,7 @@ func (t *Translator) ValidateAPICall(call *APICall) error {
 	}
 
 	// Validate destructive operations
-	if call.Method == "DELETE" || call.Method == "POST" {
+	if call.Method == http.MethodDelete || call.Method == http.MethodPost {
 		// These should require confirmation
 		return nil
 	}
@@ -491,7 +505,7 @@ func (t *Translator) FormatAPICallAsCommand(call *APICall) string {
 		cmd += fmt.Sprintf(" -H '%s: %s'", key, value)
 	}
 
-	if len(call.Parameters) > 0 && (call.Method == "POST" || call.Method == "PUT") {
+	if len(call.Parameters) > 0 && (call.Method == http.MethodPost || call.Method == http.MethodPut) {
 		jsonData := fmt.Sprintf("%v", call.Parameters)
 		cmd += fmt.Sprintf(" -d '%s'", jsonData)
 	}

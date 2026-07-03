@@ -96,7 +96,7 @@ func (e *AdaptiveEngine) Save() error {
 		return err
 	}
 
-	return os.WriteFile(e.stateFile, data, 0o644)
+	return os.WriteFile(e.stateFile, data, 0o600)
 }
 
 // Learn records a command execution for learning.
@@ -215,9 +215,7 @@ func (e *AdaptiveEngine) SuggestArgs(command string, context map[string]string) 
 
 	for _, pattern := range e.patterns {
 		if pattern.Command == command && e.contextMatches(pattern.Context, context) {
-			for _, arg := range pattern.Args {
-				suggestions = append(suggestions, arg)
-			}
+			suggestions = append(suggestions, pattern.Args...)
 		}
 	}
 

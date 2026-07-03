@@ -150,9 +150,9 @@ func (qp *QueryParser) Parse(query string) *ParsedQuery {
 }
 
 // matchIntent finds the best matching intent.
-func (qp *QueryParser) matchIntent(query string) (Intent, float64) {
-	var bestIntent Intent = IntentUnknown
-	var bestScore float64 = 0.0
+func (qp *QueryParser) matchIntent(query string) (bestIntent Intent, confidence float64) {
+	bestIntent = IntentUnknown
+	bestScore := 0.0
 
 	for intent, patterns := range qp.patterns {
 		for _, pattern := range patterns {
@@ -175,7 +175,7 @@ func (qp *QueryParser) matchIntent(query string) (Intent, float64) {
 	}
 
 	// Normalize confidence to 0-1 range
-	confidence := bestScore
+	confidence = bestScore
 	if confidence > 1.0 {
 		confidence = 1.0
 	}
@@ -240,27 +240,28 @@ func (qp *QueryParser) extractEntities(query string, parsed *ParsedQuery) {
 // extractDates extracts date references from query.
 func (qp *QueryParser) extractDates(query string, parsed *ParsedQuery) {
 	// Relative dates
-	if regexp.MustCompile(`(?i)today`).MatchString(query) {
+	switch {
+	case regexp.MustCompile(`(?i)today`).MatchString(query):
 		parsed.Entities["date"] = Entity{
 			Type:  "date",
 			Value: "today",
 		}
-	} else if regexp.MustCompile(`(?i)yesterday`).MatchString(query) {
+	case regexp.MustCompile(`(?i)yesterday`).MatchString(query):
 		parsed.Entities["date"] = Entity{
 			Type:  "date",
 			Value: "yesterday",
 		}
-	} else if regexp.MustCompile(`(?i)this\s+week`).MatchString(query) {
+	case regexp.MustCompile(`(?i)this\s+week`).MatchString(query):
 		parsed.Entities["date_range"] = Entity{
 			Type:  "date_range",
 			Value: "this_week",
 		}
-	} else if regexp.MustCompile(`(?i)this\s+month`).MatchString(query) {
+	case regexp.MustCompile(`(?i)this\s+month`).MatchString(query):
 		parsed.Entities["date_range"] = Entity{
 			Type:  "date_range",
 			Value: "this_month",
 		}
-	} else if regexp.MustCompile(`(?i)last\s+week`).MatchString(query) {
+	case regexp.MustCompile(`(?i)last\s+week`).MatchString(query):
 		parsed.Entities["date_range"] = Entity{
 			Type:  "date_range",
 			Value: "last_week",
@@ -380,8 +381,8 @@ func (qp *QueryParser) GenerateSuggestions(partial string) []string {
 }
 
 // ValidateQuery checks if a query is valid and provides feedback.
-func (qp *QueryParser) ValidateQuery(query string) (bool, string) {
-	if len(strings.TrimSpace(query)) == 0 {
+func (qp *QueryParser) ValidateQuery(query string) (valid bool, message string) {
+	if strings.TrimSpace(query) == "" {
 		return false, "Query cannot be empty"
 	}
 

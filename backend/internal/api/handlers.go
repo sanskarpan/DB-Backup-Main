@@ -23,6 +23,14 @@ var (
 	ServerGitCommit = "unknown"
 )
 
+// Database type request string values.
+const (
+	dbTypeMySQL    = "mysql"
+	dbTypePostgres = "postgres"
+	dbTypeMongoDB  = "mongodb"
+	dbTypeSQLite   = "sqlite"
+)
+
 // handleRoot handles the root endpoint.
 func (s *Server) handleRoot(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
@@ -95,13 +103,13 @@ func (s *Server) handleCreateBackup(c *gin.Context) {
 	// Parse database type
 	var dbType database.DatabaseType
 	switch req.DatabaseType {
-	case "mysql":
+	case dbTypeMySQL:
 		dbType = database.DatabaseTypeMySQL
-	case "postgres", "postgresql":
+	case dbTypePostgres, "postgresql":
 		dbType = database.DatabaseTypePostgreSQL
-	case "mongodb", "mongo":
+	case dbTypeMongoDB, "mongo":
 		dbType = database.DatabaseTypeMongoDB
-	case "sqlite":
+	case dbTypeSQLite:
 		dbType = database.DatabaseTypeSQLite
 	default:
 		s.respondError(c, http.StatusBadRequest, fmt.Errorf("invalid database type"), "Unsupported database type")
@@ -355,9 +363,9 @@ func (s *Server) handleRestoreBackup(c *gin.Context) {
 	var result *restore.RestoreResult
 	if req.PointInTime != "" {
 		// PITR restore
-		targetTime, err := time.Parse(time.RFC3339, req.PointInTime)
-		if err != nil {
-			s.respondError(c, http.StatusBadRequest, err, "Invalid point_in_time format")
+		targetTime, parseErr := time.Parse(time.RFC3339, req.PointInTime)
+		if parseErr != nil {
+			s.respondError(c, http.StatusBadRequest, parseErr, "Invalid point_in_time format")
 			return
 		}
 		result, err = s.restoreEngine.RestorePointInTime(ctx, metadata, targetTime, opts)
@@ -437,13 +445,13 @@ func (s *Server) handleCreateSchedule(c *gin.Context) {
 	// Parse database type
 	var dbType database.DatabaseType
 	switch req.BackupOpts.DatabaseType {
-	case "mysql":
+	case dbTypeMySQL:
 		dbType = database.DatabaseTypeMySQL
-	case "postgres", "postgresql":
+	case dbTypePostgres, "postgresql":
 		dbType = database.DatabaseTypePostgreSQL
-	case "mongodb", "mongo":
+	case dbTypeMongoDB, "mongo":
 		dbType = database.DatabaseTypeMongoDB
-	case "sqlite":
+	case dbTypeSQLite:
 		dbType = database.DatabaseTypeSQLite
 	default:
 		s.respondError(c, http.StatusBadRequest, fmt.Errorf("invalid database type"), "Unsupported database type")
@@ -550,13 +558,13 @@ func (s *Server) handleUpdateSchedule(c *gin.Context) {
 	if req.BackupOpts.DatabaseType != "" {
 		var dbType database.DatabaseType
 		switch req.BackupOpts.DatabaseType {
-		case "mysql":
+		case dbTypeMySQL:
 			dbType = database.DatabaseTypeMySQL
-		case "postgres", "postgresql":
+		case dbTypePostgres, "postgresql":
 			dbType = database.DatabaseTypePostgreSQL
-		case "mongodb", "mongo":
+		case dbTypeMongoDB, "mongo":
 			dbType = database.DatabaseTypeMongoDB
-		case "sqlite":
+		case dbTypeSQLite:
 			dbType = database.DatabaseTypeSQLite
 		default:
 			s.respondError(c, http.StatusBadRequest, fmt.Errorf("invalid database type"), "Unsupported database type")

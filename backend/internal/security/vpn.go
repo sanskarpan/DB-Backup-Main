@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"os"
@@ -16,6 +17,9 @@ import (
 
 	"golang.org/x/crypto/curve25519"
 )
+
+// wireGuardConfigDir is the base directory for WireGuard configuration files.
+const wireGuardConfigDir = "/etc/wireguard"
 
 // VPNType represents the VPN implementation type.
 type VPNType string
@@ -253,12 +257,13 @@ func (m *VPNManager) startWireGuard() error {
 	}
 
 	// Write configuration to file
-	configPath := filepath.Join("/etc/wireguard", m.config.WireGuardInterface+".conf")
+	configPath := filepath.Join(wireGuardConfigDir, m.config.WireGuardInterface+".conf")
 	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
 		return fmt.Errorf("failed to write WireGuard config: %w", err)
 	}
 
 	// Start WireGuard interface
+	//nolint:gosec // G204: interface name comes from operator-supplied configuration, not untrusted input.
 	cmd := exec.Command("wg-quick", "up", m.config.WireGuardInterface)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to start WireGuard: %w", err)
@@ -283,6 +288,7 @@ func (m *VPNManager) startOpenVPN() error {
 	}
 
 	// Start OpenVPN server
+	//nolint:gosec // G204: config path comes from operator-supplied configuration, not untrusted input.
 	m.serverProc = exec.Command("openvpn", "--config", m.config.OpenVPNConfigPath)
 	if err := m.serverProc.Start(); err != nil {
 		return fmt.Errorf("failed to start OpenVPN: %w", err)
@@ -393,7 +399,7 @@ func (m *VPNManager) GenerateClientConfig(clientID string) (string, error) {
 	case VPNTypeWireGuard:
 		return m.generateWireGuardClientConfig(client)
 	case VPNTypeOpenVPN:
-		return m.generateOpenVPNClientConfig(client)
+		return m.generateOpenVPNClientConfig()
 	default:
 		return "", fmt.Errorf("unsupported VPN type: %s", m.config.Type)
 	}
@@ -523,7 +529,10 @@ verb 3
 
 	t := template.Must(template.New("openvpn-server").Parse(tmpl))
 
-	_, ipnet, _ := net.ParseCIDR(m.config.Network)
+	_, ipnet, err := net.ParseCIDR(m.config.Network)
+	if err != nil {
+		return "", fmt.Errorf("invalid network CIDR %q: %w", m.config.Network, err)
+	}
 	networkIP := ipnet.IP.String()
 	netmask := net.IP(ipnet.Mask).String()
 
@@ -564,7 +573,7 @@ verb 3
 }
 
 // generateOpenVPNClientConfig generates OpenVPN client configuration.
-func (m *VPNManager) generateOpenVPNClientConfig(client *VPNClient) (string, error) {
+func (m *VPNManager) generateOpenVPNClientConfig() (string, error) {
 	tmpl := `client
 dev tun
 proto {{.Protocol}}
@@ -659,7 +668,11 @@ func (p *IPPool) Release(ip string) {
 
 func generateClientID() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		// crypto/rand should never fail; fall back to time-based entropy.
+		binary.BigEndian.PutUint64(b, uint64(time.Now().UnixNano()))
+		binary.BigEndian.PutUint64(b[8:], uint64(time.Now().UnixNano()))
+	}
 	return base64.URLEncoding.EncodeToString(b)
 }
 

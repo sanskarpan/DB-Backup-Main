@@ -19,6 +19,8 @@ import (
 )
 
 // SQLiteDriver implements the database.Driver interface for SQLite.
+//
+//nolint:revive // SQLiteDriver keeps a stable public name used by other packages
 type SQLiteDriver struct {
 	db     *sql.DB
 	config *database.ConnectionConfig
@@ -103,14 +105,15 @@ func (d *SQLiteDriver) Backup(ctx context.Context, opts *database.BackupOptions)
 
 	// Try VACUUM INTO first (preferred method)
 	// Note: VACUUM INTO doesn't support parameterized queries, but we've validated the path
+	//nolint:gosec // G201: sanitizedPath is validated via validation.SanitizePath; VACUUM INTO does not support parameters
 	query := fmt.Sprintf("VACUUM INTO '%s'", sanitizedPath)
 	_, err = d.db.ExecContext(ctx, query)
 	if err != nil {
 		// Fallback to file copy method
-		if err := d.fileCopyBackup(ctx, sanitizedPath); err != nil {
+		if copyErr := d.fileCopyBackup(ctx, sanitizedPath); copyErr != nil {
 			result.Status = database.BackupStatusFailed
-			result.Error = err
-			return result, pkgErrors.ErrDatabaseBackup(err)
+			result.Error = copyErr
+			return result, pkgErrors.ErrDatabaseBackup(copyErr)
 		}
 	}
 
@@ -122,11 +125,17 @@ func (d *SQLiteDriver) Backup(ctx context.Context, opts *database.BackupOptions)
 		return result, err
 	}
 
-	// Get database version
-	version, _ := d.GetVersion(ctx)
+	// Get database version (best-effort; failure should not fail the backup)
+	version, verErr := d.GetVersion(ctx)
+	if verErr != nil {
+		version = ""
+	}
 
-	// Get table information
-	tables, _ := d.getTableInfo(ctx)
+	// Get table information (best-effort; failure should not fail the backup)
+	tables, tblErr := d.getTableInfo(ctx)
+	if tblErr != nil {
+		tables = nil
+	}
 
 	// Complete result
 	result.EndTime = time.Now()
@@ -272,6 +281,7 @@ func (d *SQLiteDriver) GetTableSize(ctx context.Context, database, table string)
 	// SQLite doesn't have a direct way to get table size
 	// We can estimate by counting rows and page size
 	var rowCount int64
+	//nolint:gosec // G201: table is validated via validation.ValidateTableName; identifiers cannot be parameterized
 	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", table)
 	if err := d.db.QueryRowContext(ctx, query).Scan(&rowCount); err != nil {
 		return 0, err
@@ -321,7 +331,12 @@ func (d *SQLiteDriver) fileCopyBackup(ctx context.Context, destPath string) erro
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		// Rollback of a read-only transaction; its error is non-fatal.
+		if rbErr := tx.Rollback(); rbErr != nil {
+			_ = rbErr
+		}
+	}()
 
 	// Copy file
 	if err := copyFile(d.config.Database, destPath); err != nil {
@@ -341,7 +356,7 @@ func copyFile(src, dst string) error {
 
 	// Ensure destination directory exists
 	dstDir := filepath.Dir(dst)
-	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+	if err = os.MkdirAll(dstDir, 0o755); err != nil {
 		return err
 	}
 
@@ -362,7 +377,7 @@ func (d *SQLiteDriver) getTableInfo(ctx context.Context) ([]database.TableInfo, 
 		return nil, err
 	}
 
-	var tableInfos []database.TableInfo
+	tableInfos := make([]database.TableInfo, 0, len(tables))
 	for _, table := range tables {
 		// Validate table name to prevent SQL injection
 		if err := validation.ValidateTableName(table); err != nil {
@@ -370,6 +385,7 @@ func (d *SQLiteDriver) getTableInfo(ctx context.Context) ([]database.TableInfo, 
 		}
 
 		var rowCount int64
+		//nolint:gosec // G201: table is validated via validation.ValidateTableName; identifiers cannot be parameterized
 		query := fmt.Sprintf("SELECT COUNT(*) FROM %s", table)
 		if err := d.db.QueryRowContext(ctx, query).Scan(&rowCount); err != nil {
 			continue // Skip tables with errors

@@ -101,7 +101,7 @@ func (t *Tracker) Save() error {
 	}
 
 	// Write to file
-	return os.WriteFile(t.historyFile, data, 0o644)
+	return os.WriteFile(t.historyFile, data, 0o600)
 }
 
 // Record records a command execution.
@@ -183,7 +183,7 @@ func (t *Tracker) GetSuggestions(prefix string, limit int) []string {
 			fullCmd += " " + entry.Args[0]
 		}
 
-		if len(prefix) == 0 || startsWithIgnoreCase(fullCmd, prefix) {
+		if prefix == "" || startsWithIgnoreCase(fullCmd, prefix) {
 			suggestions = append(suggestions, fullCmd)
 		}
 	}

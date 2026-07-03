@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +20,8 @@ import (
 )
 
 // ElasticsearchDriver implements the database.Driver interface for Elasticsearch/OpenSearch.
+//
+//nolint:revive // keeps public name stable across packages
 type ElasticsearchDriver struct {
 	client        *elasticsearch.Client
 	config        *database.ConnectionConfig
@@ -45,7 +49,7 @@ func NewElasticsearchDriver() *ElasticsearchDriver {
 func (d *ElasticsearchDriver) Connect(ctx context.Context, config *database.ConnectionConfig) error {
 	cfg := elasticsearch.Config{
 		Addresses: []string{
-			fmt.Sprintf("http://%s:%d", config.Host, config.Port),
+			fmt.Sprintf("http://%s", net.JoinHostPort(config.Host, strconv.Itoa(config.Port))),
 		},
 		Username: config.Username,
 		Password: config.Password,
@@ -161,7 +165,7 @@ func (d *ElasticsearchDriver) createSnapshot(ctx context.Context, repo, snapshot
 	}
 
 	// Filter by indices if specified
-	if opts.IncludeSchemas != nil && len(opts.IncludeSchemas) > 0 {
+	if len(opts.IncludeSchemas) > 0 {
 		body["indices"] = strings.Join(opts.IncludeSchemas, ",")
 	}
 
@@ -182,7 +186,10 @@ func (d *ElasticsearchDriver) createSnapshot(ctx context.Context, repo, snapshot
 	defer res.Body.Close()
 
 	if res.IsError() {
-		body, _ := io.ReadAll(res.Body)
+		body, readErr := io.ReadAll(res.Body)
+		if readErr != nil {
+			return fmt.Errorf("snapshot creation failed: %s", res.Status())
+		}
 		return fmt.Errorf("snapshot creation failed: %s, body: %s", res.Status(), string(body))
 	}
 
@@ -210,11 +217,12 @@ func (d *ElasticsearchDriver) waitForSnapshot(ctx context.Context, repo, snapsho
 			if err != nil {
 				return err
 			}
-			defer res.Body.Close()
 
 			var status map[string]interface{}
-			if err := json.NewDecoder(res.Body).Decode(&status); err != nil {
-				return err
+			decodeErr := json.NewDecoder(res.Body).Decode(&status)
+			res.Body.Close()
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			snapshots, ok := status["snapshots"].([]interface{})
@@ -222,12 +230,19 @@ func (d *ElasticsearchDriver) waitForSnapshot(ctx context.Context, repo, snapsho
 				return nil // Snapshot completed
 			}
 
-			snap := snapshots[0].(map[string]interface{})
-			state := snap["state"].(string)
+			snap, ok := snapshots[0].(map[string]interface{})
+			if !ok {
+				return fmt.Errorf("unexpected snapshot status format")
+			}
+			state, ok := snap["state"].(string)
+			if !ok {
+				return fmt.Errorf("unexpected snapshot state format")
+			}
 
-			if state == "SUCCESS" {
+			switch state {
+			case "SUCCESS":
 				return nil
-			} else if state == "FAILED" || state == "PARTIAL" {
+			case "FAILED", "PARTIAL":
 				return fmt.Errorf("snapshot failed with state: %s", state)
 			}
 		}
@@ -236,7 +251,11 @@ func (d *ElasticsearchDriver) waitForSnapshot(ctx context.Context, repo, snapsho
 
 // getSnapshotInfo retrieves snapshot information.
 func (d *ElasticsearchDriver) getSnapshotInfo(ctx context.Context, repo, snapshot string) (*SnapshotInfo, error) {
-	res, err := d.client.Snapshot.Get(repo, []string{snapshot})
+	res, err := d.client.Snapshot.Get(
+		repo,
+		[]string{snapshot},
+		d.client.Snapshot.Get.WithContext(ctx),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +328,13 @@ func (d *ElasticsearchDriver) Restore(ctx context.Context, opts *database.Restor
 		"include_global_state": true,
 	}
 
-	bodyJSON, _ := json.Marshal(body)
+	bodyJSON, err := json.Marshal(body)
+	if err != nil {
+		result.Status = database.RestoreStatusFailed
+		result.Error = err
+		result.EndTime = time.Now()
+		return result, pkgErrors.ErrDatabaseRestore(err)
+	}
 
 	res, err := d.client.Snapshot.Restore(
 		repo,
@@ -325,9 +350,12 @@ func (d *ElasticsearchDriver) Restore(ctx context.Context, opts *database.Restor
 	defer res.Body.Close()
 
 	if res.IsError() {
-		body, _ := io.ReadAll(res.Body)
 		result.Status = database.RestoreStatusFailed
-		result.Error = fmt.Errorf("restore failed: %s, body: %s", res.Status(), string(body))
+		if body, readErr := io.ReadAll(res.Body); readErr == nil {
+			result.Error = fmt.Errorf("restore failed: %s, body: %s", res.Status(), string(body))
+		} else {
+			result.Error = fmt.Errorf("restore failed: %s", res.Status())
+		}
 		result.EndTime = time.Now()
 		return result, pkgErrors.ErrDatabaseRestore(result.Error)
 	}
@@ -359,7 +387,9 @@ func (d *ElasticsearchDriver) GetDatabaseSize(ctx context.Context) (int64, error
 	var totalSize int64
 	for _, idx := range indices {
 		var size int64
-		fmt.Sscanf(idx.StoreSize, "%d", &size)
+		if _, err := fmt.Sscanf(idx.StoreSize, "%d", &size); err != nil {
+			continue
+		}
 		totalSize += size
 	}
 
@@ -481,7 +511,9 @@ func (d *ElasticsearchDriver) GetTableSize(ctx context.Context, database, index 
 	}
 
 	var size int64
-	fmt.Sscanf(indices[0].StoreSize, "%d", &size)
+	if _, err := fmt.Sscanf(indices[0].StoreSize, "%d", &size); err != nil {
+		return 0, nil
+	}
 	return size, nil
 }
 

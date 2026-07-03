@@ -280,6 +280,9 @@ type DuplicateReport struct {
 	Recommendations  []string
 }
 
+// matchTypeExact is the match type for near-identical backups.
+const matchTypeExact = "exact"
+
 // DuplicateMatch represents a duplicate match.
 type DuplicateMatch struct {
 	BackupID       string
@@ -348,13 +351,14 @@ func (dd *DuplicateDetector) DetectDuplicates(ctx context.Context, backupID, dat
 		similarity := dd.calculateSimilarity(targetHashStr, hash)
 
 		var matchType string
-		if similarity > 0.99 {
-			matchType = "exact"
-		} else if similarity > 0.80 {
+		switch {
+		case similarity > 0.99:
+			matchType = matchTypeExact
+		case similarity > 0.80:
 			matchType = "similar"
-		} else if similarity > 0.50 {
+		case similarity > 0.50:
 			matchType = "partial"
-		} else {
+		default:
 			continue // Not similar enough
 		}
 
@@ -369,7 +373,7 @@ func (dd *DuplicateDetector) DetectDuplicates(ctx context.Context, backupID, dat
 
 		duplicates = append(duplicates, match)
 
-		if matchType == "exact" {
+		if matchType == matchTypeExact {
 			totalSavings += backup.Size
 		}
 	}
@@ -384,15 +388,14 @@ func (dd *DuplicateDetector) DetectDuplicates(ctx context.Context, backupID, dat
 	if len(duplicates) > 0 {
 		exactDuplicates := 0
 		for _, dup := range duplicates {
-			if dup.MatchType == "exact" {
+			if dup.MatchType == matchTypeExact {
 				exactDuplicates++
 			}
 		}
 
 		if exactDuplicates > 0 {
 			recommendations = append(recommendations,
-				fmt.Sprintf("Found %d exact duplicate(s) - consider deduplication", exactDuplicates))
-			recommendations = append(recommendations,
+				fmt.Sprintf("Found %d exact duplicate(s) - consider deduplication", exactDuplicates),
 				fmt.Sprintf("Potential storage savings: %s", formatBytes(totalSavings)))
 		}
 
@@ -407,7 +410,7 @@ func (dd *DuplicateDetector) DetectDuplicates(ctx context.Context, backupID, dat
 	if len(duplicates) > 0 {
 		// Higher confidence with more exact matches
 		for _, dup := range duplicates {
-			if dup.MatchType == "exact" {
+			if dup.MatchType == matchTypeExact {
 				confidence += 100.0
 			} else if dup.MatchType == "similar" {
 				confidence += dup.Similarity * 80.0
@@ -618,7 +621,7 @@ func (nse *NLPSearchEngine) Search(ctx context.Context, query string, filters ma
 	}
 
 	// Generate related queries
-	relatedQueries := nse.generateRelatedQueries(query, queryTokens)
+	relatedQueries := nse.generateRelatedQueries(query)
 
 	// Implement spell checking for query terms
 	backups := make([]*SearchableBackup, 0, len(nse.indexedBackups))
@@ -673,7 +676,7 @@ func (nse *NLPSearchEngine) tokenize(text string) []string {
 // generateSnippet creates a text snippet highlighting matches.
 func (nse *NLPSearchEngine) generateSnippet(backup *SearchableBackup, queryTokens []string) string {
 	text := backup.Description
-	if len(text) == 0 {
+	if text == "" {
 		text = fmt.Sprintf("%s backup from %s", backup.DatabaseName, backup.BackupID)
 	}
 
@@ -692,17 +695,18 @@ func (nse *NLPSearchEngine) generateSnippet(backup *SearchableBackup, queryToken
 }
 
 // generateRelatedQueries suggests related search queries.
-func (nse *NLPSearchEngine) generateRelatedQueries(original string, tokens []string) []string {
+func (nse *NLPSearchEngine) generateRelatedQueries(original string) []string {
 	related := make([]string, 0)
 
-	// Time-based variations
-	related = append(related, original+" last week")
-	related = append(related, original+" last month")
-	related = append(related, "recent "+original)
-
-	// Type-based variations
-	related = append(related, original+" full backup")
-	related = append(related, original+" incremental")
+	related = append(related,
+		// Time-based variations
+		original+" last week",
+		original+" last month",
+		"recent "+original,
+		// Type-based variations
+		original+" full backup",
+		original+" incremental",
+	)
 
 	return related
 }
@@ -710,9 +714,7 @@ func (nse *NLPSearchEngine) generateRelatedQueries(original string, tokens []str
 // ==================== 7. Smart Retention Policy Generator ====================
 
 // SmartRetentionPolicyGenerator generates intelligent retention policies.
-type SmartRetentionPolicyGenerator struct {
-	mu sync.RWMutex
-}
+type SmartRetentionPolicyGenerator struct{}
 
 // RetentionPolicy represents a smart retention policy.
 type RetentionPolicy struct {
@@ -782,16 +784,17 @@ func (srpg *SmartRetentionPolicyGenerator) GeneratePolicy(
 	// Adjust for compliance
 	for _, req := range complianceReqs {
 		req = strings.ToLower(req)
-		if strings.Contains(req, "gdpr") {
+		switch {
+		case strings.Contains(req, "gdpr"):
 			yearlyRetention = 6 // GDPR: 6 years max
 			reasoning = append(reasoning, "GDPR compliance: max 6 years retention")
-		} else if strings.Contains(req, "hipaa") {
+		case strings.Contains(req, "hipaa"):
 			yearlyRetention = 6 // HIPAA: 6 years
 			reasoning = append(reasoning, "HIPAA compliance: 6 years retention")
-		} else if strings.Contains(req, "sox") {
+		case strings.Contains(req, "sox"):
 			yearlyRetention = 7 // SOX: 7 years
 			reasoning = append(reasoning, "SOX compliance: 7 years retention")
-		} else if strings.Contains(req, "pci") {
+		case strings.Contains(req, "pci"):
 			yearlyRetention = 1 // PCI-DSS: 1 year minimum
 			reasoning = append(reasoning, "PCI-DSS compliance: 1 year retention")
 		}
@@ -1008,20 +1011,6 @@ func levenshteinDistance(s1, s2 string) int {
 	}
 
 	return matrix[len1][len2]
-}
-
-// min returns the minimum of three integers.
-func min(a, b, c int) int {
-	if a < b {
-		if a < c {
-			return a
-		}
-		return c
-	}
-	if b < c {
-		return b
-	}
-	return c
 }
 
 // ==================== Continue with remaining features ====================

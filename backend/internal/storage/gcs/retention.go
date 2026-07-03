@@ -3,6 +3,7 @@ package gcs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,6 +11,9 @@ import (
 
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
+
+// ErrNoRetentionPolicy is returned when a bucket has no retention policy set.
+var ErrNoRetentionPolicy = errors.New("no retention policy set on bucket")
 
 // RetentionMode defines the retention mode for objects.
 type RetentionMode string
@@ -151,7 +155,7 @@ func (p *GCSProvider) GetBucketRetentionPolicy(ctx context.Context) (*RetentionP
 	}
 
 	if attrs.RetentionPolicy == nil {
-		return nil, nil // No retention policy
+		return nil, ErrNoRetentionPolicy
 	}
 
 	return &RetentionPolicyConfig{
@@ -191,7 +195,7 @@ func (p *GCSProvider) RemoveObjectRetention(ctx context.Context, objectName stri
 	// Get current attributes to check if locked
 	attrs, err := obj.Attrs(ctx)
 	if err != nil {
-		if err == storage.ErrObjectNotExist {
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			return pkgErrors.New(pkgErrors.ErrorTypeNotFound,
 				fmt.Sprintf("object not found: %s", objectName))
 		}
@@ -250,7 +254,7 @@ func (p *GCSProvider) GetObjectRetention(ctx context.Context, objectName string)
 
 	attrs, err := obj.Attrs(ctx)
 	if err != nil {
-		if err == storage.ErrObjectNotExist {
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			return nil, pkgErrors.New(pkgErrors.ErrorTypeNotFound,
 				fmt.Sprintf("object not found: %s", objectName))
 		}
@@ -341,6 +345,8 @@ func (p *GCSProvider) ListObjectsWithRetention(ctx context.Context, prefix strin
 }
 
 // GCSObjectRetentionInfo represents information about an object with retention.
+//
+//nolint:revive // keeps public name (gcs.GCSObjectRetentionInfo) stable for external callers
 type GCSObjectRetentionInfo struct {
 	ObjectName            string
 	Size                  int64

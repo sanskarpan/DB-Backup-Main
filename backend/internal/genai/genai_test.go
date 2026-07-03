@@ -1,6 +1,7 @@
 package genai
 
 import (
+	"net/http"
 	"testing"
 	"time"
 )
@@ -280,7 +281,7 @@ func TestTranslator_TranslateListBackups(t *testing.T) {
 	}
 
 	call := result.APICalls[0]
-	if call.Method != "GET" {
+	if call.Method != http.MethodGet {
 		t.Errorf("Expected method 'GET', got '%s'", call.Method)
 	}
 
@@ -306,7 +307,7 @@ func TestTranslator_TranslateCreateBackup(t *testing.T) {
 
 	if len(result.APICalls) > 0 {
 		call := result.APICalls[0]
-		if call.Method != "POST" {
+		if call.Method != http.MethodPost {
 			t.Errorf("Expected method 'POST', got '%s'", call.Method)
 		}
 	}
@@ -655,7 +656,7 @@ func TestTranslator_TranslateDeleteBackup(t *testing.T) {
 
 	if len(result.APICalls) > 0 {
 		call := result.APICalls[0]
-		if call.Method != "DELETE" {
+		if call.Method != http.MethodDelete {
 			t.Errorf("Expected method 'DELETE', got '%s'", call.Method)
 		}
 	}
@@ -677,7 +678,7 @@ func TestTranslator_TranslateGetStatus(t *testing.T) {
 	}
 
 	call := result.APICalls[0]
-	if call.Method != "GET" {
+	if call.Method != http.MethodGet {
 		t.Errorf("Expected method 'GET', got '%s'", call.Method)
 	}
 }
@@ -698,7 +699,7 @@ func TestTranslator_TranslateSearchBackups(t *testing.T) {
 	}
 
 	call := result.APICalls[0]
-	if call.Method != "GET" {
+	if call.Method != http.MethodGet {
 		t.Errorf("Expected method 'GET', got '%s'", call.Method)
 	}
 }
@@ -719,7 +720,7 @@ func TestTranslator_TranslateGetStatistics(t *testing.T) {
 	}
 
 	call := result.APICalls[0]
-	if call.Method != "GET" {
+	if call.Method != http.MethodGet {
 		t.Errorf("Expected method 'GET', got '%s'", call.Method)
 	}
 }
@@ -872,7 +873,7 @@ func TestQueryParser_GetHelp(t *testing.T) {
 
 // Helper function.
 func contains(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && (s == substr || len(s) >= len(substr) && s[len(s)-len(substr):] == substr || len(s) > len(substr) && s[:len(substr)] == substr || len(s) > len(substr) && findSubstring(s, substr))
+	return s != "" && substr != "" && (s == substr || len(s) >= len(substr) && s[len(s)-len(substr):] == substr || len(s) > len(substr) && s[:len(substr)] == substr || len(s) > len(substr) && findSubstring(s, substr))
 }
 
 func findSubstring(s, substr string) bool {

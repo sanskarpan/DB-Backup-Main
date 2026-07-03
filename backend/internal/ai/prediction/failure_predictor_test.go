@@ -310,7 +310,7 @@ func TestDeterminePatternType_Trend(t *testing.T) {
 	events := make([]BackupEvent, 0)
 	for i := 0; i < 40; i++ {
 		// Recent events (last 7 days) have higher failure rate
-		success := true
+		var success bool
 		if i < 7 {
 			success = i%2 == 0 // 50% failure rate recently
 		} else {
@@ -362,11 +362,7 @@ func TestGeneratePreventiveActions_TimeWindow(t *testing.T) {
 		ResourcePatterns: &ResourcePattern{},
 	}
 
-	prediction := &FailurePrediction{
-		DatabaseName: "testdb",
-	}
-
-	actions := fp.generatePreventiveActions(pattern, prediction)
+	actions := fp.generatePreventiveActions(pattern)
 
 	if len(actions) == 0 {
 		t.Fatal("Expected preventive actions")
@@ -403,11 +399,7 @@ func TestGeneratePreventiveActions_ResourceBased(t *testing.T) {
 		CommonErrors: make(map[string]int),
 	}
 
-	prediction := &FailurePrediction{
-		DatabaseName: "testdb",
-	}
-
-	actions := fp.generatePreventiveActions(pattern, prediction)
+	actions := fp.generatePreventiveActions(pattern)
 
 	if len(actions) == 0 {
 		t.Fatal("Expected preventive actions")
@@ -444,11 +436,7 @@ func TestGeneratePreventiveActions_ErrorSpecific(t *testing.T) {
 		},
 	}
 
-	prediction := &FailurePrediction{
-		DatabaseName: "testdb",
-	}
-
-	actions := fp.generatePreventiveActions(pattern, prediction)
+	actions := fp.generatePreventiveActions(pattern)
 
 	// Should address the most common error (NETWORK_ERROR)
 	hasNetworkAction := false
@@ -508,22 +496,6 @@ func TestGetStatistics(t *testing.T) {
 func TestCalculateRiskFactors(t *testing.T) {
 	fp := NewFailurePredictor(nil)
 
-	events := make([]BackupEvent, 0)
-	for i := 0; i < 40; i++ {
-		event := BackupEvent{
-			ID:           "event-" + string(rune(i)),
-			DatabaseName: "testdb",
-			Timestamp:    time.Now().AddDate(0, 0, -i),
-			Success:      i%3 != 0, // 33% failure rate
-			DiskUsage:    90.0,
-			SystemLoad:   0.9,
-			ErrorType:    "TIMEOUT",
-			DayOfWeek:    time.Monday,
-			HourOfDay:    23,
-		}
-		events = append(events, event)
-	}
-
 	pattern := &FailurePattern{
 		DatabaseName: "testdb",
 		Frequency:    0.5, // High frequency
@@ -539,7 +511,7 @@ func TestCalculateRiskFactors(t *testing.T) {
 		},
 	}
 
-	riskFactors := fp.calculateRiskFactors(events, pattern)
+	riskFactors := fp.calculateRiskFactors(pattern)
 
 	if len(riskFactors) == 0 {
 		t.Fatal("Expected risk factors to be identified")

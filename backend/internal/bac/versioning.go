@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"sync"
 	"time"
 )
@@ -250,11 +249,11 @@ func (vm *VersionManager) compareDatabases(from, to []DatabaseConfig) []VersionC
 	fromMap := make(map[string]DatabaseConfig)
 	toMap := make(map[string]DatabaseConfig)
 
-	for _, db := range from {
-		fromMap[db.ID] = db
+	for i := range from {
+		fromMap[from[i].ID] = from[i]
 	}
-	for _, db := range to {
-		toMap[db.ID] = db
+	for i := range to {
+		toMap[to[i].ID] = to[i]
 	}
 
 	// Check for removed databases
@@ -280,7 +279,8 @@ func (vm *VersionManager) compareDatabases(from, to []DatabaseConfig) []VersionC
 	}
 
 	// Check for modified databases
-	for id, fromDB := range fromMap {
+	for id := range fromMap {
+		fromDB := fromMap[id]
 		if toDB, exists := toMap[id]; exists {
 			if fromDB.Enabled != toDB.Enabled {
 				changes = append(changes, VersionChange{
@@ -364,11 +364,11 @@ func (vm *VersionManager) comparePolicies(from, to []PolicyConfig) []VersionChan
 	fromMap := make(map[string]PolicyConfig)
 	toMap := make(map[string]PolicyConfig)
 
-	for _, policy := range from {
-		fromMap[policy.Name] = policy
+	for i := range from {
+		fromMap[from[i].Name] = from[i]
 	}
-	for _, policy := range to {
-		toMap[policy.Name] = policy
+	for i := range to {
+		toMap[to[i].Name] = to[i]
 	}
 
 	// Check for removed policies
@@ -495,13 +495,13 @@ func (vm *VersionManager) analyzeImpact(current, target *BackupConfig) *ImpactAn
 
 	// Check affected databases
 	currentDBs := make(map[string]bool)
-	for _, db := range current.Spec.Databases {
-		currentDBs[db.ID] = true
+	for i := range current.Spec.Databases {
+		currentDBs[current.Spec.Databases[i].ID] = true
 	}
 
 	targetDBs := make(map[string]bool)
-	for _, db := range target.Spec.Databases {
-		targetDBs[db.ID] = true
+	for i := range target.Spec.Databases {
+		targetDBs[target.Spec.Databases[i].ID] = true
 	}
 
 	// Databases that will be removed
@@ -614,52 +614,9 @@ func (vm *VersionManager) saveVersion(version *ConfigVersion, configName string)
 		return fmt.Errorf("failed to marshal version: %w", err)
 	}
 
-	if err := os.WriteFile(filePath, data, 0o644); err != nil {
+	if err := os.WriteFile(filePath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write version file: %w", err)
 	}
-
-	return nil
-}
-
-// loadVersions loads versions from disk.
-func (vm *VersionManager) loadVersions(configName string) error {
-	versionPath := filepath.Join(vm.versionDir, configName)
-
-	entries, err := os.ReadDir(versionPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil // No versions yet
-		}
-		return fmt.Errorf("failed to read version directory: %w", err)
-	}
-
-	versions := make([]*ConfigVersion, 0)
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		filePath := filepath.Join(versionPath, entry.Name())
-		data, err := os.ReadFile(filePath)
-		if err != nil {
-			continue
-		}
-
-		var version ConfigVersion
-		if err := json.Unmarshal(data, &version); err != nil {
-			continue
-		}
-
-		versions = append(versions, &version)
-	}
-
-	// Sort by version number
-	sort.Slice(versions, func(i, j int) bool {
-		return versions[i].VersionNum < versions[j].VersionNum
-	})
-
-	vm.versions[configName] = versions
 
 	return nil
 }

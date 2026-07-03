@@ -13,6 +13,8 @@ import (
 )
 
 // ServiceNowIntegration implements integration with ServiceNow for incident management.
+//
+//nolint:revive // keeps public name stable across packages
 type ServiceNowIntegration struct {
 	*integrations.BaseIntegration
 	client          *http.Client
@@ -48,18 +50,6 @@ type incidentResponse struct {
 		ResolvedAt    string `json:"resolved_at"`
 		ClosedAt      string `json:"closed_at"`
 		CloseNotes    string `json:"close_notes"`
-	} `json:"result"`
-}
-
-// ServiceNow incidents list response.
-type incidentsListResponse struct {
-	Result []struct {
-		SysID     string `json:"sys_id"`
-		Number    string `json:"number"`
-		State     string `json:"state"`
-		ShortDesc string `json:"short_description"`
-		Priority  string `json:"priority"`
-		OpenedAt  string `json:"opened_at"`
 	} `json:"result"`
 }
 
@@ -148,7 +138,7 @@ func (s *ServiceNowIntegration) HealthCheck(ctx context.Context) error {
 	// Test connection by getting system properties
 	url := fmt.Sprintf("%s/api/now/table/sys_properties?sysparm_limit=1", config.BaseURL)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -167,7 +157,10 @@ func (s *ServiceNowIntegration) HealthCheck(ctx context.Context) error {
 	s.GetMetrics().RecordRequest(time.Since(start))
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("health check failed with status %d (failed to read body: %w)", resp.StatusCode, err)
+		}
 		return fmt.Errorf("health check failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -210,7 +203,10 @@ func (s *ServiceNowIntegration) CreateIncident(ctx context.Context, incident *in
 
 	// Add custom fields as additional comments
 	if len(incident.CustomFields) > 0 {
-		customFieldsJSON, _ := json.MarshalIndent(incident.CustomFields, "", "  ")
+		customFieldsJSON, err := json.MarshalIndent(incident.CustomFields, "", "  ")
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal custom fields: %w", err)
+		}
 		payload["work_notes"] = fmt.Sprintf("Additional Context:\n%s", string(customFieldsJSON))
 	}
 
@@ -219,7 +215,7 @@ func (s *ServiceNowIntegration) CreateIncident(ctx context.Context, incident *in
 		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -296,7 +292,7 @@ func (s *ServiceNowIntegration) UpdateIncident(ctx context.Context, incidentID s
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "PATCH", url, bytes.NewReader(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -314,7 +310,11 @@ func (s *ServiceNowIntegration) UpdateIncident(ctx context.Context, incidentID s
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			s.GetMetrics().RecordError(err)
+			return fmt.Errorf("failed to update incident, status %d (failed to read body: %w)", resp.StatusCode, err)
+		}
 		s.GetMetrics().RecordError(fmt.Errorf("status code: %d", resp.StatusCode))
 		return fmt.Errorf("failed to update incident, status %d: %s", resp.StatusCode, string(body))
 	}
@@ -332,7 +332,7 @@ func (s *ServiceNowIntegration) GetIncident(ctx context.Context, incidentID stri
 	config := s.GetConfig()
 	url := fmt.Sprintf("%s/api/now/table/incident/%s", config.BaseURL, incidentID)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -375,7 +375,7 @@ func (s *ServiceNowIntegration) GetIncident(ctx context.Context, incidentID stri
 }
 
 // CloseIncident closes an incident in ServiceNow.
-func (s *ServiceNowIntegration) CloseIncident(ctx context.Context, incidentID string, resolution string) error {
+func (s *ServiceNowIntegration) CloseIncident(ctx context.Context, incidentID, resolution string) error {
 	if err := s.Validate(); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
 	}
@@ -394,7 +394,7 @@ func (s *ServiceNowIntegration) CloseIncident(ctx context.Context, incidentID st
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "PATCH", url, bytes.NewReader(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -412,7 +412,11 @@ func (s *ServiceNowIntegration) CloseIncident(ctx context.Context, incidentID st
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			s.GetMetrics().RecordError(err)
+			return fmt.Errorf("failed to close incident, status %d (failed to read body: %w)", resp.StatusCode, err)
+		}
 		s.GetMetrics().RecordError(fmt.Errorf("status code: %d", resp.StatusCode))
 		return fmt.Errorf("failed to close incident, status %d: %s", resp.StatusCode, string(body))
 	}

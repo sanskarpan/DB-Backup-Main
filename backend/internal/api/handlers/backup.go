@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -140,34 +139,7 @@ func (h *BackupHandler) HandleCreateBackup(c *gin.Context) {
 	c.JSON(http.StatusCreated, metadata)
 }
 
-// HandleListBackups lists all backups
-// validateQueryParams validates and sanitizes query parameters.
-func validateQueryParams(c *gin.Context) error {
-	// Validate sort_by parameter
-	sortBy := c.DefaultQuery("sort_by", "date")
-	validSortFields := map[string]bool{
-		"date": true, "name": true, "size": true, "status": true,
-	}
-	if !validSortFields[sortBy] {
-		return fmt.Errorf("invalid sort_by parameter: %s", sortBy)
-	}
-
-	// Validate sort_order parameter
-	sortOrder := c.DefaultQuery("sort_order", "desc")
-	if sortOrder != "asc" && sortOrder != "desc" {
-		return fmt.Errorf("invalid sort_order parameter: %s", sortOrder)
-	}
-
-	// Validate limit parameter
-	limitStr := c.DefaultQuery("limit", "100")
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil || limit < 1 || limit > 1000 {
-		return fmt.Errorf("invalid limit parameter: must be between 1 and 1000")
-	}
-
-	return nil
-}
-
+// HandleListBackups lists all backups.
 func (h *BackupHandler) HandleListBackups(c *gin.Context) {
 	ctx := c.Request.Context()
 

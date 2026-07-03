@@ -13,6 +13,8 @@ import (
 )
 
 // LocalProvider implements local filesystem storage.
+//
+//nolint:revive // keeps public name stable; renaming would break other packages
 type LocalProvider struct {
 	config *storage.LocalConfig
 }
@@ -49,7 +51,7 @@ func (p *LocalProvider) Upload(ctx context.Context, localPath, remotePath string
 
 	// Ensure destination directory exists
 	destDir := filepath.Dir(destPath)
-	if err := os.MkdirAll(destDir, 0o755); err != nil {
+	if err = os.MkdirAll(destDir, 0o755); err != nil {
 		return pkgErrors.ErrStorageUpload(err)
 	}
 
@@ -118,7 +120,7 @@ func (p *LocalProvider) Download(ctx context.Context, remotePath, localPath stri
 
 	// Ensure local directory exists
 	localDir := filepath.Dir(localPath)
-	if err := os.MkdirAll(localDir, 0o755); err != nil {
+	if err = os.MkdirAll(localDir, 0o755); err != nil {
 		return pkgErrors.ErrStorageDownload(err)
 	}
 

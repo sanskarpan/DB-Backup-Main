@@ -77,7 +77,7 @@ func (r *FileRepository) Save(ctx context.Context, metadata *models.BackupMetada
 	}
 
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(metadataPath), 0o755); err != nil {
+	if err = os.MkdirAll(filepath.Dir(metadataPath), 0o755); err != nil {
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage, "failed to create metadata directory")
 	}
 
@@ -103,7 +103,7 @@ func (r *FileRepository) Get(ctx context.Context, id string) (*models.BackupMeta
 	}
 
 	// Check if file exists
-	if _, err := os.Stat(metadataPath); os.IsNotExist(err) {
+	if _, err = os.Stat(metadataPath); os.IsNotExist(err) {
 		return nil, pkgErrors.New(pkgErrors.ErrorTypeNotFound, fmt.Sprintf("backup not found: %s", id))
 	}
 
@@ -140,37 +140,19 @@ func (r *FileRepository) List(ctx context.Context, filter *ListFilter) ([]*model
 		// Read metadata file
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return nil // Skip files that can't be read
+			return nil //nolint:nilerr // skip files that can't be read
 		}
 
 		// Unmarshal metadata
 		var metadata models.BackupMetadata
 		if err := json.Unmarshal(data, &metadata); err != nil {
-			return nil // Skip invalid metadata files
+			return nil //nolint:nilerr // skip invalid metadata files
 		}
 
 		// Apply filters
-		if filter != nil {
-			if filter.Database != "" && metadata.Database != filter.Database {
-				return nil
-			}
-			if filter.DatabaseType != "" && string(metadata.DatabaseType) != filter.DatabaseType {
-				return nil
-			}
-			if filter.From != nil && metadata.StartTime.Before(*filter.From) {
-				return nil
-			}
-			if filter.To != nil && metadata.StartTime.After(*filter.To) {
-				return nil
-			}
-			if filter.Tags != nil && len(filter.Tags) > 0 {
-				if !matchTags(metadata.Tags, filter.Tags) {
-					return nil
-				}
-			}
+		if matchesFilter(&metadata, filter) {
+			backups = append(backups, &metadata)
 		}
-
-		backups = append(backups, &metadata)
 		return nil
 	})
 	if err != nil {
@@ -261,6 +243,29 @@ func (r *FileRepository) sortBackups(backups []*models.BackupMetadata, sortBy, o
 		}
 		return !less
 	})
+}
+
+// matchesFilter reports whether the metadata satisfies the given filter.
+func matchesFilter(metadata *models.BackupMetadata, filter *ListFilter) bool {
+	if filter == nil {
+		return true
+	}
+	if filter.Database != "" && metadata.Database != filter.Database {
+		return false
+	}
+	if filter.DatabaseType != "" && string(metadata.DatabaseType) != filter.DatabaseType {
+		return false
+	}
+	if filter.From != nil && metadata.StartTime.Before(*filter.From) {
+		return false
+	}
+	if filter.To != nil && metadata.StartTime.After(*filter.To) {
+		return false
+	}
+	if len(filter.Tags) > 0 && !matchTags(metadata.Tags, filter.Tags) {
+		return false
+	}
+	return true
 }
 
 // matchTags checks if metadata tags match filter tags.

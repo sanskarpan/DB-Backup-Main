@@ -92,7 +92,7 @@ func (ns *NotificationService) SendSlackNotification(ctx context.Context, schedu
 		return fmt.Errorf("failed to marshal Slack message: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", webhook, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhook, bytes.NewReader(payload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -106,8 +106,11 @@ func (ns *NotificationService) SendSlackNotification(ctx context.Context, schedu
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("Slack API returned status %d: %s", resp.StatusCode, string(body))
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return fmt.Errorf("slack API returned status %d (failed to read body: %w)", resp.StatusCode, readErr)
+		}
+		return fmt.Errorf("slack API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	return nil
@@ -229,7 +232,7 @@ func (ns *NotificationService) SendEmailNotification(ctx context.Context, schedu
 func (ns *NotificationService) buildEmailSubject(schedule *TestSchedule, result *TestResult) string {
 	status := "PASSED"
 	if !result.Success {
-		status = "FAILED"
+		status = statusFailed
 	} else if !result.RTOMet || !result.RPOMet {
 		status = "PASSED WITH WARNINGS"
 	}
@@ -246,7 +249,7 @@ func (ns *NotificationService) buildEmailBody(schedule *TestSchedule, result *Te
 	statusText := "PASSED"
 	if !result.Success {
 		statusColor = "#dc3545" // Red
-		statusText = "FAILED"
+		statusText = statusFailed
 	} else if !result.RTOMet || !result.RPOMet {
 		statusColor = "#ffc107" // Yellow
 		statusText = "PASSED WITH WARNINGS"

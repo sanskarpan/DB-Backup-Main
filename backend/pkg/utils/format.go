@@ -45,7 +45,7 @@ func ParseBytes(s string) (int64, error) {
 		return 0, fmt.Errorf("invalid size format: %w", err)
 	}
 
-	multiplier := int64(1)
+	var multiplier int64
 	switch unit {
 	case "B":
 		multiplier = 1

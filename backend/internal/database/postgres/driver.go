@@ -20,6 +20,8 @@ import (
 )
 
 // PostgreSQLDriver implements the database.Driver interface for PostgreSQL.
+//
+//nolint:revive // keeps public name stable; used by other packages
 type PostgreSQLDriver struct {
 	db          *sql.DB
 	config      *database.ConnectionConfig
@@ -130,7 +132,7 @@ func (d *PostgreSQLDriver) Backup(ctx context.Context, opts *database.BackupOpti
 	}
 
 	// Start command
-	if err := cmd.Start(); err != nil {
+	if err = cmd.Start(); err != nil {
 		result.Status = database.BackupStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseBackup(err).WithMetadata("command", "pg_dump")
@@ -143,7 +145,7 @@ func (d *PostgreSQLDriver) Backup(ctx context.Context, opts *database.BackupOpti
 	}
 
 	// Wait for command to complete
-	if err := cmd.Wait(); err != nil {
+	if err = cmd.Wait(); err != nil {
 		result.Status = database.BackupStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseBackup(err).WithMetadata("stderr", string(stderrOutput))
@@ -157,11 +159,17 @@ func (d *PostgreSQLDriver) Backup(ctx context.Context, opts *database.BackupOpti
 		return result, err
 	}
 
-	// Get database version
-	version, _ := d.GetVersion(ctx)
+	// Get database version (best-effort; ignore errors as backup already succeeded)
+	version, verErr := d.GetVersion(ctx)
+	if verErr != nil {
+		version = ""
+	}
 
-	// Get table information
-	tables, _ := d.getTableInfo(ctx, opts.Database)
+	// Get table information (best-effort; ignore errors as backup already succeeded)
+	tables, tblErr := d.getTableInfo(ctx)
+	if tblErr != nil {
+		tables = nil
+	}
 
 	// Complete result
 	result.EndTime = time.Now()
@@ -257,7 +265,12 @@ func (d *PostgreSQLDriver) Restore(ctx context.Context, opts *database.RestoreOp
 	}
 
 	// Capture stderr
-	stderrPipe, _ := cmd.StderrPipe()
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		result.Status = database.RestoreStatusFailed
+		result.Error = err
+		return result, pkgErrors.ErrDatabaseRestore(err)
+	}
 
 	// Run command
 	if err := cmd.Start(); err != nil {
@@ -584,7 +597,7 @@ func (d *PostgreSQLDriver) buildPsqlArgs(opts *database.RestoreOptions) ([]strin
 }
 
 // getTableInfo retrieves information about tables.
-func (d *PostgreSQLDriver) getTableInfo(ctx context.Context, dbName string) ([]database.TableInfo, error) {
+func (d *PostgreSQLDriver) getTableInfo(ctx context.Context) ([]database.TableInfo, error) {
 	query := `
 		SELECT
 			tablename,

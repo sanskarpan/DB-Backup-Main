@@ -96,7 +96,7 @@ func ValidateBackupID(id string) error {
 }
 
 // SanitizePath cleans and validates a file path.
-func SanitizePath(path string, baseDir string) (string, error) {
+func SanitizePath(path, baseDir string) (string, error) {
 	// Clean the path to resolve .. and .
 	cleaned := filepath.Clean(path)
 

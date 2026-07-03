@@ -45,7 +45,7 @@ func TestEngineSendNotification(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start engine
-	if err := engine.Start(); err != nil {
+	if err = engine.Start(); err != nil {
 		t.Fatalf("Failed to start engine: %v", err)
 	}
 	defer engine.Stop()

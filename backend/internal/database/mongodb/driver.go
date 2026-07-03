@@ -21,6 +21,8 @@ import (
 )
 
 // MongoDBDriver implements the database.Driver interface for MongoDB.
+//
+//nolint:revive // keeps public name stable; referenced by other packages
 type MongoDBDriver struct {
 	client      *mongo.Client
 	config      *database.ConnectionConfig
@@ -44,9 +46,13 @@ func (d *MongoDBDriver) Connect(ctx context.Context, config *database.Connection
 	connectionString := d.buildConnectionString(config)
 
 	// Set client options
+	maxConns := config.MaxConnections
+	if maxConns < 0 {
+		maxConns = 0
+	}
 	clientOpts := options.Client().
 		ApplyURI(connectionString).
-		SetMaxPoolSize(uint64(config.MaxConnections))
+		SetMaxPoolSize(uint64(maxConns))
 
 	// Connect to MongoDB
 	client, err := mongo.Connect(ctx, clientOpts)
@@ -56,7 +62,10 @@ func (d *MongoDBDriver) Connect(ctx context.Context, config *database.Connection
 
 	// Test connection
 	if err := client.Ping(ctx, nil); err != nil {
-		client.Disconnect(ctx)
+		if cerr := client.Disconnect(ctx); cerr != nil {
+			// best-effort cleanup; the original ping error is returned below
+			_ = cerr
+		}
 		return pkgErrors.ErrDatabaseConnection(err)
 	}
 
@@ -113,17 +122,20 @@ func (d *MongoDBDriver) Backup(ctx context.Context, opts *database.BackupOptions
 	}
 
 	// Start command
-	if err := cmd.Start(); err != nil {
+	if err = cmd.Start(); err != nil {
 		result.Status = database.BackupStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseBackup(err).WithMetadata("command", "mongodump")
 	}
 
-	// Read stderr
-	stderrOutput, _ := io.ReadAll(stderrPipe)
+	// Read stderr (best-effort; ignore read errors)
+	stderrOutput, readErr := io.ReadAll(stderrPipe)
+	if readErr != nil {
+		stderrOutput = nil
+	}
 
 	// Wait for command to complete
-	if err := cmd.Wait(); err != nil {
+	if err = cmd.Wait(); err != nil {
 		result.Status = database.BackupStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseBackup(err).WithMetadata("stderr", string(stderrOutput))
@@ -137,8 +149,11 @@ func (d *MongoDBDriver) Backup(ctx context.Context, opts *database.BackupOptions
 		return result, err
 	}
 
-	// Get database version
-	version, _ := d.GetVersion(ctx)
+	// Get database version (best-effort; empty string if unavailable)
+	version, verErr := d.GetVersion(ctx)
+	if verErr != nil {
+		version = ""
+	}
 
 	// Complete result
 	result.EndTime = time.Now()
@@ -210,18 +225,27 @@ func (d *MongoDBDriver) Restore(ctx context.Context, opts *database.RestoreOptio
 	cmd := exec.CommandContext(ctx, "mongorestore", args...)
 
 	// Capture stderr
-	stderrPipe, _ := cmd.StderrPipe()
-
-	// Run command
-	if err := cmd.Start(); err != nil {
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
 		result.Status = database.RestoreStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseRestore(err)
 	}
 
-	stderrOutput, _ := io.ReadAll(stderrPipe)
+	// Run command
+	if err = cmd.Start(); err != nil {
+		result.Status = database.RestoreStatusFailed
+		result.Error = err
+		return result, pkgErrors.ErrDatabaseRestore(err)
+	}
 
-	if err := cmd.Wait(); err != nil {
+	// Read stderr (best-effort; ignore read errors)
+	stderrOutput, readErr := io.ReadAll(stderrPipe)
+	if readErr != nil {
+		stderrOutput = nil
+	}
+
+	if err = cmd.Wait(); err != nil {
 		result.Status = database.RestoreStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseRestore(err).WithMetadata("stderr", string(stderrOutput))
@@ -379,7 +403,7 @@ func (d *MongoDBDriver) buildConnectionString(config *database.ConnectionConfig)
 		return config.ConnectionString
 	}
 
-	// mongodb://[username:password@]host[:port][/database]
+	// Build a URI of the form: scheme, optional credentials, host, port and database.
 	auth := ""
 	if config.Username != "" && config.Password != "" {
 		auth = fmt.Sprintf("%s:%s@", config.Username, config.Password)

@@ -342,7 +342,7 @@ func TestAIEngineLerpFunction(t *testing.T) {
 
 	// Test linear interpolation
 	result := ai.lerp(0.5, 1.0, 0.5)
-	expected := 0.75 // 0.5 + 0.5 * (1.0 - 0.5) = 0.75
+	expected := 0.75 // midpoint between current and target
 
 	if result != expected {
 		t.Errorf("Expected lerp result to be %f, got %f", expected, result)

@@ -116,11 +116,10 @@ func main() {
 	}
 
 	// Start scheduler
-	if err := sched.Start(); err != nil {
+	if err = sched.Start(); err != nil {
 		log.Error("Failed to start scheduler", err)
 		os.Exit(1)
 	}
-	defer sched.Stop()
 
 	// Initialize health checker
 	healthChecker := health.NewChecker()
@@ -255,6 +254,12 @@ func main() {
 
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Error("Server forced to shutdown", err)
+	}
+
+	// Stop the scheduler as part of graceful shutdown. Done here (rather than via
+	// defer) because the earlier os.Exit calls would bypass a deferred stop.
+	if err := sched.Stop(); err != nil {
+		log.Error("Failed to stop scheduler cleanly", err)
 	}
 
 	log.Info("Server exited")

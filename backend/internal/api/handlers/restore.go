@@ -58,8 +58,8 @@ func (h *RestoreHandler) HandleRestoreBackup(c *gin.Context) {
 	// Parse point-in-time if provided
 	var pitTime *time.Time
 	if req.PointInTime != "" {
-		t, err := time.Parse(time.RFC3339, req.PointInTime)
-		if err != nil {
+		t, parseErr := time.Parse(time.RFC3339, req.PointInTime)
+		if parseErr != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid point-in-time format"})
 			return
 		}

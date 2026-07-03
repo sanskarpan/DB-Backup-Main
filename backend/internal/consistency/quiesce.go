@@ -302,13 +302,17 @@ func (mq *MySQLQuiescer) Resume(ctx context.Context) error {
 
 // Close closes the MySQL connection.
 func (mq *MySQLQuiescer) Close() error {
-	// Ensure tables are unlocked
+	// Ensure tables are unlocked, preferring to surface a resume failure.
+	var resumeErr error
 	if mq.tablesLocked {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = mq.Resume(ctx)
+		resumeErr = mq.Resume(ctx)
+		cancel()
 	}
-	return mq.db.Close()
+	if err := mq.db.Close(); err != nil {
+		return err
+	}
+	return resumeErr
 }
 
 // MongoDBQuiescer handles MongoDB quiesce operations.
@@ -440,16 +444,20 @@ func (mq *MongoDBQuiescer) Resume(ctx context.Context) error {
 
 // Close closes the MongoDB connection.
 func (mq *MongoDBQuiescer) Close() error {
-	// Ensure database is unlocked
+	// Ensure database is unlocked, preferring to surface a resume failure.
+	var resumeErr error
 	if mq.fsyncLocked {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = mq.Resume(ctx)
+		rctx, rcancel := context.WithTimeout(context.Background(), 5*time.Second)
+		resumeErr = mq.Resume(rctx)
+		rcancel()
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	return mq.client.Disconnect(ctx)
+	if err := mq.client.Disconnect(ctx); err != nil {
+		return err
+	}
+	return resumeErr
 }
 
 // Quiescer interface for database-agnostic quiesce operations.

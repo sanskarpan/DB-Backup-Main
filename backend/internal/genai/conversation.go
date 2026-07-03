@@ -209,7 +209,7 @@ func (cm *ConversationManager) processWithRules(session *ConversationSession, pa
 		APICalls:             translation.APICalls,
 		RequiresConfirmation: translation.RequiresConfirmation,
 		ConfirmationMessage:  translation.ConfirmationMessage,
-		Suggestions:          cm.generateSuggestions(session, parsed),
+		Suggestions:          cm.generateSuggestions(parsed),
 		Context:              session.Context,
 	}
 
@@ -239,7 +239,7 @@ func (cm *ConversationManager) processWithLLM(session *ConversationSession, mess
 	response := &ConversationResponse{
 		Message:     llmResp.Text,
 		Intent:      llmResp.Intent,
-		Suggestions: cm.generateSuggestions(session, parsed),
+		Suggestions: cm.generateSuggestions(parsed),
 		Context:     session.Context,
 	}
 
@@ -326,8 +326,8 @@ func (cm *ConversationManager) buildContextString(session *ConversationSession) 
 }
 
 // generateSuggestions generates follow-up suggestions.
-func (cm *ConversationManager) generateSuggestions(session *ConversationSession, parsed *ParsedQuery) []string {
-	suggestions := []string{}
+func (cm *ConversationManager) generateSuggestions(parsed *ParsedQuery) []string {
+	var suggestions []string
 
 	switch parsed.Intent {
 	case IntentListBackups:
@@ -435,7 +435,7 @@ func (cm *ConversationManager) GetActiveSessionCount() int {
 }
 
 // UpdateSessionContext updates the context for a session.
-func (cm *ConversationManager) UpdateSessionContext(sessionID string, key string, value interface{}) error {
+func (cm *ConversationManager) UpdateSessionContext(sessionID, key string, value interface{}) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 

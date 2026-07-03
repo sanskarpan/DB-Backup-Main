@@ -30,7 +30,7 @@ func init() {
 }
 
 func runVersion(cmd *cobra.Command, args []string) {
-	short, _ := cmd.Flags().GetBool("short")
+	short := flagBool(cmd, "short")
 
 	if short {
 		fmt.Println(Version)

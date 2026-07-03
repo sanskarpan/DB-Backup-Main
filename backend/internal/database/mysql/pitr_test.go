@@ -199,6 +199,7 @@ func TestBinaryLogPosition_String(t *testing.T) {
 
 // Helper function to setup test MySQL connection.
 func setupTestMySQL(t *testing.T) *MySQLDriver {
+	t.Helper()
 	// Check if MySQL is available via environment variables
 	host := os.Getenv("MYSQL_TEST_HOST")
 	if host == "" {

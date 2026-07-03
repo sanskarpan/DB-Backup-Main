@@ -166,6 +166,8 @@ func (cr *ComplianceReporter) GenerateReport(reportType ReportType, format Repor
 }
 
 // generateExecutiveReport generates an executive summary report.
+//
+//nolint:unparam // period bounds kept for a uniform report-generator signature; used once historical querying is implemented
 func (cr *ComplianceReporter) generateExecutiveReport(format ReportFormat, periodStart, periodEnd time.Time) (string, error) {
 	summary := cr.getExecutiveSummary()
 
@@ -192,6 +194,8 @@ func (cr *ComplianceReporter) generateExecutiveReport(format ReportFormat, perio
 }
 
 // generateDetailedReport generates a detailed compliance report.
+//
+//nolint:unparam // period bounds kept for a uniform report-generator signature; used once historical querying is implemented
 func (cr *ComplianceReporter) generateDetailedReport(format ReportFormat, periodStart, periodEnd time.Time) (string, error) {
 	details := cr.getDatabaseComplianceDetails()
 
@@ -278,6 +282,8 @@ func (cr *ComplianceReporter) generateViolationReport(format ReportFormat, perio
 }
 
 // generateComplianceStandardReport generates a compliance standard report.
+//
+//nolint:unparam // period bounds kept for a uniform report-generator signature; used once historical querying is implemented
 func (cr *ComplianceReporter) generateComplianceStandardReport(format ReportFormat, periodStart, periodEnd time.Time) (string, error) {
 	complianceData := cr.getComplianceStandardData()
 
@@ -301,12 +307,18 @@ func (cr *ComplianceReporter) generateComplianceStandardReport(format ReportForm
 func (cr *ComplianceReporter) getExecutiveSummary() *ExecutiveSummary {
 	summary := cr.monitor.GetComplianceSummary()
 
+	totalDatabases, _ := summary["total_databases"].(int)
+	compliantDatabases, _ := summary["compliant_databases"].(int)
+	averageSuccessRate, _ := summary["average_success_rate"].(float64)
+	totalViolations, _ := summary["violations_count"].(int)
+	unresolvedViolations, _ := summary["unresolved_violations"].(int)
+
 	exec := &ExecutiveSummary{
-		TotalDatabases:       summary["total_databases"].(int),
-		CompliantDatabases:   summary["compliant_databases"].(int),
-		AverageSuccessRate:   summary["average_success_rate"].(float64),
-		TotalViolations:      summary["violations_count"].(int),
-		UnresolvedViolations: summary["unresolved_violations"].(int),
+		TotalDatabases:       totalDatabases,
+		CompliantDatabases:   compliantDatabases,
+		AverageSuccessRate:   averageSuccessRate,
+		TotalViolations:      totalViolations,
+		UnresolvedViolations: unresolvedViolations,
 		ComplianceByLevel:    make(map[SLALevel]int),
 		ComplianceByStandard: make(map[string]bool),
 		TopIssues:            make([]string, 0),
@@ -414,6 +426,8 @@ func (cr *ComplianceReporter) getDatabaseComplianceDetails() []*DatabaseComplian
 }
 
 // getTrendData generates historical trend data.
+//
+//nolint:unparam // period bounds kept for the intended historical query implementation (see snapshot note below)
 func (cr *ComplianceReporter) getTrendData(periodStart, periodEnd time.Time) []*TrendData {
 	trends := make([]*TrendData, 0)
 
@@ -491,9 +505,9 @@ func (cr *ComplianceReporter) getComplianceStandardData() map[string]interface{}
 }
 
 // analyzeIssuesAndRecommendations analyzes violations and generates recommendations.
-func (cr *ComplianceReporter) analyzeIssuesAndRecommendations() ([]string, []string) {
-	issues := make([]string, 0)
-	recommendations := make([]string, 0)
+func (cr *ComplianceReporter) analyzeIssuesAndRecommendations() (issues, recommendations []string) {
+	issues = make([]string, 0)
+	recommendations = make([]string, 0)
 
 	cr.monitor.mu.RLock()
 	defer cr.monitor.mu.RUnlock()
@@ -893,8 +907,8 @@ func (cr *ComplianceReporter) formatComplianceStandardMarkdown(data map[string]i
 	sb.WriteString("# Compliance Standard Report\n\n")
 	sb.WriteString(fmt.Sprintf("**Generated:** %s\n\n", time.Now().Format(time.RFC3339)))
 
-	standards := data["standards"].(map[string][]string)
-	complianceStatus := data["compliance_status"].(map[string]bool)
+	standards, _ := data["standards"].(map[string][]string)
+	complianceStatus, _ := data["compliance_status"].(map[string]bool)
 
 	sb.WriteString("## Compliance Standards Coverage\n\n")
 

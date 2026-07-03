@@ -20,6 +20,8 @@ type BackupOptimizer struct {
 }
 
 // OptimizationMetrics represents metrics for a backup operation.
+//
+//nolint:revive // exported name kept stable; referenced across the package and public API
 type OptimizationMetrics struct {
 	ID                string
 	DatabaseName      string
@@ -77,6 +79,8 @@ const (
 )
 
 // OptimizationRecommendation represents optimization recommendations.
+//
+//nolint:revive // exported name kept stable; referenced across the package and public API
 type OptimizationRecommendation struct {
 	DatabaseName              string
 	GeneratedAt               time.Time
@@ -222,6 +226,8 @@ func NewCostCalculator(config *OptimizerConfig) *CostCalculator {
 }
 
 // AddMetrics adds optimization metrics.
+//
+//nolint:gocritic // hugeParam: value receiver kept to preserve the public API signature
 func (bo *BackupOptimizer) AddMetrics(metrics OptimizationMetrics) {
 	bo.mu.Lock()
 	defer bo.mu.Unlock()
@@ -235,9 +241,10 @@ func (bo *BackupOptimizer) AddMetrics(metrics OptimizationMetrics) {
 	// Keep only recent history (last 90 days)
 	cutoff := time.Now().AddDate(0, 0, -90)
 	filtered := make([]OptimizationMetrics, 0)
-	for _, m := range bo.historicalData[metrics.DatabaseName] {
-		if m.Timestamp.After(cutoff) {
-			filtered = append(filtered, m)
+	data := bo.historicalData[metrics.DatabaseName]
+	for i := range data {
+		if data[i].Timestamp.After(cutoff) {
+			filtered = append(filtered, data[i])
 		}
 	}
 	bo.historicalData[metrics.DatabaseName] = filtered
@@ -287,7 +294,8 @@ func (bo *BackupOptimizer) recommendCompression(metrics []OptimizationMetrics) *
 	// Analyze historical compression performance
 	algoPerformance := make(map[CompressionAlgorithm]*CompressionStats)
 
-	for _, m := range metrics {
+	for i := range metrics {
+		m := &metrics[i]
 		if !m.Success {
 			continue
 		}
@@ -435,10 +443,12 @@ func (bo *BackupOptimizer) getCompressionTradeOff(algo CompressionAlgorithm) str
 func (bo *BackupOptimizer) getCompressionReasoning(algo CompressionAlgorithm, stats *CompressionStats, dataType DataType) []string {
 	reasoning := make([]string, 0)
 
-	reasoning = append(reasoning, fmt.Sprintf("Algorithm %s achieves %.1f%% compression ratio", algo, stats.AvgRatio*100))
-	reasoning = append(reasoning, fmt.Sprintf("Average compression time: %s", stats.AvgDuration.Round(time.Second)))
-	reasoning = append(reasoning, fmt.Sprintf("CPU usage: %.1f%%", stats.AvgCPUUsage))
-	reasoning = append(reasoning, fmt.Sprintf("Optimal for %s data type", dataType))
+	reasoning = append(reasoning,
+		fmt.Sprintf("Algorithm %s achieves %.1f%% compression ratio", algo, stats.AvgRatio*100),
+		fmt.Sprintf("Average compression time: %s", stats.AvgDuration.Round(time.Second)),
+		fmt.Sprintf("CPU usage: %.1f%%", stats.AvgCPUUsage),
+		fmt.Sprintf("Optimal for %s data type", dataType),
+	)
 
 	if stats.AvgRatio > 0.7 {
 		reasoning = append(reasoning, "Excellent compression efficiency")
@@ -456,7 +466,8 @@ func (bo *BackupOptimizer) recommendBackupWindow(metrics []OptimizationMetrics) 
 	// Analyze performance by time window
 	windowStats := make(map[string]*WindowStats)
 
-	for _, m := range metrics {
+	for i := range metrics {
+		m := &metrics[i]
 		if !m.Success {
 			continue
 		}
@@ -561,8 +572,10 @@ func (bo *BackupOptimizer) getWindowReasoning(optimal, worst []BackupWindow) []s
 
 	if len(optimal) > 0 {
 		best := optimal[0]
-		reasoning = append(reasoning, fmt.Sprintf("Best window: %s at %02d:00 (score: %.1f)", best.DayOfWeek, best.StartHour, best.Score))
-		reasoning = append(reasoning, fmt.Sprintf("Average duration in best window: %s", best.AvgDuration.Round(time.Second)))
+		reasoning = append(reasoning,
+			fmt.Sprintf("Best window: %s at %02d:00 (score: %.1f)", best.DayOfWeek, best.StartHour, best.Score),
+			fmt.Sprintf("Average duration in best window: %s", best.AvgDuration.Round(time.Second)),
+		)
 	}
 
 	if len(worst) > 0 {
@@ -580,7 +593,8 @@ func (bo *BackupOptimizer) recommendParallelism(metrics []OptimizationMetrics) *
 	// Analyze performance by worker count
 	workerPerformance := make(map[int]*ParallelismStats)
 
-	for _, m := range metrics {
+	for i := range metrics {
+		m := &metrics[i]
 		if !m.Success {
 			continue
 		}
@@ -666,10 +680,12 @@ func (bo *BackupOptimizer) calculateParallelismEfficiency(stats *ParallelismStat
 func (bo *BackupOptimizer) getParallelismReasoning(workers int, speedup float64, resources map[string]float64) []string {
 	reasoning := make([]string, 0)
 
-	reasoning = append(reasoning, fmt.Sprintf("Optimal parallelism: %d workers", workers))
-	reasoning = append(reasoning, fmt.Sprintf("Expected speedup: %.2fx", speedup))
-	reasoning = append(reasoning, fmt.Sprintf("CPU utilization: %.1f%%", resources["cpu"]))
-	reasoning = append(reasoning, fmt.Sprintf("Memory utilization: %.1f%%", resources["memory"]))
+	reasoning = append(reasoning,
+		fmt.Sprintf("Optimal parallelism: %d workers", workers),
+		fmt.Sprintf("Expected speedup: %.2fx", speedup),
+		fmt.Sprintf("CPU utilization: %.1f%%", resources["cpu"]),
+		fmt.Sprintf("Memory utilization: %.1f%%", resources["memory"]),
+	)
 
 	if workers > 4 {
 		reasoning = append(reasoning, "High parallelism recommended for large databases")
@@ -685,12 +701,10 @@ func (bo *BackupOptimizer) recommendStorage(metrics []OptimizationMetrics) *Stor
 	// Calculate current storage usage and growth
 	totalSize := int64(0)
 	totalCost := 0.0
-	var sizes []int64
 
-	for _, m := range metrics {
-		totalSize += m.CompressedSize
-		totalCost += m.Cost
-		sizes = append(sizes, m.CompressedSize)
+	for i := range metrics {
+		totalSize += metrics[i].CompressedSize
+		totalCost += metrics[i].Cost
 	}
 
 	// Calculate growth rate
@@ -758,14 +772,16 @@ func (bo *BackupOptimizer) recommendStorageTier(metrics []OptimizationMetrics) S
 	// Analyze access patterns (simplified for now)
 	avgAge := bo.calculateAverageAge(metrics)
 
-	if avgAge < 7*24*time.Hour {
+	switch {
+	case avgAge < 7*24*time.Hour:
 		return StorageTierHot
-	} else if avgAge < 30*24*time.Hour {
+	case avgAge < 30*24*time.Hour:
 		return StorageTierCool
-	} else if avgAge < 90*24*time.Hour {
+	case avgAge < 90*24*time.Hour:
 		return StorageTierArchive
+	default:
+		return StorageTierGlacier
 	}
-	return StorageTierGlacier
 }
 
 // calculateAverageAge calculates average age of backups.
@@ -777,8 +793,8 @@ func (bo *BackupOptimizer) calculateAverageAge(metrics []OptimizationMetrics) ti
 	totalAge := time.Duration(0)
 	now := time.Now()
 
-	for _, m := range metrics {
-		totalAge += now.Sub(m.Timestamp)
+	for i := range metrics {
+		totalAge += now.Sub(metrics[i].Timestamp)
 	}
 
 	return totalAge / time.Duration(len(metrics))
@@ -895,8 +911,8 @@ func (bo *BackupOptimizer) calculateOverallScore(rec *OptimizationRecommendation
 func (bo *BackupOptimizer) calculateSavings(metrics []OptimizationMetrics, rec *OptimizationRecommendation) CostSavings {
 	// Calculate time savings from optimal compression and parallelism
 	avgDuration := time.Duration(0)
-	for _, m := range metrics {
-		avgDuration += m.Duration
+	for i := range metrics {
+		avgDuration += metrics[i].Duration
 	}
 	avgDuration /= time.Duration(len(metrics))
 
@@ -911,8 +927,8 @@ func (bo *BackupOptimizer) calculateSavings(metrics []OptimizationMetrics, rec *
 
 	// Storage savings
 	avgSize := int64(0)
-	for _, m := range metrics {
-		avgSize += m.CompressedSize
+	for i := range metrics {
+		avgSize += metrics[i].CompressedSize
 	}
 	avgSize /= int64(len(metrics))
 
@@ -1079,11 +1095,4 @@ func (bo *BackupOptimizer) GetStatistics() map[string]interface{} {
 		"total_annual_savings":   totalSavings,
 		"average_savings_per_db": totalSavings / float64(max(1, totalDatabases)),
 	}
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

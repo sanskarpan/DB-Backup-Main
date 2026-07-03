@@ -169,84 +169,77 @@ func (cs *CloudSelector) getCandidates(criteria *SelectionCriteria) map[string]*
 	candidates := make(map[string]*ProviderMetrics)
 
 	for key, metrics := range cs.metrics {
-		// Check excluded providers
-		excluded := false
-		for _, ep := range criteria.ExcludedProviders {
-			if metrics.Provider == ep {
-				excluded = true
-				break
-			}
+		if metricsMeetCriteria(metrics, criteria) {
+			candidates[key] = metrics
 		}
-		if excluded {
-			continue
-		}
-
-		// Check max cost
-		if criteria.MaxCost > 0 && metrics.CostPerGB > criteria.MaxCost {
-			continue
-		}
-
-		// Check min performance
-		if criteria.MinPerformance > 0 && metrics.PerformanceScore < criteria.MinPerformance {
-			continue
-		}
-
-		// Check max latency
-		if criteria.MaxLatency > 0 && metrics.Latency > criteria.MaxLatency {
-			continue
-		}
-
-		// Check required regions
-		if len(criteria.RequiredRegions) > 0 {
-			hasRegion := false
-			for _, reqRegion := range criteria.RequiredRegions {
-				for _, supportedRegion := range metrics.SupportedRegions {
-					if reqRegion == supportedRegion {
-						hasRegion = true
-						break
-					}
-				}
-				if hasRegion {
-					break
-				}
-			}
-			if !hasRegion {
-				continue
-			}
-		}
-
-		// Check data residency
-		if criteria.DataResidencyCountry != "" {
-			if metrics.DataResidencyCountry != criteria.DataResidencyCountry {
-				continue
-			}
-		}
-
-		// Check compliance certifications
-		if len(criteria.RequireCertifications) > 0 {
-			hasAllCerts := true
-			for _, reqCert := range criteria.RequireCertifications {
-				found := false
-				for _, cert := range metrics.ComplianceCerts {
-					if cert == reqCert {
-						found = true
-						break
-					}
-				}
-				if !found {
-					hasAllCerts = false
-					break
-				}
-			}
-			if !hasAllCerts {
-				continue
-			}
-		}
-
-		candidates[key] = metrics
 	}
 
 	return candidates
+}
+
+// metricsMeetCriteria reports whether a provider's metrics satisfy all criteria.
+func metricsMeetCriteria(metrics *ProviderMetrics, criteria *SelectionCriteria) bool {
+	if isProviderExcluded(metrics.Provider, criteria.ExcludedProviders) {
+		return false
+	}
+	if criteria.MaxCost > 0 && metrics.CostPerGB > criteria.MaxCost {
+		return false
+	}
+	if criteria.MinPerformance > 0 && metrics.PerformanceScore < criteria.MinPerformance {
+		return false
+	}
+	if criteria.MaxLatency > 0 && metrics.Latency > criteria.MaxLatency {
+		return false
+	}
+	if len(criteria.RequiredRegions) > 0 && !hasAnyRegion(metrics.SupportedRegions, criteria.RequiredRegions) {
+		return false
+	}
+	if criteria.DataResidencyCountry != "" && metrics.DataResidencyCountry != criteria.DataResidencyCountry {
+		return false
+	}
+	if len(criteria.RequireCertifications) > 0 && !hasAllCertifications(metrics.ComplianceCerts, criteria.RequireCertifications) {
+		return false
+	}
+	return true
+}
+
+// isProviderExcluded reports whether provider appears in the excluded list.
+func isProviderExcluded(provider StorageProvider, excluded []StorageProvider) bool {
+	for _, ep := range excluded {
+		if provider == ep {
+			return true
+		}
+	}
+	return false
+}
+
+// hasAnyRegion reports whether supported includes at least one required region.
+func hasAnyRegion(supported, required []string) bool {
+	for _, reqRegion := range required {
+		for _, supportedRegion := range supported {
+			if reqRegion == supportedRegion {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// hasAllCertifications reports whether certs contains every required certification.
+func hasAllCertifications(certs, required []string) bool {
+	for _, reqCert := range required {
+		found := false
+		for _, cert := range certs {
+			if cert == reqCert {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 // calculateScore calculates a score for a provider based on strategy.
@@ -395,44 +388,60 @@ func (cs *CloudSelector) ensureRedundancy(selections []*ProviderSelection, minRe
 
 	// Select top from each provider until we have minRedundancy
 	result := make([]*ProviderSelection, 0, minRedundancy)
-	usedProviders := make(map[StorageProvider]bool)
 
-	// First pass: one from each unique provider
-	for len(result) < minRedundancy && len(usedProviders) < len(byProvider) {
-		for provider, sels := range byProvider {
-			if usedProviders[provider] {
-				continue
-			}
-			if len(sels) > 0 {
-				result = append(result, sels[0])
-				usedProviders[provider] = true
-				if len(result) >= minRedundancy {
-					break
-				}
-			}
-		}
-	}
+	// First pass: one from each unique provider.
+	result = redundancyFirstPass(result, byProvider, minRedundancy)
 
-	// Second pass: fill remaining slots with best scores
+	// Second pass: fill remaining slots with best scores.
 	if len(result) < minRedundancy {
-		for _, sel := range selections {
-			alreadySelected := false
-			for _, r := range result {
-				if r.Provider == sel.Provider && r.Region == sel.Region {
-					alreadySelected = true
-					break
-				}
-			}
-			if !alreadySelected {
-				result = append(result, sel)
-				if len(result) >= minRedundancy {
-					break
-				}
-			}
-		}
+		result = redundancySecondPass(result, selections, minRedundancy)
 	}
 
 	return result
+}
+
+// redundancyFirstPass adds one selection from each unique provider until
+// minRedundancy is reached.
+func redundancyFirstPass(result []*ProviderSelection, byProvider map[StorageProvider][]*ProviderSelection, minRedundancy int) []*ProviderSelection {
+	usedProviders := make(map[StorageProvider]bool)
+	for len(result) < minRedundancy && len(usedProviders) < len(byProvider) {
+		for provider, sels := range byProvider {
+			if usedProviders[provider] || len(sels) == 0 {
+				continue
+			}
+			result = append(result, sels[0])
+			usedProviders[provider] = true
+			if len(result) >= minRedundancy {
+				break
+			}
+		}
+	}
+	return result
+}
+
+// redundancySecondPass fills any remaining redundancy slots from the ordered
+// selections, skipping entries already present in result.
+func redundancySecondPass(result, selections []*ProviderSelection, minRedundancy int) []*ProviderSelection {
+	for _, sel := range selections {
+		if selectionPresent(result, sel) {
+			continue
+		}
+		result = append(result, sel)
+		if len(result) >= minRedundancy {
+			break
+		}
+	}
+	return result
+}
+
+// selectionPresent reports whether sel (by provider and region) is already in result.
+func selectionPresent(result []*ProviderSelection, sel *ProviderSelection) bool {
+	for _, r := range result {
+		if r.Provider == sel.Provider && r.Region == sel.Region {
+			return true
+		}
+	}
+	return false
 }
 
 // GetBestProvider returns the single best provider based on criteria.

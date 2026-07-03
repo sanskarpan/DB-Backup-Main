@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+// priorityHigh is the high-priority / high-severity level value.
+const priorityHigh = "high"
+
 // MonitoringIntegration integrates push notifications with the monitoring system.
 type MonitoringIntegration struct {
 	pushService *PushService
@@ -98,7 +101,7 @@ func (m *MonitoringIntegration) NotifyBackupCompleted(ctx context.Context, userI
 			Badge:              "/icons/error-badge.png",
 			Tag:                fmt.Sprintf("backup-%s", backupID),
 			Type:               PushNotificationBackupFailed,
-			Priority:           "high",
+			Priority:           priorityHigh,
 			RequireInteraction: true,
 			Data: map[string]interface{}{
 				"type":      "backup_failed",
@@ -126,7 +129,7 @@ func (m *MonitoringIntegration) NotifyBackupCompleted(ctx context.Context, userI
 }
 
 // NotifyMetricThresholdExceeded sends notification when a metric exceeds threshold.
-func (m *MonitoringIntegration) NotifyMetricThresholdExceeded(ctx context.Context, metric string, value float64, threshold float64) error {
+func (m *MonitoringIntegration) NotifyMetricThresholdExceeded(ctx context.Context, metric string, value, threshold float64) error {
 	m.mu.RLock()
 	userIDs := m.subscribers[metric]
 	m.mu.RUnlock()
@@ -138,7 +141,7 @@ func (m *MonitoringIntegration) NotifyMetricThresholdExceeded(ctx context.Contex
 		Badge:              "/icons/alert-badge.png",
 		Tag:                fmt.Sprintf("metric-%s", metric),
 		Type:               PushNotificationMonitoringAlert,
-		Priority:           "high",
+		Priority:           priorityHigh,
 		RequireInteraction: true,
 		Data: map[string]interface{}{
 			"type":      "monitoring_alert",
@@ -173,12 +176,12 @@ func (m *MonitoringIntegration) NotifyMetricThresholdExceeded(ctx context.Contex
 }
 
 // NotifyComplianceViolation sends notification for compliance violations.
-func (m *MonitoringIntegration) NotifyComplianceViolation(ctx context.Context, userID, violationType, description string, severity string) error {
+func (m *MonitoringIntegration) NotifyComplianceViolation(ctx context.Context, userID, violationType, description, severity string) error {
 	priority := "normal"
 	requireInteraction := false
 
-	if severity == "high" || severity == "critical" {
-		priority = "high"
+	if severity == priorityHigh || severity == "critical" {
+		priority = priorityHigh
 		requireInteraction = true
 	}
 
@@ -220,7 +223,7 @@ func (m *MonitoringIntegration) NotifySystemCritical(ctx context.Context, title,
 		Badge:              "/icons/error-badge.png",
 		Tag:                "system-critical",
 		Type:               PushNotificationSystemCritical,
-		Priority:           "high",
+		Priority:           priorityHigh,
 		RequireInteraction: true,
 		Data:               data,
 		Actions: []NotificationAction{
@@ -265,7 +268,7 @@ func (m *MonitoringIntegration) NotifyStorageWarning(ctx context.Context, userID
 	requireInteraction := false
 
 	if usedPercent >= 90 {
-		priority = "high"
+		priority = priorityHigh
 		requireInteraction = true
 	}
 
@@ -312,7 +315,7 @@ func (m *MonitoringIntegration) NotifyDatabaseConnectionFailed(ctx context.Conte
 		Badge:              "/icons/error-badge.png",
 		Tag:                fmt.Sprintf("db-connection-%s", databaseName),
 		Type:               PushNotificationMonitoringAlert,
-		Priority:           "high",
+		Priority:           priorityHigh,
 		RequireInteraction: !retrying,
 		Data: map[string]interface{}{
 			"type":      "connection_failed",

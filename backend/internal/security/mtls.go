@@ -1,6 +1,7 @@
 package security
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -176,7 +177,7 @@ func (m *MTLSManager) loadFromVault(path string) ([]byte, error) {
 		return nil, fmt.Errorf("vault path is empty")
 	}
 
-	secret, err := m.vault.GetSecret(nil, path)
+	secret, err := m.vault.GetSecret(context.TODO(), path)
 	if err != nil {
 		return nil, err
 	}
@@ -485,6 +486,8 @@ func GetCipherSuiteName(cipherSuite uint16) string {
 }
 
 // ValidateTLSConnection validates a TLS connection state.
+//
+//nolint:gocritic // hugeParam: exported API mirrors tls.ConnectionState value semantics; changing to pointer would break the public signature.
 func ValidateTLSConnection(state tls.ConnectionState) error {
 	// Check TLS version
 	if state.Version < tls.VersionTLS12 {

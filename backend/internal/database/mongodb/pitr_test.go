@@ -239,6 +239,7 @@ func TestBackupWithOplog(t *testing.T) {
 
 // Helper function to setup test MongoDB connection.
 func setupTestMongoDB(t *testing.T) *MongoDBDriver {
+	t.Helper()
 	skipIfMongoDBUnavailable(t)
 	host := os.Getenv("MONGODB_TEST_HOST")
 	if host == "" {

@@ -331,13 +331,14 @@ func (bm *BudgetManager) EvaluateBudget(ctx context.Context, budgetID string) er
 	budget.LastEvaluated = now
 
 	// Determine status
-	if percentUsed >= 100 {
+	switch {
+	case percentUsed >= 100:
 		budget.Status = StatusExceeded
-	} else if percentUsed >= 90 {
+	case percentUsed >= 90:
 		budget.Status = StatusCritical
-	} else if percentUsed >= 75 {
+	case percentUsed >= 75:
 		budget.Status = StatusWarning
-	} else {
+	default:
 		budget.Status = StatusOK
 	}
 	bm.mu.Unlock()
@@ -448,11 +449,10 @@ func (bm *BudgetManager) checkThresholds(ctx context.Context, budget *Budget) {
 // createAlert creates a budget alert.
 func (bm *BudgetManager) createAlert(budget *Budget, threshold float64) *BudgetAlert {
 	severity := SeverityInfo
-	if threshold >= 100 {
+	switch {
+	case threshold >= 90:
 		severity = SeverityCritical
-	} else if threshold >= 90 {
-		severity = SeverityCritical
-	} else if threshold >= 75 {
+	case threshold >= 75:
 		severity = SeverityWarning
 	}
 

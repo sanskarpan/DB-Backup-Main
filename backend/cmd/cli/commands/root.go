@@ -80,8 +80,8 @@ func init() {
 	rootCmd.PersistentFlags().String("log-file", "", "log file path")
 
 	// Bind flags to viper
-	viper.BindPFlag("logging.level", rootCmd.PersistentFlags().Lookup("log-level"))
-	viper.BindPFlag("logging.file.path", rootCmd.PersistentFlags().Lookup("log-file"))
+	cobra.CheckErr(viper.BindPFlag("logging.level", rootCmd.PersistentFlags().Lookup("log-level")))
+	cobra.CheckErr(viper.BindPFlag("logging.file.path", rootCmd.PersistentFlags().Lookup("log-file")))
 }
 
 // initConfig reads in config file and ENV variables if set.

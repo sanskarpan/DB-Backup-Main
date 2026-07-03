@@ -3,6 +3,7 @@ package s3
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -13,6 +14,9 @@ import (
 
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
+
+// ErrNoRetention indicates that an object has no Object Lock retention configured.
+var ErrNoRetention = errors.New("object has no retention configuration")
 
 // ObjectLockMode defines the S3 Object Lock mode.
 type ObjectLockMode string
@@ -97,7 +101,7 @@ func (p *S3Provider) SetDefaultRetention(ctx context.Context, mode ObjectLockMod
 			Rule: &types.ObjectLockRule{
 				DefaultRetention: &types.DefaultRetention{
 					Mode: s3Mode,
-					Days: aws.Int32(int32(days)),
+					Days: aws.Int32(int32(days)), //nolint:gosec // G115: retention days is a small, operator-supplied bounded value
 				},
 			},
 		},
@@ -170,7 +174,7 @@ func (p *S3Provider) GetObjectRetention(ctx context.Context, remotePath string) 
 	}
 
 	if output.Retention == nil {
-		return nil, nil
+		return nil, ErrNoRetention
 	}
 
 	config := &ObjectLockConfig{
@@ -234,13 +238,12 @@ func (p *S3Provider) ExtendRetention(ctx context.Context, remotePath string,
 ) error {
 	// Get current retention
 	current, err := p.GetObjectRetention(ctx, remotePath)
-	if err != nil {
-		return err
-	}
-
-	if current == nil {
+	if errors.Is(err, ErrNoRetention) {
 		return pkgErrors.New(pkgErrors.ErrorTypeValidation,
 			"object does not have retention set")
+	}
+	if err != nil {
+		return err
 	}
 
 	// Calculate new retention date

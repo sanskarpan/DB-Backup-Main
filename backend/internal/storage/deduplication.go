@@ -110,20 +110,12 @@ type DeduplicationMetrics struct {
 type ChunkCache struct {
 	maxSize int
 	cache   map[string]*cacheEntry
-	lruList *lruNode
 	mu      sync.RWMutex
 }
 
 type cacheEntry struct {
 	data     []byte
-	node     *lruNode
 	accessed time.Time
-}
-
-type lruNode struct {
-	key  string
-	prev *lruNode
-	next *lruNode
 }
 
 // NewDeduplicationManager creates a new deduplication manager.
@@ -225,8 +217,8 @@ func (m *DeduplicationManager) StoreFile(sourcePath string) (*FileManifest, erro
 		hash := m.hashChunk(chunk)
 
 		// Store chunk if not exists
-		if err := m.storeChunk(hash, chunk); err != nil {
-			return nil, fmt.Errorf("failed to store chunk: %w", err)
+		if storeErr := m.storeChunk(hash, chunk); storeErr != nil {
+			return nil, fmt.Errorf("failed to store chunk: %w", storeErr)
 		}
 
 		// Add to manifest
@@ -311,7 +303,10 @@ func (m *DeduplicationManager) storeChunk(hash string, data []byte) error {
 
 	// Store chunk to disk
 	chunkPath := m.getChunkPath(hash)
-	if err := os.WriteFile(chunkPath, dataToStore, 0o644); err != nil {
+	if err := os.MkdirAll(filepath.Dir(chunkPath), 0o755); err != nil {
+		return fmt.Errorf("failed to create chunk directory: %w", err)
+	}
+	if err := os.WriteFile(chunkPath, dataToStore, 0o600); err != nil {
 		return fmt.Errorf("failed to write chunk: %w", err)
 	}
 
@@ -399,7 +394,6 @@ func (m *DeduplicationManager) getChunkPath(hash string) string {
 	// Use first 2 characters as subdirectory for better filesystem performance
 	subdir := hash[:2]
 	subdirPath := filepath.Join(m.config.ChunkStorePath, subdir)
-	os.MkdirAll(subdirPath, 0o755)
 	return filepath.Join(subdirPath, hash)
 }
 
@@ -446,23 +440,25 @@ func (m *DeduplicationManager) GarbageCollect() (int, error) {
 	removed := 0
 
 	for hash, meta := range m.index {
-		if meta.RefCount == 0 {
-			// Remove chunk file
-			if err := os.Remove(meta.StoragePath); err != nil && !os.IsNotExist(err) {
-				return removed, fmt.Errorf("failed to remove chunk: %w", err)
-			}
-
-			// Remove from index
-			delete(m.index, hash)
-			delete(m.refCount, hash)
-			removed++
-
-			// Update metrics
-			m.metrics.mu.Lock()
-			m.metrics.UniqueChunks--
-			m.metrics.UniqueBytes -= meta.Size
-			m.metrics.mu.Unlock()
+		if meta.RefCount != 0 {
+			continue
 		}
+
+		// Remove chunk file
+		if err := os.Remove(meta.StoragePath); err != nil && !os.IsNotExist(err) {
+			return removed, fmt.Errorf("failed to remove chunk: %w", err)
+		}
+
+		// Remove from index
+		delete(m.index, hash)
+		delete(m.refCount, hash)
+		removed++
+
+		// Update metrics
+		m.metrics.mu.Lock()
+		m.metrics.UniqueChunks--
+		m.metrics.UniqueBytes -= meta.Size
+		m.metrics.mu.Unlock()
 	}
 
 	return removed, nil
@@ -498,7 +494,7 @@ func (m *DeduplicationManager) saveIndex() error {
 		return fmt.Errorf("failed to marshal index: %w", err)
 	}
 
-	if err := os.WriteFile(m.config.IndexPath, data, 0o644); err != nil {
+	if err := os.WriteFile(m.config.IndexPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write index: %w", err)
 	}
 
@@ -540,7 +536,6 @@ func NewChunkCache(maxSize int) *ChunkCache {
 	return &ChunkCache{
 		maxSize: maxSize,
 		cache:   make(map[string]*cacheEntry),
-		lruList: &lruNode{},
 	}
 }
 

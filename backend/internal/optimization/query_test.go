@@ -355,6 +355,7 @@ func (mqr *mockQueryRewriter) GetRewriteRules() []RewriteRule {
 	return mqr.rules
 }
 
+//nolint:gocritic // hugeParam: RewriteRule is passed by value to satisfy the QueryRewriter interface
 func (mqr *mockQueryRewriter) ApplyRule(ctx context.Context, query string, rule RewriteRule) (string, error) {
 	if mqr.errorToReturn != nil {
 		return "", mqr.errorToReturn

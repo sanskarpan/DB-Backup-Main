@@ -584,6 +584,7 @@ func TestTimescaleDB_BuildConnectionString(t *testing.T) {
 // Helper functions
 
 func setupTestDriver(t *testing.T) *TimescaleDBDriver {
+	t.Helper()
 	skipIfTimescaleDBUnavailable(t)
 	driver := NewTimescaleDBDriver()
 	config := &database.ConnectionConfig{

@@ -14,7 +14,7 @@ import (
 )
 
 // SlackNotifier implements Slack webhook notifications.
-type SlackNotifier struct {
+type SlackNotifier struct { //nolint:revive // keeps public name stable; used by other packages (e.g. notification/factory)
 	webhookURL string
 	channel    string
 	username   string
@@ -74,7 +74,7 @@ func (s *SlackNotifier) Send(ctx context.Context, notif *notification.Notificati
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeOperation, "failed to marshal Slack message")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", s.webhookURL, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.webhookURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeOperation, "failed to create request")
 	}
@@ -109,7 +109,7 @@ func (s *SlackNotifier) ValidateConfig() error {
 }
 
 // SlackMessage represents a Slack message payload.
-type SlackMessage struct {
+type SlackMessage struct { //nolint:revive // keeps public exported name stable
 	Channel     string            `json:"channel,omitempty"`
 	Username    string            `json:"username,omitempty"`
 	IconEmoji   string            `json:"icon_emoji,omitempty"`
@@ -118,7 +118,7 @@ type SlackMessage struct {
 }
 
 // SlackAttachment represents a Slack message attachment.
-type SlackAttachment struct {
+type SlackAttachment struct { //nolint:revive // keeps public exported name stable
 	Fallback   string       `json:"fallback"`
 	Color      string       `json:"color"`
 	Title      string       `json:"title,omitempty"`
@@ -131,7 +131,7 @@ type SlackAttachment struct {
 }
 
 // SlackField represents a field in a Slack attachment.
-type SlackField struct {
+type SlackField struct { //nolint:revive // keeps public exported name stable
 	Title string `json:"title"`
 	Value string `json:"value"`
 	Short bool   `json:"short"`

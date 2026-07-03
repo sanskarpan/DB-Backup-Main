@@ -492,7 +492,7 @@ func (m *MockIntegration) GetIncident(ctx context.Context, incidentID string) (*
 	}, nil
 }
 
-func (m *MockIntegration) CloseIncident(ctx context.Context, incidentID string, resolution string) error {
+func (m *MockIntegration) CloseIncident(ctx context.Context, incidentID, resolution string) error {
 	return nil
 }
 

@@ -48,7 +48,7 @@ func TestInjectExtractHTTP(t *testing.T) {
 	defer span.End()
 
 	// Create HTTP request
-	req, err := http.NewRequest("GET", "http://example.com", nil)
+	req, err := http.NewRequest("GET", "http://example.com", http.NoBody)
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
@@ -229,7 +229,7 @@ func TestHTTPMiddleware(t *testing.T) {
 	handler := HTTPMiddleware(testHandler)
 
 	// Create test request
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest("GET", "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	// Execute request
@@ -255,7 +255,7 @@ func TestHTTPMiddlewareWithPropagation(t *testing.T) {
 
 	propagator := NewContextPropagator()
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest("GET", "/test", http.NoBody)
 	propagator.InjectHTTP(ctx, req)
 
 	originalTraceID := GetTraceID(ctx)
@@ -322,7 +322,7 @@ func TestContextPropagationEndToEnd(t *testing.T) {
 
 	// Service A makes HTTP call to Service B
 	propagator := NewContextPropagator()
-	reqToB, _ := http.NewRequest("GET", "http://service-b/endpoint", nil)
+	reqToB, _ := http.NewRequest("GET", "http://service-b/endpoint", http.NoBody)
 	propagator.InjectHTTP(ctxA, reqToB)
 
 	// Service B receives request and extracts context

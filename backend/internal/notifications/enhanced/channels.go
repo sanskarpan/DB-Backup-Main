@@ -104,14 +104,14 @@ func (c *EmailChannel) buildHTMLEmail(notification *Notification) string {
 
 	// Add image if present
 	if notification.ImageURL != "" {
-		html.WriteString(fmt.Sprintf(`<img src="%s" style="max-width: 100%%; height: auto;">`, notification.ImageURL))
+		html.WriteString(fmt.Sprintf(`<img src=%q style="max-width: 100%%; height: auto;">`, notification.ImageURL))
 	}
 
 	// Add actions
 	if len(notification.Actions) > 0 {
 		html.WriteString(`<div class="actions">`)
 		for _, action := range notification.Actions {
-			html.WriteString(fmt.Sprintf(`<a href="%s" class="btn">%s</a> `, action.URL, action.Label))
+			html.WriteString(fmt.Sprintf(`<a href=%q class="btn">%s</a> `, action.URL, action.Label))
 		}
 		html.WriteString(`</div>`)
 	}
@@ -219,7 +219,10 @@ func (c *SlackChannel) Send(ctx context.Context, notification *Notification) err
 			})
 		}
 
-		blocks := payload["blocks"].([]map[string]interface{})
+		blocks, ok := payload["blocks"].([]map[string]interface{})
+		if !ok {
+			blocks = []map[string]interface{}{}
+		}
 		blocks = append(blocks, map[string]interface{}{
 			"type":     "actions",
 			"elements": actions,
@@ -233,7 +236,7 @@ func (c *SlackChannel) Send(ctx context.Context, notification *Notification) err
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.WebhookURL, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.WebhookURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}
@@ -325,7 +328,7 @@ func (c *TeamsChannel) Send(ctx context.Context, notification *Notification) err
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.WebhookURL, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.WebhookURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}
@@ -404,7 +407,7 @@ func (c *DiscordChannel) Send(ctx context.Context, notification *Notification) e
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.WebhookURL, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.WebhookURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}
@@ -463,7 +466,7 @@ func (c *WebhookChannel) Send(ctx context.Context, notification *Notification) e
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.URL, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.URL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}
@@ -539,7 +542,7 @@ func (c *PushChannel) sendFCM(ctx context.Context, deviceToken string, notificat
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://fcm.googleapis.com/fcm/send", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://fcm.googleapis.com/fcm/send", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}

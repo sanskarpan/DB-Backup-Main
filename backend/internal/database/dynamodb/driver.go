@@ -34,6 +34,8 @@ type dynamoDBAPI interface {
 }
 
 // DynamoDBDriver implements the database.Driver interface for DynamoDB.
+//
+//nolint:revive // keeps public name stable across packages
 type DynamoDBDriver struct {
 	client      dynamoDBAPI
 	config      *database.ConnectionConfig
@@ -202,7 +204,7 @@ func (d *DynamoDBDriver) waitForBackup(ctx context.Context, backupARN string) er
 // getTablesToBackup returns the list of tables to backup.
 func (d *DynamoDBDriver) getTablesToBackup(ctx context.Context, opts *database.BackupOptions) ([]string, error) {
 	// If specific tables are specified, use those
-	if opts.IncludeSchemas != nil && len(opts.IncludeSchemas) > 0 {
+	if len(opts.IncludeSchemas) > 0 {
 		return opts.IncludeSchemas, nil
 	}
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/template"
 	"time"
+	"unicode"
 
 	"github.com/rs/zerolog/log"
 )
@@ -38,7 +39,6 @@ func (e *TemplateEngine) registerBuiltInTemplates() {
   "source": "{{.Source}}",
   "data": {{toJSON .Data}}
 }`
-	e.RegisterTemplate("default", defaultTemplate)
 
 	// Slack template
 	slackTemplate := `{
@@ -60,7 +60,6 @@ func (e *TemplateEngine) registerBuiltInTemplates() {
     }
   ]
 }`
-	e.RegisterTemplate("slack", slackTemplate)
 
 	// Discord template
 	discordTemplate := `{
@@ -77,7 +76,6 @@ func (e *TemplateEngine) registerBuiltInTemplates() {
     "timestamp": "{{.Timestamp.Format "2006-01-02T15:04:05Z07:00"}}"
   }]
 }`
-	e.RegisterTemplate("discord", discordTemplate)
 
 	// Microsoft Teams template
 	teamsTemplate := `{
@@ -97,7 +95,6 @@ func (e *TemplateEngine) registerBuiltInTemplates() {
     "text": "` + "```json\n{{toJSON .Data}}\n```" + `"
   }]
 }`
-	e.RegisterTemplate("teams", teamsTemplate)
 
 	// PagerDuty template
 	pagerdutyTemplate := `{
@@ -111,18 +108,15 @@ func (e *TemplateEngine) registerBuiltInTemplates() {
     "custom_details": {{toJSON .Data}}
   }
 }`
-	e.RegisterTemplate("pagerduty", pagerdutyTemplate)
 
 	// Email-friendly template
 	emailTemplate := `{
   "subject": "{{.Type}} Event - {{.Source}}",
   "body": "Event ID: {{.ID}}\nType: {{.Type}}\nSource: {{.Source}}\nTimestamp: {{.Timestamp.Format "2006-01-02 15:04:05"}}\n\nDetails:\n{{toJSON .Data}}"
 }`
-	e.RegisterTemplate("email", emailTemplate)
 
 	// Minimal template - just data
 	minimalTemplate := `{{toJSON .Data}}`
-	e.RegisterTemplate("minimal", minimalTemplate)
 
 	// Backup-specific template
 	backupTemplate := `{
@@ -133,7 +127,26 @@ func (e *TemplateEngine) registerBuiltInTemplates() {
   "timestamp": "{{.Timestamp.Format "2006-01-02T15:04:05Z07:00"}}",
   "details": {{toJSON .Data}}
 }`
-	e.RegisterTemplate("backup", backupTemplate)
+
+	builtIns := []struct {
+		name string
+		tmpl string
+	}{
+		{"default", defaultTemplate},
+		{"slack", slackTemplate},
+		{"discord", discordTemplate},
+		{"teams", teamsTemplate},
+		{"pagerduty", pagerdutyTemplate},
+		{"email", emailTemplate},
+		{"minimal", minimalTemplate},
+		{"backup", backupTemplate},
+	}
+
+	for _, bt := range builtIns {
+		if err := e.RegisterTemplate(bt.name, bt.tmpl); err != nil {
+			log.Error().Err(err).Str("template", bt.name).Msg("Failed to register built-in webhook template")
+		}
+	}
 
 	log.Info().Int("count", len(e.templates)).Msg("Registered built-in webhook templates")
 }
@@ -149,7 +162,7 @@ func (e *TemplateEngine) RegisterTemplate(name, templateStr string) error {
 		"formatTime":        formatTime,
 		"upper":             strings.ToUpper,
 		"lower":             strings.ToLower,
-		"title":             strings.Title,
+		"title":             titleCase,
 	}
 
 	// Parse template
@@ -246,18 +259,35 @@ func eventColorHex(eventType EventType) string {
 	}
 }
 
+// severityInfo is the PagerDuty "info" severity level.
+const severityInfo = "info"
+
 // pagerDutySeverity returns PagerDuty severity based on event type.
 func pagerDutySeverity(eventType EventType) string {
 	switch {
 	case strings.Contains(string(eventType), "failed"):
 		return "error"
 	case strings.Contains(string(eventType), "started"):
-		return "info"
+		return severityInfo
 	case strings.Contains(string(eventType), "completed"):
-		return "info"
+		return severityInfo
 	default:
-		return "info"
+		return severityInfo
 	}
+}
+
+// titleCase capitalizes the first letter of each whitespace/punctuation-separated
+// word. It replaces the deprecated strings.Title for the "title" template helper.
+func titleCase(s string) string {
+	prevIsSeparator := true
+	return strings.Map(func(r rune) rune {
+		if prevIsSeparator && unicode.IsLetter(r) {
+			prevIsSeparator = false
+			return unicode.ToTitle(r)
+		}
+		prevIsSeparator = !unicode.IsLetter(r) && !unicode.IsNumber(r)
+		return r
+	}, s)
 }
 
 // formatTime formats a time value.
@@ -323,7 +353,7 @@ func (e *TemplateEngine) ValidateTemplate(templateStr string) error {
 		"formatTime":        formatTime,
 		"upper":             strings.ToUpper,
 		"lower":             strings.ToLower,
-		"title":             strings.Title,
+		"title":             titleCase,
 	}
 
 	_, err := template.New("validation").Funcs(funcMap).Parse(templateStr)

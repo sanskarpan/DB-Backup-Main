@@ -364,7 +364,7 @@ func TestExportCSV(t *testing.T) {
 
 	// Verify CSV contains expected sections
 	csvStr := string(data)
-	if len(csvStr) == 0 {
+	if csvStr == "" {
 		t.Errorf("Expected non-empty CSV output")
 	}
 }

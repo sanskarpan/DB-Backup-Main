@@ -12,7 +12,7 @@ import (
 )
 
 // GlusterFSProvider implements storage provider for GlusterFS.
-type GlusterFSProvider struct {
+type GlusterFSProvider struct { //nolint:revive // keeps public name stable for external API consumers
 	config *storage.GlusterFSConfig
 }
 
@@ -114,7 +114,7 @@ func (p *GlusterFSProvider) Download(ctx context.Context, remotePath, localPath 
 	defer sourceFile.Close()
 
 	// Create directory if it doesn't exist
-	if err := os.MkdirAll(filepath.Dir(localPath), 0o755); err != nil {
+	if err = os.MkdirAll(filepath.Dir(localPath), 0o755); err != nil {
 		return &storage.ProviderError{
 			Type:    storage.ProviderTypeGlusterFS,
 			Message: fmt.Sprintf("failed to create local directory: %s", filepath.Dir(localPath)),

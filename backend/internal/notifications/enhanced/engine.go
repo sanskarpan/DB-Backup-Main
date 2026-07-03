@@ -71,7 +71,10 @@ func NewEngine(config *Config) (*Engine, error) {
 
 	// Expand home directory
 	if len(config.DataDir) >= 2 && config.DataDir[:2] == "~/" {
-		home, _ := os.UserHomeDir()
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve home directory: %w", err)
+		}
 		config.DataDir = filepath.Join(home, config.DataDir[2:])
 	}
 
@@ -95,12 +98,16 @@ func NewEngine(config *Config) (*Engine, error) {
 	// Initialize components
 	if config.AnalyticsEnabled {
 		engine.analytics = NewAnalyticsTracker(filepath.Join(config.DataDir, "analytics.json"), 10000)
-		engine.analytics.Load()
+		if err := engine.analytics.Load(); err != nil {
+			return nil, fmt.Errorf("failed to load analytics: %w", err)
+		}
 	}
 
 	if config.AIEnabled {
 		engine.aiEngine = NewAIEngine(filepath.Join(config.DataDir, "ai_model.json"))
-		engine.aiEngine.Load()
+		if err := engine.aiEngine.Load(); err != nil {
+			return nil, fmt.Errorf("failed to load AI model: %w", err)
+		}
 	}
 
 	batchConfig := BatchConfig{
@@ -161,13 +168,13 @@ func (e *Engine) Send(ctx context.Context, notification *Notification) error {
 	// Check Do Not Disturb
 	if e.isInDNDPeriod(prefs) && notification.Priority < PriorityUrgent {
 		notification.Status = StatusQueued
-		notification.ScheduledFor = e.getNextAvailableTime(prefs)
+		notification.ScheduledFor = e.getNextAvailableTime()
 	}
 
 	// Check quiet hours
 	if e.isInQuietHours(prefs) && notification.Priority < PriorityHigh {
 		notification.Status = StatusQueued
-		notification.ScheduledFor = e.getNextAvailableTime(prefs)
+		notification.ScheduledFor = e.getNextAvailableTime()
 	}
 
 	// AI relevance scoring
@@ -218,7 +225,11 @@ func (e *Engine) Send(ctx context.Context, notification *Notification) error {
 	}
 
 	// Save
-	go e.saveNotifications()
+	go func() {
+		if err := e.saveNotifications(); err != nil {
+			fmt.Printf("Error saving notifications: %v\n", err)
+		}
+	}()
 
 	return nil
 }
@@ -260,7 +271,7 @@ func (e *Engine) Start() error {
 
 	// Start workers
 	for i := 0; i < e.config.WorkerCount; i++ {
-		go e.worker(i)
+		go e.worker()
 	}
 
 	// Start batch processor
@@ -293,13 +304,15 @@ func (e *Engine) Stop() error {
 	close(e.stopChan)
 
 	// Save all data
-	e.save()
+	if err := e.save(); err != nil {
+		return fmt.Errorf("failed to save on stop: %w", err)
+	}
 
 	return nil
 }
 
 // worker processes notifications from the queue.
-func (e *Engine) worker(id int) {
+func (e *Engine) worker() {
 	for {
 		select {
 		case notification := <-e.queue:
@@ -510,7 +523,7 @@ func (e *Engine) isInQuietHours(prefs *NotificationPreferences) bool {
 	return false
 }
 
-func (e *Engine) getNextAvailableTime(prefs *NotificationPreferences) *time.Time {
+func (e *Engine) getNextAvailableTime() *time.Time {
 	// Simplified implementation
 	next := time.Now().Add(time.Hour)
 	return &next
@@ -559,16 +572,17 @@ func (e *Engine) findOrCreateGroup(notification *Notification) string {
 
 	// Look for existing group
 	for _, group := range e.groups {
-		if group.Type == notification.Type && group.Category == notification.Category {
-			// Add to existing group
-			group.Notifications = append(group.Notifications, notification)
-			group.Count = len(group.Notifications)
-			group.UpdatedAt = time.Now()
-			if notification.Priority > group.Priority {
-				group.Priority = notification.Priority
-			}
-			return group.ID
+		if group.Type != notification.Type || group.Category != notification.Category {
+			continue
 		}
+		// Add to existing group
+		group.Notifications = append(group.Notifications, notification)
+		group.Count = len(group.Notifications)
+		group.UpdatedAt = time.Now()
+		if notification.Priority > group.Priority {
+			group.Priority = notification.Priority
+		}
+		return group.ID
 	}
 
 	// Create new group
@@ -600,8 +614,8 @@ func (e *Engine) renderTemplate(template string, variables map[string]interface{
 	return result
 }
 
-// replaceString replaces all occurrences of old with new in s.
-func replaceString(s, old, new string) string {
+// replaceString replaces all occurrences of old with replacement in s.
+func replaceString(s, old, replacement string) string {
 	result := ""
 	for {
 		idx := findString(s, old)
@@ -609,7 +623,7 @@ func replaceString(s, old, new string) string {
 			result += s
 			break
 		}
-		result += s[:idx] + new
+		result += s[:idx] + replacement
 		s = s[idx+len(old):]
 	}
 	return result
@@ -617,7 +631,7 @@ func replaceString(s, old, new string) string {
 
 // findString returns the index of the first occurrence of substr in s, or -1 if not found.
 func findString(s, substr string) int {
-	if len(substr) == 0 {
+	if substr == "" {
 		return 0
 	}
 	for i := 0; i <= len(s)-len(substr); i++ {
@@ -699,7 +713,7 @@ func (e *Engine) saveTemplates() error {
 	}
 
 	path := filepath.Join(e.dataDir, "templates.json")
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o600)
 }
 
 func (e *Engine) loadPreferences() error {
@@ -736,7 +750,7 @@ func (e *Engine) savePreferences() error {
 	}
 
 	path := filepath.Join(e.dataDir, "preferences.json")
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o600)
 }
 
 func (e *Engine) loadNotifications() error {
@@ -780,5 +794,5 @@ func (e *Engine) saveNotifications() error {
 	}
 
 	path := filepath.Join(e.dataDir, "notifications.json")
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o600)
 }

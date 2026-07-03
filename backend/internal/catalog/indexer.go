@@ -86,6 +86,8 @@ type BackupDocument struct {
 }
 
 // CatalogIndexer indexes backup metadata into Elasticsearch.
+//
+//nolint:revive // keeps public name stable; used as catalog.CatalogIndexer by other packages
 type CatalogIndexer struct {
 	client    *ElasticsearchClient
 	indexName string

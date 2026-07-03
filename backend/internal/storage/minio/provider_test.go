@@ -306,12 +306,20 @@ func TestMinIOProvider_List(t *testing.T) {
 	prefix := "test-list-" + time.Now().Format("20060102150405") + "/"
 	files := []string{"file1.txt", "file2.txt", "file3.txt"}
 
+	var uploaded []string
 	for _, file := range files {
 		remotePath := prefix + file
 		err := provider.UploadStream(ctx, bytes.NewReader([]byte("content")), remotePath, nil)
 		require.NoError(t, err)
-		defer provider.Delete(ctx, remotePath)
+		uploaded = append(uploaded, remotePath)
 	}
+	defer func() {
+		for _, remotePath := range uploaded {
+			if err := provider.Delete(ctx, remotePath); err != nil {
+				t.Logf("cleanup: failed to delete %s: %v", remotePath, err)
+			}
+		}
+	}()
 
 	// List files
 	result, err := provider.List(ctx, prefix)
@@ -522,7 +530,8 @@ func skipIfMinIOUnavailable(t *testing.T) {
 	conn.Close()
 }
 
-func setupTestProvider(t *testing.T) *MinIOProvider {
+func setupTestProvider(t *testing.T) *Provider {
+	t.Helper()
 	skipIfMinIOUnavailable(t)
 	config := &storage.MinIOConfig{
 		Endpoint:  getEnv("MINIO_ENDPOINT", "localhost:9000"),
@@ -545,6 +554,7 @@ func setupTestProvider(t *testing.T) *MinIOProvider {
 }
 
 func createTestFile(t *testing.T, content string) string {
+	t.Helper()
 	tmpFile, err := os.CreateTemp("", "minio-test-*.txt")
 	require.NoError(t, err)
 

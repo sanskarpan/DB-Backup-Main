@@ -44,7 +44,7 @@ type mockDownloader struct {
 	shouldFail bool
 }
 
-func (m *mockDownloader) Download(ctx context.Context, provider StorageProvider, location string) ([]byte, map[string]interface{}, error) {
+func (m *mockDownloader) Download(ctx context.Context, provider StorageProvider, location string) (backupData []byte, meta map[string]interface{}, err error) {
 	if m.shouldFail {
 		return nil, nil, fmt.Errorf("mock download failed")
 	}

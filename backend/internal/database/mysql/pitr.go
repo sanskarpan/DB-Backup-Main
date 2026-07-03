@@ -45,10 +45,7 @@ func (p *PITRManager) BackupBinaryLogs(ctx context.Context, outputDir string, si
 
 	// Filter logs if 'since' is provided
 	if since != nil {
-		binlogs, err = p.filterBinaryLogsSince(ctx, binlogs, *since)
-		if err != nil {
-			return err
-		}
+		binlogs = p.filterBinaryLogsSince(ctx, binlogs, *since)
 	}
 
 	// Flush logs to ensure current log is complete
@@ -146,7 +143,7 @@ func (p *PITRManager) getBinaryLogs(ctx context.Context) ([]string, error) {
 	return logs, nil
 }
 
-func (p *PITRManager) filterBinaryLogsSince(ctx context.Context, logs []string, since time.Time) ([]string, error) {
+func (p *PITRManager) filterBinaryLogsSince(ctx context.Context, logs []string, since time.Time) []string {
 	var filtered []string
 
 	for _, logName := range logs {
@@ -164,7 +161,7 @@ func (p *PITRManager) filterBinaryLogsSince(ctx context.Context, logs []string, 
 		}
 	}
 
-	return filtered, nil
+	return filtered
 }
 
 func (p *PITRManager) getFirstEventTime(ctx context.Context, logName string) (time.Time, error) {
@@ -192,15 +189,33 @@ func (p *PITRManager) getFirstEventTime(ctx context.Context, logName string) (ti
 
 	// Parse the timestamp
 	dateStr := matches[1]
-	hour, _ := strconv.Atoi(matches[2])
-	min, _ := strconv.Atoi(matches[3])
-	sec, _ := strconv.Atoi(matches[4])
+	hour, err := strconv.Atoi(matches[2])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid hour in binary log timestamp: %w", err)
+	}
+	minute, err := strconv.Atoi(matches[3])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid minute in binary log timestamp: %w", err)
+	}
+	sec, err := strconv.Atoi(matches[4])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid second in binary log timestamp: %w", err)
+	}
 
-	year, _ := strconv.Atoi("20" + dateStr[0:2])
-	month, _ := strconv.Atoi(dateStr[2:4])
-	day, _ := strconv.Atoi(dateStr[4:6])
+	year, err := strconv.Atoi("20" + dateStr[0:2])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid year in binary log timestamp: %w", err)
+	}
+	month, err := strconv.Atoi(dateStr[2:4])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid month in binary log timestamp: %w", err)
+	}
+	day, err := strconv.Atoi(dateStr[4:6])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid day in binary log timestamp: %w", err)
+	}
 
-	return time.Date(year, time.Month(month), day, hour, min, sec, 0, time.UTC), nil
+	return time.Date(year, time.Month(month), day, hour, minute, sec, 0, time.UTC), nil
 }
 
 func (p *PITRManager) flushBinaryLogs(ctx context.Context) error {
@@ -212,6 +227,7 @@ func (p *PITRManager) copyBinaryLog(ctx context.Context, logName, outputDir stri
 	destPath := filepath.Join(outputDir, logName)
 
 	// Use mysqlbinlog to read the log (safer than direct file copy)
+	//nolint:gosec // G204: log names come from the server's SHOW BINARY LOGS; connection args are validated config
 	cmd := exec.CommandContext(
 		ctx, "mysqlbinlog",
 		"--read-from-remote-server",
@@ -306,6 +322,7 @@ func (p *PITRManager) applyBinaryLogs(ctx context.Context, opts *PITRRestoreOpti
 
 func (p *PITRManager) applyBinaryLogToTime(ctx context.Context, logPath string, opts *PITRRestoreOptions) error {
 	// Build mysqlbinlog command
+	//nolint:gosec // G204: logPath is derived from a controlled binlog index; datetime is formatted constant
 	cmd := exec.CommandContext(
 		ctx, "mysqlbinlog",
 		"--stop-datetime="+opts.TargetTime.Format("2006-01-02 15:04:05"),
@@ -319,6 +336,7 @@ func (p *PITRManager) applyBinaryLogToTime(ctx context.Context, logPath string, 
 	}
 
 	// Apply to database using mysql client
+	//nolint:gosec // G204: connection args are validated config; database name validated upstream
 	mysqlCmd := exec.CommandContext(
 		ctx, "mysql",
 		fmt.Sprintf("--host=%s", p.driver.config.Host),
@@ -340,8 +358,11 @@ func (p *PITRManager) applyBinaryLogToTime(ctx context.Context, logPath string, 
 		return err
 	}
 
-	// Read stderr
-	stderrOutput, _ := io.ReadAll(stderr)
+	// Read stderr (best-effort; a read failure should not mask the command result)
+	stderrOutput, readErr := io.ReadAll(stderr)
+	if readErr != nil {
+		stderrOutput = nil
+	}
 
 	if err := mysqlCmd.Wait(); err != nil {
 		return fmt.Errorf("mysql command failed: %w, stderr: %s", err, string(stderrOutput))

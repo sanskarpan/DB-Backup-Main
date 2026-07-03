@@ -54,6 +54,7 @@ func TestRetentionPolicyConfig(t *testing.T) {
 
 		assert.Equal(t, 90*24*time.Hour, config.RetentionPeriod)
 		assert.True(t, config.IsLocked)
+		assert.NotZero(t, config.EffectiveTime)
 	})
 }
 

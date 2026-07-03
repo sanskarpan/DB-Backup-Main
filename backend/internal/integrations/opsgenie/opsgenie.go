@@ -13,6 +13,8 @@ import (
 )
 
 // OpsgenieIntegration implements integration with Opsgenie for alert/incident management.
+//
+//nolint:revive // OpsgenieIntegration keeps the public type name stable across the integrations API.
 type OpsgenieIntegration struct {
 	*integrations.BaseIntegration
 	client     *http.Client
@@ -31,20 +33,6 @@ const (
 )
 
 // Alert response structures.
-type alertResponse struct {
-	Result struct {
-		AlertID   string   `json:"alertId"`
-		Alias     string   `json:"alias"`
-		Status    string   `json:"status"`
-		Message   string   `json:"message"`
-		Priority  string   `json:"priority"`
-		Source    string   `json:"source"`
-		Tags      []string `json:"tags"`
-		CreatedAt string   `json:"createdAt"`
-	} `json:"data"`
-	RequestID string `json:"requestId"`
-}
-
 type createAlertResponse struct {
 	Result struct {
 		AlertID string `json:"alertId"`
@@ -108,30 +96,11 @@ func (o *OpsgenieIntegration) Configure(config *integrations.Config) error {
 		}
 
 		if responders, ok := settings["responders"].([]interface{}); ok {
-			o.responders = make([]map[string]string, 0, len(responders))
-			for _, r := range responders {
-				if responder, ok := r.(map[string]interface{}); ok {
-					resp := make(map[string]string)
-					if id, ok := responder["id"].(string); ok {
-						resp["id"] = id
-					}
-					if typ, ok := responder["type"].(string); ok {
-						resp["type"] = typ
-					}
-					if len(resp) > 0 {
-						o.responders = append(o.responders, resp)
-					}
-				}
-			}
+			o.responders = parseResponders(responders)
 		}
 
 		if tags, ok := settings["tags"].([]interface{}); ok {
-			o.tags = make([]string, 0, len(tags))
-			for _, t := range tags {
-				if tag, ok := t.(string); ok {
-					o.tags = append(o.tags, tag)
-				}
-			}
+			o.tags = parseTags(tags)
 		}
 	}
 
@@ -144,6 +113,39 @@ func (o *OpsgenieIntegration) Configure(config *integrations.Config) error {
 	return nil
 }
 
+// parseResponders converts a raw settings slice into responder maps.
+func parseResponders(responders []interface{}) []map[string]string {
+	result := make([]map[string]string, 0, len(responders))
+	for _, r := range responders {
+		responder, ok := r.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		resp := make(map[string]string)
+		if id, ok := responder["id"].(string); ok {
+			resp["id"] = id
+		}
+		if typ, ok := responder["type"].(string); ok {
+			resp["type"] = typ
+		}
+		if len(resp) > 0 {
+			result = append(result, resp)
+		}
+	}
+	return result
+}
+
+// parseTags converts a raw settings slice into a slice of tag strings.
+func parseTags(tags []interface{}) []string {
+	result := make([]string, 0, len(tags))
+	for _, t := range tags {
+		if tag, ok := t.(string); ok {
+			result = append(result, tag)
+		}
+	}
+	return result
+}
+
 // Validate validates the Opsgenie configuration.
 func (o *OpsgenieIntegration) Validate() error {
 	config := o.GetConfig()
@@ -152,7 +154,7 @@ func (o *OpsgenieIntegration) Validate() error {
 	}
 
 	if config.APIKey == "" {
-		return fmt.Errorf("Opsgenie API key is required")
+		return fmt.Errorf("opsgenie API key is required")
 	}
 
 	return nil
@@ -167,7 +169,7 @@ func (o *OpsgenieIntegration) HealthCheck(ctx context.Context) error {
 	// Test by getting heartbeat info or current user
 	url := fmt.Sprintf("%s/account", o.apiURL)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -185,7 +187,10 @@ func (o *OpsgenieIntegration) HealthCheck(ctx context.Context) error {
 	o.GetMetrics().RecordRequest(time.Since(start))
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			body = nil
+		}
 		return fmt.Errorf("health check failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -239,7 +244,7 @@ func (o *OpsgenieIntegration) CreateIncident(ctx context.Context, incident *inte
 		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -312,7 +317,7 @@ func (o *OpsgenieIntegration) GetIncident(ctx context.Context, incidentID string
 
 	url := fmt.Sprintf("%s/alerts/%s", o.apiURL, incidentID)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -353,7 +358,7 @@ func (o *OpsgenieIntegration) GetIncident(ctx context.Context, incidentID string
 }
 
 // CloseIncident closes an alert in Opsgenie.
-func (o *OpsgenieIntegration) CloseIncident(ctx context.Context, incidentID string, resolution string) error {
+func (o *OpsgenieIntegration) CloseIncident(ctx context.Context, incidentID, resolution string) error {
 	if err := o.Validate(); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
 	}
@@ -370,7 +375,7 @@ func (o *OpsgenieIntegration) CloseIncident(ctx context.Context, incidentID stri
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -387,7 +392,10 @@ func (o *OpsgenieIntegration) CloseIncident(ctx context.Context, incidentID stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			body = nil
+		}
 		o.GetMetrics().RecordError(fmt.Errorf("status code: %d", resp.StatusCode))
 		return fmt.Errorf("failed to close alert, status %d: %s", resp.StatusCode, string(body))
 	}
@@ -444,7 +452,7 @@ func (o *OpsgenieIntegration) mapPriority(priority integrations.Priority) string
 }
 
 // acknowledgeAlert acknowledges an alert.
-func (o *OpsgenieIntegration) acknowledgeAlert(ctx context.Context, alertID string, note string) error {
+func (o *OpsgenieIntegration) acknowledgeAlert(ctx context.Context, alertID, note string) error {
 	url := fmt.Sprintf("%s/alerts/%s/acknowledge", o.apiURL, alertID)
 
 	payload := map[string]interface{}{}
@@ -457,7 +465,7 @@ func (o *OpsgenieIntegration) acknowledgeAlert(ctx context.Context, alertID stri
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -474,7 +482,10 @@ func (o *OpsgenieIntegration) acknowledgeAlert(ctx context.Context, alertID stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			body = nil
+		}
 		o.GetMetrics().RecordError(fmt.Errorf("status code: %d", resp.StatusCode))
 		return fmt.Errorf("failed to acknowledge alert, status %d: %s", resp.StatusCode, string(body))
 	}
@@ -484,7 +495,7 @@ func (o *OpsgenieIntegration) acknowledgeAlert(ctx context.Context, alertID stri
 }
 
 // addNote adds a note to an alert.
-func (o *OpsgenieIntegration) addNote(ctx context.Context, alertID string, note string) error {
+func (o *OpsgenieIntegration) addNote(ctx context.Context, alertID, note string) error {
 	url := fmt.Sprintf("%s/alerts/%s/notes", o.apiURL, alertID)
 
 	payload := map[string]interface{}{
@@ -496,7 +507,7 @@ func (o *OpsgenieIntegration) addNote(ctx context.Context, alertID string, note 
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -513,7 +524,10 @@ func (o *OpsgenieIntegration) addNote(ctx context.Context, alertID string, note 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			body = nil
+		}
 		o.GetMetrics().RecordError(fmt.Errorf("status code: %d", resp.StatusCode))
 		return fmt.Errorf("failed to add note, status %d: %s", resp.StatusCode, string(body))
 	}

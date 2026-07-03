@@ -104,7 +104,7 @@ func TestGetProvider(t *testing.T) {
 			t.Errorf("Failed to get provider: %v", err)
 		}
 		if provider == nil {
-			t.Error("Provider should not be nil")
+			t.Fatal("Provider should not be nil")
 		}
 		if provider.ClientID != "test-client-id" {
 			t.Errorf("Expected ClientID 'test-client-id', got '%s'", provider.ClientID)

@@ -56,7 +56,10 @@ func (r *RepositoryManager) CreateRepository(ctx context.Context, name, location
 	defer res.Body.Close()
 
 	if res.IsError() {
-		body, _ := io.ReadAll(res.Body)
+		body, readErr := io.ReadAll(res.Body)
+		if readErr != nil {
+			return fmt.Errorf("repository creation failed: %s", res.Status())
+		}
 		return fmt.Errorf("repository creation failed: %s, body: %s", res.Status(), string(body))
 	}
 
@@ -104,7 +107,7 @@ func (r *RepositoryManager) ListRepositories(ctx context.Context) ([]string, err
 		return nil, err
 	}
 
-	var repoNames []string
+	repoNames := make([]string, 0, len(repos))
 	for name := range repos {
 		repoNames = append(repoNames, name)
 	}

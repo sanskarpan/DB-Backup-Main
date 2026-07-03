@@ -286,17 +286,18 @@ func (bp *BatchProcessor) generateBatchSummary(batch *Batch) struct {
 
 	var title, message string
 
-	if batch.Type != "" {
+	switch {
+	case batch.Type != "":
 		// Type-specific summary
 		title = fmt.Sprintf("%d %s notifications", count, batch.Type)
 		message = fmt.Sprintf("You have %d %s notifications from the last %s",
 			count, batch.Type, bp.formatDuration(time.Since(batch.CreatedAt)))
-	} else if batch.Category != "" {
+	case batch.Category != "":
 		// Category-specific summary
 		title = fmt.Sprintf("%d %s updates", count, batch.Category)
 		message = fmt.Sprintf("You have %d updates in %s category",
 			count, batch.Category)
-	} else {
+	default:
 		// Generic summary
 		title = fmt.Sprintf("%d notifications", count)
 		message = fmt.Sprintf("You have %d notifications waiting for you", count)
@@ -439,25 +440,24 @@ func (bp *BatchProcessor) getTimeline(batch *Batch) []map[string]interface{} {
 }
 
 func (bp *BatchProcessor) formatDuration(d time.Duration) string {
-	if d < time.Minute {
+	switch {
+	case d < time.Minute:
 		return fmt.Sprintf("%d seconds", int(d.Seconds()))
-	} else if d < time.Hour {
+	case d < time.Hour:
 		return fmt.Sprintf("%d minutes", int(d.Minutes()))
-	} else if d < 24*time.Hour {
+	case d < 24*time.Hour:
 		return fmt.Sprintf("%d hours", int(d.Hours()))
-	} else {
+	default:
 		return fmt.Sprintf("%d days", int(d.Hours()/24))
 	}
 }
 
 // DigestGenerator generates periodic notification digests.
 type DigestGenerator struct {
-	mu           sync.RWMutex
-	engine       *Engine
-	frequency    string // daily, weekly, monthly
-	scheduledFor time.Time
-	ticker       *time.Ticker
-	stopChan     chan struct{}
+	engine    *Engine
+	frequency string // daily, weekly, monthly
+	ticker    *time.Ticker
+	stopChan  chan struct{}
 }
 
 // DigestConfig represents digest configuration.

@@ -2,6 +2,7 @@ package analytics
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -108,7 +109,7 @@ func (a *Analytics) Save() error {
 		return err
 	}
 
-	return os.WriteFile(a.dataFile, data, 0o644)
+	return os.WriteFile(a.dataFile, data, 0o600)
 }
 
 // TrackCompletion records a completion event.
@@ -129,12 +130,16 @@ func (a *Analytics) TrackCompletion(event *CompletionEvent) {
 
 	// Auto-save if enabled
 	if a.flushEnabled {
-		go a.Save()
+		go func() {
+			if err := a.Save(); err != nil {
+				log.Printf("analytics: auto-save failed: %v", err)
+			}
+		}()
 	}
 }
 
 // TrackError records a completion error.
-func (a *Analytics) TrackError(command string, errorMsg string) {
+func (a *Analytics) TrackError(command, errorMsg string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -282,8 +287,8 @@ func (a *Analytics) GetPerformanceStats() map[string]interface{} {
 	}
 
 	sum := 0.0
-	min := times[0]
-	max := times[len(times)-1]
+	minTime := times[0]
+	maxTime := times[len(times)-1]
 	for _, t := range times {
 		sum += t
 	}
@@ -295,8 +300,8 @@ func (a *Analytics) GetPerformanceStats() map[string]interface{} {
 
 	return map[string]interface{}{
 		"avg_response_time": avg,
-		"min_response_time": min,
-		"max_response_time": max,
+		"min_response_time": minTime,
+		"max_response_time": maxTime,
 		"p50_response_time": p50,
 		"p95_response_time": p95,
 		"p99_response_time": p99,

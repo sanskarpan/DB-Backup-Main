@@ -16,6 +16,8 @@ import (
 )
 
 // BackblazeB2Provider implements the storage.Provider interface for Backblaze B2.
+//
+//nolint:revive // keeps public name stable; renaming would break other packages using this exported type
 type BackblazeB2Provider struct {
 	client *b2.Client
 	bucket *b2.Bucket
@@ -52,16 +54,16 @@ func NewBackblazeB2Provider(cfg *storage.BackblazeB2Config) (*BackblazeB2Provide
 // validateConfig validates the Backblaze B2 configuration.
 func validateConfig(cfg *storage.BackblazeB2Config) error {
 	if cfg == nil {
-		return fmt.Errorf("Backblaze B2 config is required")
+		return fmt.Errorf("config is required for Backblaze B2")
 	}
 	if cfg.AccountID == "" {
-		return fmt.Errorf("Backblaze B2 account ID is required")
+		return fmt.Errorf("account ID is required for Backblaze B2")
 	}
 	if cfg.ApplicationKey == "" {
-		return fmt.Errorf("Backblaze B2 application key is required")
+		return fmt.Errorf("application key is required for Backblaze B2")
 	}
 	if cfg.Bucket == "" {
-		return fmt.Errorf("Backblaze B2 bucket is required")
+		return fmt.Errorf("bucket is required for Backblaze B2")
 	}
 	return nil
 }
@@ -74,24 +76,18 @@ func (p *BackblazeB2Provider) Upload(ctx context.Context, localPath, remotePath 
 	}
 	defer file.Close()
 
-	// Get file info for size
-	info, err := file.Stat()
-	if err != nil {
-		return fmt.Errorf("failed to stat file: %w", err)
-	}
-
-	return p.uploadStream(ctx, file, remotePath, info.Size(), opts)
+	return p.uploadStream(ctx, file, remotePath, opts)
 }
 
 // UploadStream uploads data from a reader to Backblaze B2.
 func (p *BackblazeB2Provider) UploadStream(ctx context.Context, reader io.Reader, remotePath string, opts *storage.UploadOptions) error {
 	// For stream uploads, we need to buffer the data to get the size
 	// In production, you might want to use a temporary file or require size in opts
-	return p.uploadStream(ctx, reader, remotePath, -1, opts)
+	return p.uploadStream(ctx, reader, remotePath, opts)
 }
 
 // uploadStream is the internal upload method.
-func (p *BackblazeB2Provider) uploadStream(ctx context.Context, reader io.Reader, remotePath string, size int64, opts *storage.UploadOptions) error {
+func (p *BackblazeB2Provider) uploadStream(ctx context.Context, reader io.Reader, remotePath string, opts *storage.UploadOptions) error {
 	if opts == nil {
 		opts = &storage.UploadOptions{}
 	}

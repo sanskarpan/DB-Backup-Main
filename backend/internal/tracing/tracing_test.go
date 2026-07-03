@@ -299,10 +299,7 @@ func TestResourceCreation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res, err := createResource(tt.config)
-			if err != nil {
-				t.Fatalf("Failed to create resource: %v", err)
-			}
+			res := createResource(tt.config)
 
 			if res == nil {
 				t.Fatal("Resource should not be nil")

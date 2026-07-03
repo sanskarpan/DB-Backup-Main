@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,7 +22,7 @@ import (
 )
 
 // WasabiProvider implements the storage.Provider interface for Wasabi.
-type WasabiProvider struct {
+type WasabiProvider struct { //nolint:revive // keeps public name stable across packages
 	client     *s3.Client
 	uploader   *manager.Uploader
 	downloader *manager.Downloader
@@ -59,20 +60,21 @@ func NewWasabiProvider(cfg *storage.WasabiConfig) (*WasabiProvider, error) {
 		}
 	}
 
-	// Create custom resolver for Wasabi endpoint
+	// Create custom resolver for Wasabi endpoint.
+	//nolint:staticcheck // SA1019: aws-sdk-go-v2 global EndpointResolver is deprecated but still required to point the S3 client at Wasabi's custom endpoint; migrating to per-service BaseEndpoint is tracked separately.
 	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		if service == s3.ServiceID {
 			scheme := "http"
 			if cfg.UseSSL {
 				scheme = "https"
 			}
-			return aws.Endpoint{
+			return aws.Endpoint{ //nolint:staticcheck // SA1019: deprecated type required for Wasabi custom endpoint resolution.
 				URL:               fmt.Sprintf("%s://%s", scheme, endpoint),
 				SigningRegion:     cfg.Region,
 				HostnameImmutable: true,
 			}, nil
 		}
-		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+		return aws.Endpoint{}, &aws.EndpointNotFoundError{} //nolint:staticcheck // SA1019: deprecated type required for Wasabi custom endpoint resolution.
 	})
 
 	// Build AWS config for Wasabi
@@ -109,16 +111,16 @@ func NewWasabiProvider(cfg *storage.WasabiConfig) (*WasabiProvider, error) {
 // validateConfig validates the Wasabi configuration.
 func validateConfig(cfg *storage.WasabiConfig) error {
 	if cfg == nil {
-		return fmt.Errorf("Wasabi config is required")
+		return fmt.Errorf("wasabi config is required")
 	}
 	if cfg.AccessKey == "" {
-		return fmt.Errorf("Wasabi access key is required")
+		return fmt.Errorf("wasabi access key is required")
 	}
 	if cfg.SecretKey == "" {
-		return fmt.Errorf("Wasabi secret key is required")
+		return fmt.Errorf("wasabi secret key is required")
 	}
 	if cfg.Bucket == "" {
-		return fmt.Errorf("Wasabi bucket is required")
+		return fmt.Errorf("wasabi bucket is required")
 	}
 	if cfg.Region == "" {
 		cfg.Region = "us-east-1" // Default region
@@ -362,6 +364,15 @@ func (p *WasabiProvider) CreateBucket(ctx context.Context) error {
 
 // setObjectLockConfiguration sets the default object lock configuration.
 func (p *WasabiProvider) setObjectLockConfiguration(ctx context.Context) error {
+	// Clamp retention days to the int32 range to avoid overflow.
+	retentionDays := p.config.RetentionDays
+	if retentionDays < 0 {
+		retentionDays = 0
+	}
+	if retentionDays > math.MaxInt32 {
+		retentionDays = math.MaxInt32
+	}
+
 	_, err := p.client.PutObjectLockConfiguration(ctx, &s3.PutObjectLockConfigurationInput{
 		Bucket: aws.String(p.bucket),
 		ObjectLockConfiguration: &types.ObjectLockConfiguration{
@@ -369,7 +380,7 @@ func (p *WasabiProvider) setObjectLockConfiguration(ctx context.Context) error {
 			Rule: &types.ObjectLockRule{
 				DefaultRetention: &types.DefaultRetention{
 					Mode: types.ObjectLockRetentionModeCompliance,
-					Days: aws.Int32(int32(p.config.RetentionDays)),
+					Days: aws.Int32(int32(retentionDays)), //nolint:gosec // G115: retentionDays is clamped to [0, math.MaxInt32] above.
 				},
 			},
 		},

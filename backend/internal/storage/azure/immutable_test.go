@@ -89,6 +89,7 @@ func TestContainerImmutabilityPolicy(t *testing.T) {
 		assert.Equal(t, 90, policy.ImmutabilityPeriodDays)
 		assert.Equal(t, "Locked", policy.State)
 		assert.True(t, policy.AllowProtectedAppendWrites)
+		assert.False(t, policy.AllowProtectedAppendWritesAll)
 	})
 }
 
@@ -301,6 +302,8 @@ func TestAzureImmutableBlobInfo_ProtectionScenarios(t *testing.T) {
 
 		assert.True(t, config.AllowProtectedAppendWrites)
 		assert.Equal(t, 60, config.ImmutabilityPeriodDays)
+		assert.False(t, config.LegalHold)
+		assert.Equal(t, ImmutabilityPolicyModeUnlocked, config.Mode)
 	})
 }
 
@@ -330,6 +333,7 @@ func TestImmutableBlobConfig_Validation(t *testing.T) {
 		assert.Equal(t, ImmutabilityPolicyModeUnlocked, config.Mode)
 		assert.True(t, config.AllowProtectedAppendWrites)
 		assert.Equal(t, 30, config.ImmutabilityPeriodDays)
+		assert.False(t, config.LegalHold)
 	})
 
 	t.Run("locked policy cannot be modified", func(t *testing.T) {
@@ -343,6 +347,7 @@ func TestImmutableBlobConfig_Validation(t *testing.T) {
 		assert.Equal(t, ImmutabilityPolicyModeLocked, config.Mode)
 		assert.False(t, config.AllowProtectedAppendWrites)
 		assert.Equal(t, 90, config.ImmutabilityPeriodDays)
+		assert.False(t, config.LegalHold)
 	})
 }
 
@@ -388,6 +393,8 @@ func TestContainerImmutabilityPolicy_Scenarios(t *testing.T) {
 
 		assert.Equal(t, 7, policy.ImmutabilityPeriodDays)
 		assert.Equal(t, "Unlocked", policy.State)
+		assert.False(t, policy.AllowProtectedAppendWrites)
+		assert.False(t, policy.AllowProtectedAppendWritesAll)
 	})
 
 	t.Run("container with locked retention", func(t *testing.T) {

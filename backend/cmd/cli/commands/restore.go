@@ -3,7 +3,9 @@ package commands
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -111,25 +113,25 @@ func runRestore(cmd *cobra.Command, args []string) error {
 	}
 
 	// Parse flags
-	opts.TargetType, _ = cmd.Flags().GetString("target-type")
-	opts.TargetHost, _ = cmd.Flags().GetString("target-host")
-	opts.TargetPort, _ = cmd.Flags().GetInt("target-port")
-	opts.TargetUser, _ = cmd.Flags().GetString("target-user")
-	opts.TargetPassword, _ = cmd.Flags().GetString("target-password")
-	opts.TargetDatabase, _ = cmd.Flags().GetString("target-database")
+	opts.TargetType = flagString(cmd, "target-type")
+	opts.TargetHost = flagString(cmd, "target-host")
+	opts.TargetPort = flagInt(cmd, "target-port")
+	opts.TargetUser = flagString(cmd, "target-user")
+	opts.TargetPassword = flagString(cmd, "target-password")
+	opts.TargetDatabase = flagString(cmd, "target-database")
 
-	opts.PointInTime, _ = cmd.Flags().GetString("point-in-time")
-	opts.Tables, _ = cmd.Flags().GetStringSlice("tables")
-	opts.ExcludeTables, _ = cmd.Flags().GetStringSlice("exclude-tables")
+	opts.PointInTime = flagString(cmd, "point-in-time")
+	opts.Tables = flagStringSlice(cmd, "tables")
+	opts.ExcludeTables = flagStringSlice(cmd, "exclude-tables")
 
-	opts.Decrypt, _ = cmd.Flags().GetBool("decrypt")
-	opts.DecryptionKey, _ = cmd.Flags().GetString("decryption-key")
+	opts.Decrypt = flagBool(cmd, "decrypt")
+	opts.DecryptionKey = flagString(cmd, "decryption-key")
 
-	opts.DownloadOnly, _ = cmd.Flags().GetBool("download-only")
-	opts.DownloadPath, _ = cmd.Flags().GetString("download-path")
+	opts.DownloadOnly = flagBool(cmd, "download-only")
+	opts.DownloadPath = flagString(cmd, "download-path")
 
-	opts.SkipValidation, _ = cmd.Flags().GetBool("skip-validation")
-	opts.Force, _ = cmd.Flags().GetBool("force")
+	opts.SkipValidation = flagBool(cmd, "skip-validation")
+	opts.Force = flagBool(cmd, "force")
 
 	// Get logger and config
 	log := GetLogger()
@@ -176,7 +178,7 @@ func runRestore(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Downloading backup to: %s\n", downloadPath)
 
 		// Copy backup file
-		if err := copyFile(metadata.BackupPath, downloadPath); err != nil {
+		if err = copyFile(metadata.BackupPath, downloadPath); err != nil {
 			return fmt.Errorf("failed to download backup: %w", err)
 		}
 
@@ -191,7 +193,10 @@ func runRestore(cmd *cobra.Command, args []string) error {
 		fmt.Print("\nDo you want to continue? (yes/no): ")
 
 		reader := bufio.NewReader(os.Stdin)
-		response, _ := reader.ReadString('\n')
+		response, readErr := reader.ReadString('\n')
+		if readErr != nil && !errors.Is(readErr, io.EOF) {
+			return fmt.Errorf("failed to read confirmation input: %w", readErr)
+		}
 		response = strings.TrimSpace(strings.ToLower(response))
 
 		if response != "yes" && response != "y" {
@@ -210,7 +215,8 @@ func runRestore(cmd *cobra.Command, args []string) error {
 	// Parse point-in-time if provided
 	var pitTime *time.Time
 	if opts.PointInTime != "" {
-		t, err := time.Parse(time.RFC3339, opts.PointInTime)
+		var t time.Time
+		t, err = time.Parse(time.RFC3339, opts.PointInTime)
 		if err != nil {
 			return fmt.Errorf("invalid point-in-time format (use RFC3339): %w", err)
 		}
@@ -281,5 +287,5 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(dst, input, 0o644)
+	return os.WriteFile(dst, input, 0o600)
 }

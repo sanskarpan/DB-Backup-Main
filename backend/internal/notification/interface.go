@@ -39,7 +39,7 @@ type Notification struct {
 }
 
 // NotificationLevel represents the severity level.
-type NotificationLevel string
+type NotificationLevel string //nolint:revive // keeps public name stable across packages
 
 const (
 	LevelInfo    NotificationLevel = "info"
@@ -72,7 +72,7 @@ type Router struct {
 }
 
 // NotificationFilter filters which notifications should be sent.
-type NotificationFilter interface {
+type NotificationFilter interface { //nolint:revive // keeps public name stable across packages
 	ShouldSend(notification *Notification) bool
 }
 

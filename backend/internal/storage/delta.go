@@ -202,7 +202,7 @@ func (m *DeltaManager) CreateDelta(sourcePath, targetPath, baseID string) (*Delt
 
 	// Save delta to disk
 	deltaPath := filepath.Join(m.config.DeltaStorePath, deltaID+".delta")
-	if err := os.WriteFile(deltaPath, deltaData, 0o644); err != nil {
+	if err := os.WriteFile(deltaPath, deltaData, 0o600); err != nil {
 		return nil, fmt.Errorf("failed to write delta: %w", err)
 	}
 
@@ -274,7 +274,7 @@ func (m *DeltaManager) ApplyDelta(sourcePath string, delta *DeltaBackup, outputP
 	}
 
 	// Write output
-	if err := os.WriteFile(outputPath, targetData, 0o644); err != nil {
+	if err := os.WriteFile(outputPath, targetData, 0o600); err != nil {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 
@@ -513,7 +513,7 @@ func (m *DeltaManager) GetChain(baseID string) (*BackupChain, error) {
 }
 
 // RestoreFromChain restores a file by applying all deltas in a chain.
-func (m *DeltaManager) RestoreFromChain(basePath string, chainID string, version int, outputPath string) error {
+func (m *DeltaManager) RestoreFromChain(basePath, chainID string, version int, outputPath string) error {
 	chain, err := m.GetChain(chainID)
 	if err != nil {
 		return err
@@ -533,12 +533,12 @@ func (m *DeltaManager) RestoreFromChain(basePath string, chainID string, version
 		tempPath := filepath.Join(os.TempDir(), fmt.Sprintf("delta-restore-%d.tmp", i))
 		tempFiles = append(tempFiles, tempPath)
 
-		if err := m.ApplyDelta(currentPath, delta, tempPath); err != nil {
+		if applyErr := m.ApplyDelta(currentPath, delta, tempPath); applyErr != nil {
 			// Cleanup temp files
 			for _, tf := range tempFiles {
 				os.Remove(tf)
 			}
-			return fmt.Errorf("failed to apply delta %d: %w", i, err)
+			return fmt.Errorf("failed to apply delta %d: %w", i, applyErr)
 		}
 
 		currentPath = tempPath
@@ -550,7 +550,7 @@ func (m *DeltaManager) RestoreFromChain(basePath string, chainID string, version
 		return err
 	}
 
-	if err := os.WriteFile(outputPath, finalData, 0o644); err != nil {
+	if err := os.WriteFile(outputPath, finalData, 0o600); err != nil {
 		return err
 	}
 

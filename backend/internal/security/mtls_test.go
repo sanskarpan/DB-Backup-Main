@@ -228,6 +228,26 @@ func TestCertificateInfo(t *testing.T) {
 	if info.IsCA {
 		t.Error("Expected IsCA to be false")
 	}
+
+	if info.Issuer != "CN=Example CA" {
+		t.Errorf("Expected Issuer to be CN=Example CA, got %s", info.Issuer)
+	}
+
+	if info.NotBefore.IsZero() {
+		t.Error("Expected NotBefore to be set")
+	}
+
+	if !info.NotAfter.After(info.NotBefore) {
+		t.Error("Expected NotAfter to be after NotBefore")
+	}
+
+	if len(info.IPAddresses) != 1 {
+		t.Errorf("Expected 1 IP address, got %d", len(info.IPAddresses))
+	}
+
+	if info.SerialNumber != "123456" {
+		t.Errorf("Expected SerialNumber to be 123456, got %s", info.SerialNumber)
+	}
 }
 
 func TestSecureCipherSuites(t *testing.T) {
@@ -409,11 +429,9 @@ func TestVerifyPeerCertificate(t *testing.T) {
 		return
 	}
 
-	// Create a mock valid certificate
-	validCert := &x509.Certificate{
-		NotBefore: time.Now().Add(-24 * time.Hour),
-		NotAfter:  time.Now().Add(365 * 24 * time.Hour),
-	}
+	// Create a mock valid certificate. A manually constructed x509.Certificate
+	// has no raw DER encoding, so we use a minimal ASN.1 SEQUENCE tag instead.
+	validCert := &x509.Certificate{}
 
 	validRawCert := validCert.Raw
 	if validRawCert == nil {

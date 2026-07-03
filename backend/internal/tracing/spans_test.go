@@ -23,7 +23,7 @@ func TestStartSpan(t *testing.T) {
 	ctx := context.Background()
 
 	// Start a span with attributes
-	ctx, span := StartSpan(
+	_, span := StartSpan(
 		ctx, "test-tracer", "test-operation",
 		WithAttributes(
 			attribute.String("key1", "value1"),
@@ -485,7 +485,7 @@ func TestTraceFunc(t *testing.T) {
 			return testErr
 		})
 
-		if err != testErr {
+		if !errors.Is(err, testErr) {
 			t.Errorf("Expected error %v, got %v", testErr, err)
 		}
 
@@ -538,7 +538,7 @@ func TestTraceFuncWithResult(t *testing.T) {
 				return 0, testErr
 			})
 
-		if err != testErr {
+		if !errors.Is(err, testErr) {
 			t.Errorf("Expected error %v, got %v", testErr, err)
 		}
 

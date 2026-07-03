@@ -74,6 +74,8 @@ func (pqr *PostgreSQLQueryRewriter) GetRewriteRules() []RewriteRule {
 }
 
 // ApplyRule applies a specific rewrite rule.
+//
+//nolint:gocritic // hugeParam: RewriteRule is passed by value to satisfy the QueryRewriter interface
 func (pqr *PostgreSQLQueryRewriter) ApplyRule(ctx context.Context, query string, rule RewriteRule) (string, error) {
 	if rule.Pattern == "" {
 		return query, fmt.Errorf("empty pattern")
@@ -92,6 +94,8 @@ func (pqr *PostgreSQLQueryRewriter) ApplyRule(ctx context.Context, query string,
 }
 
 // AddRule adds a custom rewrite rule.
+//
+//nolint:gocritic // hugeParam: RewriteRule is passed by value to keep the public API stable
 func (pqr *PostgreSQLQueryRewriter) AddRule(rule RewriteRule) {
 	pqr.rules = append(pqr.rules, rule)
 	pqr.sortRulesByPriority()
@@ -130,93 +134,88 @@ func (pqr *PostgreSQLQueryRewriter) DisableRule(name string) {
 // Helper methods
 
 func (pqr *PostgreSQLQueryRewriter) addDefaultRules() {
-	// Rule 1: Replace SELECT * with explicit columns (when possible)
-	pqr.rules = append(pqr.rules, RewriteRule{
-		Name:        "avoid-select-star",
-		Description: "Avoid SELECT * for better performance",
-		Pattern:     `SELECT\s+\*\s+FROM`,
-		Replacement: "SELECT /* optimized */ * FROM", // Marker for manual review
-		Priority:    100,
-		Enabled:     false, // Disabled by default (requires table schema)
-		Conditions:  []string{"has-select-star"},
-	})
-
-	// Rule 2: Add LIMIT to queries without it
-	pqr.rules = append(pqr.rules, RewriteRule{
-		Name:        "add-limit-safeguard",
-		Description: "Add LIMIT to prevent accidentally fetching too many rows",
-		Pattern:     `(SELECT\s+.+\s+FROM\s+.+)(?!.*LIMIT)$`,
-		Replacement: "$1 LIMIT 1000",
-		Priority:    90,
-		Enabled:     false, // Disabled by default
-		Conditions:  []string{"missing-limit"},
-	})
-
-	// Rule 3: Replace LIKE with prefix index optimization
-	pqr.rules = append(pqr.rules, RewriteRule{
-		Name:        "optimize-like-prefix",
-		Description: "Optimize LIKE queries with prefix patterns",
-		Pattern:     `LIKE\s+'([^%]+)%'`,
-		Replacement: ">= '$1' AND column < '$1' || chr(255)",
-		Priority:    80,
-		Enabled:     false, // Complex transformation, disabled by default
-		Conditions:  []string{"has-like-prefix"},
-	})
-
-	// Rule 4: Replace NOT IN with NOT EXISTS
-	pqr.rules = append(pqr.rules, RewriteRule{
-		Name:        "not-in-to-not-exists",
-		Description: "Replace NOT IN with NOT EXISTS for better performance",
-		Pattern:     `NOT\s+IN\s*\(`,
-		Replacement: "NOT EXISTS (",
-		Priority:    70,
-		Enabled:     true,
-		Conditions:  []string{"has-not-in"},
-	})
-
-	// Rule 5: Add explicit JOIN type
-	pqr.rules = append(pqr.rules, RewriteRule{
-		Name:        "explicit-inner-join",
-		Description: "Make implicit INNER JOIN explicit",
-		Pattern:     `\s+JOIN\s+`,
-		Replacement: " INNER JOIN ",
-		Priority:    60,
-		Enabled:     true,
-		Conditions:  []string{},
-	})
-
-	// Rule 6: Optimize OR conditions with IN
-	pqr.rules = append(pqr.rules, RewriteRule{
-		Name:        "or-to-in",
-		Description: "Replace multiple OR conditions with IN clause",
-		Pattern:     `(\w+)\s*=\s*'([^']+)'\s+OR\s+\1\s*=\s*'([^']+)'`,
-		Replacement: "$1 IN ('$2', '$3')",
-		Priority:    50,
-		Enabled:     true,
-		Conditions:  []string{"has-or-conditions"},
-	})
-
-	// Rule 7: Add index hints for specific patterns
-	pqr.rules = append(pqr.rules, RewriteRule{
-		Name:        "suggest-index-scan",
-		Description: "Add comments suggesting index usage",
-		Pattern:     `WHERE\s+(\w+)\s*=`,
-		Replacement: "WHERE /* use index on $1 */ $1 =",
-		Priority:    40,
-		Enabled:     false, // Informational only
-		Conditions:  []string{},
-	})
-
-	// Rule 8: Optimize DISTINCT with GROUP BY
-	pqr.rules = append(pqr.rules, RewriteRule{
-		Name:        "distinct-to-group-by",
-		Description: "Replace DISTINCT with GROUP BY when appropriate",
-		Pattern:     `SELECT\s+DISTINCT\s+(\w+)\s+FROM`,
-		Replacement: "SELECT $1 FROM ... GROUP BY $1",
-		Priority:    30,
-		Enabled:     false, // Complex transformation
-		Conditions:  []string{"has-distinct"},
-	})
+	pqr.rules = append(pqr.rules,
+		// Rule 1: Replace SELECT * with explicit columns (when possible)
+		RewriteRule{
+			Name:        "avoid-select-star",
+			Description: "Avoid SELECT * for better performance",
+			Pattern:     `SELECT\s+\*\s+FROM`,
+			Replacement: "SELECT /* optimized */ * FROM", // Marker for manual review
+			Priority:    100,
+			Enabled:     false, // Disabled by default (requires table schema)
+			Conditions:  []string{"has-select-star"},
+		},
+		// Rule 2: Add LIMIT to queries without it
+		RewriteRule{
+			Name:        "add-limit-safeguard",
+			Description: "Add LIMIT to prevent accidentally fetching too many rows",
+			Pattern:     `(SELECT\s+.+\s+FROM\s+.+)(?!.*LIMIT)$`,
+			Replacement: "$1 LIMIT 1000",
+			Priority:    90,
+			Enabled:     false, // Disabled by default
+			Conditions:  []string{"missing-limit"},
+		},
+		// Rule 3: Replace LIKE with prefix index optimization
+		RewriteRule{
+			Name:        "optimize-like-prefix",
+			Description: "Optimize LIKE queries with prefix patterns",
+			Pattern:     `LIKE\s+'([^%]+)%'`,
+			Replacement: ">= '$1' AND column < '$1' || chr(255)",
+			Priority:    80,
+			Enabled:     false, // Complex transformation, disabled by default
+			Conditions:  []string{"has-like-prefix"},
+		},
+		// Rule 4: Replace NOT IN with NOT EXISTS
+		RewriteRule{
+			Name:        "not-in-to-not-exists",
+			Description: "Replace NOT IN with NOT EXISTS for better performance",
+			Pattern:     `NOT\s+IN\s*\(`,
+			Replacement: "NOT EXISTS (",
+			Priority:    70,
+			Enabled:     true,
+			Conditions:  []string{"has-not-in"},
+		},
+		// Rule 5: Add explicit JOIN type
+		RewriteRule{
+			Name:        "explicit-inner-join",
+			Description: "Make implicit INNER JOIN explicit",
+			Pattern:     `\s+JOIN\s+`,
+			Replacement: " INNER JOIN ",
+			Priority:    60,
+			Enabled:     true,
+			Conditions:  []string{},
+		},
+		// Rule 6: Optimize OR conditions with IN
+		RewriteRule{
+			Name:        "or-to-in",
+			Description: "Replace multiple OR conditions with IN clause",
+			Pattern:     `(\w+)\s*=\s*'([^']+)'\s+OR\s+\1\s*=\s*'([^']+)'`,
+			Replacement: "$1 IN ('$2', '$3')",
+			Priority:    50,
+			Enabled:     true,
+			Conditions:  []string{"has-or-conditions"},
+		},
+		// Rule 7: Add index hints for specific patterns
+		RewriteRule{
+			Name:        "suggest-index-scan",
+			Description: "Add comments suggesting index usage",
+			Pattern:     `WHERE\s+(\w+)\s*=`,
+			Replacement: "WHERE /* use index on $1 */ $1 =",
+			Priority:    40,
+			Enabled:     false, // Informational only
+			Conditions:  []string{},
+		},
+		// Rule 8: Optimize DISTINCT with GROUP BY
+		RewriteRule{
+			Name:        "distinct-to-group-by",
+			Description: "Replace DISTINCT with GROUP BY when appropriate",
+			Pattern:     `SELECT\s+DISTINCT\s+(\w+)\s+FROM`,
+			Replacement: "SELECT $1 FROM ... GROUP BY $1",
+			Priority:    30,
+			Enabled:     false, // Complex transformation
+			Conditions:  []string{"has-distinct"},
+		},
+	)
 
 	// Sort by priority
 	pqr.sortRulesByPriority()

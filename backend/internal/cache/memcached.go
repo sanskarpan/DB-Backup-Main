@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -48,7 +49,7 @@ func (m *MemcachedCache) Get(ctx context.Context, key string, dest interface{}) 
 	fullKey := m.makeKey(key)
 
 	item, err := m.client.Get(fullKey)
-	if err == memcache.ErrCacheMiss {
+	if errors.Is(err, memcache.ErrCacheMiss) {
 		return ErrCacheMiss
 	}
 	if err != nil {
@@ -93,7 +94,7 @@ func (m *MemcachedCache) Set(ctx context.Context, key string, value interface{},
 func (m *MemcachedCache) Delete(ctx context.Context, key string) error {
 	fullKey := m.makeKey(key)
 
-	if err := m.client.Delete(fullKey); err != nil && err != memcache.ErrCacheMiss {
+	if err := m.client.Delete(fullKey); err != nil && !errors.Is(err, memcache.ErrCacheMiss) {
 		return fmt.Errorf("failed to delete from cache: %w", err)
 	}
 
@@ -105,7 +106,7 @@ func (m *MemcachedCache) Exists(ctx context.Context, key string) (bool, error) {
 	fullKey := m.makeKey(key)
 
 	_, err := m.client.Get(fullKey)
-	if err == memcache.ErrCacheMiss {
+	if errors.Is(err, memcache.ErrCacheMiss) {
 		return false, nil
 	}
 	if err != nil {
@@ -133,11 +134,13 @@ func (m *MemcachedCache) Close() error {
 func (m *MemcachedCache) Increment(ctx context.Context, key string, delta int64) (int64, error) {
 	fullKey := m.makeKey(key)
 
+	//nolint:gosec // G115: delta is a caller-supplied positive counter increment
 	newValue, err := m.client.Increment(fullKey, uint64(delta))
 	if err != nil {
 		return 0, fmt.Errorf("failed to increment: %w", err)
 	}
 
+	//nolint:gosec // G115: memcached counter value fits an int64 counter
 	return int64(newValue), nil
 }
 
@@ -145,11 +148,13 @@ func (m *MemcachedCache) Increment(ctx context.Context, key string, delta int64)
 func (m *MemcachedCache) Decrement(ctx context.Context, key string, delta int64) (int64, error) {
 	fullKey := m.makeKey(key)
 
+	//nolint:gosec // G115: delta is a caller-supplied positive counter decrement
 	newValue, err := m.client.Decrement(fullKey, uint64(delta))
 	if err != nil {
 		return 0, fmt.Errorf("failed to decrement: %w", err)
 	}
 
+	//nolint:gosec // G115: memcached counter value fits an int64 counter
 	return int64(newValue), nil
 }
 

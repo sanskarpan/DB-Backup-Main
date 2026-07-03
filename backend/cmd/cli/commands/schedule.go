@@ -84,7 +84,6 @@ type ScheduleAddOptions struct {
 	AllDatabases bool
 	Compression  string
 	Encrypt      bool
-	Storage      string
 	Retries      int
 	RetryDelay   time.Duration
 	Timeout      time.Duration
@@ -122,9 +121,9 @@ func init() {
 	scheduleAddCmd.Flags().Duration("retry-delay", 5*time.Minute, "Delay between retries")
 	scheduleAddCmd.Flags().Duration("timeout", 24*time.Hour, "Job timeout")
 
-	scheduleAddCmd.MarkFlagRequired("id")
-	scheduleAddCmd.MarkFlagRequired("cron")
-	scheduleAddCmd.MarkFlagRequired("type")
+	cobra.CheckErr(scheduleAddCmd.MarkFlagRequired("id"))
+	cobra.CheckErr(scheduleAddCmd.MarkFlagRequired("cron"))
+	cobra.CheckErr(scheduleAddCmd.MarkFlagRequired("type"))
 
 	scheduleListCmd.Flags().String("format", "table", "Output format (table, json)")
 }
@@ -140,29 +139,15 @@ func runScheduleAdd(cmd *cobra.Command, args []string) error {
 		User:        cmd.Flag("user").Value.String(),
 		Database:    cmd.Flag("database").Value.String(),
 		Compression: cmd.Flag("compression").Value.String(),
-		Storage:     cmd.Flag("storage").Value.String(),
 	}
 
-	port, _ := cmd.Flags().GetInt("port")
-	opts.Port = port
-
-	databases, _ := cmd.Flags().GetStringSlice("databases")
-	opts.Databases = databases
-
-	allDbs, _ := cmd.Flags().GetBool("all-databases")
-	opts.AllDatabases = allDbs
-
-	encrypt, _ := cmd.Flags().GetBool("encrypt")
-	opts.Encrypt = encrypt
-
-	retries, _ := cmd.Flags().GetInt("retries")
-	opts.Retries = retries
-
-	retryDelay, _ := cmd.Flags().GetDuration("retry-delay")
-	opts.RetryDelay = retryDelay
-
-	timeout, _ := cmd.Flags().GetDuration("timeout")
-	opts.Timeout = timeout
+	opts.Port = flagInt(cmd, "port")
+	opts.Databases = flagStringSlice(cmd, "databases")
+	opts.AllDatabases = flagBool(cmd, "all-databases")
+	opts.Encrypt = flagBool(cmd, "encrypt")
+	opts.Retries = flagInt(cmd, "retries")
+	opts.RetryDelay = flagDuration(cmd, "retry-delay")
+	opts.Timeout = flagDuration(cmd, "timeout")
 
 	// Set default name if not provided
 	if opts.Name == "" {
@@ -231,7 +216,7 @@ func runScheduleAdd(cmd *cobra.Command, args []string) error {
 }
 
 func runScheduleList(cmd *cobra.Command, args []string) error {
-	format, _ := cmd.Flags().GetString("format")
+	format := flagString(cmd, "format")
 
 	// Initialize scheduler
 	cfg := GetConfig()

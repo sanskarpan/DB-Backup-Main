@@ -14,7 +14,7 @@ func New(prefix string) string {
 	if _, err := rand.Read(b); err != nil {
 		// Extremely unlikely; fall back to a larger read to reduce collision probability
 		b = make([]byte, 8)
-		rand.Read(b) //nolint:errcheck
+		rand.Read(b) //nolint:errcheck // best-effort fallback; crypto/rand.Read rarely errors and the resulting ID is still usable
 	}
 	if prefix == "" {
 		return hex.EncodeToString(b)
@@ -28,6 +28,6 @@ func Hex(n int) string {
 		n = 8
 	}
 	b := make([]byte, (n+1)/2)
-	rand.Read(b) //nolint:errcheck
+	rand.Read(b) //nolint:errcheck // crypto/rand.Read effectively never fails on supported platforms; b defaults to zeroed bytes if it did
 	return hex.EncodeToString(b)[:n]
 }

@@ -79,16 +79,16 @@ func runList(cmd *cobra.Command, args []string) error {
 	opts := &ListOptions{}
 
 	// Parse flags
-	opts.Database, _ = cmd.Flags().GetString("database")
-	opts.Type, _ = cmd.Flags().GetString("type")
-	opts.Storage, _ = cmd.Flags().GetString("storage")
-	opts.From, _ = cmd.Flags().GetString("from")
-	opts.To, _ = cmd.Flags().GetString("to")
-	opts.Tags, _ = cmd.Flags().GetStringSlice("tags")
-	opts.Format, _ = cmd.Flags().GetString("format")
-	opts.Limit, _ = cmd.Flags().GetInt("limit")
-	opts.Sort, _ = cmd.Flags().GetString("sort")
-	opts.Order, _ = cmd.Flags().GetString("order")
+	opts.Database = flagString(cmd, "database")
+	opts.Type = flagString(cmd, "type")
+	opts.Storage = flagString(cmd, "storage")
+	opts.From = flagString(cmd, "from")
+	opts.To = flagString(cmd, "to")
+	opts.Tags = flagStringSlice(cmd, "tags")
+	opts.Format = flagString(cmd, "format")
+	opts.Limit = flagInt(cmd, "limit")
+	opts.Sort = flagString(cmd, "sort")
+	opts.Order = flagString(cmd, "order")
 
 	// Get logger and config
 	log := GetLogger()
@@ -121,7 +121,8 @@ func runList(cmd *cobra.Command, args []string) error {
 
 	// Parse time filters
 	if opts.From != "" {
-		fromTime, err := time.Parse(time.RFC3339, opts.From)
+		var fromTime time.Time
+		fromTime, err = time.Parse(time.RFC3339, opts.From)
 		if err != nil {
 			return fmt.Errorf("invalid from date format (use RFC3339): %w", err)
 		}
@@ -129,7 +130,8 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	if opts.To != "" {
-		toTime, err := time.Parse(time.RFC3339, opts.To)
+		var toTime time.Time
+		toTime, err = time.Parse(time.RFC3339, opts.To)
 		if err != nil {
 			return fmt.Errorf("invalid to date format (use RFC3339): %w", err)
 		}

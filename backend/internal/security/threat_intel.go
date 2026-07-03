@@ -151,13 +151,14 @@ func (tif *ThreatIntelligenceFeed) Update(ctx context.Context) error {
 		}
 
 		// Add to combined indicators
-		for _, indicator := range indicators {
+		for i := range indicators {
+			indicator := &indicators[i]
 			// Use ID or value as key
 			key := indicator.ID
 			if key == "" {
 				key = fmt.Sprintf("%s:%s", indicator.Type, indicator.Value)
 			}
-			newIndicators[key] = &indicator
+			newIndicators[key] = indicator
 		}
 	}
 
@@ -178,7 +179,7 @@ func (tif *ThreatIntelligenceFeed) fetchFeed(ctx context.Context, feedURL string
 	// - Recorded Future
 	// - Commercial feeds (CrowdStrike, Palo Alto, etc.)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", feedURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", feedURL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

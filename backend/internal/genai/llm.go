@@ -2,6 +2,7 @@ package genai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -177,11 +178,19 @@ func (llm *LLMClient) queryOpenAI(req *LLMRequest) (*LLMResponse, error) {
 
 	// Add context if provided
 	if len(req.Context) > 0 {
-		contextJSON, _ := json.Marshal(req.Context)
-		requestBody["messages"] = append(requestBody["messages"].([]map[string]string), map[string]string{
+		contextJSON, mErr := json.Marshal(req.Context)
+		if mErr != nil {
+			return nil, fmt.Errorf("failed to marshal context: %w", mErr)
+		}
+		messages, ok := requestBody["messages"].([]map[string]string)
+		if !ok {
+			return nil, fmt.Errorf("unexpected messages type in request body")
+		}
+		messages = append(messages, map[string]string{
 			"role":    "system",
 			"content": fmt.Sprintf("Context: %s", string(contextJSON)),
 		})
+		requestBody["messages"] = messages
 	}
 
 	jsonBody, err := json.Marshal(requestBody)
@@ -190,7 +199,7 @@ func (llm *LLMClient) queryOpenAI(req *LLMRequest) (*LLMResponse, error) {
 	}
 
 	// Create HTTP request
-	httpReq, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBody))
+	httpReq, err := http.NewRequestWithContext(context.Background(), http.MethodPost, endpoint, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -249,6 +258,8 @@ func (llm *LLMClient) queryOpenAI(req *LLMRequest) (*LLMResponse, error) {
 }
 
 // queryAnthropic sends a query to Anthropic API.
+//
+//nolint:unparam // req kept for signature parity with other providers; used once Anthropic API is wired up
 func (llm *LLMClient) queryAnthropic(req *LLMRequest) (*LLMResponse, error) {
 	// Similar implementation for Anthropic
 	return &LLMResponse{
@@ -258,6 +269,8 @@ func (llm *LLMClient) queryAnthropic(req *LLMRequest) (*LLMResponse, error) {
 }
 
 // queryLocal sends a query to local LLM.
+//
+//nolint:unparam // error return kept for signature parity with other provider query methods
 func (llm *LLMClient) queryLocal(req *LLMRequest) (*LLMResponse, error) {
 	// Mock local LLM response
 	response := &LLMResponse{

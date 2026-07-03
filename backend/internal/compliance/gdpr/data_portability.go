@@ -147,7 +147,7 @@ func (pm *PortabilityManager) CreateExportRequest(ctx context.Context, userID st
 		}
 	}
 
-	if dataTypes == nil || len(dataTypes) == 0 {
+	if len(dataTypes) == 0 {
 		dataTypes = []string{"all"}
 	}
 
@@ -181,7 +181,7 @@ func (pm *PortabilityManager) ProcessExportRequest(ctx context.Context, requestI
 
 	// Update status to processing
 	request.Status = ExportStatusProcessing
-	if err := pm.exportStore.Update(ctx, request); err != nil {
+	if err = pm.exportStore.Update(ctx, request); err != nil {
 		return err
 	}
 
@@ -190,7 +190,9 @@ func (pm *PortabilityManager) ProcessExportRequest(ctx context.Context, requestI
 	if err != nil {
 		request.Status = ExportStatusFailed
 		request.Error = err.Error()
-		_ = pm.exportStore.Update(ctx, request)
+		if updErr := pm.exportStore.Update(ctx, request); updErr != nil {
+			return fmt.Errorf("%w (and failed to persist failed status: %v)", err, updErr)
+		}
 		return err
 	}
 
@@ -212,7 +214,9 @@ func (pm *PortabilityManager) ProcessExportRequest(ctx context.Context, requestI
 	if err != nil {
 		request.Status = ExportStatusFailed
 		request.Error = err.Error()
-		_ = pm.exportStore.Update(ctx, request)
+		if updErr := pm.exportStore.Update(ctx, request); updErr != nil {
+			return fmt.Errorf("%w (and failed to persist failed status: %v)", err, updErr)
+		}
 		return err
 	}
 
@@ -221,7 +225,9 @@ func (pm *PortabilityManager) ProcessExportRequest(ctx context.Context, requestI
 	if err != nil {
 		request.Status = ExportStatusFailed
 		request.Error = err.Error()
-		_ = pm.exportStore.Update(ctx, request)
+		if updErr := pm.exportStore.Update(ctx, request); updErr != nil {
+			return fmt.Errorf("%w (and failed to persist failed status: %v)", err, updErr)
+		}
 		return err
 	}
 
@@ -258,7 +264,9 @@ func (pm *PortabilityManager) DownloadExport(ctx context.Context, requestID stri
 
 	if time.Now().After(request.ExpiresAt) {
 		request.Status = ExportStatusExpired
-		_ = pm.exportStore.Update(ctx, request)
+		if updErr := pm.exportStore.Update(ctx, request); updErr != nil {
+			return nil, fmt.Errorf("export has expired (and failed to persist expired status: %w)", updErr)
+		}
 		return nil, errors.New("export has expired")
 	}
 
@@ -294,10 +302,12 @@ func (pm *PortabilityManager) exportCSV(data *UserData) ([]byte, error) {
 	if len(data.Backups) > 0 {
 		buf.WriteString("=== BACKUPS ===\n")
 		writer := csv.NewWriter(&buf)
-		writer.Write([]string{"backup_id", "database_id", "created_at", "size", "status", "location", "encrypted"})
+		if err := writer.Write([]string{"backup_id", "database_id", "created_at", "size", "status", "location", "encrypted"}); err != nil {
+			return nil, err
+		}
 
 		for _, backup := range data.Backups {
-			writer.Write([]string{
+			if err := writer.Write([]string{
 				backup.BackupID,
 				backup.DatabaseID,
 				backup.CreatedAt.Format(time.RFC3339),
@@ -305,9 +315,14 @@ func (pm *PortabilityManager) exportCSV(data *UserData) ([]byte, error) {
 				backup.Status,
 				backup.Location,
 				fmt.Sprintf("%t", backup.Encrypted),
-			})
+			}); err != nil {
+				return nil, err
+			}
 		}
 		writer.Flush()
+		if err := writer.Error(); err != nil {
+			return nil, err
+		}
 		buf.WriteString("\n")
 	}
 
@@ -315,23 +330,30 @@ func (pm *PortabilityManager) exportCSV(data *UserData) ([]byte, error) {
 	if len(data.Consents) > 0 {
 		buf.WriteString("=== CONSENTS ===\n")
 		writer := csv.NewWriter(&buf)
-		writer.Write([]string{"consent_id", "purpose", "granted_at", "revoked_at", "status", "legal_basis"})
+		if err := writer.Write([]string{"consent_id", "purpose", "granted_at", "revoked_at", "status", "legal_basis"}); err != nil {
+			return nil, err
+		}
 
 		for _, consent := range data.Consents {
 			revokedAt := ""
 			if consent.RevokedAt != nil {
 				revokedAt = consent.RevokedAt.Format(time.RFC3339)
 			}
-			writer.Write([]string{
+			if err := writer.Write([]string{
 				consent.ConsentID,
 				consent.Purpose,
 				consent.GrantedAt.Format(time.RFC3339),
 				revokedAt,
 				consent.Status,
 				consent.LegalBasis,
-			})
+			}); err != nil {
+				return nil, err
+			}
 		}
 		writer.Flush()
+		if err := writer.Error(); err != nil {
+			return nil, err
+		}
 		buf.WriteString("\n")
 	}
 
@@ -339,19 +361,26 @@ func (pm *PortabilityManager) exportCSV(data *UserData) ([]byte, error) {
 	if len(data.ActivityLogs) > 0 {
 		buf.WriteString("=== ACTIVITY LOGS ===\n")
 		writer := csv.NewWriter(&buf)
-		writer.Write([]string{"log_id", "timestamp", "action", "resource", "ip_address", "user_agent"})
+		if err := writer.Write([]string{"log_id", "timestamp", "action", "resource", "ip_address", "user_agent"}); err != nil {
+			return nil, err
+		}
 
 		for _, log := range data.ActivityLogs {
-			writer.Write([]string{
+			if err := writer.Write([]string{
 				log.LogID,
 				log.Timestamp.Format(time.RFC3339),
 				log.Action,
 				log.Resource,
 				log.IPAddress,
 				log.UserAgent,
-			})
+			}); err != nil {
+				return nil, err
+			}
 		}
 		writer.Flush()
+		if err := writer.Error(); err != nil {
+			return nil, err
+		}
 	}
 
 	return buf.Bytes(), nil
@@ -371,7 +400,7 @@ func (pm *PortabilityManager) exportZIP(data *UserData) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := io.Copy(jsonFile, bytes.NewReader(jsonData)); err != nil {
+	if _, err = io.Copy(jsonFile, bytes.NewReader(jsonData)); err != nil {
 		return nil, err
 	}
 
@@ -384,7 +413,7 @@ func (pm *PortabilityManager) exportZIP(data *UserData) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := io.Copy(xmlFile, bytes.NewReader(xmlData)); err != nil {
+	if _, err = io.Copy(xmlFile, bytes.NewReader(xmlData)); err != nil {
 		return nil, err
 	}
 
@@ -397,7 +426,7 @@ func (pm *PortabilityManager) exportZIP(data *UserData) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := io.Copy(csvFile, bytes.NewReader(csvData)); err != nil {
+	if _, err = io.Copy(csvFile, bytes.NewReader(csvData)); err != nil {
 		return nil, err
 	}
 

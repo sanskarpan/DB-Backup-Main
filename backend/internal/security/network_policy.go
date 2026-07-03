@@ -274,7 +274,7 @@ func (m *NetworkPolicyManager) EvaluateConnection(ctx context.Context, conn *Con
 		if !m.isIPWhitelisted(conn.SourceIP) {
 			return m.denyConnection(conn, "IP not in whitelist", nil)
 		}
-		return m.allowConnection(conn, "IP is whitelisted", nil)
+		return m.allowConnection("IP is whitelisted", nil)
 	}
 
 	// Check port restrictions
@@ -322,7 +322,7 @@ func (m *NetworkPolicyManager) EvaluateConnection(ctx context.Context, conn *Con
 			if rule.Action == PolicyActionDeny {
 				return m.denyConnection(conn, fmt.Sprintf("Matched deny rule: %s", rule.Name), rule)
 			} else if rule.Action == PolicyActionAllow {
-				return m.allowConnection(conn, fmt.Sprintf("Matched allow rule: %s", rule.Name), rule)
+				return m.allowConnection(fmt.Sprintf("Matched allow rule: %s", rule.Name), rule)
 			}
 		}
 	}
@@ -332,7 +332,7 @@ func (m *NetworkPolicyManager) EvaluateConnection(ctx context.Context, conn *Con
 		return m.denyConnection(conn, "No matching rules, default deny", nil)
 	}
 
-	return m.allowConnection(conn, "No matching rules, default allow", nil)
+	return m.allowConnection("No matching rules, default allow", nil)
 }
 
 // isIPBlacklisted checks if an IP is blacklisted.
@@ -552,7 +552,7 @@ func (m *NetworkPolicyManager) evaluateCondition(condition *Condition, conn *Con
 }
 
 // allowConnection creates an allow decision.
-func (m *NetworkPolicyManager) allowConnection(conn *ConnectionInfo, reason string, rule *NetworkRule) (*PolicyDecision, error) {
+func (m *NetworkPolicyManager) allowConnection(reason string, rule *NetworkRule) (*PolicyDecision, error) {
 	m.metrics.mu.Lock()
 	m.metrics.AllowedRequests++
 	m.metrics.mu.Unlock()
@@ -651,7 +651,11 @@ func getClientIP(r *http.Request) string {
 	}
 
 	// Fall back to RemoteAddr
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		// RemoteAddr may not include a port; use it as-is.
+		return r.RemoteAddr
+	}
 	return ip
 }
 

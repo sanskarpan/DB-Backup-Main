@@ -30,7 +30,11 @@ func (m *MockSearchEngine) IsAvailable() bool {
 func (m *MockSearchEngine) Search(ctx context.Context, query *catalog.SearchQuery) (*catalog.SearchResults, error) {
 	args := m.Called(ctx, query)
 	if result := args.Get(0); result != nil {
-		return result.(*catalog.SearchResults), args.Error(1)
+		res, ok := result.(*catalog.SearchResults)
+		if !ok {
+			return nil, args.Error(1)
+		}
+		return res, args.Error(1)
 	}
 	return nil, args.Error(1)
 }
@@ -38,15 +42,23 @@ func (m *MockSearchEngine) Search(ctx context.Context, query *catalog.SearchQuer
 func (m *MockSearchEngine) ParseQueryString(queryString string) (*catalog.SearchQuery, error) {
 	args := m.Called(queryString)
 	if result := args.Get(0); result != nil {
-		return result.(*catalog.SearchQuery), args.Error(1)
+		res, ok := result.(*catalog.SearchQuery)
+		if !ok {
+			return nil, args.Error(1)
+		}
+		return res, args.Error(1)
 	}
 	return nil, args.Error(1)
 }
 
-func (m *MockSearchEngine) Suggest(ctx context.Context, prefix string, field string, limit int) ([]string, error) {
+func (m *MockSearchEngine) Suggest(ctx context.Context, prefix, field string, limit int) ([]string, error) {
 	args := m.Called(ctx, prefix, field, limit)
 	if result := args.Get(0); result != nil {
-		return result.([]string), args.Error(1)
+		res, ok := result.([]string)
+		if !ok {
+			return nil, args.Error(1)
+		}
+		return res, args.Error(1)
 	}
 	return nil, args.Error(1)
 }
@@ -54,7 +66,11 @@ func (m *MockSearchEngine) Suggest(ctx context.Context, prefix string, field str
 func (m *MockSearchEngine) GetStats(ctx context.Context) (*catalog.CatalogStats, error) {
 	args := m.Called(ctx)
 	if result := args.Get(0); result != nil {
-		return result.(*catalog.CatalogStats), args.Error(1)
+		res, ok := result.(*catalog.CatalogStats)
+		if !ok {
+			return nil, args.Error(1)
+		}
+		return res, args.Error(1)
 	}
 	return nil, args.Error(1)
 }
@@ -313,7 +329,7 @@ func TestHandleSearchCatalogSimple(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet,
-			"/api/v1/catalog/search?q=database:customers+type:postgres+status:success", nil)
+			"/api/v1/catalog/search?q=database:customers+type:postgres+status:success", http.NoBody)
 
 		server.handleSearchCatalogSimple(c)
 
@@ -337,7 +353,7 @@ func TestHandleSuggestCatalog(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet,
-			"/api/v1/catalog/suggest?field=database_name&prefix=prod&limit=10", nil)
+			"/api/v1/catalog/suggest?field=database_name&prefix=prod&limit=10", http.NoBody)
 
 		server.handleSuggestCatalog(c)
 
@@ -360,7 +376,7 @@ func TestHandleSuggestCatalog(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet,
-			"/api/v1/catalog/suggest?prefix=prod", nil)
+			"/api/v1/catalog/suggest?prefix=prod", http.NoBody)
 
 		server.handleSuggestCatalog(c)
 
@@ -373,7 +389,7 @@ func TestHandleSuggestCatalog(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet,
-			"/api/v1/catalog/suggest?field=database_name", nil)
+			"/api/v1/catalog/suggest?field=database_name", http.NoBody)
 
 		server.handleSuggestCatalog(c)
 
@@ -386,7 +402,7 @@ func TestHandleSuggestCatalog(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet,
-			"/api/v1/catalog/suggest?field=invalid_field&prefix=test", nil)
+			"/api/v1/catalog/suggest?field=invalid_field&prefix=test", http.NoBody)
 
 		server.handleSuggestCatalog(c)
 
@@ -405,7 +421,7 @@ func TestHandleSuggestCatalog(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet,
-			"/api/v1/catalog/suggest?field=database_type&prefix=pos", nil)
+			"/api/v1/catalog/suggest?field=database_type&prefix=pos", http.NoBody)
 
 		server.handleSuggestCatalog(c)
 
@@ -449,7 +465,7 @@ func TestHandleGetCatalogStats(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/api/v1/catalog/stats", nil)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/v1/catalog/stats", http.NoBody)
 
 		server.handleGetCatalogStats(c)
 
@@ -474,7 +490,7 @@ func TestHandleQueryExamples(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/api/v1/catalog/query-examples", nil)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/v1/catalog/query-examples", http.NoBody)
 
 		server.handleQueryExamples(c)
 

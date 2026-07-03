@@ -15,8 +15,15 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
+const (
+	// providerTypeNFS is the storage provider type identifier for NFS.
+	providerTypeNFS = "nfs"
+	// tempMountPrefix is the filename prefix used for auto-created temporary mount points.
+	tempMountPrefix = "nfs-mount-"
+)
+
 // NFSProvider implements NFS storage.
-type NFSProvider struct {
+type NFSProvider struct { //nolint:revive // keeps public name stable for external callers
 	config      *NFSConfig
 	mountPoint  string
 	isMounted   bool
@@ -24,7 +31,7 @@ type NFSProvider struct {
 }
 
 // NFSConfig holds NFS configuration.
-type NFSConfig struct {
+type NFSConfig struct { //nolint:revive // keeps public name stable for external callers
 	Server      string            // NFS server address (e.g., "192.168.1.100")
 	Export      string            // NFS export path (e.g., "/export/backups")
 	MountPoint  string            // Local mount point (e.g., "/mnt/nfs-backups")
@@ -48,7 +55,7 @@ func NewNFSProvider(config *NFSConfig) (*NFSProvider, error) {
 
 	if config.MountPoint == "" {
 		// Create temporary mount point
-		config.MountPoint = filepath.Join("/tmp", fmt.Sprintf("nfs-mount-%d", time.Now().Unix()))
+		config.MountPoint = filepath.Join(os.TempDir(), fmt.Sprintf("%s%d", tempMountPrefix, time.Now().Unix()))
 		config.AutoUnmount = true
 	}
 
@@ -84,9 +91,7 @@ func (p *NFSProvider) Mount(ctx context.Context) error {
 	}
 
 	// Check if already mounted
-	if mounted, err := p.checkMounted(); err != nil {
-		return err
-	} else if mounted {
+	if p.checkMounted() {
 		p.isMounted = true
 		return nil
 	}
@@ -113,6 +118,7 @@ func (p *NFSProvider) Unmount(ctx context.Context) error {
 		return nil // Not mounted
 	}
 
+	//nolint:gosec // G204: mountPoint is an operator-controlled local path, not untrusted input
 	cmd := exec.CommandContext(ctx, "umount", p.mountPoint)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -123,8 +129,11 @@ func (p *NFSProvider) Unmount(ctx context.Context) error {
 	p.isMounted = false
 
 	// Remove temporary mount point if auto-cleanup is enabled
-	if p.autoCleanup && strings.HasPrefix(p.mountPoint, "/tmp/nfs-mount-") {
-		os.Remove(p.mountPoint)
+	if p.autoCleanup && strings.HasPrefix(p.mountPoint, filepath.Join(os.TempDir(), tempMountPrefix)) {
+		if err := os.Remove(p.mountPoint); err != nil {
+			return pkgErrors.New(pkgErrors.ErrorTypeStorage,
+				fmt.Sprintf("failed to remove temporary mount point: %v", err))
+		}
 	}
 
 	return nil
@@ -156,7 +165,7 @@ func (p *NFSProvider) Upload(ctx context.Context, localPath, remotePath string, 
 
 	// Ensure destination directory exists
 	destDir := filepath.Dir(destPath)
-	if err := os.MkdirAll(destDir, 0o755); err != nil {
+	if err = os.MkdirAll(destDir, 0o755); err != nil {
 		return pkgErrors.ErrStorageUpload(err)
 	}
 
@@ -247,7 +256,7 @@ func (p *NFSProvider) Download(ctx context.Context, remotePath, localPath string
 
 	// Ensure local directory exists
 	localDir := filepath.Dir(localPath)
-	if err := os.MkdirAll(localDir, 0o755); err != nil {
+	if err = os.MkdirAll(localDir, 0o755); err != nil {
 		return pkgErrors.ErrStorageDownload(err)
 	}
 
@@ -397,7 +406,7 @@ func (p *NFSProvider) List(ctx context.Context, prefix string) ([]*storage.FileM
 
 // GetType returns the provider type.
 func (p *NFSProvider) GetType() storage.ProviderType {
-	return "nfs"
+	return providerTypeNFS
 }
 
 // ValidateConfig validates the provider configuration.
@@ -430,7 +439,7 @@ func (p *NFSProvider) Close() error {
 
 func (p *NFSProvider) buildMountArgs(nfsPath string) []string {
 	args := []string{
-		"-t", "nfs",
+		"-t", providerTypeNFS,
 	}
 
 	// Build options
@@ -462,23 +471,23 @@ func (p *NFSProvider) buildMountArgs(nfsPath string) []string {
 	return args
 }
 
-func (p *NFSProvider) checkMounted() (bool, error) {
+func (p *NFSProvider) checkMounted() bool {
 	// Read /proc/mounts to check if already mounted
 	data, err := os.ReadFile("/proc/mounts")
 	if err != nil {
 		// /proc/mounts might not exist on non-Linux systems
-		return false, nil
+		return false
 	}
 
 	lines := strings.Split(string(data), "\n")
 	for _, line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) >= 2 && fields[1] == p.mountPoint {
-			return true, nil
+			return true
 		}
 	}
 
-	return false, nil
+	return false
 }
 
 // progressReader wraps a reader to track progress.

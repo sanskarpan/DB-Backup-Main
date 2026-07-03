@@ -239,9 +239,9 @@ func (m *Manager) ReencryptDirectory(ctx context.Context, dirPath string) error 
 
 		// Try to parse as envelope
 		var envelope EncryptionEnvelope
-		if err := json.Unmarshal(oldData, &envelope); err != nil {
-			// Not an encrypted envelope, skip
-			return nil
+		if unmarshalErr := json.Unmarshal(oldData, &envelope); unmarshalErr != nil {
+			// Not an encrypted envelope, skip it rather than failing the walk.
+			return nil //nolint:nilerr // skipping non-envelope files is intentional
 		}
 
 		// Check if already using current key
@@ -355,7 +355,7 @@ func (m *Manager) autoRotate() {
 }
 
 // EncryptionEnvelope wraps encrypted data with metadata.
-type EncryptionEnvelope struct {
+type EncryptionEnvelope struct { //nolint:revive // keeps public name stable
 	KeyID      string    `json:"key_id"`
 	Algorithm  string    `json:"algorithm"`
 	Ciphertext string    `json:"ciphertext"`

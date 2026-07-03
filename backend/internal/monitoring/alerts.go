@@ -2,14 +2,19 @@ package monitoring
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
 	"time"
 
+	"github.com/sanskarpan/db-backup/internal/logger"
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
+
+// notificationTimeout bounds outbound alert-notification HTTP requests.
+const notificationTimeout = 10 * time.Second
 
 // AlertSeverity represents the severity of an alert.
 type AlertSeverity string
@@ -44,9 +49,9 @@ type AlertManager struct {
 }
 
 // NewAlertManager creates a new alert manager.
-func NewAlertManager(config MonitorConfig) *AlertManager {
+func NewAlertManager(config *MonitorConfig) *AlertManager {
 	return &AlertManager{
-		config:       config,
+		config:       *config,
 		alerts:       make(map[string]*Alert),
 		alertHistory: make([]*Alert, 0),
 		maxHistory:   1000,
@@ -135,12 +140,20 @@ func (am *AlertManager) GetAlertHistory(limit int) []*Alert {
 func (am *AlertManager) sendNotifications(alert *Alert) {
 	// Send to Slack if configured
 	if am.config.SlackWebhookURL != "" {
-		_ = am.sendSlackNotification(alert)
+		if err := am.sendSlackNotification(alert); err != nil {
+			logger.DefaultLogger().Error("failed to send slack alert notification", err, map[string]interface{}{
+				"alert_id": alert.ID,
+			})
+		}
 	}
 
 	// Send to Alertmanager if configured
 	if am.config.AlertManagerURL != "" {
-		_ = am.sendAlertmanagerNotification(alert)
+		if err := am.sendAlertmanagerNotification(alert); err != nil {
+			logger.DefaultLogger().Error("failed to send alertmanager notification", err, map[string]interface{}{
+				"alert_id": alert.ID,
+			})
+		}
 	}
 
 	// Send email if configured
@@ -194,7 +207,16 @@ func (am *AlertManager) sendSlackNotification(alert *Alert) error {
 		return err
 	}
 
-	resp, err := http.Post(am.config.SlackWebhookURL, "application/json", bytes.NewBuffer(payloadBytes))
+	ctx, cancel := context.WithTimeout(context.Background(), notificationTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, am.config.SlackWebhookURL, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -231,7 +253,17 @@ func (am *AlertManager) sendAlertmanagerNotification(alert *Alert) error {
 	}
 
 	url := fmt.Sprintf("%s/api/v2/alerts", am.config.AlertManagerURL)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(payloadBytes))
+
+	ctx, cancel := context.WithTimeout(context.Background(), notificationTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}

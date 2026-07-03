@@ -12,6 +12,8 @@ import (
 )
 
 // PolicyVersion represents a versioned policy.
+//
+//nolint:revive // keeps public name stable across packages
 type PolicyVersion struct {
 	ID           string                 `json:"id"`
 	PolicyID     string                 `json:"policy_id"`
@@ -30,6 +32,8 @@ type PolicyVersion struct {
 }
 
 // PolicyVersionStatus represents the status of a policy version.
+//
+//nolint:revive // keeps public name stable across packages
 type PolicyVersionStatus string
 
 const (
@@ -39,6 +43,8 @@ const (
 )
 
 // PolicyVersionManager manages policy versions.
+//
+//nolint:revive // keeps public name stable across packages
 type PolicyVersionManager struct {
 	mu       sync.RWMutex
 	store    PolicyVersionStore
@@ -47,6 +53,8 @@ type PolicyVersionManager struct {
 }
 
 // PolicyVersionStore defines the interface for storing policy versions.
+//
+//nolint:revive // keeps public name stable across packages
 type PolicyVersionStore interface {
 	Save(ctx context.Context, version *PolicyVersion) error
 	Get(ctx context.Context, versionID string) (*PolicyVersion, error)

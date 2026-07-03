@@ -14,7 +14,12 @@ import (
 	"github.com/sanskarpan/db-backup/internal/integrations"
 )
 
+// eventsAPIURL is the PagerDuty Events API v2 enqueue endpoint.
+const eventsAPIURL = "https://events.pagerduty.com/v2/enqueue"
+
 // PagerDutyIntegration implements the Integration interface for PagerDuty.
+//
+//nolint:revive // keeps public name stable across packages
 type PagerDutyIntegration struct {
 	*integrations.BaseIntegration
 	client         *http.Client
@@ -98,7 +103,7 @@ func (p *PagerDutyIntegration) HealthCheck(ctx context.Context) error {
 	config := p.GetConfig()
 
 	// Use Events API v2 for health check
-	url := "https://events.pagerduty.com/v2/enqueue"
+	url := eventsAPIURL
 
 	// Send a test event
 	payload := map[string]interface{}{
@@ -117,7 +122,7 @@ func (p *PagerDutyIntegration) HealthCheck(ctx context.Context) error {
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -138,7 +143,12 @@ func (p *PagerDutyIntegration) HealthCheck(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		p.GetMetrics().RecordError(err)
+		p.SetStatus(integrations.StatusError)
+		return fmt.Errorf("failed to read response: %w", err)
+	}
 
 	if resp.StatusCode != http.StatusAccepted {
 		err := fmt.Errorf("health check failed with status: %d, body: %s", resp.StatusCode, string(body))
@@ -161,7 +171,7 @@ func (p *PagerDutyIntegration) CreateIncident(ctx context.Context, incident *int
 		return nil, err
 	}
 
-	url := "https://events.pagerduty.com/v2/enqueue"
+	url := eventsAPIURL
 
 	// Map severity
 	severity := p.mapSeverity(incident.Severity)
@@ -198,7 +208,9 @@ func (p *PagerDutyIntegration) CreateIncident(ctx context.Context, incident *int
 			customDetails[k] = v
 		}
 
-		payload["payload"].(map[string]interface{})["custom_details"] = customDetails
+		if inner, ok := payload["payload"].(map[string]interface{}); ok {
+			inner["custom_details"] = customDetails
+		}
 	}
 
 	bodyBytes, err := json.Marshal(payload)
@@ -206,7 +218,7 @@ func (p *PagerDutyIntegration) CreateIncident(ctx context.Context, incident *int
 		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -274,7 +286,7 @@ func (p *PagerDutyIntegration) UpdateIncident(ctx context.Context, dedupKey stri
 		return err
 	}
 
-	url := "https://events.pagerduty.com/v2/enqueue"
+	url := eventsAPIURL
 
 	payload := map[string]interface{}{
 		"routing_key":  p.integrationKey,
@@ -288,8 +300,10 @@ func (p *PagerDutyIntegration) UpdateIncident(ctx context.Context, dedupKey stri
 	}
 
 	if update.Comment != "" {
-		payload["payload"].(map[string]interface{})["custom_details"] = map[string]string{
-			"update": update.Comment,
+		if inner, ok := payload["payload"].(map[string]interface{}); ok {
+			inner["custom_details"] = map[string]string{
+				"update": update.Comment,
+			}
 		}
 	}
 
@@ -298,7 +312,7 @@ func (p *PagerDutyIntegration) UpdateIncident(ctx context.Context, dedupKey stri
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -316,7 +330,10 @@ func (p *PagerDutyIntegration) UpdateIncident(ctx context.Context, dedupKey stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusAccepted {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			body = nil
+		}
 		err := fmt.Errorf("failed to update incident, status: %d, body: %s", resp.StatusCode, string(body))
 		p.GetMetrics().RecordError(err)
 		return err
@@ -345,7 +362,7 @@ func (p *PagerDutyIntegration) GetIncident(ctx context.Context, incidentID strin
 
 	url := fmt.Sprintf("https://api.pagerduty.com/incidents/%s", incidentID)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -406,12 +423,12 @@ func (p *PagerDutyIntegration) GetIncident(ctx context.Context, incidentID strin
 }
 
 // CloseIncident closes/resolves a PagerDuty incident.
-func (p *PagerDutyIntegration) CloseIncident(ctx context.Context, dedupKey string, resolution string) error {
+func (p *PagerDutyIntegration) CloseIncident(ctx context.Context, dedupKey, resolution string) error {
 	if err := p.Validate(); err != nil {
 		return err
 	}
 
-	url := "https://events.pagerduty.com/v2/enqueue"
+	url := eventsAPIURL
 
 	payload := map[string]interface{}{
 		"routing_key":  p.integrationKey,
@@ -431,7 +448,7 @@ func (p *PagerDutyIntegration) CloseIncident(ctx context.Context, dedupKey strin
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -449,7 +466,10 @@ func (p *PagerDutyIntegration) CloseIncident(ctx context.Context, dedupKey strin
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusAccepted {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			body = nil
+		}
 		err := fmt.Errorf("failed to resolve incident, status: %d, body: %s", resp.StatusCode, string(body))
 		p.GetMetrics().RecordError(err)
 		return err

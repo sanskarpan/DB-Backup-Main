@@ -11,6 +11,7 @@ import (
 )
 
 func setupTestDetector(t *testing.T) (*Detector, *BaselineTrainer) {
+	t.Helper()
 	trainer := NewBaselineTrainer(30)
 
 	// Create baseline with some variance
@@ -407,9 +408,13 @@ func TestAnomalyReport_Fields(t *testing.T) {
 
 	assert.Equal(t, "anomaly-123", report.ID)
 	assert.Equal(t, "test-db", report.DatabaseName)
+	assert.Equal(t, "backup-123", report.BackupID)
 	assert.Equal(t, AnomalyTypeSizeIncrease, report.Type)
 	assert.Equal(t, AnomalySeverityHigh, report.Severity)
 	assert.Equal(t, 85.5, report.Score)
+	assert.False(t, report.DetectedAt.IsZero())
+	assert.Equal(t, "Size increased significantly", report.Description)
+	assert.Equal(t, "Investigate data growth", report.Recommendation)
 	assert.Contains(t, report.Deviations, "size")
 	assert.Equal(t, 4.2, report.Deviations["size"])
 }

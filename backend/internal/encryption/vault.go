@@ -242,8 +242,8 @@ func (v *VaultKeyStore) GetCurrentKeyID(ctx context.Context) (string, error) {
 
 	secret, err := v.client.KVv2(v.mountPath).Get(ctx, metadataPath)
 	if err != nil {
-		// If metadata doesn't exist, return default
-		return v.currentKey, nil
+		// If metadata doesn't exist, fall back to the default current key.
+		return v.currentKey, nil //nolint:nilerr // missing metadata falls back to default
 	}
 
 	if secret == nil || secret.Data == nil {
@@ -329,7 +329,7 @@ type FileKeyStore struct {
 }
 
 // NewFileKeyStore creates a file-based key store.
-func NewFileKeyStore(basePath string, currentKey string) *FileKeyStore {
+func NewFileKeyStore(basePath, currentKey string) *FileKeyStore {
 	if currentKey == "" {
 		currentKey = "master"
 	}
@@ -410,7 +410,9 @@ func (f *FileKeyStore) RotateKey(ctx context.Context, keyID string) (newKeyID st
 	}
 
 	newKeyID = fmt.Sprintf("%s-v%d", keyID, nextVersion)
-	f.StoreKey(ctx, newKeyID, newKey)
+	if err := f.StoreKey(ctx, newKeyID, newKey); err != nil {
+		return "", nil, err
+	}
 	f.currentKey = newKeyID
 
 	return newKeyID, newKey, nil

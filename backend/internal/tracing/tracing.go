@@ -4,9 +4,12 @@ package tracing
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	//nolint:staticcheck // SA1019: Jaeger exporter is deprecated but still supported for existing deployments; migration to OTLP tracked separately.
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -38,10 +41,7 @@ func NewTracerProvider(cfg *config.TracingConfig) (*TracerProvider, error) {
 	}
 
 	// Create resource with service information
-	res, err := createResource(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create resource: %w", err)
-	}
+	res := createResource(cfg)
 
 	// Create exporter based on provider type
 	exporter, err := createExporter(cfg)
@@ -109,7 +109,7 @@ func (tp *TracerProvider) GetTracer(name string, options ...trace.TracerOption) 
 
 // Helper functions
 
-func createResource(cfg *config.TracingConfig) (*resource.Resource, error) {
+func createResource(cfg *config.TracingConfig) *resource.Resource {
 	serviceName := cfg.ServiceName
 	if serviceName == "" {
 		serviceName = "db-backup"
@@ -134,7 +134,7 @@ func createResource(cfg *config.TracingConfig) (*resource.Resource, error) {
 	return resource.NewWithAttributes(
 		semconv.SchemaURL,
 		attrs...,
-	), nil
+	)
 }
 
 func createExporter(cfg *config.TracingConfig) (sdktrace.SpanExporter, error) {
@@ -161,7 +161,7 @@ func createJaegerExporter(cfg config.JaegerConfig) (sdktrace.SpanExporter, error
 		if agentPort == 0 {
 			agentPort = 14268 // Default Jaeger collector port
 		}
-		endpoint = fmt.Sprintf("http://%s:%d/api/traces", cfg.AgentHost, agentPort)
+		endpoint = fmt.Sprintf("http://%s/api/traces", net.JoinHostPort(cfg.AgentHost, strconv.Itoa(agentPort)))
 	} else if endpoint == "" {
 		// Default to localhost collector
 		endpoint = "http://localhost:14268/api/traces"

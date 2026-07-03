@@ -246,7 +246,7 @@ func (ep *EscalationProcessor) performEscalation(state *EscalationState) {
 	}
 
 	for _, targetUserID := range targets {
-		escalationNotif := ep.createEscalationNotification(state, level, targetUserID)
+		escalationNotif := ep.createEscalationNotification(state, &level, targetUserID)
 
 		if ep.engine != nil {
 			if err := ep.engine.Send(ctx, escalationNotif); err != nil {
@@ -266,7 +266,7 @@ func (ep *EscalationProcessor) performEscalation(state *EscalationState) {
 }
 
 // createEscalationNotification creates an escalation notification.
-func (ep *EscalationProcessor) createEscalationNotification(state *EscalationState, level EscalationLevel, targetUserID string) *Notification {
+func (ep *EscalationProcessor) createEscalationNotification(state *EscalationState, level *EscalationLevel, targetUserID string) *Notification {
 	title := fmt.Sprintf("🔔 Escalation: Notification requires attention (Level %d)", level.Level)
 	message := level.Message
 
@@ -351,88 +351,88 @@ func (ep *EscalationProcessor) findApplicableRule(notification *Notification) *E
 
 // addDefaultRules adds default escalation rules.
 func (ep *EscalationProcessor) addDefaultRules() {
-	// Urgent notifications - escalate quickly
-	ep.rules = append(ep.rules, &EscalationRule{
-		ID:          "urgent_default",
-		Name:        "Urgent Notification Escalation",
-		Description: "Escalate urgent notifications if not read within 5 minutes",
-		Priority:    PriorityUrgent,
-		Enabled:     true,
-		Levels: []EscalationLevel{
-			{
-				Level:      1,
-				DelayAfter: 5 * time.Minute,
-				Channels:   []DeliveryChannel{ChannelEmail, ChannelSMS},
-				Message:    "URGENT: A critical notification requires immediate attention.",
-				StopOnRead: true,
-			},
-			{
-				Level:      2,
-				DelayAfter: 10 * time.Minute,
-				Channels:   []DeliveryChannel{ChannelSMS, ChannelPush},
-				Message:    "CRITICAL: Escalating to Level 2 - notification still unread.",
-				StopOnRead: true,
-			},
-			{
-				Level:      3,
-				DelayAfter: 15 * time.Minute,
-				Channels:   []DeliveryChannel{ChannelSMS, ChannelPush, ChannelSlack},
-				Message:    "CRITICAL ALERT: Level 3 escalation - requires immediate action.",
-				StopOnRead: false,
-			},
-		},
-	})
-
-	// High priority notifications
-	ep.rules = append(ep.rules, &EscalationRule{
-		ID:          "high_default",
-		Name:        "High Priority Escalation",
-		Description: "Escalate high priority notifications if not read within 30 minutes",
-		Priority:    PriorityHigh,
-		Enabled:     true,
-		Levels: []EscalationLevel{
-			{
-				Level:      1,
-				DelayAfter: 30 * time.Minute,
-				Channels:   []DeliveryChannel{ChannelEmail},
-				Message:    "A high-priority notification requires your attention.",
-				StopOnRead: true,
-			},
-			{
-				Level:      2,
-				DelayAfter: 1 * time.Hour,
-				Channels:   []DeliveryChannel{ChannelEmail, ChannelPush},
-				Message:    "Escalating: High-priority notification still pending.",
-				StopOnRead: true,
+	ep.rules = append(ep.rules,
+		// Urgent notifications - escalate quickly
+		&EscalationRule{
+			ID:          "urgent_default",
+			Name:        "Urgent Notification Escalation",
+			Description: "Escalate urgent notifications if not read within 5 minutes",
+			Priority:    PriorityUrgent,
+			Enabled:     true,
+			Levels: []EscalationLevel{
+				{
+					Level:      1,
+					DelayAfter: 5 * time.Minute,
+					Channels:   []DeliveryChannel{ChannelEmail, ChannelSMS},
+					Message:    "URGENT: A critical notification requires immediate attention.",
+					StopOnRead: true,
+				},
+				{
+					Level:      2,
+					DelayAfter: 10 * time.Minute,
+					Channels:   []DeliveryChannel{ChannelSMS, ChannelPush},
+					Message:    "CRITICAL: Escalating to Level 2 - notification still unread.",
+					StopOnRead: true,
+				},
+				{
+					Level:      3,
+					DelayAfter: 15 * time.Minute,
+					Channels:   []DeliveryChannel{ChannelSMS, ChannelPush, ChannelSlack},
+					Message:    "CRITICAL ALERT: Level 3 escalation - requires immediate action.",
+					StopOnRead: false,
+				},
 			},
 		},
-	})
-
-	// Backup failure notifications - special handling
-	ep.rules = append(ep.rules, &EscalationRule{
-		ID:          "backup_failed",
-		Name:        "Backup Failure Escalation",
-		Description: "Escalate backup failures immediately",
-		Priority:    PriorityHigh,
-		Type:        TypeBackupFailed,
-		Enabled:     true,
-		Levels: []EscalationLevel{
-			{
-				Level:      1,
-				DelayAfter: 15 * time.Minute,
-				Channels:   []DeliveryChannel{ChannelEmail, ChannelSlack},
-				Message:    "BACKUP FAILED: Immediate attention required to prevent data loss.",
-				StopOnRead: true,
-			},
-			{
-				Level:      2,
-				DelayAfter: 30 * time.Minute,
-				Channels:   []DeliveryChannel{ChannelSMS, ChannelSlack},
-				Message:    "CRITICAL: Backup failure escalation - data protection at risk.",
-				StopOnRead: false,
+		// High priority notifications
+		&EscalationRule{
+			ID:          "high_default",
+			Name:        "High Priority Escalation",
+			Description: "Escalate high priority notifications if not read within 30 minutes",
+			Priority:    PriorityHigh,
+			Enabled:     true,
+			Levels: []EscalationLevel{
+				{
+					Level:      1,
+					DelayAfter: 30 * time.Minute,
+					Channels:   []DeliveryChannel{ChannelEmail},
+					Message:    "A high-priority notification requires your attention.",
+					StopOnRead: true,
+				},
+				{
+					Level:      2,
+					DelayAfter: 1 * time.Hour,
+					Channels:   []DeliveryChannel{ChannelEmail, ChannelPush},
+					Message:    "Escalating: High-priority notification still pending.",
+					StopOnRead: true,
+				},
 			},
 		},
-	})
+		// Backup failure notifications - special handling
+		&EscalationRule{
+			ID:          "backup_failed",
+			Name:        "Backup Failure Escalation",
+			Description: "Escalate backup failures immediately",
+			Priority:    PriorityHigh,
+			Type:        TypeBackupFailed,
+			Enabled:     true,
+			Levels: []EscalationLevel{
+				{
+					Level:      1,
+					DelayAfter: 15 * time.Minute,
+					Channels:   []DeliveryChannel{ChannelEmail, ChannelSlack},
+					Message:    "BACKUP FAILED: Immediate attention required to prevent data loss.",
+					StopOnRead: true,
+				},
+				{
+					Level:      2,
+					DelayAfter: 30 * time.Minute,
+					Channels:   []DeliveryChannel{ChannelSMS, ChannelSlack},
+					Message:    "CRITICAL: Backup failure escalation - data protection at risk.",
+					StopOnRead: false,
+				},
+			},
+		},
+	)
 }
 
 // GetEscalationState returns the escalation state for a notification.

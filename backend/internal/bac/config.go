@@ -11,6 +11,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Supported configuration file extensions.
+const (
+	extYAML = ".yaml"
+	extYML  = ".yml"
+	extJSON = ".json"
+)
+
 // BackupConfig represents the declarative backup configuration.
 type BackupConfig struct {
 	APIVersion string         `yaml:"apiVersion" json:"apiVersion"`
@@ -262,9 +269,9 @@ func (cm *ConfigManager) LoadConfig(filePath string) (*BackupConfig, error) {
 	// Determine format based on extension
 	ext := filepath.Ext(filePath)
 	switch ext {
-	case ".yaml", ".yml":
+	case extYAML, extYML:
 		err = yaml.Unmarshal(data, &config)
-	case ".json":
+	case extJSON:
 		err = json.Unmarshal(data, &config)
 	default:
 		return nil, fmt.Errorf("unsupported config format: %s", ext)
@@ -295,9 +302,9 @@ func (cm *ConfigManager) SaveConfig(config *BackupConfig, filePath string) error
 	// Determine format based on extension
 	ext := filepath.Ext(filePath)
 	switch ext {
-	case ".yaml", ".yml":
+	case extYAML, extYML:
 		data, err = yaml.Marshal(config)
-	case ".json":
+	case extJSON:
 		data, err = json.MarshalIndent(config, "", "  ")
 	default:
 		return fmt.Errorf("unsupported config format: %s", ext)
@@ -307,7 +314,7 @@ func (cm *ConfigManager) SaveConfig(config *BackupConfig, filePath string) error
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	err = os.WriteFile(filePath, data, 0o644)
+	err = os.WriteFile(filePath, data, 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
@@ -428,7 +435,7 @@ func (cm *ConfigManager) LoadConfigsFromDirectory(dir string) error {
 		}
 
 		ext := filepath.Ext(entry.Name())
-		if ext != ".yaml" && ext != ".yml" && ext != ".json" {
+		if ext != extYAML && ext != extYML && ext != extJSON {
 			continue
 		}
 
@@ -456,8 +463,8 @@ func (cm *ConfigManager) GetConfigsByDatabase(databaseID string) []*BackupConfig
 
 	configs := make([]*BackupConfig, 0)
 	for _, config := range cm.configs {
-		for _, db := range config.Spec.Databases {
-			if db.ID == databaseID {
+		for i := range config.Spec.Databases {
+			if config.Spec.Databases[i].ID == databaseID {
 				configs = append(configs, config)
 				break
 			}

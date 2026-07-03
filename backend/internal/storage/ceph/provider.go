@@ -19,6 +19,8 @@ import (
 )
 
 // CephProvider implements storage provider for Ceph via RADOS Gateway.
+//
+//nolint:revive // keeps public name stable; used by other packages
 type CephProvider struct {
 	config     *storage.CephConfig
 	client     *s3.Client
@@ -249,7 +251,7 @@ func (p *CephProvider) List(ctx context.Context, prefix string) ([]*storage.File
 		}
 	}
 
-	var files []*storage.FileMetadata
+	files := make([]*storage.FileMetadata, 0, len(result.Contents))
 	for _, obj := range result.Contents {
 		files = append(files, &storage.FileMetadata{
 			Path:         *obj.Key,
@@ -385,19 +387,19 @@ func (p *CephProvider) GetLifecyclePolicy(ctx context.Context) ([]types.Lifecycl
 
 func validateConfig(cfg *storage.CephConfig) error {
 	if cfg == nil {
-		return fmt.Errorf("Ceph config is required")
+		return errors.New("ceph config is required")
 	}
 	if cfg.Endpoint == "" {
-		return fmt.Errorf("Ceph RADOS Gateway endpoint is required")
+		return errors.New("ceph RADOS Gateway endpoint is required")
 	}
 	if cfg.AccessKey == "" {
-		return fmt.Errorf("Ceph access key is required")
+		return errors.New("ceph access key is required")
 	}
 	if cfg.SecretKey == "" {
-		return fmt.Errorf("Ceph secret key is required")
+		return errors.New("ceph secret key is required")
 	}
 	if cfg.Bucket == "" {
-		return fmt.Errorf("Ceph bucket is required")
+		return errors.New("ceph bucket is required")
 	}
 	if cfg.Region == "" {
 		cfg.Region = "default" // Ceph uses "default" region

@@ -367,7 +367,7 @@ func TestPatternEngine_EdgeCases(t *testing.T) {
 		filePath := filepath.Join(tempDir, "largefile.bin")
 		// Create 5MB file with signature near end
 		data := make([]byte, 5*1024*1024)
-		copy(data[len(data)-100:], []byte("RYUK"))
+		copy(data[len(data)-100:], "RYUK")
 		require.NoError(t, os.WriteFile(filePath, data, 0o644))
 
 		match, err := engine.ScanFile(filePath)
@@ -555,7 +555,7 @@ func BenchmarkPatternEngine_ScanFile(b *testing.B) {
 	// Create test file
 	filePath := filepath.Join(tempDir, "test.encrypted")
 	content := make([]byte, 1024*1024) // 1MB
-	copy(content[500:], []byte("RYUK encrypted"))
+	copy(content[500:], "RYUK encrypted")
 	require.NoError(b, os.WriteFile(filePath, content, 0o644))
 
 	b.ResetTimer()

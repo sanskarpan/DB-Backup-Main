@@ -15,6 +15,8 @@ import (
 )
 
 // JiraIntegration implements the Integration interface for Jira.
+//
+//nolint:revive // keeps public name stable across the integrations API
 type JiraIntegration struct {
 	*integrations.BaseIntegration
 	client     *http.Client
@@ -108,7 +110,7 @@ func (j *JiraIntegration) HealthCheck(ctx context.Context) error {
 	config := j.GetConfig()
 	url := fmt.Sprintf("%s/rest/api/2/myself", config.BaseURL)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -169,22 +171,26 @@ func (j *JiraIntegration) CreateIncident(ctx context.Context, incident *integrat
 		},
 	}
 
+	fieldsMap, ok := payload["fields"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid payload fields")
+	}
+
 	// Add labels if provided
 	if len(incident.Tags) > 0 {
-		payload["fields"].(map[string]interface{})["labels"] = incident.Tags
+		fieldsMap["labels"] = incident.Tags
 	}
 
 	// Add custom fields
 	if incident.CustomFields != nil {
-		fields := payload["fields"].(map[string]interface{})
 		for k, v := range incident.CustomFields {
-			fields[k] = v
+			fieldsMap[k] = v
 		}
 	}
 
 	// Add assignee if provided
 	if incident.Assignee != "" {
-		payload["fields"].(map[string]interface{})["assignee"] = map[string]string{
+		fieldsMap["assignee"] = map[string]string{
 			"name": incident.Assignee,
 		}
 	}
@@ -194,7 +200,7 @@ func (j *JiraIntegration) CreateIncident(ctx context.Context, incident *integrat
 		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -306,7 +312,7 @@ func (j *JiraIntegration) UpdateIncident(ctx context.Context, issueKey string, u
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -325,7 +331,10 @@ func (j *JiraIntegration) UpdateIncident(ctx context.Context, issueKey string, u
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			body = nil
+		}
 		err := fmt.Errorf("failed to update issue, status: %d, body: %s", resp.StatusCode, string(body))
 		j.GetMetrics().RecordError(err)
 		return err
@@ -357,7 +366,7 @@ func (j *JiraIntegration) GetIncident(ctx context.Context, issueKey string) (*in
 	config := j.GetConfig()
 	url := fmt.Sprintf("%s/rest/api/2/issue/%s", config.BaseURL, issueKey)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -407,8 +416,14 @@ func (j *JiraIntegration) GetIncident(ctx context.Context, issueKey string) (*in
 
 	j.GetMetrics().RecordRequest(duration)
 
-	created, _ := time.Parse(time.RFC3339, jiraIssue.Fields.Created)
-	updated, _ := time.Parse(time.RFC3339, jiraIssue.Fields.Updated)
+	created, err := time.Parse(time.RFC3339, jiraIssue.Fields.Created)
+	if err != nil {
+		log.Warn().Err(err).Str("issue_key", issueKey).Msg("Failed to parse created time")
+	}
+	updated, err := time.Parse(time.RFC3339, jiraIssue.Fields.Updated)
+	if err != nil {
+		log.Warn().Err(err).Str("issue_key", issueKey).Msg("Failed to parse updated time")
+	}
 
 	response := &integrations.IncidentResponse{
 		ID:        jiraIssue.ID,
@@ -423,7 +438,7 @@ func (j *JiraIntegration) GetIncident(ctx context.Context, issueKey string) (*in
 }
 
 // CloseIncident closes a Jira issue.
-func (j *JiraIntegration) CloseIncident(ctx context.Context, issueKey string, resolution string) error {
+func (j *JiraIntegration) CloseIncident(ctx context.Context, issueKey, resolution string) error {
 	if err := j.Validate(); err != nil {
 		return err
 	}
@@ -469,7 +484,7 @@ func (j *JiraIntegration) CloseIncident(ctx context.Context, issueKey string, re
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -488,7 +503,10 @@ func (j *JiraIntegration) CloseIncident(ctx context.Context, issueKey string, re
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			body = nil
+		}
 		err := fmt.Errorf("failed to close issue, status: %d, body: %s", resp.StatusCode, string(body))
 		j.GetMetrics().RecordError(err)
 		return err
@@ -539,7 +557,7 @@ func (j *JiraIntegration) mapPriority(priority integrations.Priority) string {
 	}
 }
 
-func (j *JiraIntegration) addComment(ctx context.Context, issueKey string, comment string) error {
+func (j *JiraIntegration) addComment(ctx context.Context, issueKey, comment string) error {
 	config := j.GetConfig()
 	url := fmt.Sprintf("%s/rest/api/2/issue/%s/comment", config.BaseURL, issueKey)
 
@@ -552,7 +570,7 @@ func (j *JiraIntegration) addComment(ctx context.Context, issueKey string, comme
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -567,7 +585,10 @@ func (j *JiraIntegration) addComment(ctx context.Context, issueKey string, comme
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			body = nil
+		}
 		return fmt.Errorf("failed to add comment, status: %d, body: %s", resp.StatusCode, string(body))
 	}
 
@@ -583,7 +604,7 @@ func (j *JiraIntegration) getTransitions(ctx context.Context, issueKey string) (
 	config := j.GetConfig()
 	url := fmt.Sprintf("%s/rest/api/2/issue/%s/transitions", config.BaseURL, issueKey)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

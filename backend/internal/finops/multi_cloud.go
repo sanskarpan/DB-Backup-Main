@@ -281,8 +281,9 @@ func (mcc *MultiCloudComparison) calculateProviderCost(dbCosts *DatabaseCosts, p
 
 	reasoning := make([]string, 0)
 	if savings > 0 {
-		reasoning = append(reasoning, fmt.Sprintf("%.1f%% cost reduction", savingsPercent))
-		reasoning = append(reasoning, fmt.Sprintf("$%.2f monthly savings", savings))
+		reasoning = append(reasoning,
+			fmt.Sprintf("%.1f%% cost reduction", savingsPercent),
+			fmt.Sprintf("$%.2f monthly savings", savings))
 	}
 	if tier != TierHot {
 		reasoning = append(reasoning, fmt.Sprintf("Using %s tier for cost optimization", tier))

@@ -285,12 +285,12 @@ func TestStatsCollectorConcurrency(t *testing.T) {
 	done := make(chan bool, 10)
 
 	for i := 0; i < 10; i++ {
-		go func(id int) {
+		go func() {
 			for j := 0; j < 100; j++ {
 				collector.RecordQuery("SELECT * FROM concurrent_test", 100*time.Millisecond)
 			}
 			done <- true
-		}(i)
+		}()
 	}
 
 	// Wait for all goroutines

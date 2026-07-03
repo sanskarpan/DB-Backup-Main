@@ -33,7 +33,7 @@ const (
 )
 
 // RansomwareFamily represents a known ransomware family with detection patterns.
-type RansomwareFamily struct {
+type RansomwareFamily struct { //nolint:revive // keeps public name stable across packages
 	Name        string
 	Aliases     []string
 	FirstSeen   time.Time
@@ -991,7 +991,8 @@ func (pe *PatternEngine) ScanFile(filePath string) (*RansomwareFamilyMatch, erro
 	}
 
 	if len(matches) == 0 {
-		return nil, nil
+		// No family matched: nil result with nil error is the intended "no match" outcome.
+		return nil, nil //nolint:nilnil // absence of a match is not an error
 	}
 
 	// Sort matches by score (highest first)
@@ -1011,9 +1012,7 @@ func (pe *PatternEngine) ScanFile(filePath string) (*RansomwareFamilyMatch, erro
 }
 
 // checkFileSignatures checks file content for signatures.
-func (pe *PatternEngine) checkFileSignatures(file *os.File, fileSize int64, signatures []FileSignature) (bool, []string) {
-	var indicators []string
-
+func (pe *PatternEngine) checkFileSignatures(file *os.File, fileSize int64, signatures []FileSignature) (matched bool, indicators []string) {
 	for _, sig := range signatures {
 		// Determine scan region
 		var scanData []byte
@@ -1050,7 +1049,7 @@ func (pe *PatternEngine) checkFileSignatures(file *os.File, fileSize int64, sign
 }
 
 // readAtOffset reads data from file at specific offset.
-func (pe *PatternEngine) readAtOffset(file *os.File, offset int64, length int64) ([]byte, error) {
+func (pe *PatternEngine) readAtOffset(file *os.File, offset, length int64) ([]byte, error) {
 	if _, err := file.Seek(offset, 0); err != nil {
 		return nil, err
 	}
@@ -1088,7 +1087,7 @@ func (pe *PatternEngine) readHeaderAndFooter(file *os.File, fileSize int64) ([]b
 	// Read footer if file is large enough
 	if fileSize > pe.config.HeaderScanSize+pe.config.FooterScanSize {
 		if _, err := file.Seek(-pe.config.FooterScanSize, 2); err != nil {
-			return data, nil // Return header only
+			return data, nil //nolint:nilerr // footer seek failure is non-fatal; return header data only
 		}
 
 		footer := make([]byte, pe.config.FooterScanSize)
@@ -1139,7 +1138,11 @@ func (pe *PatternEngine) matchFilename(filename, pattern string) bool {
 	pattern = strings.ReplaceAll(pattern, "[victim_id]", "*")
 	pattern = strings.ReplaceAll(pattern, "[id]", "*")
 
-	matched, _ := filepath.Match(strings.ToLower(pattern), strings.ToLower(filename))
+	matched, err := filepath.Match(strings.ToLower(pattern), strings.ToLower(filename))
+	if err != nil {
+		// Malformed pattern: treat as non-match rather than propagating the error.
+		return false
+	}
 	return matched
 }
 
@@ -1211,7 +1214,7 @@ func (pe *PatternEngine) AnalyzeFileHash(filePath string) (*HashMatchResult, err
 }
 
 // RansomwareFamilyMatch represents a matched ransomware family.
-type RansomwareFamilyMatch struct {
+type RansomwareFamilyMatch struct { //nolint:revive // keeps public name stable across packages
 	Family             *RansomwareFamily
 	ConfidenceScore    int
 	MatchedIndicators  []string
@@ -1226,7 +1229,7 @@ type FamilyMatchResult struct {
 }
 
 // RansomwareIndicator represents a ransomware indicator found.
-type RansomwareIndicator struct {
+type RansomwareIndicator struct { //nolint:revive // keeps public name stable across packages
 	Type        string
 	FilePath    string
 	Family      string
