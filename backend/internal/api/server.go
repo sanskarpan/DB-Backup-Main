@@ -226,6 +226,13 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 		backups.POST("/:id/legal-hold", s.handleApplyLegalHold)
 		backups.POST("/:id/replicate", s.handleReplicateBackup)
 
+		// Recovery features that operate directly on a stored backup: run a
+		// read-only SQL query against a mounted backup without a full restore,
+		// and perform an isolated clean-room recovery (restore + malware scan +
+		// integrity check) that reports whether the backup is promotable.
+		backups.POST("/:id/query", s.handleQueryBackup)
+		backups.POST("/:id/clean-room-recovery", s.handleCleanRoomRecovery)
+
 		// Database registry (the set of databases to back up)
 		{
 			databases := v1.Group("/databases", authMiddleware)
