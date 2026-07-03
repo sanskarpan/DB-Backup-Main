@@ -124,17 +124,17 @@ func (aa *AIAdvisor) Ask(ctx context.Context, sessionID, question string) (*Advi
 
 	switch intent {
 	case "optimization":
-		response, err = aa.handleOptimizationQuery(ctx, sessionID, question)
+		response, err = aa.handleOptimizationQuery(ctx, question)
 	case "cost_analysis":
-		response, err = aa.handleCostAnalysisQuery(ctx, sessionID, question)
+		response, err = aa.handleCostAnalysisQuery(ctx, question)
 	case "troubleshooting":
-		response, err = aa.handleTroubleshootingQuery(ctx, sessionID, question)
+		response, err = aa.handleTroubleshootingQuery(ctx, question)
 	case "best_practices":
-		response, err = aa.handleBestPracticesQuery(ctx, sessionID, question)
+		response, err = aa.handleBestPracticesQuery(ctx, question)
 	case "security":
-		response, err = aa.handleSecurityQuery(ctx, sessionID, question)
+		response, err = aa.handleSecurityQuery(ctx, question)
 	default:
-		response, err = aa.handleGeneralQuery(ctx, sessionID, question)
+		response, err = aa.handleGeneralQuery(ctx, question)
 	}
 
 	if err != nil {
@@ -190,7 +190,7 @@ func (aa *AIAdvisor) detectIntent(question string) string {
 }
 
 // handleOptimizationQuery handles optimization-related questions.
-func (aa *AIAdvisor) handleOptimizationQuery(_ context.Context, sessionID, question string) (*AdvisorResponse, error) {
+func (aa *AIAdvisor) handleOptimizationQuery(_ context.Context, question string) (*AdvisorResponse, error) {
 	recommendations := []*Recommendation{
 		{
 			ID:          generateID(),
@@ -270,7 +270,7 @@ func (aa *AIAdvisor) handleOptimizationQuery(_ context.Context, sessionID, quest
 }
 
 // handleCostAnalysisQuery handles cost-related questions.
-func (aa *AIAdvisor) handleCostAnalysisQuery(_ context.Context, sessionID, question string) (*AdvisorResponse, error) {
+func (aa *AIAdvisor) handleCostAnalysisQuery(_ context.Context, question string) (*AdvisorResponse, error) {
 	response := &AdvisorResponse{
 		Message: "Based on your current usage patterns, I've identified several cost-saving opportunities. " +
 			"By implementing smart retention policies and using Cool storage tiers for older backups, " +
@@ -308,7 +308,7 @@ func (aa *AIAdvisor) handleCostAnalysisQuery(_ context.Context, sessionID, quest
 }
 
 // handleTroubleshootingQuery handles troubleshooting questions.
-func (aa *AIAdvisor) handleTroubleshootingQuery(_ context.Context, sessionID, question string) (*AdvisorResponse, error) {
+func (aa *AIAdvisor) handleTroubleshootingQuery(_ context.Context, question string) (*AdvisorResponse, error) {
 	response := &AdvisorResponse{
 		Message: "I can help you troubleshoot backup issues. To provide the best assistance, " +
 			"I need to know more about the specific problem. Common issues include:\n\n" +
@@ -336,7 +336,7 @@ func (aa *AIAdvisor) handleTroubleshootingQuery(_ context.Context, sessionID, qu
 }
 
 // handleBestPracticesQuery handles best practices questions.
-func (aa *AIAdvisor) handleBestPracticesQuery(_ context.Context, sessionID, question string) (*AdvisorResponse, error) {
+func (aa *AIAdvisor) handleBestPracticesQuery(_ context.Context, question string) (*AdvisorResponse, error) {
 	response := &AdvisorResponse{
 		Message: "Here are the top backup best practices I recommend:\n\n" +
 			"1. **3-2-1 Rule**: 3 copies of data, 2 different media types, 1 offsite\n" +
@@ -371,7 +371,7 @@ func (aa *AIAdvisor) handleBestPracticesQuery(_ context.Context, sessionID, ques
 }
 
 // handleSecurityQuery handles security-related questions.
-func (aa *AIAdvisor) handleSecurityQuery(_ context.Context, sessionID, question string) (*AdvisorResponse, error) {
+func (aa *AIAdvisor) handleSecurityQuery(_ context.Context, question string) (*AdvisorResponse, error) {
 	response := &AdvisorResponse{
 		Message: "Security is critical for backups. I've analyzed your configuration and identified " +
 			"some important security improvements you should consider.",
@@ -409,7 +409,7 @@ func (aa *AIAdvisor) handleSecurityQuery(_ context.Context, sessionID, question 
 }
 
 // handleGeneralQuery handles general questions.
-func (aa *AIAdvisor) handleGeneralQuery(_ context.Context, sessionID, question string) (*AdvisorResponse, error) {
+func (aa *AIAdvisor) handleGeneralQuery(_ context.Context, question string) (*AdvisorResponse, error) {
 	response := &AdvisorResponse{
 		Message: "I can help you with various backup-related topics including:\n\n" +
 			"• Optimization and performance tuning\n" +

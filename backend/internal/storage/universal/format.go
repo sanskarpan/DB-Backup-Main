@@ -264,7 +264,7 @@ func (w *UniversalBackupWriter) Finalize() error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal manifest: %w", err)
 	}
-	if err := os.WriteFile(manifestPath, manifestData, 0o600); err != nil {
+	if err = os.WriteFile(manifestPath, manifestData, 0o600); err != nil {
 		return fmt.Errorf("failed to write manifest: %w", err)
 	}
 

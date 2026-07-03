@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestDetector(t *testing.T) (*Detector, *BaselineTrainer) {
+func setupTestDetector(t *testing.T) *Detector {
 	t.Helper()
 	trainer := NewBaselineTrainer(30)
 
@@ -36,7 +36,7 @@ func setupTestDetector(t *testing.T) (*Detector, *BaselineTrainer) {
 	config := DefaultDetectorConfig()
 	detector := NewDetector(config, trainer)
 
-	return detector, trainer
+	return detector
 }
 
 func TestNewDetector(t *testing.T) {
@@ -52,7 +52,7 @@ func TestNewDetector(t *testing.T) {
 }
 
 func TestDetector_DetectSizeAnomaly(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	// Create metric with significantly larger size (5x normal)
 	metric := BackupMetric{
@@ -85,7 +85,7 @@ func TestDetector_DetectSizeAnomaly(t *testing.T) {
 }
 
 func TestDetector_DetectDurationAnomaly(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	// Create metric with significantly longer duration (10x normal)
 	metric := BackupMetric{
@@ -116,7 +116,7 @@ func TestDetector_DetectDurationAnomaly(t *testing.T) {
 }
 
 func TestDetector_DetectFailureCluster(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	ctx := context.Background()
 
@@ -151,7 +151,7 @@ func TestDetector_DetectFailureCluster(t *testing.T) {
 }
 
 func TestDetector_NoAnomalyForNormalMetric(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	// Create normal metric matching baseline
 	metric := BackupMetric{
@@ -193,7 +193,7 @@ func TestDetector_NoBaselineNoDetection(t *testing.T) {
 }
 
 func TestDetector_RegisterAlertCallback(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	var mu sync.Mutex
 	callbackCalled := false
@@ -234,7 +234,7 @@ func TestDetector_RegisterAlertCallback(t *testing.T) {
 }
 
 func TestDetector_GetAnomalyHistory(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	ctx := context.Background()
 
@@ -259,7 +259,7 @@ func TestDetector_GetAnomalyHistory(t *testing.T) {
 }
 
 func TestDetector_CalculateSeverity(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	tests := []struct {
 		deviation float64
@@ -278,7 +278,7 @@ func TestDetector_CalculateSeverity(t *testing.T) {
 }
 
 func TestDetector_CalculateScore(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	tests := []struct {
 		deviation float64
@@ -350,7 +350,7 @@ func TestDetector_DetectUnusualTiming(t *testing.T) {
 }
 
 func TestDetector_MultipleSimultaneousAnomalies(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	// Create metric with multiple anomalies
 	metric := BackupMetric{

@@ -435,8 +435,9 @@ func (m *EncryptionKeyManager) GetEncryptionKey(purpose string) (key string, ver
 
 	// Ensure key is registered
 	path := fmt.Sprintf("encryption-keys/%s", purpose)
-	if err := m.rotationManager.RegisterKey(keyID, path); err != nil {
+	if err = m.rotationManager.RegisterKey(keyID, path); err != nil {
 		// Key might already be registered, that's okay
+		err = nil
 	}
 
 	key, err = m.rotationManager.GetKey(keyID)

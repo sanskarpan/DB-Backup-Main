@@ -306,7 +306,7 @@ func TestMinIOProvider_List(t *testing.T) {
 	prefix := "test-list-" + time.Now().Format("20060102150405") + "/"
 	files := []string{"file1.txt", "file2.txt", "file3.txt"}
 
-	var uploaded []string
+	uploaded := make([]string, 0, len(files))
 	for _, file := range files {
 		remotePath := prefix + file
 		err := provider.UploadStream(ctx, bytes.NewReader([]byte("content")), remotePath, nil)

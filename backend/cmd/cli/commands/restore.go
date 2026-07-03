@@ -113,7 +113,7 @@ func runRestore(cmd *cobra.Command, args []string) error {
 	}
 
 	// Parse flags
-	opts.TargetType = flagString(cmd, "target-type")
+	opts.TargetType = flagString(cmd, "target-type") //nolint:govet // TargetType parsed for CLI completeness; restore derives DB type from backup metadata
 	opts.TargetHost = flagString(cmd, "target-host")
 	opts.TargetPort = flagInt(cmd, "target-port")
 	opts.TargetUser = flagString(cmd, "target-user")

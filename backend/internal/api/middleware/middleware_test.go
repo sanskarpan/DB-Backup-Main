@@ -35,7 +35,7 @@ func TestCORS(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/test", http.NoBody)
+			req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 			req.Header.Set("Origin", tt.origin)
 			w := httptest.NewRecorder()
 
@@ -57,7 +57,7 @@ func TestCORS_Wildcard(t *testing.T) {
 		c.String(http.StatusOK, "OK")
 	})
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("Origin", "https://any-origin.com")
 	w := httptest.NewRecorder()
 
@@ -73,7 +73,7 @@ func TestCORS_Preflight(t *testing.T) {
 		c.String(http.StatusOK, "OK")
 	})
 
-	req := httptest.NewRequest("OPTIONS", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodOptions, "/test", http.NoBody)
 	req.Header.Set("Origin", "http://localhost:3000")
 	w := httptest.NewRecorder()
 
@@ -92,7 +92,7 @@ func TestRateLimit(t *testing.T) {
 
 	// First 5 requests should succeed
 	for i := 0; i < 5; i++ {
-		req := httptest.NewRequest("GET", "/test", http.NoBody)
+		req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 		req.RemoteAddr = "127.0.0.1:12345"
 		w := httptest.NewRecorder()
 
@@ -102,7 +102,7 @@ func TestRateLimit(t *testing.T) {
 	}
 
 	// 6th request should be rate limited
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.RemoteAddr = "127.0.0.1:12345"
 	w := httptest.NewRecorder()
 
@@ -125,7 +125,7 @@ func TestAuth_ValidToken(t *testing.T) {
 	tokenString, err := tokenService.GenerateToken("user123", "test@example.com", []string{"admin"})
 	assert.NoError(t, err)
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+tokenString)
 	w := httptest.NewRecorder()
 
@@ -142,7 +142,7 @@ func TestAuth_InvalidToken(t *testing.T) {
 		c.String(http.StatusOK, "OK")
 	})
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("Authorization", "Bearer invalid-token")
 	w := httptest.NewRecorder()
 
@@ -158,7 +158,7 @@ func TestAuth_MissingToken(t *testing.T) {
 		c.String(http.StatusOK, "OK")
 	})
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -181,7 +181,7 @@ func TestAuth_ExpiredToken(t *testing.T) {
 	tokenString, err := expiredTokenService.GenerateToken("user123", "test@example.com", []string{"admin"})
 	assert.NoError(t, err)
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+tokenString)
 	w := httptest.NewRecorder()
 
@@ -204,7 +204,7 @@ func TestOptionalAuth_WithToken(t *testing.T) {
 	tokenString, err := tokenService.GenerateToken("user123", "test@example.com", []string{"admin"})
 	assert.NoError(t, err)
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+tokenString)
 	w := httptest.NewRecorder()
 
@@ -222,7 +222,7 @@ func TestOptionalAuth_WithoutToken(t *testing.T) {
 		c.JSON(http.StatusOK, gin.H{"authenticated": exists})
 	})
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -242,7 +242,7 @@ func TestRequireRole_HasRole(t *testing.T) {
 		c.String(http.StatusOK, "OK")
 	})
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -261,7 +261,7 @@ func TestRequireRole_MissingRole(t *testing.T) {
 		c.String(http.StatusOK, "OK")
 	})
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -276,7 +276,7 @@ func TestRequireRole_NoRoles(t *testing.T) {
 		c.String(http.StatusOK, "OK")
 	})
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)

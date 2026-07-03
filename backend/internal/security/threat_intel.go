@@ -179,7 +179,7 @@ func (tif *ThreatIntelligenceFeed) fetchFeed(ctx context.Context, feedURL string
 	// - Recorded Future
 	// - Commercial feeds (CrowdStrike, Palo Alto, etc.)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", feedURL, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedURL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

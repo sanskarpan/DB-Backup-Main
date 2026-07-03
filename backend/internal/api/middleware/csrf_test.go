@@ -65,7 +65,7 @@ func TestCSRFProtection_GETRequest(t *testing.T) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -122,7 +122,7 @@ func TestCSRFProtection_POSTWithValidToken(t *testing.T) {
 	})
 
 	// GET request to obtain token
-	getReq := httptest.NewRequest("GET", "/form", http.NoBody)
+	getReq := httptest.NewRequest(http.MethodGet, "/form", http.NoBody)
 	getW := httptest.NewRecorder()
 	router.ServeHTTP(getW, getReq)
 
@@ -226,7 +226,7 @@ func TestCSRFProtection_DELETERequest(t *testing.T) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("DELETE", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodDelete, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -243,7 +243,7 @@ func TestCSRFProtection_OPTIONSRequest(t *testing.T) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("OPTIONS", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodOptions, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)

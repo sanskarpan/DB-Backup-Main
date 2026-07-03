@@ -17,7 +17,7 @@ func TestSecurityHeaders_Default(t *testing.T) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -46,7 +46,7 @@ func TestSecurityHeaders_Strict(t *testing.T) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -76,7 +76,7 @@ func TestSecurityHeaders_Development(t *testing.T) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -115,7 +115,7 @@ func TestSecurityHeaders_Custom(t *testing.T) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -140,7 +140,7 @@ func TestSecurityHeaders_NilConfig(t *testing.T) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -171,7 +171,7 @@ func TestSecurityHeaders_EmptyStrings(t *testing.T) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -200,7 +200,7 @@ func TestSecurityHeaders_CSP_Directives(t *testing.T) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -223,12 +223,12 @@ func TestSecurityHeaders_MultipleRequests(t *testing.T) {
 	})
 
 	// First request
-	req1 := httptest.NewRequest("GET", "/test", http.NoBody)
+	req1 := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w1 := httptest.NewRecorder()
 	router.ServeHTTP(w1, req1)
 
 	// Second request
-	req2 := httptest.NewRequest("GET", "/test", http.NoBody)
+	req2 := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, req2)
 

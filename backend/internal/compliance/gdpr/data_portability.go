@@ -181,7 +181,7 @@ func (pm *PortabilityManager) ProcessExportRequest(ctx context.Context, requestI
 
 	// Update status to processing
 	request.Status = ExportStatusProcessing
-	if err = pm.exportStore.Update(ctx, request); err != nil {
+	if err := pm.exportStore.Update(ctx, request); err != nil {
 		return err
 	}
 
@@ -191,7 +191,7 @@ func (pm *PortabilityManager) ProcessExportRequest(ctx context.Context, requestI
 		request.Status = ExportStatusFailed
 		request.Error = err.Error()
 		if updErr := pm.exportStore.Update(ctx, request); updErr != nil {
-			return fmt.Errorf("%w (and failed to persist failed status: %v)", err, updErr)
+			return fmt.Errorf("%w (and failed to persist failed status: %w)", err, updErr)
 		}
 		return err
 	}
@@ -215,7 +215,7 @@ func (pm *PortabilityManager) ProcessExportRequest(ctx context.Context, requestI
 		request.Status = ExportStatusFailed
 		request.Error = err.Error()
 		if updErr := pm.exportStore.Update(ctx, request); updErr != nil {
-			return fmt.Errorf("%w (and failed to persist failed status: %v)", err, updErr)
+			return fmt.Errorf("%w (and failed to persist failed status: %w)", err, updErr)
 		}
 		return err
 	}
@@ -226,7 +226,7 @@ func (pm *PortabilityManager) ProcessExportRequest(ctx context.Context, requestI
 		request.Status = ExportStatusFailed
 		request.Error = err.Error()
 		if updErr := pm.exportStore.Update(ctx, request); updErr != nil {
-			return fmt.Errorf("%w (and failed to persist failed status: %v)", err, updErr)
+			return fmt.Errorf("%w (and failed to persist failed status: %w)", err, updErr)
 		}
 		return err
 	}
@@ -294,20 +294,31 @@ func (pm *PortabilityManager) exportXML(data *UserData) ([]byte, error) {
 	return append([]byte(xml.Header), output...), nil
 }
 
+// writeCSVSection writes a titled CSV section (header + rows) to buf.
+func writeCSVSection(buf *bytes.Buffer, title string, header []string, rows [][]string) error {
+	buf.WriteString(title)
+	writer := csv.NewWriter(buf)
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+	writer.Flush()
+	return writer.Error()
+}
+
 // exportCSV exports user data as CSV (multiple files for different data types).
 func (pm *PortabilityManager) exportCSV(data *UserData) ([]byte, error) {
 	var buf bytes.Buffer
 
 	// Export backups as CSV
 	if len(data.Backups) > 0 {
-		buf.WriteString("=== BACKUPS ===\n")
-		writer := csv.NewWriter(&buf)
-		if err := writer.Write([]string{"backup_id", "database_id", "created_at", "size", "status", "location", "encrypted"}); err != nil {
-			return nil, err
-		}
-
+		rows := make([][]string, 0, len(data.Backups))
 		for _, backup := range data.Backups {
-			if err := writer.Write([]string{
+			rows = append(rows, []string{
 				backup.BackupID,
 				backup.DatabaseID,
 				backup.CreatedAt.Format(time.RFC3339),
@@ -315,12 +326,11 @@ func (pm *PortabilityManager) exportCSV(data *UserData) ([]byte, error) {
 				backup.Status,
 				backup.Location,
 				fmt.Sprintf("%t", backup.Encrypted),
-			}); err != nil {
-				return nil, err
-			}
+			})
 		}
-		writer.Flush()
-		if err := writer.Error(); err != nil {
+		if err := writeCSVSection(&buf, "=== BACKUPS ===\n",
+			[]string{"backup_id", "database_id", "created_at", "size", "status", "location", "encrypted"},
+			rows); err != nil {
 			return nil, err
 		}
 		buf.WriteString("\n")
@@ -328,30 +338,24 @@ func (pm *PortabilityManager) exportCSV(data *UserData) ([]byte, error) {
 
 	// Export consents as CSV
 	if len(data.Consents) > 0 {
-		buf.WriteString("=== CONSENTS ===\n")
-		writer := csv.NewWriter(&buf)
-		if err := writer.Write([]string{"consent_id", "purpose", "granted_at", "revoked_at", "status", "legal_basis"}); err != nil {
-			return nil, err
-		}
-
+		rows := make([][]string, 0, len(data.Consents))
 		for _, consent := range data.Consents {
 			revokedAt := ""
 			if consent.RevokedAt != nil {
 				revokedAt = consent.RevokedAt.Format(time.RFC3339)
 			}
-			if err := writer.Write([]string{
+			rows = append(rows, []string{
 				consent.ConsentID,
 				consent.Purpose,
 				consent.GrantedAt.Format(time.RFC3339),
 				revokedAt,
 				consent.Status,
 				consent.LegalBasis,
-			}); err != nil {
-				return nil, err
-			}
+			})
 		}
-		writer.Flush()
-		if err := writer.Error(); err != nil {
+		if err := writeCSVSection(&buf, "=== CONSENTS ===\n",
+			[]string{"consent_id", "purpose", "granted_at", "revoked_at", "status", "legal_basis"},
+			rows); err != nil {
 			return nil, err
 		}
 		buf.WriteString("\n")
@@ -359,26 +363,20 @@ func (pm *PortabilityManager) exportCSV(data *UserData) ([]byte, error) {
 
 	// Export activity logs as CSV
 	if len(data.ActivityLogs) > 0 {
-		buf.WriteString("=== ACTIVITY LOGS ===\n")
-		writer := csv.NewWriter(&buf)
-		if err := writer.Write([]string{"log_id", "timestamp", "action", "resource", "ip_address", "user_agent"}); err != nil {
-			return nil, err
-		}
-
+		rows := make([][]string, 0, len(data.ActivityLogs))
 		for _, log := range data.ActivityLogs {
-			if err := writer.Write([]string{
+			rows = append(rows, []string{
 				log.LogID,
 				log.Timestamp.Format(time.RFC3339),
 				log.Action,
 				log.Resource,
 				log.IPAddress,
 				log.UserAgent,
-			}); err != nil {
-				return nil, err
-			}
+			})
 		}
-		writer.Flush()
-		if err := writer.Error(); err != nil {
+		if err := writeCSVSection(&buf, "=== ACTIVITY LOGS ===\n",
+			[]string{"log_id", "timestamp", "action", "resource", "ip_address", "user_agent"},
+			rows); err != nil {
 			return nil, err
 		}
 	}

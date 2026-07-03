@@ -52,7 +52,7 @@ func (d *MongoDBDriver) Connect(ctx context.Context, config *database.Connection
 	}
 	clientOpts := options.Client().
 		ApplyURI(connectionString).
-		SetMaxPoolSize(uint64(maxConns))
+		SetMaxPoolSize(uint64(maxConns)) //nolint:gosec // G115: maxConns is bounded non-negative (see guard above)
 
 	// Connect to MongoDB
 	client, err := mongo.Connect(ctx, clientOpts)

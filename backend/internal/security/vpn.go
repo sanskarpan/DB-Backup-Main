@@ -670,8 +670,8 @@ func generateClientID() string {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		// crypto/rand should never fail; fall back to time-based entropy.
-		binary.BigEndian.PutUint64(b, uint64(time.Now().UnixNano()))
-		binary.BigEndian.PutUint64(b[8:], uint64(time.Now().UnixNano()))
+		binary.BigEndian.PutUint64(b, uint64(time.Now().UnixNano()))     //nolint:gosec // G115: UnixNano is non-negative
+		binary.BigEndian.PutUint64(b[8:], uint64(time.Now().UnixNano())) //nolint:gosec // G115: UnixNano is non-negative
 	}
 	return base64.URLEncoding.EncodeToString(b)
 }

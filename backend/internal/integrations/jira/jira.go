@@ -391,7 +391,7 @@ func (j *JiraIntegration) GetIncident(ctx context.Context, issueKey string) (*in
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		err := fmt.Errorf("failed to get issue, status: %d, body: %s", resp.StatusCode, string(body))
+		err = fmt.Errorf("failed to get issue, status: %d, body: %s", resp.StatusCode, string(body))
 		j.GetMetrics().RecordError(err)
 		return nil, err
 	}
@@ -409,7 +409,7 @@ func (j *JiraIntegration) GetIncident(ctx context.Context, issueKey string) (*in
 		} `json:"fields"`
 	}
 
-	if err := json.Unmarshal(body, &jiraIssue); err != nil {
+	if err = json.Unmarshal(body, &jiraIssue); err != nil {
 		j.GetMetrics().RecordError(err)
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}

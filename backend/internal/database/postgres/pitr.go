@@ -39,7 +39,7 @@ func (p *PITRManager) BackupWALFiles(ctx context.Context, outputDir string, sinc
 	}
 
 	// Force a WAL switch to ensure current WAL is complete
-	if err = p.switchWAL(ctx); err != nil {
+	if err := p.switchWAL(ctx); err != nil {
 		return err
 	}
 

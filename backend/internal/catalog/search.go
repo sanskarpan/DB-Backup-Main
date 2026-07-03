@@ -567,17 +567,19 @@ func parseTermsAggregation(aggs map[string]interface{}, name string) map[string]
 	if agg, ok := aggs[name].(map[string]interface{}); ok {
 		if buckets, ok := agg["buckets"].([]interface{}); ok {
 			for _, bucket := range buckets {
-				if b, ok := bucket.(map[string]interface{}); ok {
-					key, ok := b["key"].(string)
-					if !ok {
-						continue
-					}
-					count := int64(0)
-					if docCount, ok := b["doc_count"].(float64); ok {
-						count = int64(docCount)
-					}
-					result[key] = count
+				b, ok := bucket.(map[string]interface{})
+				if !ok {
+					continue
 				}
+				key, ok := b["key"].(string)
+				if !ok {
+					continue
+				}
+				count := int64(0)
+				if docCount, ok := b["doc_count"].(float64); ok {
+					count = int64(docCount)
+				}
+				result[key] = count
 			}
 		}
 	}

@@ -307,11 +307,11 @@ func (cr *ComplianceReporter) generateComplianceStandardReport(format ReportForm
 func (cr *ComplianceReporter) getExecutiveSummary() *ExecutiveSummary {
 	summary := cr.monitor.GetComplianceSummary()
 
-	totalDatabases, _ := summary["total_databases"].(int)
-	compliantDatabases, _ := summary["compliant_databases"].(int)
-	averageSuccessRate, _ := summary["average_success_rate"].(float64)
-	totalViolations, _ := summary["violations_count"].(int)
-	unresolvedViolations, _ := summary["unresolved_violations"].(int)
+	totalDatabases, _ := summary["total_databases"].(int)              //nolint:errcheck // type assertion ok ignored; zero value is an acceptable default
+	compliantDatabases, _ := summary["compliant_databases"].(int)      //nolint:errcheck // type assertion ok ignored; zero value is an acceptable default
+	averageSuccessRate, _ := summary["average_success_rate"].(float64) //nolint:errcheck // type assertion ok ignored; zero value is an acceptable default
+	totalViolations, _ := summary["violations_count"].(int)            //nolint:errcheck // type assertion ok ignored; zero value is an acceptable default
+	unresolvedViolations, _ := summary["unresolved_violations"].(int)  //nolint:errcheck // type assertion ok ignored; zero value is an acceptable default
 
 	exec := &ExecutiveSummary{
 		TotalDatabases:       totalDatabases,
@@ -907,8 +907,8 @@ func (cr *ComplianceReporter) formatComplianceStandardMarkdown(data map[string]i
 	sb.WriteString("# Compliance Standard Report\n\n")
 	sb.WriteString(fmt.Sprintf("**Generated:** %s\n\n", time.Now().Format(time.RFC3339)))
 
-	standards, _ := data["standards"].(map[string][]string)
-	complianceStatus, _ := data["compliance_status"].(map[string]bool)
+	standards, _ := data["standards"].(map[string][]string)            //nolint:errcheck // type assertion ok ignored; nil map is an acceptable default
+	complianceStatus, _ := data["compliance_status"].(map[string]bool) //nolint:errcheck // type assertion ok ignored; nil map is an acceptable default
 
 	sb.WriteString("## Compliance Standards Coverage\n\n")
 

@@ -25,10 +25,12 @@ var (
 
 // Database type request string values.
 const (
-	dbTypeMySQL    = "mysql"
-	dbTypePostgres = "postgres"
-	dbTypeMongoDB  = "mongodb"
-	dbTypeSQLite   = "sqlite"
+	dbTypeMySQL      = "mysql"
+	dbTypePostgres   = "postgres"
+	dbTypePostgreSQL = "postgresql"
+	dbTypeMongoDB    = "mongodb"
+	dbTypeMongo      = "mongo"
+	dbTypeSQLite     = "sqlite"
 )
 
 // handleRoot handles the root endpoint.
@@ -105,9 +107,9 @@ func (s *Server) handleCreateBackup(c *gin.Context) {
 	switch req.DatabaseType {
 	case dbTypeMySQL:
 		dbType = database.DatabaseTypeMySQL
-	case dbTypePostgres, "postgresql":
+	case dbTypePostgres, dbTypePostgreSQL:
 		dbType = database.DatabaseTypePostgreSQL
-	case dbTypeMongoDB, "mongo":
+	case dbTypeMongoDB, dbTypeMongo:
 		dbType = database.DatabaseTypeMongoDB
 	case dbTypeSQLite:
 		dbType = database.DatabaseTypeSQLite
@@ -447,9 +449,9 @@ func (s *Server) handleCreateSchedule(c *gin.Context) {
 	switch req.BackupOpts.DatabaseType {
 	case dbTypeMySQL:
 		dbType = database.DatabaseTypeMySQL
-	case dbTypePostgres, "postgresql":
+	case dbTypePostgres, dbTypePostgreSQL:
 		dbType = database.DatabaseTypePostgreSQL
-	case dbTypeMongoDB, "mongo":
+	case dbTypeMongoDB, dbTypeMongo:
 		dbType = database.DatabaseTypeMongoDB
 	case dbTypeSQLite:
 		dbType = database.DatabaseTypeSQLite
@@ -560,9 +562,9 @@ func (s *Server) handleUpdateSchedule(c *gin.Context) {
 		switch req.BackupOpts.DatabaseType {
 		case dbTypeMySQL:
 			dbType = database.DatabaseTypeMySQL
-		case dbTypePostgres, "postgresql":
+		case dbTypePostgres, dbTypePostgreSQL:
 			dbType = database.DatabaseTypePostgreSQL
-		case dbTypeMongoDB, "mongo":
+		case dbTypeMongoDB, dbTypeMongo:
 			dbType = database.DatabaseTypeMongoDB
 		case dbTypeSQLite:
 			dbType = database.DatabaseTypeSQLite

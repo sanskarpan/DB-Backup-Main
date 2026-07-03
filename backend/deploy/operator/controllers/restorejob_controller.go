@@ -55,7 +55,7 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Add finalizer if it doesn't exist
 	if !controllerutil.ContainsFinalizer(restoreJob, restoreJobFinalizer) {
 		controllerutil.AddFinalizer(restoreJob, restoreJobFinalizer)
-		if err = r.Update(ctx, restoreJob); err != nil {
+		if err := r.Update(ctx, restoreJob); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -82,7 +82,7 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 		r.updateCondition(restoreJob, "Initialized", metav1.ConditionTrue, "JobCreated", "Restore job initialized")
 
-		if err = r.Status().Update(ctx, restoreJob); err != nil {
+		if err := r.Status().Update(ctx, restoreJob); err != nil {
 			return ctrl.Result{}, err
 		}
 	}

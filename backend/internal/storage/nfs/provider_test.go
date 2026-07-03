@@ -225,7 +225,7 @@ func TestBuildMountArgs(t *testing.T) {
 // newMountedTestProvider returns a provider backed by a temporary directory that
 // simulates an already-mounted NFS share. The temp directory is cleaned up
 // automatically when the test finishes.
-func newMountedTestProvider(t *testing.T) (*NFSProvider, string) {
+func newMountedTestProvider(t *testing.T) (provider *NFSProvider, mountPoint string) {
 	t.Helper()
 
 	tempDir, err := os.MkdirTemp("", "nfs-test-*")
@@ -238,7 +238,7 @@ func newMountedTestProvider(t *testing.T) (*NFSProvider, string) {
 		}
 	})
 
-	provider := &NFSProvider{
+	provider = &NFSProvider{
 		config: &NFSConfig{
 			Server:     "192.168.1.100",
 			Export:     "/export/backups",

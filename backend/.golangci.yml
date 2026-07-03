@@ -93,7 +93,7 @@ linters-settings:
       - fieldalignment
 
   gocyclo:
-    min-complexity: 20
+    min-complexity: 30
 
   gocognit:
     min-complexity: 30

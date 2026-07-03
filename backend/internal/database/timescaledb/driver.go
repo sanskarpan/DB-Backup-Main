@@ -60,7 +60,7 @@ func (d *TimescaleDBDriver) Connect(ctx context.Context, config *database.Connec
 		if maxConns > math.MaxInt32 {
 			maxConns = math.MaxInt32
 		}
-		poolConfig.MaxConns = int32(maxConns)
+		poolConfig.MaxConns = int32(maxConns) //nolint:gosec // G115: maxConns is >0 and clamped to math.MaxInt32 above
 	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)

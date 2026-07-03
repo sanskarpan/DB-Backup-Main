@@ -254,7 +254,8 @@ func (d *PostgreSQLDriver) Restore(ctx context.Context, opts *database.RestoreOp
 
 	// For SQL dumps, read from file
 	if cmdName == "psql" {
-		backupFile, err := os.Open(opts.SourceBackup)
+		var backupFile *os.File
+		backupFile, err = os.Open(opts.SourceBackup)
 		if err != nil {
 			result.Status = database.RestoreStatusFailed
 			result.Error = err
