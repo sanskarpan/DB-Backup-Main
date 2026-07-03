@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/sanskarpan/db-backup/internal/api/middleware"
 	"github.com/sanskarpan/db-backup/internal/approvals"
 	"github.com/sanskarpan/db-backup/internal/auth"
@@ -21,7 +22,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/websocket"
 )
 
-// Server represents the API server
+// Server represents the API server.
 type Server struct {
 	config        *Config
 	backupEngine  *backup.Engine
@@ -42,7 +43,7 @@ type Server struct {
 	muaEnabled bool
 }
 
-// Config holds API server configuration
+// Config holds API server configuration.
 type Config struct {
 	Host          string
 	Port          int
@@ -56,7 +57,7 @@ type Config struct {
 	ScanBaseDir string
 }
 
-// NewServer creates a new API server
+// NewServer creates a new API server.
 func NewServer(
 	cfg *Config,
 	backupEngine *backup.Engine,
@@ -95,7 +96,7 @@ func NewServer(
 	}
 }
 
-// SetupRoutes configures all API routes
+// SetupRoutes configures all API routes.
 func (s *Server) SetupRoutes(router *gin.Engine) {
 	// Middleware - Order matters!
 
@@ -143,17 +144,15 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 		// Authentication endpoints (public)
 		if s.jwtService != nil {
 			authGroup := v1.Group("/auth")
-			{
-				// JWT login (simple username/password for testing)
-				authGroup.POST("/login", s.handleLogin)
+			// JWT login (simple username/password for testing)
+			authGroup.POST("/login", s.handleLogin)
 
-				// OAuth2 endpoints
-				if s.oauth2Handler != nil {
-					authGroup.GET("/oauth2/providers", gin.WrapF(s.oauth2Handler.ListProviders))
-					authGroup.GET("/oauth2/:provider/login", gin.WrapF(s.oauth2Handler.InitiateLogin))
-					authGroup.GET("/oauth2/callback", gin.WrapF(s.oauth2Handler.HandleCallback))
-					authGroup.GET("/oauth2/user", gin.WrapF(s.oauth2Handler.GetUserInfo))
-				}
+			// OAuth2 endpoints
+			if s.oauth2Handler != nil {
+				authGroup.GET("/oauth2/providers", gin.WrapF(s.oauth2Handler.ListProviders))
+				authGroup.GET("/oauth2/:provider/login", gin.WrapF(s.oauth2Handler.InitiateLogin))
+				authGroup.GET("/oauth2/callback", gin.WrapF(s.oauth2Handler.HandleCallback))
+				authGroup.GET("/oauth2/user", gin.WrapF(s.oauth2Handler.GetUserInfo))
 			}
 		}
 
@@ -176,24 +175,22 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 
 		// Backup operations
 		backups := v1.Group("/backups", authMiddleware)
-		{
-			backups.POST("", s.handleCreateBackup)
-			backups.GET("", s.handleListBackups)
+		backups.POST("", s.handleCreateBackup)
+		backups.GET("", s.handleListBackups)
 
-			// Recycle-bin (soft-delete) endpoints. The static "/trash" routes are
-			// registered before the "/:id" routes; gin's radix tree lets a static
-			// segment coexist with a param segment at the same level, so there is
-			// no route conflict. DELETE "/:id" now soft-deletes (moves to trash).
-			backups.GET("/trash", s.handleListDeletedBackups)
-			backups.POST("/trash/purge-expired", s.handlePurgeExpired)
+		// Recycle-bin (soft-delete) endpoints. The static "/trash" routes are
+		// registered before the "/:id" routes; gin's radix tree lets a static
+		// segment coexist with a param segment at the same level, so there is
+		// no route conflict. DELETE "/:id" now soft-deletes (moves to trash).
+		backups.GET("/trash", s.handleListDeletedBackups)
+		backups.POST("/trash/purge-expired", s.handlePurgeExpired)
 
-			backups.GET("/:id", s.handleGetBackup)
-			backups.DELETE("/:id", s.handleDeleteBackup)
-			backups.POST("/:id/restore", s.handleRestoreBackup)
-			backups.POST("/:id/restore-from-trash", s.handleRestoreDeletedBackup)
-			backups.DELETE("/:id/purge", s.handlePurgeBackup)
-			backups.GET("/:id/download", s.handleDownloadBackup)
-		}
+		backups.GET("/:id", s.handleGetBackup)
+		backups.DELETE("/:id", s.handleDeleteBackup)
+		backups.POST("/:id/restore", s.handleRestoreBackup)
+		backups.POST("/:id/restore-from-trash", s.handleRestoreDeletedBackup)
+		backups.DELETE("/:id/purge", s.handlePurgeBackup)
+		backups.GET("/:id/download", s.handleDownloadBackup)
 
 		// Database registry (the set of databases to back up)
 		{
@@ -218,16 +215,14 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 
 		// Schedule management
 		schedules := v1.Group("/schedules", authMiddleware)
-		{
-			schedules.POST("", s.handleCreateSchedule)
-			schedules.GET("", s.handleListSchedules)
-			schedules.GET("/:id", s.handleGetSchedule)
-			schedules.PUT("/:id", s.handleUpdateSchedule)
-			schedules.DELETE("/:id", s.handleDeleteSchedule)
-			schedules.POST("/:id/enable", s.handleEnableSchedule)
-			schedules.POST("/:id/disable", s.handleDisableSchedule)
-			schedules.POST("/:id/run", s.handleRunSchedule)
-		}
+		schedules.POST("", s.handleCreateSchedule)
+		schedules.GET("", s.handleListSchedules)
+		schedules.GET("/:id", s.handleGetSchedule)
+		schedules.PUT("/:id", s.handleUpdateSchedule)
+		schedules.DELETE("/:id", s.handleDeleteSchedule)
+		schedules.POST("/:id/enable", s.handleEnableSchedule)
+		schedules.POST("/:id/disable", s.handleDisableSchedule)
+		schedules.POST("/:id/run", s.handleRunSchedule)
 
 		// Statistics and monitoring
 		v1.GET("/stats", authMiddleware, s.handleGetStats)
@@ -236,35 +231,31 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 
 		// Security endpoints
 		security := v1.Group("/security", authMiddleware)
-		{
-			// Ransomware detection
-			security.POST("/scan/file", s.handleScanFile)
-			security.POST("/scan/directory", s.handleScanDirectory)
-			security.GET("/stats", s.handleGetSecurityStats)
+		// Ransomware detection
+		security.POST("/scan/file", s.handleScanFile)
+		security.POST("/scan/directory", s.handleScanDirectory)
+		security.GET("/stats", s.handleGetSecurityStats)
 
-			// Threat alerts
-			security.GET("/alerts", s.handleListThreatAlerts)
-			security.GET("/alerts/:id", s.handleGetThreatAlert)
-			security.PUT("/alerts/:id", s.handleUpdateThreatAlert)
+		// Threat alerts
+		security.GET("/alerts", s.handleListThreatAlerts)
+		security.GET("/alerts/:id", s.handleGetThreatAlert)
+		security.PUT("/alerts/:id", s.handleUpdateThreatAlert)
 
-			// Storage provider configuration (backed by storageregistry.Store)
-			security.GET("/storage/providers", s.handleListStorageProviders)
-			security.GET("/storage/providers/:id", s.handleGetStorageProvider)
-			security.POST("/storage/providers", s.handleCreateStorageProvider)
-			security.PUT("/storage/providers/:id", s.handleUpdateStorageProvider)
-			security.DELETE("/storage/providers/:id", s.handleDeleteStorageProvider)
-			security.POST("/storage/providers/:id/test", s.handleTestStorageProvider)
-		}
+		// Storage provider configuration (backed by storageregistry.Store)
+		security.GET("/storage/providers", s.handleListStorageProviders)
+		security.GET("/storage/providers/:id", s.handleGetStorageProvider)
+		security.POST("/storage/providers", s.handleCreateStorageProvider)
+		security.PUT("/storage/providers/:id", s.handleUpdateStorageProvider)
+		security.DELETE("/storage/providers/:id", s.handleDeleteStorageProvider)
+		security.POST("/storage/providers/:id/test", s.handleTestStorageProvider)
 
 		// Catalog and search endpoints
 		catalogRoutes := v1.Group("/catalog", authMiddleware)
-		{
-			catalogRoutes.POST("/search", s.handleSearchCatalog)
-			catalogRoutes.GET("/search", s.handleSearchCatalogSimple)
-			catalogRoutes.GET("/suggest", s.handleSuggestCatalog)
-			catalogRoutes.GET("/stats", s.handleGetCatalogStats)
-			catalogRoutes.GET("/query-examples", s.handleQueryExamples)
-		}
+		catalogRoutes.POST("/search", s.handleSearchCatalog)
+		catalogRoutes.GET("/search", s.handleSearchCatalogSimple)
+		catalogRoutes.GET("/suggest", s.handleSuggestCatalog)
+		catalogRoutes.GET("/stats", s.handleGetCatalogStats)
+		catalogRoutes.GET("/query-examples", s.handleQueryExamples)
 	}
 
 	// Swagger/OpenAPI documentation
@@ -295,7 +286,7 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 	router.GET("/", s.handleRoot)
 }
 
-// Response helpers
+// Response helpers.
 type ErrorResponse struct {
 	Error   string                 `json:"error"`
 	Message string                 `json:"message,omitempty"`
@@ -308,7 +299,7 @@ type SuccessResponse struct {
 	Message string      `json:"message,omitempty"`
 }
 
-// Helper methods
+// Helper methods.
 func (s *Server) respondError(c *gin.Context, code int, err error, message string) {
 	if err != nil && s.logger != nil {
 		s.logger.Error("API error", err, map[string]interface{}{

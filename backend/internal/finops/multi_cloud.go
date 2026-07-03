@@ -8,81 +8,81 @@ import (
 	"time"
 )
 
-// MultiCloudComparison provides cost comparison across cloud providers
+// MultiCloudComparison provides cost comparison across cloud providers.
 type MultiCloudComparison struct {
-	mu              sync.RWMutex
-	costTracker     *CostTracker
-	providerRates   map[StorageProvider]*ProviderRates
-	comparisons     []*ComparisonResult
-	lastUpdate      time.Time
+	mu            sync.RWMutex
+	costTracker   *CostTracker
+	providerRates map[StorageProvider]*ProviderRates
+	comparisons   []*ComparisonResult
+	lastUpdate    time.Time
 }
 
-// ComparisonResult represents cost comparison result
+// ComparisonResult represents cost comparison result.
 type ComparisonResult struct {
-	Timestamp         time.Time
-	DatabaseName      string
-	CurrentProvider   StorageProvider
-	CurrentCost       float64
-	Recommendations   []*ProviderRecommendation
-	PotentialSavings  float64
-	BestProvider      StorageProvider
-	BestCost          float64
+	Timestamp        time.Time
+	DatabaseName     string
+	CurrentProvider  StorageProvider
+	CurrentCost      float64
+	Recommendations  []*ProviderRecommendation
+	PotentialSavings float64
+	BestProvider     StorageProvider
+	BestCost         float64
 }
 
-// ProviderRecommendation represents a provider recommendation
+// ProviderRecommendation represents a provider recommendation.
 type ProviderRecommendation struct {
-	Provider         StorageProvider
-	Region           string
-	EstimatedCost    float64
-	Savings          float64
-	SavingsPercent   float64
-	Tier             StorageTier
-	Reasoning        []string
-	MigrationCost    float64
-	BreakEvenDays    int
+	Provider       StorageProvider
+	Region         string
+	EstimatedCost  float64
+	Savings        float64
+	SavingsPercent float64
+	Tier           StorageTier
+	Reasoning      []string
+	MigrationCost  float64
+	BreakEvenDays  int
 }
 
-// CostOptimizationDashboard provides dashboard data
+// CostOptimizationDashboard provides dashboard data.
 type CostOptimizationDashboard struct {
-	mu               sync.RWMutex
-	costTracker      *CostTracker
-	budgetManager    *BudgetManager
-	multiCloud       *MultiCloudComparison
-	lastRefresh      time.Time
+	mu            sync.RWMutex
+	costTracker   *CostTracker
+	budgetManager *BudgetManager
+	multiCloud    *MultiCloudComparison
+	lastRefresh   time.Time
 }
 
-// DashboardData represents dashboard data
+// DashboardData represents dashboard data.
 type DashboardData struct {
-	Timestamp           time.Time
-	Overview            *CostOverview
-	TopCosts            *TopCosts
-	Trends              *CostTrends
-	Budgets             *BudgetDashboardStatus
-	Optimizations       *OptimizationOpportunities
-	Forecasts           *CostForecasts
-	Alerts              *ActiveAlerts
+	Timestamp     time.Time
+	Overview      *CostOverview
+	TopCosts      *TopCosts
+	Trends        *CostTrends
+	Budgets       *BudgetDashboardStatus
+	Optimizations *OptimizationOpportunities
+	Forecasts     *CostForecasts
+	Alerts        *ActiveAlerts
 }
 
-// CostOverview represents cost overview
+// CostOverview represents cost overview.
 type CostOverview struct {
-	TotalCost        float64
-	MonthToDate      float64
-	StorageCost      float64
-	TransferCost     float64
-	ComputeCost      float64
-	DailyAverage     float64
+	TotalCost         float64
+	MonthToDate       float64
+	StorageCost       float64
+	TransferCost      float64
+	ComputeCost       float64
+	DailyAverage      float64
 	MonthlyProjection float64
-	ByProvider       map[StorageProvider]float64
+	ByProvider        map[StorageProvider]float64
 }
 
-// TopCosts represents top cost contributors
+// TopCosts represents top cost contributors.
 type TopCosts struct {
-	TopDatabases  []*DatabaseCostRank
-	TopProviders  []*ProviderCostRank
-	TopTags       []*TagCostRank
+	TopDatabases []*DatabaseCostRank
+	TopProviders []*ProviderCostRank
+	TopTags      []*TagCostRank
 }
 
-// DatabaseCostRank represents database cost ranking
+// DatabaseCostRank represents database cost ranking.
 type DatabaseCostRank struct {
 	DatabaseName string
 	Cost         float64
@@ -90,7 +90,7 @@ type DatabaseCostRank struct {
 	Trend        string // increasing, decreasing, stable
 }
 
-// ProviderCostRank represents provider cost ranking
+// ProviderCostRank represents provider cost ranking.
 type ProviderCostRank struct {
 	Provider   StorageProvider
 	Cost       float64
@@ -98,14 +98,14 @@ type ProviderCostRank struct {
 	Trend      string
 }
 
-// TagCostRank represents tag-based cost ranking
+// TagCostRank represents tag-based cost ranking.
 type TagCostRank struct {
 	Tag        string
 	Cost       float64
 	Percentage float64
 }
 
-// CostTrends represents cost trends
+// CostTrends represents cost trends.
 type CostTrends struct {
 	Last7Days    *CostTrend
 	Last30Days   *CostTrend
@@ -113,52 +113,52 @@ type CostTrends struct {
 	DailyHistory []*DailyCost
 }
 
-// DailyCost represents daily cost
+// DailyCost represents daily cost.
 type DailyCost struct {
-	Date   time.Time
-	Cost   float64
+	Date time.Time
+	Cost float64
 }
 
-// BudgetDashboardStatus represents budget status for dashboard
+// BudgetDashboardStatus represents budget status for dashboard.
 type BudgetDashboardStatus struct {
-	TotalBudgets     int
-	BudgetsOK        int
-	BudgetsWarning   int
-	BudgetsCritical  int
-	BudgetsExceeded  int
-	ActiveAlerts     int
-	RecentAlerts     []*BudgetAlert
+	TotalBudgets    int
+	BudgetsOK       int
+	BudgetsWarning  int
+	BudgetsCritical int
+	BudgetsExceeded int
+	ActiveAlerts    int
+	RecentAlerts    []*BudgetAlert
 }
 
-// OptimizationOpportunities represents optimization opportunities
+// OptimizationOpportunities represents optimization opportunities.
 type OptimizationOpportunities struct {
 	TotalSavingsOpportunity float64
-	StorageTierOptimization  *StorageTierOpportunity
-	ProviderSwitching        []*ProviderSwitchingOpportunity
+	StorageTierOptimization *StorageTierOpportunity
+	ProviderSwitching       []*ProviderSwitchingOpportunity
 	UnusedBackups           []*UnusedBackupOpportunity
 	CompressionSavings      *CompressionSavingsOpportunity
 }
 
-// StorageTierOpportunity represents tier optimization opportunity
+// StorageTierOpportunity represents tier optimization opportunity.
 type StorageTierOpportunity struct {
-	CurrentCost     float64
-	OptimizedCost   float64
-	Savings         float64
-	Databases       []string
+	CurrentCost   float64
+	OptimizedCost float64
+	Savings       float64
+	Databases     []string
 }
 
-// ProviderSwitchingOpportunity represents provider switching opportunity
+// ProviderSwitchingOpportunity represents provider switching opportunity.
 type ProviderSwitchingOpportunity struct {
-	DatabaseName    string
-	CurrentProvider StorageProvider
-	CurrentCost     float64
+	DatabaseName        string
+	CurrentProvider     StorageProvider
+	CurrentCost         float64
 	RecommendedProvider StorageProvider
-	RecommendedCost float64
-	Savings         float64
-	BreakEvenDays   int
+	RecommendedCost     float64
+	Savings             float64
+	BreakEvenDays       int
 }
 
-// UnusedBackupOpportunity represents unused backup opportunity
+// UnusedBackupOpportunity represents unused backup opportunity.
 type UnusedBackupOpportunity struct {
 	DatabaseName string
 	LastAccessed time.Time
@@ -166,7 +166,7 @@ type UnusedBackupOpportunity struct {
 	Age          int // days
 }
 
-// CompressionSavingsOpportunity represents compression savings
+// CompressionSavingsOpportunity represents compression savings.
 type CompressionSavingsOpportunity struct {
 	CurrentSize      float64
 	CompressedSize   float64
@@ -174,20 +174,20 @@ type CompressionSavingsOpportunity struct {
 	CompressionRatio float64
 }
 
-// CostForecasts represents cost forecasts
+// CostForecasts represents cost forecasts.
 type CostForecasts struct {
 	Next7Days  *CostProjection
 	Next30Days *CostProjection
 	Next90Days *CostProjection
 }
 
-// ActiveAlerts represents active alerts
+// ActiveAlerts represents active alerts.
 type ActiveAlerts struct {
 	Count  int
 	Alerts []*BudgetAlert
 }
 
-// NewMultiCloudComparison creates a new multi-cloud comparison engine
+// NewMultiCloudComparison creates a new multi-cloud comparison engine.
 func NewMultiCloudComparison(costTracker *CostTracker) *MultiCloudComparison {
 	return &MultiCloudComparison{
 		costTracker:   costTracker,
@@ -196,7 +196,7 @@ func NewMultiCloudComparison(costTracker *CostTracker) *MultiCloudComparison {
 	}
 }
 
-// CompareProviders compares costs across providers for a database
+// CompareProviders compares costs across providers for a database.
 func (mcc *MultiCloudComparison) CompareProviders(ctx context.Context, databaseName string) (*ComparisonResult, error) {
 	mcc.mu.Lock()
 	defer mcc.mu.Unlock()
@@ -246,7 +246,7 @@ func (mcc *MultiCloudComparison) CompareProviders(ctx context.Context, databaseN
 	return result, nil
 }
 
-// calculateProviderCost calculates estimated cost for a provider
+// calculateProviderCost calculates estimated cost for a provider.
 func (mcc *MultiCloudComparison) calculateProviderCost(dbCosts *DatabaseCosts, provider StorageProvider, rates *ProviderRates) *ProviderRecommendation {
 	// Estimate storage cost based on current usage
 	estimatedCost := 0.0
@@ -281,8 +281,9 @@ func (mcc *MultiCloudComparison) calculateProviderCost(dbCosts *DatabaseCosts, p
 
 	reasoning := make([]string, 0)
 	if savings > 0 {
-		reasoning = append(reasoning, fmt.Sprintf("%.1f%% cost reduction", savingsPercent))
-		reasoning = append(reasoning, fmt.Sprintf("$%.2f monthly savings", savings))
+		reasoning = append(reasoning,
+			fmt.Sprintf("%.1f%% cost reduction", savingsPercent),
+			fmt.Sprintf("$%.2f monthly savings", savings))
 	}
 	if tier != TierHot {
 		reasoning = append(reasoning, fmt.Sprintf("Using %s tier for cost optimization", tier))
@@ -304,7 +305,7 @@ func (mcc *MultiCloudComparison) calculateProviderCost(dbCosts *DatabaseCosts, p
 	}
 }
 
-// GetAllComparisons returns all comparison results
+// GetAllComparisons returns all comparison results.
 func (mcc *MultiCloudComparison) GetAllComparisons() []*ComparisonResult {
 	mcc.mu.RLock()
 	defer mcc.mu.RUnlock()
@@ -314,7 +315,7 @@ func (mcc *MultiCloudComparison) GetAllComparisons() []*ComparisonResult {
 	return result
 }
 
-// NewCostOptimizationDashboard creates a new cost optimization dashboard
+// NewCostOptimizationDashboard creates a new cost optimization dashboard.
 func NewCostOptimizationDashboard(costTracker *CostTracker, budgetManager *BudgetManager, multiCloud *MultiCloudComparison) *CostOptimizationDashboard {
 	return &CostOptimizationDashboard{
 		costTracker:   costTracker,
@@ -323,7 +324,7 @@ func NewCostOptimizationDashboard(costTracker *CostTracker, budgetManager *Budge
 	}
 }
 
-// GetDashboardData returns complete dashboard data
+// GetDashboardData returns complete dashboard data.
 func (cod *CostOptimizationDashboard) GetDashboardData(ctx context.Context) (*DashboardData, error) {
 	cod.mu.Lock()
 	defer cod.mu.Unlock()
@@ -344,7 +345,7 @@ func (cod *CostOptimizationDashboard) GetDashboardData(ctx context.Context) (*Da
 	return data, nil
 }
 
-// getCostOverview generates cost overview
+// getCostOverview generates cost overview.
 func (cod *CostOptimizationDashboard) getCostOverview() *CostOverview {
 	snapshot := cod.costTracker.GetTotalCosts()
 
@@ -364,7 +365,7 @@ func (cod *CostOptimizationDashboard) getCostOverview() *CostOverview {
 	}
 }
 
-// getTopCosts generates top cost contributors
+// getTopCosts generates top cost contributors.
 func (cod *CostOptimizationDashboard) getTopCosts() *TopCosts {
 	snapshot := cod.costTracker.GetTotalCosts()
 
@@ -442,17 +443,17 @@ func (cod *CostOptimizationDashboard) getTopCosts() *TopCosts {
 	}
 }
 
-// getCostTrends generates cost trends
+// getCostTrends generates cost trends.
 func (cod *CostOptimizationDashboard) getCostTrends() *CostTrends {
 	return &CostTrends{
-		Last7Days:  cod.costTracker.GetCostTrend(7),
-		Last30Days: cod.costTracker.GetCostTrend(30),
-		Last90Days: cod.costTracker.GetCostTrend(90),
+		Last7Days:    cod.costTracker.GetCostTrend(7),
+		Last30Days:   cod.costTracker.GetCostTrend(30),
+		Last90Days:   cod.costTracker.GetCostTrend(90),
 		DailyHistory: make([]*DailyCost, 0),
 	}
 }
 
-// getBudgetStatus generates budget status
+// getBudgetStatus generates budget status.
 func (cod *CostOptimizationDashboard) getBudgetStatus() *BudgetDashboardStatus {
 	summary := cod.budgetManager.GetBudgetSummary()
 	alerts := cod.budgetManager.GetAlerts(true) // Unacknowledged only
@@ -473,7 +474,7 @@ func (cod *CostOptimizationDashboard) getBudgetStatus() *BudgetDashboardStatus {
 	}
 }
 
-// getOptimizationOpportunities generates optimization opportunities
+// getOptimizationOpportunities generates optimization opportunities.
 func (cod *CostOptimizationDashboard) getOptimizationOpportunities() *OptimizationOpportunities {
 	comparisons := cod.multiCloud.GetAllComparisons()
 
@@ -506,7 +507,7 @@ func (cod *CostOptimizationDashboard) getOptimizationOpportunities() *Optimizati
 	}
 }
 
-// getCostForecasts generates cost forecasts
+// getCostForecasts generates cost forecasts.
 func (cod *CostOptimizationDashboard) getCostForecasts() *CostForecasts {
 	return &CostForecasts{
 		Next7Days:  cod.costTracker.GetCostProjection(7),
@@ -515,7 +516,7 @@ func (cod *CostOptimizationDashboard) getCostForecasts() *CostForecasts {
 	}
 }
 
-// getActiveAlerts generates active alerts
+// getActiveAlerts generates active alerts.
 func (cod *CostOptimizationDashboard) getActiveAlerts() *ActiveAlerts {
 	alerts := cod.budgetManager.GetAlerts(true) // Unacknowledged only
 
@@ -525,13 +526,13 @@ func (cod *CostOptimizationDashboard) getActiveAlerts() *ActiveAlerts {
 	}
 }
 
-// RefreshDashboard refreshes dashboard data
+// RefreshDashboard refreshes dashboard data.
 func (cod *CostOptimizationDashboard) RefreshDashboard(ctx context.Context) error {
 	_, err := cod.GetDashboardData(ctx)
 	return err
 }
 
-// GetLastRefreshTime returns last refresh time
+// GetLastRefreshTime returns last refresh time.
 func (cod *CostOptimizationDashboard) GetLastRefreshTime() time.Time {
 	cod.mu.RLock()
 	defer cod.mu.RUnlock()

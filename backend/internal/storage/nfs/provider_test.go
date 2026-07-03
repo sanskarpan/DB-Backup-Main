@@ -1,6 +1,7 @@
 package nfs
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -126,10 +127,8 @@ func TestNFSProvider_ValidateConfig(t *testing.T) {
 				if tt.errMsg != "" && err.Error() != tt.errMsg {
 					t.Errorf("Expected error '%s', got '%s'", tt.errMsg, err.Error())
 				}
-			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
+			} else if err != nil {
+				t.Errorf("Unexpected error: %v", err)
 			}
 		})
 	}
@@ -223,15 +222,23 @@ func TestBuildMountArgs(t *testing.T) {
 	}
 }
 
-func TestNFSProvider_UploadDownload(t *testing.T) {
-	// Create a temporary directory to simulate mount point
+// newMountedTestProvider returns a provider backed by a temporary directory that
+// simulates an already-mounted NFS share. The temp directory is cleaned up
+// automatically when the test finishes.
+func newMountedTestProvider(t *testing.T) (provider *NFSProvider, mountPoint string) {
+	t.Helper()
+
 	tempDir, err := os.MkdirTemp("", "nfs-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		if rmErr := os.RemoveAll(tempDir); rmErr != nil {
+			t.Logf("Failed to remove temp dir: %v", rmErr)
+		}
+	})
 
-	provider := &NFSProvider{
+	provider = &NFSProvider{
 		config: &NFSConfig{
 			Server:     "192.168.1.100",
 			Export:     "/export/backups",
@@ -241,200 +248,204 @@ func TestNFSProvider_UploadDownload(t *testing.T) {
 		isMounted:  true, // Simulate mounted state
 	}
 
+	return provider, tempDir
+}
+
+func TestNFSProvider_Upload(t *testing.T) {
+	provider, tempDir := newMountedTestProvider(t)
 	ctx := context.Background()
 
-	// Test Upload
-	t.Run("Upload", func(t *testing.T) {
-		// Create a test file
-		testFile := filepath.Join(tempDir, "source.txt")
-		testContent := []byte("test content for NFS upload")
-		if err := os.WriteFile(testFile, testContent, 0644); err != nil {
-			t.Fatalf("Failed to create test file: %v", err)
-		}
+	// Create a test file
+	testFile := filepath.Join(tempDir, "source.txt")
+	testContent := []byte("test content for NFS upload")
+	if err := os.WriteFile(testFile, testContent, 0o600); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
 
-		remotePath := "backups/test-upload.txt"
-		err := provider.Upload(ctx, testFile, remotePath, nil)
-		if err != nil {
-			t.Fatalf("Upload failed: %v", err)
-		}
+	remotePath := "backups/test-upload.txt"
+	if err := provider.Upload(ctx, testFile, remotePath, nil); err != nil {
+		t.Fatalf("Upload failed: %v", err)
+	}
 
-		// Verify file was uploaded
-		uploadedPath := filepath.Join(tempDir, remotePath)
-		if _, err := os.Stat(uploadedPath); os.IsNotExist(err) {
-			t.Error("Uploaded file does not exist")
-		}
+	// Verify file was uploaded
+	uploadedPath := filepath.Join(tempDir, remotePath)
+	if _, err := os.Stat(uploadedPath); os.IsNotExist(err) {
+		t.Error("Uploaded file does not exist")
+	}
 
-		// Verify content
-		content, err := os.ReadFile(uploadedPath)
-		if err != nil {
-			t.Fatalf("Failed to read uploaded file: %v", err)
-		}
+	// Verify content
+	content, err := os.ReadFile(uploadedPath)
+	if err != nil {
+		t.Fatalf("Failed to read uploaded file: %v", err)
+	}
 
-		if string(content) != string(testContent) {
-			t.Errorf("Content mismatch. Expected: %s, Got: %s", testContent, content)
-		}
-	})
+	if !bytes.Equal(content, testContent) {
+		t.Errorf("Content mismatch. Expected: %s, Got: %s", testContent, content)
+	}
+}
 
-	// Test Download
-	t.Run("Download", func(t *testing.T) {
-		// Create a remote file
-		remotePath := "backups/test-download.txt"
-		remoteFile := filepath.Join(tempDir, remotePath)
-		testContent := []byte("test content for NFS download")
+func TestNFSProvider_Download(t *testing.T) {
+	provider, tempDir := newMountedTestProvider(t)
+	ctx := context.Background()
 
-		if err := os.MkdirAll(filepath.Dir(remoteFile), 0755); err != nil {
+	// Create a remote file
+	remotePath := "backups/test-download.txt"
+	remoteFile := filepath.Join(tempDir, remotePath)
+	testContent := []byte("test content for NFS download")
+
+	if err := os.MkdirAll(filepath.Dir(remoteFile), 0o755); err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+
+	if err := os.WriteFile(remoteFile, testContent, 0o600); err != nil {
+		t.Fatalf("Failed to create remote file: %v", err)
+	}
+
+	// Download to local path
+	localPath := filepath.Join(tempDir, "downloaded.txt")
+	if err := provider.Download(ctx, remotePath, localPath); err != nil {
+		t.Fatalf("Download failed: %v", err)
+	}
+
+	// Verify download
+	content, err := os.ReadFile(localPath)
+	if err != nil {
+		t.Fatalf("Failed to read downloaded file: %v", err)
+	}
+
+	if !bytes.Equal(content, testContent) {
+		t.Errorf("Content mismatch. Expected: %s, Got: %s", testContent, content)
+	}
+}
+
+func TestNFSProvider_Exists(t *testing.T) {
+	provider, tempDir := newMountedTestProvider(t)
+	ctx := context.Background()
+
+	remotePath := "backups/test-exists.txt"
+	remoteFile := filepath.Join(tempDir, remotePath)
+	if err := os.MkdirAll(filepath.Dir(remoteFile), 0o755); err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if err := os.WriteFile(remoteFile, []byte("content"), 0o600); err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+
+	exists, err := provider.Exists(ctx, remotePath)
+	if err != nil {
+		t.Fatalf("Exists failed: %v", err)
+	}
+	if !exists {
+		t.Error("File should exist")
+	}
+
+	nonExistentPath := "nonexistent/file.txt"
+	exists, err = provider.Exists(ctx, nonExistentPath)
+	if err != nil {
+		t.Fatalf("Exists failed: %v", err)
+	}
+	if exists {
+		t.Error("File should not exist")
+	}
+}
+
+func TestNFSProvider_Delete(t *testing.T) {
+	provider, tempDir := newMountedTestProvider(t)
+	ctx := context.Background()
+
+	remotePath := "backups/test-delete.txt"
+	remoteFile := filepath.Join(tempDir, remotePath)
+	testContent := []byte("test content for deletion")
+
+	if err := os.MkdirAll(filepath.Dir(remoteFile), 0o755); err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if err := os.WriteFile(remoteFile, testContent, 0o600); err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+
+	if err := provider.Delete(ctx, remotePath); err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+
+	// Verify file was deleted
+	if _, err := os.Stat(remoteFile); !os.IsNotExist(err) {
+		t.Error("File should have been deleted")
+	}
+}
+
+func TestNFSProvider_GetMetadata(t *testing.T) {
+	provider, tempDir := newMountedTestProvider(t)
+	ctx := context.Background()
+
+	remotePath := "backups/test-metadata.txt"
+	remoteFile := filepath.Join(tempDir, remotePath)
+	testContent := []byte("test content for metadata")
+
+	if err := os.MkdirAll(filepath.Dir(remoteFile), 0o755); err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if err := os.WriteFile(remoteFile, testContent, 0o600); err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+
+	metadata, err := provider.GetMetadata(ctx, remotePath)
+	if err != nil {
+		t.Fatalf("GetMetadata failed: %v", err)
+	}
+
+	if metadata.Path != remotePath {
+		t.Errorf("Expected path %s, got %s", remotePath, metadata.Path)
+	}
+
+	if metadata.Size != int64(len(testContent)) {
+		t.Errorf("Expected size %d, got %d", len(testContent), metadata.Size)
+	}
+
+	if metadata.ContentType != "application/octet-stream" {
+		t.Errorf("Expected content type 'application/octet-stream', got %s", metadata.ContentType)
+	}
+}
+
+func TestNFSProvider_List(t *testing.T) {
+	provider, tempDir := newMountedTestProvider(t)
+	ctx := context.Background()
+
+	prefix := "backups/list-test"
+	testFiles := []string{
+		"file1.txt",
+		"file2.txt",
+		"subdir/file3.txt",
+	}
+
+	for _, file := range testFiles {
+		fullPath := filepath.Join(tempDir, prefix, file)
+		if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
 			t.Fatalf("Failed to create directory: %v", err)
 		}
-
-		if err := os.WriteFile(remoteFile, testContent, 0644); err != nil {
-			t.Fatalf("Failed to create remote file: %v", err)
-		}
-
-		// Download to local path
-		localPath := filepath.Join(tempDir, "downloaded.txt")
-		err := provider.Download(ctx, remotePath, localPath)
-		if err != nil {
-			t.Fatalf("Download failed: %v", err)
-		}
-
-		// Verify download
-		content, err := os.ReadFile(localPath)
-		if err != nil {
-			t.Fatalf("Failed to read downloaded file: %v", err)
-		}
-
-		if string(content) != string(testContent) {
-			t.Errorf("Content mismatch. Expected: %s, Got: %s", testContent, content)
-		}
-	})
-
-	// Test Exists
-	t.Run("Exists", func(t *testing.T) {
-		remotePath := "backups/test-download.txt"
-
-		exists, err := provider.Exists(ctx, remotePath)
-		if err != nil {
-			t.Fatalf("Exists failed: %v", err)
-		}
-
-		if !exists {
-			t.Error("File should exist")
-		}
-
-		nonExistentPath := "nonexistent/file.txt"
-		exists, err = provider.Exists(ctx, nonExistentPath)
-		if err != nil {
-			t.Fatalf("Exists failed: %v", err)
-		}
-
-		if exists {
-			t.Error("File should not exist")
-		}
-	})
-
-	// Test Delete
-	t.Run("Delete", func(t *testing.T) {
-		remotePath := "backups/test-delete.txt"
-		remoteFile := filepath.Join(tempDir, remotePath)
-		testContent := []byte("test content for deletion")
-
-		if err := os.WriteFile(remoteFile, testContent, 0644); err != nil {
+		if err := os.WriteFile(fullPath, []byte("content"), 0o600); err != nil {
 			t.Fatalf("Failed to create file: %v", err)
 		}
+	}
 
-		err := provider.Delete(ctx, remotePath)
-		if err != nil {
-			t.Fatalf("Delete failed: %v", err)
-		}
+	files, err := provider.List(ctx, prefix)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
 
-		// Verify file was deleted
-		if _, err := os.Stat(remoteFile); !os.IsNotExist(err) {
-			t.Error("File should have been deleted")
-		}
-	})
-
-	// Test GetMetadata
-	t.Run("GetMetadata", func(t *testing.T) {
-		remotePath := "backups/test-metadata.txt"
-		remoteFile := filepath.Join(tempDir, remotePath)
-		testContent := []byte("test content for metadata")
-
-		if err := os.WriteFile(remoteFile, testContent, 0644); err != nil {
-			t.Fatalf("Failed to create file: %v", err)
-		}
-
-		metadata, err := provider.GetMetadata(ctx, remotePath)
-		if err != nil {
-			t.Fatalf("GetMetadata failed: %v", err)
-		}
-
-		if metadata.Path != remotePath {
-			t.Errorf("Expected path %s, got %s", remotePath, metadata.Path)
-		}
-
-		if metadata.Size != int64(len(testContent)) {
-			t.Errorf("Expected size %d, got %d", len(testContent), metadata.Size)
-		}
-
-		if metadata.ContentType != "application/octet-stream" {
-			t.Errorf("Expected content type 'application/octet-stream', got %s", metadata.ContentType)
-		}
-	})
-
-	// Test List
-	t.Run("List", func(t *testing.T) {
-		// Create multiple files
-		prefix := "backups/list-test"
-		testFiles := []string{
-			"file1.txt",
-			"file2.txt",
-			"subdir/file3.txt",
-		}
-
-		for _, file := range testFiles {
-			fullPath := filepath.Join(tempDir, prefix, file)
-			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-				t.Fatalf("Failed to create directory: %v", err)
-			}
-			if err := os.WriteFile(fullPath, []byte("content"), 0644); err != nil {
-				t.Fatalf("Failed to create file: %v", err)
-			}
-		}
-
-		files, err := provider.List(ctx, prefix)
-		if err != nil {
-			t.Fatalf("List failed: %v", err)
-		}
-
-		if len(files) != len(testFiles) {
-			t.Errorf("Expected %d files, got %d", len(testFiles), len(files))
-		}
-	})
+	if len(files) != len(testFiles) {
+		t.Errorf("Expected %d files, got %d", len(testFiles), len(files))
+	}
 }
 
 func TestNFSProvider_UploadWithProgress(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "nfs-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	provider := &NFSProvider{
-		config: &NFSConfig{
-			Server:     "192.168.1.100",
-			Export:     "/export/backups",
-			MountPoint: tempDir,
-		},
-		mountPoint: tempDir,
-		isMounted:  true,
-	}
-
+	provider, tempDir := newMountedTestProvider(t)
 	ctx := context.Background()
 
 	// Create a test file
 	testFile := filepath.Join(tempDir, "source.txt")
 	testContent := []byte("test content with progress tracking")
-	if err := os.WriteFile(testFile, testContent, 0644); err != nil {
+	if err := os.WriteFile(testFile, testContent, 0o600); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -449,8 +460,7 @@ func TestNFSProvider_UploadWithProgress(t *testing.T) {
 	}
 
 	remotePath := "backups/test-progress.txt"
-	err = provider.Upload(ctx, testFile, remotePath, opts)
-	if err != nil {
+	if err := provider.Upload(ctx, testFile, remotePath, opts); err != nil {
 		t.Fatalf("Upload with progress failed: %v", err)
 	}
 

@@ -408,10 +408,10 @@ func TestCalculateSeverity(t *testing.T) {
 	}
 
 	tests := []struct {
-		name              string
-		heapGrowth        int64
-		goroutineGrowth   int
-		expectedSeverity  Severity
+		name             string
+		heapGrowth       int64
+		goroutineGrowth  int
+		expectedSeverity Severity
 	}{
 		{
 			name:             "low severity",

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/sanskarpan/db-backup/internal/dbregistry"
 
 	// Register the sqlite driver so the connection test can succeed for real.

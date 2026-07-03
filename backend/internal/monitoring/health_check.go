@@ -5,10 +5,10 @@ import (
 	"time"
 )
 
-// HealthCheckFunc is a function that performs a health check
+// HealthCheckFunc is a function that performs a health check.
 type HealthCheckFunc func(ctx context.Context) (healthy bool, message string, err error)
 
-// HealthCheck represents a health check
+// HealthCheck represents a health check.
 type HealthCheck struct {
 	Name       string
 	Check      HealthCheckFunc
@@ -18,16 +18,16 @@ type HealthCheck struct {
 	LastResult *HealthCheckResult
 }
 
-// HealthCheckResult represents the result of a health check
+// HealthCheckResult represents the result of a health check.
 type HealthCheckResult struct {
-	Healthy   bool      `json:"healthy"`
-	Message   string    `json:"message"`
-	Error     error     `json:"error,omitempty"`
+	Healthy   bool          `json:"healthy"`
+	Message   string        `json:"message"`
+	Error     error         `json:"error,omitempty"`
 	Duration  time.Duration `json:"duration"`
-	Timestamp time.Time `json:"timestamp"`
+	Timestamp time.Time     `json:"timestamp"`
 }
 
-// Execute executes the health check
+// Execute executes the health check.
 func (hc *HealthCheck) Execute(ctx context.Context) *HealthCheckResult {
 	start := time.Now()
 

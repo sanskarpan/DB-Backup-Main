@@ -11,49 +11,49 @@ import (
 // Leaderboard Manager
 // ============================================================================
 
-// LeaderboardManager manages leaderboards
+// LeaderboardManager manages leaderboards.
 type LeaderboardManager struct {
 	entries map[string]*LeaderboardUserData
 	teams   map[string]*TeamData
 	mu      sync.RWMutex
 }
 
-// LeaderboardUserData holds leaderboard data for a user
-type LeaderboardUserData struct{
-	UserID          string
-	Username        string
-	TeamID          string
-	TotalXP         int
-	Level           int
-	TotalBackups    int
-	TotalSize       int64
-	CurrentStreak   int
+// LeaderboardUserData holds leaderboard data for a user.
+type LeaderboardUserData struct {
+	UserID           string
+	Username         string
+	TeamID           string
+	TotalXP          int
+	Level            int
+	TotalBackups     int
+	TotalSize        int64
+	CurrentStreak    int
 	AchievementCount int
-	LastUpdated     time.Time
+	LastUpdated      time.Time
 }
 
-// TeamData holds team information
+// TeamData holds team information.
 type TeamData struct {
-	TeamID      string
-	TeamName    string
-	Members     []string
-	TotalXP     int
+	TeamID       string
+	TeamName     string
+	Members      []string
+	TotalXP      int
 	TotalBackups int
 }
 
-// LeaderboardEntry represents an entry in the leaderboard
+// LeaderboardEntry represents an entry in the leaderboard.
 type LeaderboardEntry struct {
-	Rank            int
-	UserID          string
-	Username        string
-	TeamID          string
-	Score           int
-	Level           int
-	Achievements    int
-	Streak          int
+	Rank         int
+	UserID       string
+	Username     string
+	TeamID       string
+	Score        int
+	Level        int
+	Achievements int
+	Streak       int
 }
 
-// LeaderboardType defines different leaderboard types
+// LeaderboardType defines different leaderboard types.
 type LeaderboardType string
 
 const (
@@ -65,7 +65,7 @@ const (
 	LeaderboardAchievements LeaderboardType = "achievements"
 )
 
-// NewLeaderboardManager creates a new leaderboard manager
+// NewLeaderboardManager creates a new leaderboard manager.
 func NewLeaderboardManager() *LeaderboardManager {
 	return &LeaderboardManager{
 		entries: make(map[string]*LeaderboardUserData),
@@ -73,7 +73,7 @@ func NewLeaderboardManager() *LeaderboardManager {
 	}
 }
 
-// UpdateScore updates a user's leaderboard data
+// UpdateScore updates a user's leaderboard data.
 func (lm *LeaderboardManager) UpdateScore(userID string, data *BackupData) {
 	lm.mu.Lock()
 	defer lm.mu.Unlock()
@@ -90,7 +90,7 @@ func (lm *LeaderboardManager) UpdateScore(userID string, data *BackupData) {
 	entry.LastUpdated = time.Now()
 }
 
-// GetLeaderboard returns the leaderboard for a given type
+// GetLeaderboard returns the leaderboard for a given type.
 func (lm *LeaderboardManager) GetLeaderboard(leaderboardType LeaderboardType, limit int) []*LeaderboardEntry {
 	lm.mu.RLock()
 	defer lm.mu.RUnlock()
@@ -144,7 +144,7 @@ func (lm *LeaderboardManager) GetLeaderboard(leaderboardType LeaderboardType, li
 	return entries
 }
 
-// GetTeamLeaderboard returns team-specific leaderboard
+// GetTeamLeaderboard returns team-specific leaderboard.
 func (lm *LeaderboardManager) GetTeamLeaderboard(teamID string, limit int) []*LeaderboardEntry {
 	lm.mu.RLock()
 	defer lm.mu.RUnlock()
@@ -183,7 +183,7 @@ func (lm *LeaderboardManager) GetTeamLeaderboard(teamID string, limit int) []*Le
 	return entries
 }
 
-// GetUserRank returns a user's rank on the global leaderboard
+// GetUserRank returns a user's rank on the global leaderboard.
 func (lm *LeaderboardManager) GetUserRank(userID string) int {
 	leaderboard := lm.GetLeaderboard(LeaderboardXP, 0)
 	for _, entry := range leaderboard {
@@ -198,14 +198,14 @@ func (lm *LeaderboardManager) GetUserRank(userID string) int {
 // Challenge Manager
 // ============================================================================
 
-// ChallengeManager manages challenges
+// ChallengeManager manages challenges.
 type ChallengeManager struct {
 	challenges     map[string]*Challenge
 	userChallenges map[string]map[string]*ChallengeProgress // userID -> challengeID -> progress
 	mu             sync.RWMutex
 }
 
-// Challenge represents a challenge
+// Challenge represents a challenge.
 type Challenge struct {
 	ID          string
 	Name        string
@@ -219,18 +219,18 @@ type Challenge struct {
 	Active      bool
 }
 
-// ChallengeType defines challenge duration
+// ChallengeType defines challenge duration.
 type ChallengeType string
 
 const (
-	ChallengeTypeDaily     ChallengeType = "daily"
-	ChallengeTypeWeekly    ChallengeType = "weekly"
-	ChallengeTypeMonthly   ChallengeType = "monthly"
-	ChallengeTypeSeasonal  ChallengeType = "seasonal"
-	ChallengeTypeSpecial   ChallengeType = "special"
+	ChallengeTypeDaily    ChallengeType = "daily"
+	ChallengeTypeWeekly   ChallengeType = "weekly"
+	ChallengeTypeMonthly  ChallengeType = "monthly"
+	ChallengeTypeSeasonal ChallengeType = "seasonal"
+	ChallengeTypeSpecial  ChallengeType = "special"
 )
 
-// ChallengeProgress tracks user progress on a challenge
+// ChallengeProgress tracks user progress on a challenge.
 type ChallengeProgress struct {
 	ChallengeID string
 	Progress    int64
@@ -238,7 +238,7 @@ type ChallengeProgress struct {
 	CompletedAt time.Time
 }
 
-// NewChallengeManager creates a new challenge manager
+// NewChallengeManager creates a new challenge manager.
 func NewChallengeManager() *ChallengeManager {
 	cm := &ChallengeManager{
 		challenges:     make(map[string]*Challenge),
@@ -251,7 +251,7 @@ func NewChallengeManager() *ChallengeManager {
 	return cm
 }
 
-// createDefaultChallenges creates default challenges
+// createDefaultChallenges creates default challenges.
 func (cm *ChallengeManager) createDefaultChallenges() {
 	now := time.Now()
 
@@ -299,7 +299,7 @@ func (cm *ChallengeManager) createDefaultChallenges() {
 	}
 }
 
-// CreateChallenge creates a new challenge
+// CreateChallenge creates a new challenge.
 func (cm *ChallengeManager) CreateChallenge(challenge *Challenge) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
@@ -312,7 +312,7 @@ func (cm *ChallengeManager) CreateChallenge(challenge *Challenge) error {
 	return nil
 }
 
-// UpdateProgress updates challenge progress for a user
+// UpdateProgress updates challenge progress for a user.
 func (cm *ChallengeManager) UpdateProgress(userID string, data *BackupData) []*Challenge {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
@@ -367,7 +367,7 @@ func (cm *ChallengeManager) UpdateProgress(userID string, data *BackupData) []*C
 	return completedChallenges
 }
 
-// GetActiveChallenges returns active challenges for a user
+// GetActiveChallenges returns active challenges for a user.
 func (cm *ChallengeManager) GetActiveChallenges(userID string) []*Challenge {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
@@ -400,14 +400,14 @@ func (cm *ChallengeManager) GetActiveChallenges(userID string) []*Challenge {
 // Reward Manager
 // ============================================================================
 
-// RewardManager manages rewards and redemption
+// RewardManager manages rewards and redemption.
 type RewardManager struct {
 	rewards     map[string]*Reward
 	userRewards map[string][]*UserReward // userID -> rewards
 	mu          sync.RWMutex
 }
 
-// Reward represents a redeemable reward
+// Reward represents a redeemable reward.
 type Reward struct {
 	ID          string
 	Name        string
@@ -420,19 +420,19 @@ type Reward struct {
 	ImageURL    string
 }
 
-// RewardType defines different reward types
+// RewardType defines different reward types.
 type RewardType string
 
 const (
-	RewardTypeBadge       RewardType = "badge"
-	RewardTypeTitle       RewardType = "title"
-	RewardTypeAvatar      RewardType = "avatar"
-	RewardTypeTheme       RewardType = "theme"
-	RewardTypeFeature     RewardType = "feature"
-	RewardTypeDiscount    RewardType = "discount"
+	RewardTypeBadge    RewardType = "badge"
+	RewardTypeTitle    RewardType = "title"
+	RewardTypeAvatar   RewardType = "avatar"
+	RewardTypeTheme    RewardType = "theme"
+	RewardTypeFeature  RewardType = "feature"
+	RewardTypeDiscount RewardType = "discount"
 )
 
-// UserReward represents a reward owned by a user
+// UserReward represents a reward owned by a user.
 type UserReward struct {
 	RewardID   string
 	AwardedAt  time.Time
@@ -440,7 +440,7 @@ type UserReward struct {
 	RedeemedAt time.Time
 }
 
-// NewRewardManager creates a new reward manager
+// NewRewardManager creates a new reward manager.
 func NewRewardManager() *RewardManager {
 	rm := &RewardManager{
 		rewards:     make(map[string]*Reward),
@@ -452,7 +452,7 @@ func NewRewardManager() *RewardManager {
 	return rm
 }
 
-// createDefaultRewards creates default rewards
+// createDefaultRewards creates default rewards.
 func (rm *RewardManager) createDefaultRewards() {
 	rewards := []*Reward{
 		{
@@ -494,7 +494,7 @@ func (rm *RewardManager) createDefaultRewards() {
 	}
 }
 
-// AwardReward awards a reward to a user
+// AwardReward awards a reward to a user.
 func (rm *RewardManager) AwardReward(userID string, reward *Reward) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
@@ -511,7 +511,7 @@ func (rm *RewardManager) AwardReward(userID string, reward *Reward) {
 	rm.userRewards[userID] = append(rm.userRewards[userID], userReward)
 }
 
-// GetAvailableRewards returns rewards available for a user
+// GetAvailableRewards returns rewards available for a user.
 func (rm *RewardManager) GetAvailableRewards(userID string) []*Reward {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
@@ -538,7 +538,7 @@ func (rm *RewardManager) GetAvailableRewards(userID string) []*Reward {
 	return available
 }
 
-// GetRewardForAchievement returns reward associated with an achievement
+// GetRewardForAchievement returns reward associated with an achievement.
 func (rm *RewardManager) GetRewardForAchievement(achievementID string) *Reward {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()

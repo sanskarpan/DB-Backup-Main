@@ -234,11 +234,11 @@ func TestAIEngineLearnFromEngagement(t *testing.T) {
 
 	// Create initial pattern
 	pattern := &UserPattern{
-		UserID:         "user-001",
-		TypeEngagement: make(map[NotificationType]float64),
+		UserID:           "user-001",
+		TypeEngagement:   make(map[NotificationType]float64),
 		PriorityResponse: make(map[Priority]float64),
-		ActionRate:     0.5,
-		DismissRate:    0.3,
+		ActionRate:       0.5,
+		DismissRate:      0.3,
 	}
 
 	ai.mu.Lock()
@@ -342,7 +342,7 @@ func TestAIEngineLerpFunction(t *testing.T) {
 
 	// Test linear interpolation
 	result := ai.lerp(0.5, 1.0, 0.5)
-	expected := 0.75 // 0.5 + 0.5 * (1.0 - 0.5) = 0.75
+	expected := 0.75 // midpoint between current and target
 
 	if result != expected {
 		t.Errorf("Expected lerp result to be %f, got %f", expected, result)

@@ -13,20 +13,22 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// ReportGenerator generates compliance reports for DR tests
+// ReportGenerator generates compliance reports for DR tests.
 type ReportGenerator struct {
 	mu      sync.RWMutex
 	history []TestResult
 }
 
-// NewReportGenerator creates a new report generator
+// NewReportGenerator creates a new report generator.
 func NewReportGenerator() *ReportGenerator {
 	return &ReportGenerator{
 		history: make([]TestResult, 0),
 	}
 }
 
-// AddTestResult adds a test result to the history
+// AddTestResult adds a test result to the history.
+//
+//nolint:gocritic // hugeParam: keeps the exported value-semantics API stable.
 func (rg *ReportGenerator) AddTestResult(result TestResult) {
 	rg.mu.Lock()
 	defer rg.mu.Unlock()
@@ -39,22 +41,23 @@ func (rg *ReportGenerator) AddTestResult(result TestResult) {
 	}
 }
 
-// GetTestHistory returns test results for a date range
+// GetTestHistory returns test results for a date range.
 func (rg *ReportGenerator) GetTestHistory(startDate, endDate time.Time) []TestResult {
 	rg.mu.RLock()
 	defer rg.mu.RUnlock()
 
 	results := make([]TestResult, 0)
-	for _, result := range rg.history {
+	for i := range rg.history {
+		result := &rg.history[i]
 		if result.StartTime.After(startDate) && result.StartTime.Before(endDate) {
-			results = append(results, result)
+			results = append(results, *result)
 		}
 	}
 
 	return results
 }
 
-// GetTestHistoryByDatabase returns test results for a specific database
+// GetTestHistoryByDatabase returns test results for a specific database.
 func (rg *ReportGenerator) GetTestHistoryByDatabase(dbName string, limit int) []TestResult {
 	rg.mu.RLock()
 	defer rg.mu.RUnlock()
@@ -73,7 +76,7 @@ func (rg *ReportGenerator) GetTestHistoryByDatabase(dbName string, limit int) []
 	return results
 }
 
-// ComplianceReport represents a compliance report
+// ComplianceReport represents a compliance report.
 type ComplianceReport struct {
 	ReportID         string
 	GeneratedAt      time.Time
@@ -92,14 +95,14 @@ type ComplianceReport struct {
 	ComplianceStatus ComplianceStatus
 }
 
-// ReportPeriod represents the time period for a report
+// ReportPeriod represents the time period for a report.
 type ReportPeriod struct {
 	StartDate time.Time
 	EndDate   time.Time
 	Label     string // e.g., "Q4 2025", "December 2025"
 }
 
-// ComplianceStatus represents overall compliance status
+// ComplianceStatus represents overall compliance status.
 type ComplianceStatus string
 
 const (
@@ -108,16 +111,16 @@ const (
 	ComplianceStatusFailing ComplianceStatus = "FAILING"
 )
 
-// GenerateComplianceReport generates a compliance report for a date range
+// GenerateComplianceReport generates a compliance report for a date range.
 func (rg *ReportGenerator) GenerateComplianceReport(ctx context.Context, dbName string, startDate, endDate time.Time) (*ComplianceReport, error) {
 	results := rg.GetTestHistory(startDate, endDate)
 
 	// Filter by database if specified
 	if dbName != "" {
 		filtered := make([]TestResult, 0)
-		for _, r := range results {
-			if r.DatabaseName == dbName {
-				filtered = append(filtered, r)
+		for i := range results {
+			if results[i].DatabaseName == dbName {
+				filtered = append(filtered, results[i])
 			}
 		}
 		results = filtered
@@ -151,7 +154,7 @@ func (rg *ReportGenerator) GenerateComplianceReport(ctx context.Context, dbName 
 	return report, nil
 }
 
-// calculateMetrics calculates report metrics
+// calculateMetrics calculates report metrics.
 func (cr *ComplianceReport) calculateMetrics() {
 	cr.TotalTests = len(cr.TestResults)
 
@@ -159,7 +162,8 @@ func (cr *ComplianceReport) calculateMetrics() {
 	rtoMet := 0
 	rpoMet := 0
 
-	for _, result := range cr.TestResults {
+	for i := range cr.TestResults {
+		result := &cr.TestResults[i]
 		if result.Success {
 			cr.SuccessfulTests++
 		} else {
@@ -186,7 +190,7 @@ func (cr *ComplianceReport) calculateMetrics() {
 	}
 }
 
-// generateRecommendations generates recommendations based on test results
+// generateRecommendations generates recommendations based on test results.
 func (cr *ComplianceReport) generateRecommendations() {
 	cr.Recommendations = make([]string, 0)
 
@@ -224,7 +228,7 @@ func (cr *ComplianceReport) generateRecommendations() {
 	}
 }
 
-// determineComplianceStatus determines overall compliance status
+// determineComplianceStatus determines overall compliance status.
 func (cr *ComplianceReport) determineComplianceStatus() {
 	// Failing if success rate < 80% or RTO/RPO compliance < 75%
 	if cr.SuccessRate < 80.0 || cr.RTOCompliance < 75.0 || cr.RPOCompliance < 75.0 {
@@ -241,7 +245,7 @@ func (cr *ComplianceReport) determineComplianceStatus() {
 	cr.ComplianceStatus = ComplianceStatusPassing
 }
 
-// ExportToCSV exports the compliance report to CSV format
+// ExportToCSV exports the compliance report to CSV format.
 func (cr *ComplianceReport) ExportToCSV() ([]byte, error) {
 	var buf bytes.Buffer
 	writer := csv.NewWriter(&buf)
@@ -281,28 +285,33 @@ func (cr *ComplianceReport) ExportToCSV() ([]byte, error) {
 		}
 	}
 
-	// Write empty row
-	writer.Write([]string{""})
-
-	// Write detailed test results
-	writer.Write([]string{"Detailed Test Results"})
-	writer.Write([]string{
-		"Test ID",
-		"Database",
-		"Start Time",
-		"Duration",
-		"Success",
-		"RTO",
-		"RTO Met",
-		"RPO",
-		"RPO Met",
-		"Schema Valid",
-		"Row Count Valid",
-		"Sample Data Valid",
-		"Smoke Tests Passed",
-		"Smoke Tests Failed",
-		"Cleaned Up",
-	})
+	// Write empty row and detailed test result headers
+	detailRows := [][]string{
+		{""},
+		{"Detailed Test Results"},
+		{
+			"Test ID",
+			"Database",
+			"Start Time",
+			"Duration",
+			"Success",
+			"RTO",
+			"RTO Met",
+			"RPO",
+			"RPO Met",
+			"Schema Valid",
+			"Row Count Valid",
+			"Sample Data Valid",
+			"Smoke Tests Passed",
+			"Smoke Tests Failed",
+			"Cleaned Up",
+		},
+	}
+	for _, row := range detailRows {
+		if err := writer.Write(row); err != nil {
+			return nil, fmt.Errorf("failed to write detail header: %w", err)
+		}
+	}
 
 	// Sort results by start time
 	sortedResults := make([]TestResult, len(cr.TestResults))
@@ -311,7 +320,8 @@ func (cr *ComplianceReport) ExportToCSV() ([]byte, error) {
 		return sortedResults[i].StartTime.Before(sortedResults[j].StartTime)
 	})
 
-	for _, result := range sortedResults {
+	for i := range sortedResults {
+		result := &sortedResults[i]
 		row := []string{
 			result.TestID,
 			result.DatabaseName,
@@ -342,7 +352,7 @@ func (cr *ComplianceReport) ExportToCSV() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// ExportToPDF exports the compliance report to PDF format
+// ExportToPDF exports the compliance report to PDF format.
 func (cr *ComplianceReport) ExportToPDF() ([]byte, error) {
 	// Generate PDF content as HTML-like format
 	// In production, use a proper PDF library like github.com/jung-kurt/gofpdf
@@ -355,7 +365,7 @@ func (cr *ComplianceReport) ExportToPDF() ([]byte, error) {
 	buf.WriteString("% Disaster Recovery Compliance Report\n\n")
 
 	// Title
-	buf.WriteString(fmt.Sprintf("DISASTER RECOVERY COMPLIANCE REPORT\n"))
+	buf.WriteString("DISASTER RECOVERY COMPLIANCE REPORT\n")
 	buf.WriteString(fmt.Sprintf("Report ID: %s\n", cr.ReportID))
 	buf.WriteString(fmt.Sprintf("Generated: %s\n", cr.GeneratedAt.Format("January 2, 2006 15:04:05 MST")))
 	buf.WriteString(fmt.Sprintf("Period: %s\n", cr.ReportPeriod.Label))
@@ -410,7 +420,8 @@ func (cr *ComplianceReport) ExportToPDF() ([]byte, error) {
 		return sortedResults[i].StartTime.Before(sortedResults[j].StartTime)
 	})
 
-	for _, result := range sortedResults {
+	for i := range sortedResults {
+		result := &sortedResults[i]
 		status := "✓ PASS"
 		if !result.Success {
 			status = "✗ FAIL"
@@ -454,13 +465,13 @@ func (cr *ComplianceReport) ExportToPDF() ([]byte, error) {
 	buf.WriteString("\n")
 	buf.WriteString("═══════════════════════════════════════════════════════════\n")
 	buf.WriteString("End of Report\n")
-	buf.WriteString(fmt.Sprintf("Generated by DB-Backup DR Testing Framework v1.0\n"))
+	buf.WriteString("Generated by DB-Backup DR Testing Framework v1.0\n")
 	buf.WriteString("═══════════════════════════════════════════════════════════\n")
 
 	return buf.Bytes(), nil
 }
 
-// GetComplianceSummary returns a summary of recent compliance
+// GetComplianceSummary returns a summary of recent compliance.
 func (rg *ReportGenerator) GetComplianceSummary(days int) map[string]interface{} {
 	endDate := time.Now()
 	startDate := endDate.AddDate(0, 0, -days)
@@ -485,7 +496,8 @@ func (rg *ReportGenerator) GetComplianceSummary(days int) map[string]interface{}
 	rpoMet := 0
 	dbCounts := make(map[string]int)
 
-	for _, result := range results {
+	for i := range results {
+		result := &results[i]
 		if result.Success {
 			successful++
 		}

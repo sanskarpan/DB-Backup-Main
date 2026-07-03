@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -18,17 +19,19 @@ import (
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/influxdata/influxdb-client-go/v2/api/write"
+
 	"github.com/sanskarpan/db-backup/internal/database"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 	"github.com/sanskarpan/db-backup/pkg/utils"
 )
 
-// InfluxDBDriver implements the database.Driver interface for InfluxDB
+// InfluxDBDriver implements the database.Driver interface for InfluxDB.
+//
+//nolint:revive // InfluxDBDriver is a public name used by other packages; keep stable.
 type InfluxDBDriver struct {
 	client       influxdb2.Client
 	config       *database.ConnectionConfig
 	queryAPI     api.QueryAPI
-	writeAPI     api.WriteAPI
 	version      string
 	organization string
 }
@@ -39,17 +42,18 @@ func init() {
 	})
 }
 
-// NewInfluxDBDriver creates a new InfluxDB driver instance
+// NewInfluxDBDriver creates a new InfluxDB driver instance.
 func NewInfluxDBDriver() *InfluxDBDriver {
 	return &InfluxDBDriver{}
 }
 
-// Connect establishes a connection to InfluxDB
+// Connect establishes a connection to InfluxDB.
 func (d *InfluxDBDriver) Connect(ctx context.Context, config *database.ConnectionConfig) error {
 	// Build InfluxDB connection URL
-	url := fmt.Sprintf("http://%s:%d", config.Host, config.Port)
+	hostPort := net.JoinHostPort(config.Host, strconv.Itoa(config.Port))
+	url := "http://" + hostPort
 	if config.SSLMode == "enable" || config.SSLMode == "require" {
-		url = fmt.Sprintf("https://%s:%d", config.Host, config.Port)
+		url = "https://" + hostPort
 	}
 
 	// Get token (password) and organization
@@ -94,7 +98,7 @@ func (d *InfluxDBDriver) Connect(ctx context.Context, config *database.Connectio
 	return nil
 }
 
-// Disconnect closes the database connection
+// Disconnect closes the database connection.
 func (d *InfluxDBDriver) Disconnect() error {
 	if d.client != nil {
 		d.client.Close()
@@ -102,7 +106,7 @@ func (d *InfluxDBDriver) Disconnect() error {
 	return nil
 }
 
-// Ping tests the database connection
+// Ping tests the database connection.
 func (d *InfluxDBDriver) Ping(ctx context.Context) error {
 	if d.client == nil {
 		return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "not connected to database")
@@ -120,7 +124,7 @@ func (d *InfluxDBDriver) Ping(ctx context.Context) error {
 	return nil
 }
 
-// Backup creates a backup of the InfluxDB database
+// Backup creates a backup of the InfluxDB database.
 func (d *InfluxDBDriver) Backup(ctx context.Context, opts *database.BackupOptions) (*database.BackupResult, error) {
 	result := &database.BackupResult{
 		ID:        utils.GenerateBackupID(),
@@ -137,7 +141,7 @@ func (d *InfluxDBDriver) Backup(ctx context.Context, opts *database.BackupOption
 	return d.backupV2(ctx, opts, result)
 }
 
-// backupV1 performs backup for InfluxDB v1.x using influxd backup command
+// backupV1 performs backup for InfluxDB v1.x using influxd backup command.
 func (d *InfluxDBDriver) backupV1(ctx context.Context, opts *database.BackupOptions, result *database.BackupResult) (*database.BackupResult, error) {
 	backupDir := filepath.Join(opts.OutputDir, result.ID)
 	if err := os.MkdirAll(backupDir, 0o755); err != nil {
@@ -187,12 +191,14 @@ func (d *InfluxDBDriver) backupV1(ctx context.Context, opts *database.BackupOpti
 
 	// Get backup size
 	var size int64
-	filepath.Walk(backupDir, func(path string, info os.FileInfo, err error) error {
+	if walkErr := filepath.Walk(backupDir, func(_ string, info os.FileInfo, err error) error {
 		if err == nil && !info.IsDir() {
 			size += info.Size()
 		}
 		return nil
-	})
+	}); walkErr != nil {
+		size = 0
+	}
 
 	result.BackupPath = backupDir
 	result.BackupSize = size
@@ -204,7 +210,7 @@ func (d *InfluxDBDriver) backupV1(ctx context.Context, opts *database.BackupOpti
 	return result, nil
 }
 
-// backupV2 performs backup for InfluxDB v2.x using API
+// backupV2 performs backup for InfluxDB v2.x using API.
 func (d *InfluxDBDriver) backupV2(ctx context.Context, opts *database.BackupOptions, result *database.BackupResult) (*database.BackupResult, error) {
 	backupDir := filepath.Join(opts.OutputDir, result.ID)
 	if err := os.MkdirAll(backupDir, 0o755); err != nil {
@@ -317,7 +323,7 @@ func (r *backupRecord) toPoint() *write.Point {
 	return influxdb2.NewPoint(r.Measurement, r.Tags, fields, r.Time)
 }
 
-// backupBucket backs up a single bucket to a file
+// backupBucket backs up a single bucket to a file.
 func (d *InfluxDBDriver) backupBucket(ctx context.Context, bucket, outputFile string, opts *database.BackupOptions) (int64, error) {
 	// Create output file
 	file, err := os.Create(outputFile)
@@ -388,7 +394,7 @@ func (d *InfluxDBDriver) backupBucket(ctx context.Context, bucket, outputFile st
 	return written, nil
 }
 
-// backupMetadata backs up retention policies, tasks, and other metadata
+// backupMetadata backs up retention policies, tasks, and other metadata.
 func (d *InfluxDBDriver) backupMetadata(ctx context.Context, backupDir string) error {
 	// Use the management API to export tasks, checks, notification rules, etc.
 	metadataFile := filepath.Join(backupDir, "metadata.json")
@@ -407,8 +413,9 @@ func (d *InfluxDBDriver) backupMetadata(ctx context.Context, backupDir string) e
 	if err != nil {
 		return fmt.Errorf("failed to list tasks: %w", err)
 	}
-	var taskList []map[string]interface{}
-	for _, task := range tasks {
+	taskList := make([]map[string]interface{}, 0, len(tasks))
+	for i := range tasks {
+		task := &tasks[i]
 		taskData := map[string]interface{}{
 			"id":     task.Id,
 			"name":   task.Name,
@@ -439,7 +446,7 @@ func (d *InfluxDBDriver) backupMetadata(ctx context.Context, backupDir string) e
 					"orgID":       bucket.OrgID,
 					"description": bucket.Description,
 				}
-				if bucket.RetentionRules != nil && len(bucket.RetentionRules) > 0 {
+				if len(bucket.RetentionRules) > 0 {
 					bucketData["retention_period"] = bucket.RetentionRules[0].EverySeconds
 				}
 				bucketList = append(bucketList, bucketData)
@@ -458,7 +465,7 @@ func (d *InfluxDBDriver) backupMetadata(ctx context.Context, backupDir string) e
 	return nil
 }
 
-// getBucketsToBackup returns the list of buckets to backup
+// getBucketsToBackup returns the list of buckets to backup.
 func (d *InfluxDBDriver) getBucketsToBackup(ctx context.Context, opts *database.BackupOptions) ([]string, error) {
 	// If specific buckets are specified, use those
 	if len(opts.Databases) > 0 {
@@ -476,7 +483,7 @@ func (d *InfluxDBDriver) getBucketsToBackup(ctx context.Context, opts *database.
 		return nil, err
 	}
 
-	var bucketNames []string
+	bucketNames := make([]string, 0, len(*buckets))
 	for _, bucket := range *buckets {
 		// Skip system buckets
 		if strings.HasPrefix(bucket.Name, "_") {
@@ -488,7 +495,7 @@ func (d *InfluxDBDriver) getBucketsToBackup(ctx context.Context, opts *database.
 	return bucketNames, nil
 }
 
-// Restore restores InfluxDB from a backup
+// Restore restores InfluxDB from a backup.
 func (d *InfluxDBDriver) Restore(ctx context.Context, opts *database.RestoreOptions) (*database.RestoreResult, error) {
 	result := &database.RestoreResult{
 		ID:        utils.GenerateRestoreID(),
@@ -504,7 +511,7 @@ func (d *InfluxDBDriver) Restore(ctx context.Context, opts *database.RestoreOpti
 	return d.restoreV2(ctx, opts, result)
 }
 
-// restoreV1 performs restore for InfluxDB v1.x
+// restoreV1 performs restore for InfluxDB v1.x.
 func (d *InfluxDBDriver) restoreV1(ctx context.Context, opts *database.RestoreOptions, result *database.RestoreResult) (*database.RestoreResult, error) {
 	backupPath := opts.BackupPath
 	if backupPath == "" {
@@ -544,7 +551,7 @@ func (d *InfluxDBDriver) restoreV1(ctx context.Context, opts *database.RestoreOp
 	return result, nil
 }
 
-// restoreV2 performs restore for InfluxDB v2.x
+// restoreV2 performs restore for InfluxDB v2.x.
 func (d *InfluxDBDriver) restoreV2(ctx context.Context, opts *database.RestoreOptions, result *database.RestoreResult) (*database.RestoreResult, error) {
 	backupPath := opts.BackupPath
 	if backupPath == "" {
@@ -583,7 +590,7 @@ func (d *InfluxDBDriver) restoreV2(ctx context.Context, opts *database.RestoreOp
 	return result, nil
 }
 
-// restoreBucket restores a single bucket from a file
+// restoreBucket restores a single bucket from a file.
 func (d *InfluxDBDriver) restoreBucket(ctx context.Context, bucket, inputFile string) error {
 	// Open the NDJSON file
 	file, err := os.Open(inputFile)
@@ -652,7 +659,7 @@ func (d *InfluxDBDriver) restoreBucket(ctx context.Context, bucket, inputFile st
 	return nil
 }
 
-// GetDatabases returns the list of databases/buckets
+// GetDatabases returns the list of databases/buckets.
 func (d *InfluxDBDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	bucketsAPI := d.client.BucketsAPI()
 	buckets, err := bucketsAPI.GetBuckets(ctx)
@@ -660,7 +667,7 @@ func (d *InfluxDBDriver) GetDatabases(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 
-	var bucketNames []string
+	bucketNames := make([]string, 0, len(*buckets))
 	for _, bucket := range *buckets {
 		bucketNames = append(bucketNames, bucket.Name)
 	}
@@ -668,7 +675,7 @@ func (d *InfluxDBDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	return bucketNames, nil
 }
 
-// GetTables returns the list of measurements (tables) in a database/bucket
+// GetTables returns the list of measurements (tables) in a database/bucket.
 func (d *InfluxDBDriver) GetTables(ctx context.Context, database string) ([]string, error) {
 	query := fmt.Sprintf(`
 		import "influxdata/influxdb/schema"
@@ -695,7 +702,7 @@ func (d *InfluxDBDriver) GetTables(ctx context.Context, database string) ([]stri
 	return measurements, nil
 }
 
-// GetTableSize returns the size of a measurement (not accurate for time-series)
+// GetTableSize returns the size of a measurement (not accurate for time-series).
 func (d *InfluxDBDriver) GetTableSize(ctx context.Context, database, table string) (int64, error) {
 	// Time-series databases don't have a direct concept of table size
 	// Return the count of points as an approximation
@@ -826,28 +833,28 @@ func sumShardDiskSize(r io.Reader) (total int64, found bool, err error) {
 	return int64(sum), found, nil
 }
 
-// GetVersion returns the InfluxDB version
+// GetVersion returns the InfluxDB version.
 func (d *InfluxDBDriver) GetVersion(ctx context.Context) (string, error) {
 	return fmt.Sprintf("InfluxDB %s", d.version), nil
 }
 
-// StreamBackup streams backup data to a writer
+// StreamBackup streams backup data to a writer.
 func (d *InfluxDBDriver) StreamBackup(ctx context.Context, opts *database.BackupOptions, writer io.Writer) error {
 	return fmt.Errorf("streaming backup not implemented for InfluxDB")
 }
 
-// StreamRestore streams restore data from a reader
+// StreamRestore streams restore data from a reader.
 func (d *InfluxDBDriver) StreamRestore(ctx context.Context, opts *database.RestoreOptions, reader io.Reader) error {
 	return fmt.Errorf("streaming restore not implemented for InfluxDB")
 }
 
-// GetBackupSize returns the estimated size of a backup
+// GetBackupSize returns the estimated size of a backup.
 func (d *InfluxDBDriver) GetBackupSize(ctx context.Context, opts *database.BackupOptions) (int64, error) {
 	// Estimate based on current database size
 	return d.GetDatabaseSize(ctx)
 }
 
-// ValidateRestore validates restore options
+// ValidateRestore validates restore options.
 func (d *InfluxDBDriver) ValidateRestore(ctx context.Context, opts *database.RestoreOptions) error {
 	if opts.BackupPath == "" && opts.SourceBackup == "" {
 		return fmt.Errorf("backup path is required")
@@ -866,17 +873,17 @@ func (d *InfluxDBDriver) ValidateRestore(ctx context.Context, opts *database.Res
 	return nil
 }
 
-// GetType returns the database type
+// GetType returns the database type.
 func (d *InfluxDBDriver) GetType() database.DatabaseType {
 	return "influxdb"
 }
 
-// SupportsIncremental returns whether the driver supports incremental backups
+// SupportsIncremental returns whether the driver supports incremental backups.
 func (d *InfluxDBDriver) SupportsIncremental() bool {
 	return true
 }
 
-// SupportsPITR returns whether the driver supports point-in-time recovery
+// SupportsPITR returns whether the driver supports point-in-time recovery.
 func (d *InfluxDBDriver) SupportsPITR() bool {
 	// InfluxDB doesn't have native PITR, but we can do time-range based restores
 	return false

@@ -9,7 +9,7 @@ import (
 
 // ==================== Test Suite for Smart Features ====================
 
-// TestPredictiveScheduler tests the ML-based predictive scheduler
+// TestPredictiveScheduler tests the ML-based predictive scheduler.
 func TestPredictiveScheduler(t *testing.T) {
 	t.Run("AddDataPoint", func(t *testing.T) {
 		ps := NewPredictiveScheduler()
@@ -123,7 +123,7 @@ func TestPredictiveScheduler(t *testing.T) {
 	})
 }
 
-// TestBackupQualityScorer tests the backup quality scoring system
+// TestBackupQualityScorer tests the backup quality scoring system.
 func TestBackupQualityScorer(t *testing.T) {
 	t.Run("CalculateScore_PerfectBackup", func(t *testing.T) {
 		bqs := NewBackupQualityScorer()
@@ -208,7 +208,7 @@ func TestBackupQualityScorer(t *testing.T) {
 	})
 }
 
-// TestBackupSizeEstimator tests the size estimation ML model
+// TestBackupSizeEstimator tests the size estimation ML model.
 func TestBackupSizeEstimator(t *testing.T) {
 	t.Run("AddSizeDataPoint", func(t *testing.T) {
 		bse := NewBackupSizeEstimator()
@@ -294,7 +294,7 @@ func TestBackupSizeEstimator(t *testing.T) {
 	})
 }
 
-// TestAutoCategorizer tests the auto-categorization system
+// TestAutoCategorizer tests the auto-categorization system.
 func TestAutoCategorizer(t *testing.T) {
 	t.Run("Categorize_Production", func(t *testing.T) {
 		ac := NewAutoCategorizer()
@@ -333,7 +333,7 @@ func TestAutoCategorizer(t *testing.T) {
 	})
 }
 
-// TestDuplicateDetector tests the duplicate detection system
+// TestDuplicateDetector tests the duplicate detection system.
 func TestDuplicateDetector(t *testing.T) {
 	t.Run("IndexBackup", func(t *testing.T) {
 		dd := NewDuplicateDetector()
@@ -374,7 +374,7 @@ func TestDuplicateDetector(t *testing.T) {
 	})
 }
 
-// TestNLPSearchEngine tests the NLP search engine
+// TestNLPSearchEngine tests the NLP search engine.
 func TestNLPSearchEngine(t *testing.T) {
 	t.Run("IndexBackup", func(t *testing.T) {
 		nse := NewNLPSearchEngine()
@@ -442,7 +442,7 @@ func TestNLPSearchEngine(t *testing.T) {
 	})
 }
 
-// TestSmartRetentionPolicyGenerator tests retention policy generation
+// TestSmartRetentionPolicyGenerator tests retention policy generation.
 func TestSmartRetentionPolicyGenerator(t *testing.T) {
 	t.Run("GeneratePolicy", func(t *testing.T) {
 		srpg := NewSmartRetentionPolicyGenerator()
@@ -456,7 +456,6 @@ func TestSmartRetentionPolicyGenerator(t *testing.T) {
 			[]string{"GDPR", "HIPAA"},
 			500.0, // $500 budget
 		)
-
 		if err != nil {
 			t.Fatalf("Expected successful policy generation, got error: %v", err)
 		}
@@ -484,7 +483,7 @@ func TestSmartRetentionPolicyGenerator(t *testing.T) {
 	})
 }
 
-// TestAIAdvisor tests the AI advisor conversational mode
+// TestAIAdvisor tests the AI advisor conversational mode.
 func TestAIAdvisor(t *testing.T) {
 	t.Run("StartConversation", func(t *testing.T) {
 		aa := NewAIAdvisor()
@@ -541,7 +540,7 @@ func TestAIAdvisor(t *testing.T) {
 	})
 }
 
-// TestAutomatedTroubleshootingEngine tests the troubleshooting engine
+// TestAutomatedTroubleshootingEngine tests the troubleshooting engine.
 func TestAutomatedTroubleshootingEngine(t *testing.T) {
 	t.Run("Diagnose_DiskSpace", func(t *testing.T) {
 		ate := NewAutomatedTroubleshootingEngine()
@@ -550,7 +549,6 @@ func TestAutomatedTroubleshootingEngine(t *testing.T) {
 		result, err := ate.Diagnose(ctx, "test-db", "Error: no space left on device", map[string]interface{}{
 			"disk_usage_percent": 95.5,
 		})
-
 		if err != nil {
 			t.Fatalf("Expected successful diagnosis, got error: %v", err)
 		}
@@ -577,7 +575,6 @@ func TestAutomatedTroubleshootingEngine(t *testing.T) {
 		ctx := context.Background()
 
 		result, err := ate.Diagnose(ctx, "test-db", "Checksum validation failed: corrupted data", nil)
-
 		if err != nil {
 			t.Fatalf("Expected successful diagnosis, got error: %v", err)
 		}
@@ -618,7 +615,7 @@ func TestAutomatedTroubleshootingEngine(t *testing.T) {
 	})
 }
 
-// TestSmartFeaturesManager tests the integrated features manager
+// TestSmartFeaturesManager tests the integrated features manager.
 func TestSmartFeaturesManager(t *testing.T) {
 	t.Run("NewSmartFeaturesManager", func(t *testing.T) {
 		sfm := NewSmartFeaturesManager()
@@ -683,7 +680,7 @@ func TestSmartFeaturesManager(t *testing.T) {
 	})
 }
 
-// Benchmark tests
+// Benchmark tests.
 func BenchmarkPredictiveScheduler_TrainModel(b *testing.B) {
 	ps := NewPredictiveScheduler()
 	ctx := context.Background()

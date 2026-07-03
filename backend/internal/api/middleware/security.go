@@ -5,7 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SecurityHeadersConfig holds configuration for security headers
+// SecurityHeadersConfig holds configuration for security headers.
 type SecurityHeadersConfig struct {
 	// ContentSecurityPolicy defines CSP directives
 	ContentSecurityPolicy string
@@ -23,7 +23,7 @@ type SecurityHeadersConfig struct {
 	PermissionsPolicy string
 }
 
-// DefaultSecurityHeadersConfig returns secure default configuration
+// DefaultSecurityHeadersConfig returns secure default configuration.
 func DefaultSecurityHeadersConfig() *SecurityHeadersConfig {
 	return &SecurityHeadersConfig{
 		ContentSecurityPolicy: "default-src 'self'; " +
@@ -51,7 +51,7 @@ func DefaultSecurityHeadersConfig() *SecurityHeadersConfig {
 	}
 }
 
-// StrictSecurityHeadersConfig returns very strict security configuration
+// StrictSecurityHeadersConfig returns very strict security configuration.
 func StrictSecurityHeadersConfig() *SecurityHeadersConfig {
 	return &SecurityHeadersConfig{
 		ContentSecurityPolicy: "default-src 'none'; " +
@@ -79,7 +79,7 @@ func StrictSecurityHeadersConfig() *SecurityHeadersConfig {
 	}
 }
 
-// DevelopmentSecurityHeadersConfig returns relaxed configuration for development
+// DevelopmentSecurityHeadersConfig returns relaxed configuration for development.
 func DevelopmentSecurityHeadersConfig() *SecurityHeadersConfig {
 	return &SecurityHeadersConfig{
 		ContentSecurityPolicy: "default-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
@@ -99,7 +99,7 @@ func DevelopmentSecurityHeadersConfig() *SecurityHeadersConfig {
 	}
 }
 
-// SecurityHeaders adds security headers to all responses
+// SecurityHeaders adds security headers to all responses.
 func SecurityHeaders(config *SecurityHeadersConfig) gin.HandlerFunc {
 	if config == nil {
 		config = DefaultSecurityHeadersConfig()
@@ -145,17 +145,17 @@ func SecurityHeaders(config *SecurityHeadersConfig) gin.HandlerFunc {
 	}
 }
 
-// DefaultSecurityHeaders applies default security headers
+// DefaultSecurityHeaders applies default security headers.
 func DefaultSecurityHeaders() gin.HandlerFunc {
 	return SecurityHeaders(DefaultSecurityHeadersConfig())
 }
 
-// StrictSecurityHeaders applies strict security headers
+// StrictSecurityHeaders applies strict security headers.
 func StrictSecurityHeaders() gin.HandlerFunc {
 	return SecurityHeaders(StrictSecurityHeadersConfig())
 }
 
-// DevelopmentSecurityHeaders applies relaxed security headers for development
+// DevelopmentSecurityHeaders applies relaxed security headers for development.
 func DevelopmentSecurityHeaders() gin.HandlerFunc {
 	return SecurityHeaders(DevelopmentSecurityHeadersConfig())
 }

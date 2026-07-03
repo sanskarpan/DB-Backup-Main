@@ -13,22 +13,22 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// PITRManager handles Point-in-Time Recovery for PostgreSQL
+// PITRManager handles Point-in-Time Recovery for PostgreSQL.
 type PITRManager struct {
 	driver *PostgreSQLDriver
 }
 
-// NewPITRManager creates a new PITR manager
+// NewPITRManager creates a new PITR manager.
 func NewPITRManager(driver *PostgreSQLDriver) *PITRManager {
 	return &PITRManager{
 		driver: driver,
 	}
 }
 
-// BackupWALFiles backs up PostgreSQL WAL (Write-Ahead Log) files for PITR
+// BackupWALFiles backs up PostgreSQL WAL (Write-Ahead Log) files for PITR.
 func (p *PITRManager) BackupWALFiles(ctx context.Context, outputDir string, since *time.Time) error {
 	// Ensure output directory exists
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return pkgErrors.ErrDatabaseBackup(err).WithMetadata("output_dir", outputDir)
 	}
 
@@ -39,8 +39,8 @@ func (p *PITRManager) BackupWALFiles(ctx context.Context, outputDir string, sinc
 	}
 
 	// Force a WAL switch to ensure current WAL is complete
-	if err := p.switchWAL(ctx); err != nil {
-		return err
+	if walErr := p.switchWAL(ctx); walErr != nil {
+		return walErr
 	}
 
 	// Get current WAL location
@@ -62,7 +62,7 @@ func (p *PITRManager) BackupWALFiles(ctx context.Context, outputDir string, sinc
 	return nil
 }
 
-// RestoreToPointInTime restores database to a specific point in time
+// RestoreToPointInTime restores database to a specific point in time.
 func (p *PITRManager) RestoreToPointInTime(ctx context.Context, opts *PITRRestoreOptions) error {
 	// Validate options
 	if err := p.validatePITROptions(opts); err != nil {
@@ -97,7 +97,7 @@ func (p *PITRManager) RestoreToPointInTime(ctx context.Context, opts *PITRRestor
 	return nil
 }
 
-// GetWALLocation gets the current WAL location
+// GetWALLocation gets the current WAL location.
 func (p *PITRManager) GetWALLocation(ctx context.Context) (*WALLocation, error) {
 	return p.getCurrentWALLocation(ctx)
 }
@@ -229,7 +229,9 @@ func (p *PITRManager) restoreBaseBackup(ctx context.Context, opts *PITRRestoreOp
 	}
 
 	// Extract base backup to data directory
-	cmd := exec.CommandContext(ctx, "pg_restore",
+	//nolint:gosec // G204: pg_restore invoked with controlled config values and a caller-provided backup path
+	cmd := exec.CommandContext(
+		ctx, "pg_restore",
 		"-h", p.driver.config.Host,
 		"-p", fmt.Sprintf("%d", p.driver.config.Port),
 		"-U", p.driver.config.Username,
@@ -268,19 +270,20 @@ func (p *PITRManager) configureRecovery(opts *PITRRestoreOptions) error {
 func (p *PITRManager) configureRecoveryModern(opts *PITRRestoreOptions) error {
 	// Create recovery.signal file
 	signalPath := filepath.Join(opts.DataDirectory, "recovery.signal")
-	if err := os.WriteFile(signalPath, []byte(""), 0600); err != nil {
+	if err := os.WriteFile(signalPath, []byte(""), 0o600); err != nil {
 		return err
 	}
 
 	// Append to postgresql.auto.conf
 	autoConfPath := filepath.Join(opts.DataDirectory, "postgresql.auto.conf")
-	file, err := os.OpenFile(autoConfPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	file, err := os.OpenFile(autoConfPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	recoveryConfig := fmt.Sprintf(`
+	recoveryConfig := fmt.Sprintf(
+		`
 # PITR Recovery Configuration
 restore_command = 'cp %s/%%f %%p'
 recovery_target_time = '%s'
@@ -306,7 +309,8 @@ func (p *PITRManager) configureRecoveryLegacy(opts *PITRRestoreOptions) error {
 	}
 	defer file.Close()
 
-	recoveryConfig := fmt.Sprintf(`restore_command = 'cp %s/%%f %%p'
+	recoveryConfig := fmt.Sprintf(
+		`restore_command = 'cp %s/%%f %%p'
 recovery_target_time = '%s'
 recovery_target_action = 'promote'
 `,
@@ -378,7 +382,7 @@ func (p *PITRManager) getPostgreSQLVersion() (int, error) {
 	return major, err
 }
 
-// PITRRestoreOptions holds options for PITR restore
+// PITRRestoreOptions holds options for PITR restore.
 type PITRRestoreOptions struct {
 	Database         string
 	BaseBackupPath   string
@@ -388,13 +392,13 @@ type PITRRestoreOptions struct {
 	SkipVerification bool
 }
 
-// WALLocation represents a location in PostgreSQL WAL
+// WALLocation represents a location in PostgreSQL WAL.
 type WALLocation struct {
 	LSN       string
 	Timestamp time.Time
 }
 
-// String returns string representation of WAL location
+// String returns string representation of WAL location.
 func (w *WALLocation) String() string {
 	return fmt.Sprintf("LSN: %s, Time: %s", w.LSN, w.Timestamp.Format(time.RFC3339))
 }
@@ -436,9 +440,9 @@ func copyFile(src, dst string) error {
 	return destFile.Sync()
 }
 
-// CreateBaseBackup creates a base backup using pg_basebackup
-func (p *PITRManager) CreateBaseBackup(ctx context.Context, outputDir string, format string) error {
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+// CreateBaseBackup creates a base backup using pg_basebackup.
+func (p *PITRManager) CreateBaseBackup(ctx context.Context, outputDir, format string) error {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return err
 	}
 
@@ -447,10 +451,10 @@ func (p *PITRManager) CreateBaseBackup(ctx context.Context, outputDir string, fo
 		"-p", fmt.Sprintf("%d", p.driver.config.Port),
 		"-U", p.driver.config.Username,
 		"-D", outputDir,
-		"-Ft", // tar format
-		"-z",  // gzip compression
-		"-P",  // progress
-		"-v",  // verbose
+		"-Ft",         // tar format
+		"-z",          // gzip compression
+		"-P",          // progress
+		"-v",          // verbose
 		"-X", "fetch", // include WAL files
 	}
 
@@ -469,9 +473,9 @@ func (p *PITRManager) CreateBaseBackup(ctx context.Context, outputDir string, fo
 	return nil
 }
 
-// ArchiveWAL archives a WAL file (typically called by PostgreSQL's archive_command)
+// ArchiveWAL archives a WAL file (typically called by PostgreSQL's archive_command).
 func (p *PITRManager) ArchiveWAL(walFile, archiveDir string) error {
-	if err := os.MkdirAll(archiveDir, 0755); err != nil {
+	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
 		return err
 	}
 

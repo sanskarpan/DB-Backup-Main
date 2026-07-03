@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package integration
@@ -10,22 +11,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/sanskarpan/db-backup/internal/backup"
 	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/sanskarpan/db-backup/internal/models"
 	"github.com/sanskarpan/db-backup/internal/repository"
 	"github.com/sanskarpan/db-backup/internal/restore"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
 
 type BackupRestoreIntegrationSuite struct {
 	suite.Suite
-	tempDir    string
-	backupDir  string
+	tempDir     string
+	backupDir   string
 	metadataDir string
-	repo       repository.Repository
+	repo        repository.Repository
 }
 
 func (s *BackupRestoreIntegrationSuite) SetupSuite() {
@@ -37,8 +39,8 @@ func (s *BackupRestoreIntegrationSuite) SetupSuite() {
 	s.backupDir = filepath.Join(tempDir, "backups")
 	s.metadataDir = filepath.Join(tempDir, "metadata")
 
-	os.MkdirAll(s.backupDir, 0755)
-	os.MkdirAll(s.metadataDir, 0755)
+	os.MkdirAll(s.backupDir, 0o755)
+	os.MkdirAll(s.metadataDir, 0o755)
 
 	// Create repository
 	repo, err := repository.NewFileRepository(s.metadataDir)

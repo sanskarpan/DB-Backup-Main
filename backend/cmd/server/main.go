@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/sanskarpan/db-backup/internal/api"
 	"github.com/sanskarpan/db-backup/internal/approvals"
 	"github.com/sanskarpan/db-backup/internal/auth"
@@ -33,7 +34,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/storageregistry"
 	"github.com/sanskarpan/db-backup/internal/websocket"
 
-	// Register database drivers
+	// Register database drivers.
 	_ "github.com/sanskarpan/db-backup/internal/database/mongodb"
 	_ "github.com/sanskarpan/db-backup/internal/database/mysql"
 	_ "github.com/sanskarpan/db-backup/internal/database/postgres"
@@ -115,11 +116,10 @@ func main() {
 	}
 
 	// Start scheduler
-	if err := sched.Start(); err != nil {
+	if err = sched.Start(); err != nil {
 		log.Error("Failed to start scheduler", err)
 		os.Exit(1)
 	}
-	defer sched.Stop()
 
 	// Initialize health checker
 	healthChecker := health.NewChecker()
@@ -254,6 +254,12 @@ func main() {
 
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Error("Server forced to shutdown", err)
+	}
+
+	// Stop the scheduler as part of graceful shutdown. Done here (rather than via
+	// defer) because the earlier os.Exit calls would bypass a deferred stop.
+	if err := sched.Stop(); err != nil {
+		log.Error("Failed to stop scheduler cleanly", err)
 	}
 
 	log.Info("Server exited")

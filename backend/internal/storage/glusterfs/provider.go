@@ -11,12 +11,12 @@ import (
 	"github.com/sanskarpan/db-backup/internal/storage"
 )
 
-// GlusterFSProvider implements storage provider for GlusterFS
-type GlusterFSProvider struct {
+// GlusterFSProvider implements storage provider for GlusterFS.
+type GlusterFSProvider struct { //nolint:revive // keeps public name stable for external API consumers
 	config *storage.GlusterFSConfig
 }
 
-// NewGlusterFSProvider creates a new GlusterFS storage provider
+// NewGlusterFSProvider creates a new GlusterFS storage provider.
 func NewGlusterFSProvider(cfg *storage.GlusterFSConfig) (*GlusterFSProvider, error) {
 	if err := validateConfig(cfg); err != nil {
 		return nil, &storage.ProviderError{
@@ -40,7 +40,7 @@ func NewGlusterFSProvider(cfg *storage.GlusterFSConfig) (*GlusterFSProvider, err
 	}, nil
 }
 
-// Upload uploads a file to GlusterFS
+// Upload uploads a file to GlusterFS.
 func (p *GlusterFSProvider) Upload(ctx context.Context, localPath, remotePath string, opts *storage.UploadOptions) error {
 	sourceFile, err := os.Open(localPath)
 	if err != nil {
@@ -55,12 +55,12 @@ func (p *GlusterFSProvider) Upload(ctx context.Context, localPath, remotePath st
 	return p.UploadStream(ctx, sourceFile, remotePath, opts)
 }
 
-// UploadStream uploads data from a reader to GlusterFS
+// UploadStream uploads data from a reader to GlusterFS.
 func (p *GlusterFSProvider) UploadStream(ctx context.Context, reader io.Reader, remotePath string, opts *storage.UploadOptions) error {
 	destPath := p.getFullPath(remotePath)
 
 	// Create directory if it doesn't exist
-	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
 		return &storage.ProviderError{
 			Type:    storage.ProviderTypeGlusterFS,
 			Message: fmt.Sprintf("failed to create directory: %s", filepath.Dir(destPath)),
@@ -99,7 +99,7 @@ func (p *GlusterFSProvider) UploadStream(ctx context.Context, reader io.Reader, 
 	return nil
 }
 
-// Download downloads a file from GlusterFS
+// Download downloads a file from GlusterFS.
 func (p *GlusterFSProvider) Download(ctx context.Context, remotePath, localPath string) error {
 	sourcePath := p.getFullPath(remotePath)
 
@@ -114,7 +114,7 @@ func (p *GlusterFSProvider) Download(ctx context.Context, remotePath, localPath 
 	defer sourceFile.Close()
 
 	// Create directory if it doesn't exist
-	if err := os.MkdirAll(filepath.Dir(localPath), 0755); err != nil {
+	if err = os.MkdirAll(filepath.Dir(localPath), 0o755); err != nil {
 		return &storage.ProviderError{
 			Type:    storage.ProviderTypeGlusterFS,
 			Message: fmt.Sprintf("failed to create local directory: %s", filepath.Dir(localPath)),
@@ -143,7 +143,7 @@ func (p *GlusterFSProvider) Download(ctx context.Context, remotePath, localPath 
 	return nil
 }
 
-// DownloadStream downloads data to a reader
+// DownloadStream downloads data to a reader.
 func (p *GlusterFSProvider) DownloadStream(ctx context.Context, remotePath string) (io.ReadCloser, error) {
 	sourcePath := p.getFullPath(remotePath)
 
@@ -159,7 +159,7 @@ func (p *GlusterFSProvider) DownloadStream(ctx context.Context, remotePath strin
 	return file, nil
 }
 
-// Delete deletes a file from GlusterFS
+// Delete deletes a file from GlusterFS.
 func (p *GlusterFSProvider) Delete(ctx context.Context, remotePath string) error {
 	fullPath := p.getFullPath(remotePath)
 
@@ -174,7 +174,7 @@ func (p *GlusterFSProvider) Delete(ctx context.Context, remotePath string) error
 	return nil
 }
 
-// Exists checks if a file exists in GlusterFS
+// Exists checks if a file exists in GlusterFS.
 func (p *GlusterFSProvider) Exists(ctx context.Context, remotePath string) (bool, error) {
 	fullPath := p.getFullPath(remotePath)
 
@@ -192,7 +192,7 @@ func (p *GlusterFSProvider) Exists(ctx context.Context, remotePath string) (bool
 	return true, nil
 }
 
-// GetMetadata retrieves file metadata
+// GetMetadata retrieves file metadata.
 func (p *GlusterFSProvider) GetMetadata(ctx context.Context, remotePath string) (*storage.FileMetadata, error) {
 	fullPath := p.getFullPath(remotePath)
 
@@ -222,7 +222,7 @@ func (p *GlusterFSProvider) GetMetadata(ctx context.Context, remotePath string) 
 	return metadata, nil
 }
 
-// List lists files with a given prefix
+// List lists files with a given prefix.
 func (p *GlusterFSProvider) List(ctx context.Context, prefix string) ([]*storage.FileMetadata, error) {
 	fullPath := p.getFullPath(prefix)
 
@@ -249,7 +249,6 @@ func (p *GlusterFSProvider) List(ctx context.Context, prefix string) ([]*storage
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, &storage.ProviderError{
 			Type:    storage.ProviderTypeGlusterFS,
@@ -261,17 +260,17 @@ func (p *GlusterFSProvider) List(ctx context.Context, prefix string) ([]*storage
 	return files, nil
 }
 
-// GetType returns the provider type
+// GetType returns the provider type.
 func (p *GlusterFSProvider) GetType() storage.ProviderType {
 	return storage.ProviderTypeGlusterFS
 }
 
-// ValidateConfig validates the provider configuration
+// ValidateConfig validates the provider configuration.
 func (p *GlusterFSProvider) ValidateConfig() error {
 	return validateConfig(p.config)
 }
 
-// GetVolumeInfo returns information about the GlusterFS volume
+// GetVolumeInfo returns information about the GlusterFS volume.
 func (p *GlusterFSProvider) GetVolumeInfo(ctx context.Context) (*VolumeInfo, error) {
 	// This would typically call gluster volume info command
 	// For now, return basic info based on config
@@ -283,7 +282,7 @@ func (p *GlusterFSProvider) GetVolumeInfo(ctx context.Context) (*VolumeInfo, err
 	}, nil
 }
 
-// GetBrickStatus returns the status of GlusterFS bricks
+// GetBrickStatus returns the status of GlusterFS bricks.
 func (p *GlusterFSProvider) GetBrickStatus(ctx context.Context) ([]BrickStatus, error) {
 	// This would typically call gluster volume status command
 	// Placeholder implementation
@@ -335,7 +334,7 @@ func validateConfig(cfg *storage.GlusterFSConfig) error {
 	return nil
 }
 
-// VolumeInfo contains information about a GlusterFS volume
+// VolumeInfo contains information about a GlusterFS volume.
 type VolumeInfo struct {
 	Name        string
 	Host        string
@@ -343,7 +342,7 @@ type VolumeInfo struct {
 	Replication int
 }
 
-// BrickStatus contains status information about a GlusterFS brick
+// BrickStatus contains status information about a GlusterFS brick.
 type BrickStatus struct {
 	Host   string
 	Path   string

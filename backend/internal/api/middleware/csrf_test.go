@@ -65,7 +65,7 @@ func TestCSRFProtection_GETRequest(t *testing.T) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -98,7 +98,7 @@ func TestCSRFProtection_POSTWithoutToken(t *testing.T) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("POST", "/test", strings.NewReader("data=test"))
+	req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader("data=test"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 
@@ -122,7 +122,7 @@ func TestCSRFProtection_POSTWithValidToken(t *testing.T) {
 	})
 
 	// GET request to obtain token
-	getReq := httptest.NewRequest("GET", "/form", nil)
+	getReq := httptest.NewRequest(http.MethodGet, "/form", http.NoBody)
 	getW := httptest.NewRecorder()
 	router.ServeHTTP(getW, getReq)
 
@@ -139,7 +139,7 @@ func TestCSRFProtection_POSTWithValidToken(t *testing.T) {
 	}
 
 	// POST request with valid token
-	postReq := httptest.NewRequest("POST", "/submit", strings.NewReader("data=test"))
+	postReq := httptest.NewRequest(http.MethodPost, "/submit", strings.NewReader("data=test"))
 	postReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	postReq.Header.Set("X-CSRF-Token", csrfToken)
 	if sessionCookie != nil {
@@ -161,7 +161,7 @@ func TestCSRFProtection_POSTWithInvalidToken(t *testing.T) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("POST", "/test", strings.NewReader("data=test"))
+	req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader("data=test"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("X-CSRF-Token", "invalid-token")
 	w := httptest.NewRecorder()
@@ -184,7 +184,7 @@ func TestCSRFProtectionWithExemptions(t *testing.T) {
 	})
 
 	t.Run("Exempted path without token should succeed", func(t *testing.T) {
-		req := httptest.NewRequest("POST", "/api/webhook", strings.NewReader("data=test"))
+		req := httptest.NewRequest(http.MethodPost, "/api/webhook", strings.NewReader("data=test"))
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
@@ -193,7 +193,7 @@ func TestCSRFProtectionWithExemptions(t *testing.T) {
 	})
 
 	t.Run("Protected path without token should fail", func(t *testing.T) {
-		req := httptest.NewRequest("POST", "/api/protected", strings.NewReader("data=test"))
+		req := httptest.NewRequest(http.MethodPost, "/api/protected", strings.NewReader("data=test"))
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
@@ -209,7 +209,7 @@ func TestCSRFProtection_PUTRequest(t *testing.T) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("PUT", "/test", strings.NewReader("data=test"))
+	req := httptest.NewRequest(http.MethodPut, "/test", strings.NewReader("data=test"))
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -226,7 +226,7 @@ func TestCSRFProtection_DELETERequest(t *testing.T) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("DELETE", "/test", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -243,7 +243,7 @@ func TestCSRFProtection_OPTIONSRequest(t *testing.T) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("OPTIONS", "/test", nil)
+	req := httptest.NewRequest(http.MethodOptions, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)

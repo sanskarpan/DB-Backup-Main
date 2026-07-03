@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// KeyStore defines the interface for external key storage
+// KeyStore defines the interface for external key storage.
 type KeyStore interface {
 	// GetKey retrieves an encryption key by ID
 	GetKey(ctx context.Context, keyID string) ([]byte, error)
@@ -30,7 +30,7 @@ type KeyStore interface {
 	Close() error
 }
 
-// KeyVersion represents a version of an encryption key
+// KeyVersion represents a version of an encryption key.
 type KeyVersion struct {
 	ID         string
 	Version    int
@@ -39,7 +39,7 @@ type KeyVersion struct {
 	Deprecated bool
 }
 
-// KeyMetadata stores metadata about encrypted data
+// KeyMetadata stores metadata about encrypted data.
 type KeyMetadata struct {
 	KeyID      string
 	KeyVersion int

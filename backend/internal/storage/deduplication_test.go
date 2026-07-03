@@ -135,7 +135,7 @@ func TestStoreAndRestoreFile(t *testing.T) {
 	// Create test file
 	testFile := filepath.Join(tempDir, "test.txt")
 	testData := bytes.Repeat([]byte("Test data for deduplication. "), 100)
-	err = os.WriteFile(testFile, testData, 0644)
+	err = os.WriteFile(testFile, testData, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestDeduplicationRatio(t *testing.T) {
 	// Create file with repetitive data (high deduplication potential)
 	testFile := filepath.Join(tempDir, "repetitive.txt")
 	testData := bytes.Repeat([]byte("A"), 1000) // 1000 bytes of 'A'
-	err = os.WriteFile(testFile, testData, 0644)
+	err = os.WriteFile(testFile, testData, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -373,8 +373,8 @@ func TestDeleteManifest(t *testing.T) {
 	testFile := filepath.Join(tempDir, "test.txt")
 	chunk1 := bytes.Repeat([]byte("A"), 100)
 	chunk2 := bytes.Repeat([]byte("B"), 100)
-	testData := append(chunk1, chunk2...)
-	os.WriteFile(testFile, testData, 0644)
+	testData := bytes.Join([][]byte{chunk1, chunk2}, nil)
+	os.WriteFile(testFile, testData, 0o644)
 
 	manifest, err := manager.StoreFile(testFile)
 	if err != nil {
@@ -478,7 +478,7 @@ func TestMetrics(t *testing.T) {
 	testData = append(testData, bytes.Repeat([]byte("A"), 100)...)
 	testData = append(testData, bytes.Repeat([]byte("B"), 100)...)
 
-	os.WriteFile(testFile, testData, 0644)
+	os.WriteFile(testFile, testData, 0o644)
 
 	manifest, err := manager.StoreFile(testFile)
 	if err != nil {

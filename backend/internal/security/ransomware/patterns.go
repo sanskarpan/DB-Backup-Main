@@ -16,24 +16,24 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// PatternType represents the type of pattern matching algorithm
+// PatternType represents the type of pattern matching algorithm.
 type PatternType string
 
 const (
-	// PatternTypeExact requires exact byte sequence match
+	// PatternTypeExact requires exact byte sequence match.
 	PatternTypeExact PatternType = "EXACT"
-	// PatternTypeRegex uses regular expression matching
+	// PatternTypeRegex uses regular expression matching.
 	PatternTypeRegex PatternType = "REGEX"
-	// PatternTypeFuzzy allows partial/fuzzy matching
+	// PatternTypeFuzzy allows partial/fuzzy matching.
 	PatternTypeFuzzy PatternType = "FUZZY"
-	// PatternTypeComposite requires multiple indicators
+	// PatternTypeComposite requires multiple indicators.
 	PatternTypeComposite PatternType = "COMPOSITE"
-	// PatternTypeBehavioral detects behavioral patterns
+	// PatternTypeBehavioral detects behavioral patterns.
 	PatternTypeBehavioral PatternType = "BEHAVIORAL"
 )
 
-// RansomwareFamily represents a known ransomware family with detection patterns
-type RansomwareFamily struct {
+// RansomwareFamily represents a known ransomware family with detection patterns.
+type RansomwareFamily struct { //nolint:revive // keeps public name stable across packages
 	Name        string
 	Aliases     []string
 	FirstSeen   time.Time
@@ -56,16 +56,16 @@ type RansomwareFamily struct {
 	ATTACKTactics []string
 }
 
-// FileSignature represents a signature found in encrypted files
+// FileSignature represents a signature found in encrypted files.
 type FileSignature struct {
 	Pattern     []byte
 	PatternType PatternType
-	Offset      int64  // -1 for anywhere in file
-	MaxFileSize int64  // Max file size to scan (0 = no limit)
+	Offset      int64 // -1 for anywhere in file
+	MaxFileSize int64 // Max file size to scan (0 = no limit)
 	Description string
 }
 
-// BehavioralIndicator represents behavioral patterns
+// BehavioralIndicator represents behavioral patterns.
 type BehavioralIndicator struct {
 	Name        string
 	Description string
@@ -73,7 +73,7 @@ type BehavioralIndicator struct {
 	Threshold   int // Minimum number of indicators to match
 }
 
-// PatternEngine provides advanced pattern recognition for ransomware detection
+// PatternEngine provides advanced pattern recognition for ransomware detection.
 type PatternEngine struct {
 	mu sync.RWMutex
 
@@ -87,7 +87,7 @@ type PatternEngine struct {
 	config *PatternEngineConfig
 }
 
-// PatternEngineConfig configures the pattern engine
+// PatternEngineConfig configures the pattern engine.
 type PatternEngineConfig struct {
 	// EnableFuzzyMatching enables approximate pattern matching
 	EnableFuzzyMatching bool
@@ -111,20 +111,20 @@ type PatternEngineConfig struct {
 	CacheRegexPatterns bool
 }
 
-// DefaultPatternEngineConfig returns default configuration
+// DefaultPatternEngineConfig returns default configuration.
 func DefaultPatternEngineConfig() *PatternEngineConfig {
 	return &PatternEngineConfig{
-		EnableFuzzyMatching:    true,
-		FuzzyMatchThreshold:    85,
-		MaxFileSizeForFullScan: 10 * 1024 * 1024, // 10 MB
-		HeaderScanSize:         4 * 1024,          // 4 KB
-		FooterScanSize:         1 * 1024,          // 1 KB
+		EnableFuzzyMatching:      true,
+		FuzzyMatchThreshold:      85,
+		MaxFileSizeForFullScan:   10 * 1024 * 1024, // 10 MB
+		HeaderScanSize:           4 * 1024,         // 4 KB
+		FooterScanSize:           1 * 1024,         // 1 KB
 		EnableBehavioralAnalysis: true,
-		CacheRegexPatterns:     true,
+		CacheRegexPatterns:       true,
 	}
 }
 
-// NewPatternEngine creates a new pattern recognition engine
+// NewPatternEngine creates a new pattern recognition engine.
 func NewPatternEngine(config *PatternEngineConfig) *PatternEngine {
 	if config == nil {
 		config = DefaultPatternEngineConfig()
@@ -142,17 +142,17 @@ func NewPatternEngine(config *PatternEngineConfig) *PatternEngine {
 	return engine
 }
 
-// loadSignatureDatabase loads comprehensive ransomware signatures
+// loadSignatureDatabase loads comprehensive ransomware signatures.
 func (pe *PatternEngine) loadSignatureDatabase() {
 	// This database includes 100+ ransomware families with real-world signatures
 	// Updated as of January 2025
 
 	pe.families = map[string]*RansomwareFamily{
 		"wannacry": {
-			Name:     "WannaCry",
-			Aliases:  []string{"WannaCrypt", "WanaCrypt0r", "WCry"},
-			FirstSeen: time.Date(2017, 5, 12, 0, 0, 0, 0, time.UTC),
-			Severity: ThreatLevelCritical,
+			Name:        "WannaCry",
+			Aliases:     []string{"WannaCrypt", "WanaCrypt0r", "WCry"},
+			FirstSeen:   time.Date(2017, 5, 12, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Crypto-ransomware that exploits EternalBlue SMB vulnerability",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("WANACRY!"), Offset: -1, Description: "WannaCry marker"},
@@ -170,10 +170,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"locky": {
-			Name:      "Locky",
-			Aliases:   []string{"Locky Ransomware"},
-			FirstSeen: time.Date(2016, 2, 16, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Locky",
+			Aliases:     []string{"Locky Ransomware"},
+			FirstSeen:   time.Date(2016, 2, 16, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "RSA-2048 and AES-1024 encryption ransomware",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("LOCKY"), Offset: 0, Description: "Locky header"},
@@ -188,10 +188,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"cerber": {
-			Name:      "Cerber",
-			Aliases:   []string{"Cerber Ransomware"},
-			FirstSeen: time.Date(2016, 3, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Cerber",
+			Aliases:     []string{"Cerber Ransomware"},
+			FirstSeen:   time.Date(2016, 3, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Ransomware-as-a-Service (RaaS) with voice ransom note",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("CERBER"), Offset: -1, Description: "Cerber marker"},
@@ -206,10 +206,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"cryptowall": {
-			Name:      "CryptoWall",
-			Aliases:   []string{"CryptoDefense", "CryptoWall 3.0", "CryptoWall 4.0"},
-			FirstSeen: time.Date(2014, 1, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "CryptoWall",
+			Aliases:     []string{"CryptoDefense", "CryptoWall 3.0", "CryptoWall 4.0"},
+			FirstSeen:   time.Date(2014, 1, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Advanced ransomware using RSA-2048 encryption",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("DECRYPT_INSTRUCTION"), Offset: -1, Description: "CryptoWall marker"},
@@ -226,10 +226,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"ryuk": {
-			Name:      "Ryuk",
-			Aliases:   []string{"Ryuk Ransomware"},
-			FirstSeen: time.Date(2018, 8, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Ryuk",
+			Aliases:     []string{"Ryuk Ransomware"},
+			FirstSeen:   time.Date(2018, 8, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Targeted ransomware focusing on enterprise networks",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("RYUK"), Offset: -1, Description: "Ryuk marker"},
@@ -255,10 +255,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"lockbit": {
-			Name:      "LockBit",
-			Aliases:   []string{"LockBit 2.0", "LockBit 3.0", "LockBit Black"},
-			FirstSeen: time.Date(2019, 9, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "LockBit",
+			Aliases:     []string{"LockBit 2.0", "LockBit 3.0", "LockBit Black"},
+			FirstSeen:   time.Date(2019, 9, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Fast automated ransomware targeting enterprises",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("LockBit"), Offset: -1, Description: "LockBit marker"},
@@ -282,10 +282,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"revil": {
-			Name:      "REvil",
-			Aliases:   []string{"Sodinokibi", "Sodin"},
-			FirstSeen: time.Date(2019, 4, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "REvil",
+			Aliases:     []string{"Sodinokibi", "Sodin"},
+			FirstSeen:   time.Date(2019, 4, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "RaaS with double extortion tactics",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("REVil"), Offset: -1, Description: "REvil marker"},
@@ -303,10 +303,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"maze": {
-			Name:      "Maze",
-			Aliases:   []string{"Maze Ransomware", "ChaCha Ransomware"},
-			FirstSeen: time.Date(2019, 5, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Maze",
+			Aliases:     []string{"Maze Ransomware", "ChaCha Ransomware"},
+			FirstSeen:   time.Date(2019, 5, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "First major ransomware to use data leak extortion",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("MAZE"), Offset: -1, Description: "Maze marker"},
@@ -322,10 +322,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"conti": {
-			Name:      "Conti",
-			Aliases:   []string{"Conti Ransomware"},
-			FirstSeen: time.Date(2020, 5, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Conti",
+			Aliases:     []string{"Conti Ransomware"},
+			FirstSeen:   time.Date(2020, 5, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Ransomware operated by Russian cybercrime group",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("CONTI"), Offset: -1, Description: "Conti marker"},
@@ -341,10 +341,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"darkside": {
-			Name:      "DarkSide",
-			Aliases:   []string{"DarkSide Ransomware"},
-			FirstSeen: time.Date(2020, 8, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "DarkSide",
+			Aliases:     []string{"DarkSide Ransomware"},
+			FirstSeen:   time.Date(2020, 8, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "RaaS targeting critical infrastructure (Colonial Pipeline)",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("DarkSide"), Offset: -1, Description: "DarkSide marker"},
@@ -360,10 +360,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"blackcat": {
-			Name:      "BlackCat",
-			Aliases:   []string{"ALPHV", "Noberus"},
-			FirstSeen: time.Date(2021, 11, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "BlackCat",
+			Aliases:     []string{"ALPHV", "Noberus"},
+			FirstSeen:   time.Date(2021, 11, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "First professional ransomware written in Rust",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("ALPHV"), Offset: -1, Description: "ALPHV marker"},
@@ -380,10 +380,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"hive": {
-			Name:      "Hive",
-			Aliases:   []string{"Hive Ransomware"},
-			FirstSeen: time.Date(2021, 6, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Hive",
+			Aliases:     []string{"Hive Ransomware"},
+			FirstSeen:   time.Date(2021, 6, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Ransomware-as-a-Service with multiple attack vectors",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("Hive"), Offset: -1, Description: "Hive marker"},
@@ -398,10 +398,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"medusa": {
-			Name:      "Medusa",
-			Aliases:   []string{"Medusa Locker"},
-			FirstSeen: time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Medusa",
+			Aliases:     []string{"Medusa Locker"},
+			FirstSeen:   time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Targeted ransomware with multi-extortion tactics",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("MEDUSA"), Offset: -1, Description: "Medusa marker"},
@@ -417,10 +417,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"ragnarlocker": {
-			Name:      "Ragnar Locker",
-			Aliases:   []string{"RagnarLocker"},
-			FirstSeen: time.Date(2019, 12, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Ragnar Locker",
+			Aliases:     []string{"RagnarLocker"},
+			FirstSeen:   time.Date(2019, 12, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Targeted ransomware using virtual machines for evasion",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("RAGNAR"), Offset: -1, Description: "Ragnar marker"},
@@ -435,10 +435,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"blackbasta": {
-			Name:      "Black Basta",
-			Aliases:   []string{"BlackBasta"},
-			FirstSeen: time.Date(2022, 4, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Black Basta",
+			Aliases:     []string{"BlackBasta"},
+			FirstSeen:   time.Date(2022, 4, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Fast-moving ransomware targeting enterprises",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("Black Basta"), Offset: -1, Description: "Black Basta marker"},
@@ -453,10 +453,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"petya": {
-			Name:      "Petya",
-			Aliases:   []string{"NotPetya", "ExPetr", "GoldenEye"},
-			FirstSeen: time.Date(2016, 3, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Petya",
+			Aliases:     []string{"NotPetya", "ExPetr", "GoldenEye"},
+			FirstSeen:   time.Date(2016, 3, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "MBR-encrypting ransomware (NotPetya was actually wiper malware)",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("Petya"), Offset: -1, Description: "Petya marker"},
@@ -471,10 +471,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"gandcrab": {
-			Name:      "GandCrab",
-			Aliases:   []string{"GandCrab Ransomware"},
-			FirstSeen: time.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "GandCrab",
+			Aliases:     []string{"GandCrab Ransomware"},
+			FirstSeen:   time.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Popular RaaS that infected over 500,000 victims",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("GANDCRAB"), Offset: -1, Description: "GandCrab marker"},
@@ -491,10 +491,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 
 		// Additional modern ransomware families
 		"quantum": {
-			Name:      "Quantum",
-			Aliases:   []string{"Quantum Locker"},
-			FirstSeen: time.Date(2022, 8, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Quantum",
+			Aliases:     []string{"Quantum Locker"},
+			FirstSeen:   time.Date(2022, 8, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Fast-encrypting ransomware with short dwell time",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("QUANTUM"), Offset: -1, Description: "Quantum marker"},
@@ -509,10 +509,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"vice_society": {
-			Name:      "Vice Society",
-			Aliases:   []string{"ViceSociety"},
-			FirstSeen: time.Date(2021, 6, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Vice Society",
+			Aliases:     []string{"ViceSociety"},
+			FirstSeen:   time.Date(2021, 6, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Ransomware targeting education sector",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("Vice Society"), Offset: -1, Description: "Vice Society marker"},
@@ -527,10 +527,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"play": {
-			Name:      "Play",
-			Aliases:   []string{"Play Ransomware", "PlayCrypt"},
-			FirstSeen: time.Date(2022, 6, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Play",
+			Aliases:     []string{"Play Ransomware", "PlayCrypt"},
+			FirstSeen:   time.Date(2022, 6, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Ransomware using intermittent encryption",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("PLAY"), Offset: -1, Description: "Play marker"},
@@ -545,10 +545,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"bianlian": {
-			Name:      "BianLian",
-			Aliases:   []string{"Bian Lian"},
-			FirstSeen: time.Date(2022, 7, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "BianLian",
+			Aliases:     []string{"Bian Lian"},
+			FirstSeen:   time.Date(2022, 7, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Shifted from encryption to pure data exfiltration",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("BianLian"), Offset: -1, Description: "BianLian marker"},
@@ -563,10 +563,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"akira": {
-			Name:      "Akira",
-			Aliases:   []string{"Akira Ransomware"},
-			FirstSeen: time.Date(2023, 3, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Akira",
+			Aliases:     []string{"Akira Ransomware"},
+			FirstSeen:   time.Date(2023, 3, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Modern ransomware targeting VMware ESXi servers",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("AKIRA"), Offset: -1, Description: "Akira marker"},
@@ -581,10 +581,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"clop": {
-			Name:      "Clop",
-			Aliases:   []string{"Cl0p", "ClopReadMe"},
-			FirstSeen: time.Date(2019, 2, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Clop",
+			Aliases:     []string{"Cl0p", "ClopReadMe"},
+			FirstSeen:   time.Date(2019, 2, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Ransomware exploiting vulnerabilities (MOVEit, GoAnywhere)",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("Clop"), Offset: -1, Description: "Clop marker"},
@@ -601,10 +601,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"babuk": {
-			Name:      "Babuk",
-			Aliases:   []string{"Babuk Locker"},
-			FirstSeen: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Babuk",
+			Aliases:     []string{"Babuk Locker"},
+			FirstSeen:   time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Ransomware targeting Windows and ESXi systems",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("Babuk"), Offset: -1, Description: "Babuk marker"},
@@ -620,10 +620,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 
 		// Legacy but still active families
 		"dharma": {
-			Name:      "Dharma",
-			Aliases:   []string{"CrySis"},
-			FirstSeen: time.Date(2016, 11, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelHigh,
+			Name:        "Dharma",
+			Aliases:     []string{"CrySis"},
+			FirstSeen:   time.Date(2016, 11, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelHigh,
 			Description: "Long-running RaaS targeting SMBs",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("DHARMA"), Offset: -1, Description: "Dharma marker"},
@@ -638,10 +638,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"phobos": {
-			Name:      "Phobos",
-			Aliases:   []string{"Phobos Ransomware"},
-			FirstSeen: time.Date(2018, 12, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelHigh,
+			Name:        "Phobos",
+			Aliases:     []string{"Phobos Ransomware"},
+			FirstSeen:   time.Date(2018, 12, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelHigh,
 			Description: "RDP-based ransomware targeting SMBs",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("Phobos"), Offset: -1, Description: "Phobos marker"},
@@ -656,10 +656,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"snatch": {
-			Name:      "Snatch",
-			Aliases:   []string{"Snatch Ransomware"},
-			FirstSeen: time.Date(2018, 12, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelHigh,
+			Name:        "Snatch",
+			Aliases:     []string{"Snatch Ransomware"},
+			FirstSeen:   time.Date(2018, 12, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelHigh,
 			Description: "Reboots systems into Safe Mode to disable security",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("Snatch"), Offset: -1, Description: "Snatch marker"},
@@ -682,10 +682,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"netwalker": {
-			Name:      "Netwalker",
-			Aliases:   []string{"Mailto"},
-			FirstSeen: time.Date(2019, 8, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Netwalker",
+			Aliases:     []string{"Mailto"},
+			FirstSeen:   time.Date(2019, 8, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "RaaS targeting healthcare and education",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("Netwalker"), Offset: -1, Description: "Netwalker marker"},
@@ -700,10 +700,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"egregor": {
-			Name:      "Egregor",
-			Aliases:   []string{"Egregor Ransomware"},
-			FirstSeen: time.Date(2020, 9, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Egregor",
+			Aliases:     []string{"Egregor Ransomware"},
+			FirstSeen:   time.Date(2020, 9, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Successor to Maze ransomware",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("Egregor"), Offset: -1, Description: "Egregor marker"},
@@ -719,10 +719,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 
 		// Additional 2023-2025 families
 		"royal": {
-			Name:      "Royal",
-			Aliases:   []string{"Royal Ransomware"},
-			FirstSeen: time.Date(2022, 9, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Royal",
+			Aliases:     []string{"Royal Ransomware"},
+			FirstSeen:   time.Date(2022, 9, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Targeted ransomware with partial encryption",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("ROYAL"), Offset: -1, Description: "Royal marker"},
@@ -737,10 +737,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"cuba": {
-			Name:      "Cuba",
-			Aliases:   []string{"Cuba Ransomware", "COLDDRAW"},
-			FirstSeen: time.Date(2021, 12, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Cuba",
+			Aliases:     []string{"Cuba Ransomware", "COLDDRAW"},
+			FirstSeen:   time.Date(2021, 12, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Ransomware targeting critical infrastructure",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("Cuba"), Offset: -1, Description: "Cuba marker"},
@@ -755,10 +755,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"lorenz": {
-			Name:      "Lorenz",
-			Aliases:   []string{"Lorenz Ransomware"},
-			FirstSeen: time.Date(2021, 4, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Lorenz",
+			Aliases:     []string{"Lorenz Ransomware"},
+			FirstSeen:   time.Date(2021, 4, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Targets SMB vulnerabilities and RDP",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("Lorenz"), Offset: -1, Description: "Lorenz marker"},
@@ -773,10 +773,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"avoslocker": {
-			Name:      "AvosLocker",
-			Aliases:   []string{"Avos Locker"},
-			FirstSeen: time.Date(2021, 6, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "AvosLocker",
+			Aliases:     []string{"Avos Locker"},
+			FirstSeen:   time.Date(2021, 6, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "RaaS targeting Windows and Linux systems",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("AvosLocker"), Offset: -1, Description: "AvosLocker marker"},
@@ -791,10 +791,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"karakurt": {
-			Name:      "Karakurt",
-			Aliases:   []string{"Karakurt Team"},
-			FirstSeen: time.Date(2021, 6, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Karakurt",
+			Aliases:     []string{"Karakurt Team"},
+			FirstSeen:   time.Date(2021, 6, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Data extortion without encryption",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("Karakurt"), Offset: -1, Description: "Karakurt marker"},
@@ -809,10 +809,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"karma": {
-			Name:      "Karma",
-			Aliases:   []string{"Karma Ransomware"},
-			FirstSeen: time.Date(2021, 6, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelHigh,
+			Name:        "Karma",
+			Aliases:     []string{"Karma Ransomware"},
+			FirstSeen:   time.Date(2021, 6, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelHigh,
 			Description: "Rebrand of Nemty ransomware",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("Karma"), Offset: -1, Description: "Karma marker"},
@@ -828,10 +828,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 
 		// Emerging 2024-2025 families
 		"hunters": {
-			Name:      "Hunters International",
-			Aliases:   []string{"Hunters"},
-			FirstSeen: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "Hunters International",
+			Aliases:     []string{"Hunters"},
+			FirstSeen:   time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Possible Hive rebrand with similar code",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("Hunters"), Offset: -1, Description: "Hunters marker"},
@@ -846,10 +846,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"alphvm": {
-			Name:      "AlphVM",
-			Aliases:   []string{"AlphVM Ransomware"},
-			FirstSeen: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "AlphVM",
+			Aliases:     []string{"AlphVM Ransomware"},
+			FirstSeen:   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Next-gen ransomware with advanced evasion",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("AlphVM"), Offset: -1, Description: "AlphVM marker"},
@@ -864,10 +864,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"stormous": {
-			Name:      "Stormous",
-			Aliases:   []string{"Stormous Ransomware"},
-			FirstSeen: time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelHigh,
+			Name:        "Stormous",
+			Aliases:     []string{"Stormous Ransomware"},
+			FirstSeen:   time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelHigh,
 			Description: "Hacktivist-aligned ransomware group",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("Stormous"), Offset: -1, Description: "Stormous marker"},
@@ -882,10 +882,10 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 		},
 
 		"ransomedvc": {
-			Name:      "RansomEXX",
-			Aliases:   []string{"Defray777", "RansomEXX"},
-			FirstSeen: time.Date(2018, 8, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelCritical,
+			Name:        "RansomEXX",
+			Aliases:     []string{"Defray777", "RansomEXX"},
+			FirstSeen:   time.Date(2018, 8, 1, 0, 0, 0, 0, time.UTC),
+			Severity:    ThreatLevelCritical,
 			Description: "Targets Windows and Linux systems",
 			FileSignatures: []FileSignature{
 				{Pattern: []byte("RansomEXX"), Offset: -1, Description: "RansomEXX marker"},
@@ -901,11 +901,11 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 
 		// Generic/unknown patterns
 		"generic_encrypted": {
-			Name:      "Generic Encrypted Files",
-			Aliases:   []string{"Unknown Ransomware"},
-			FirstSeen: time.Date(2015, 1, 1, 0, 0, 0, 0, time.UTC),
-			Severity:  ThreatLevelMedium,
-			Description: "Generic encrypted file patterns",
+			Name:           "Generic Encrypted Files",
+			Aliases:        []string{"Unknown Ransomware"},
+			FirstSeen:      time.Date(2015, 1, 1, 0, 0, 0, 0, time.UTC),
+			Severity:       ThreatLevelMedium,
+			Description:    "Generic encrypted file patterns",
 			FileSignatures: []FileSignature{},
 			ExtensionPatterns: []string{
 				".encrypted", ".locked", ".crypto", ".crypt", ".crypted",
@@ -924,7 +924,7 @@ func (pe *PatternEngine) loadSignatureDatabase() {
 	}
 }
 
-// ScanFile scans a file for ransomware patterns
+// ScanFile scans a file for ransomware patterns.
 func (pe *PatternEngine) ScanFile(filePath string) (*RansomwareFamilyMatch, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -991,7 +991,8 @@ func (pe *PatternEngine) ScanFile(filePath string) (*RansomwareFamilyMatch, erro
 	}
 
 	if len(matches) == 0 {
-		return nil, nil
+		// No family matched: nil result with nil error is the intended "no match" outcome.
+		return nil, nil //nolint:nilnil // absence of a match is not an error
 	}
 
 	// Sort matches by score (highest first)
@@ -1003,17 +1004,15 @@ func (pe *PatternEngine) ScanFile(filePath string) (*RansomwareFamilyMatch, erro
 	}
 
 	return &RansomwareFamilyMatch{
-		Family:            bestMatch.Family,
-		ConfidenceScore:   bestMatch.MatchScore,
-		MatchedIndicators: bestMatch.MatchedIndicators,
+		Family:             bestMatch.Family,
+		ConfidenceScore:    bestMatch.MatchScore,
+		MatchedIndicators:  bestMatch.MatchedIndicators,
 		AlternativeMatches: matches,
 	}, nil
 }
 
-// checkFileSignatures checks file content for signatures
-func (pe *PatternEngine) checkFileSignatures(file *os.File, fileSize int64, signatures []FileSignature) (bool, []string) {
-	var indicators []string
-
+// checkFileSignatures checks file content for signatures.
+func (pe *PatternEngine) checkFileSignatures(file *os.File, fileSize int64, signatures []FileSignature) (matched bool, indicators []string) {
 	for _, sig := range signatures {
 		// Determine scan region
 		var scanData []byte
@@ -1049,8 +1048,8 @@ func (pe *PatternEngine) checkFileSignatures(file *os.File, fileSize int64, sign
 	return false, indicators
 }
 
-// readAtOffset reads data from file at specific offset
-func (pe *PatternEngine) readAtOffset(file *os.File, offset int64, length int64) ([]byte, error) {
+// readAtOffset reads data from file at specific offset.
+func (pe *PatternEngine) readAtOffset(file *os.File, offset, length int64) ([]byte, error) {
 	if _, err := file.Seek(offset, 0); err != nil {
 		return nil, err
 	}
@@ -1064,7 +1063,7 @@ func (pe *PatternEngine) readAtOffset(file *os.File, offset int64, length int64)
 	return buf[:n], nil
 }
 
-// readHeaderAndFooter reads header and footer of file
+// readHeaderAndFooter reads header and footer of file.
 func (pe *PatternEngine) readHeaderAndFooter(file *os.File, fileSize int64) ([]byte, error) {
 	var data []byte
 
@@ -1088,7 +1087,7 @@ func (pe *PatternEngine) readHeaderAndFooter(file *os.File, fileSize int64) ([]b
 	// Read footer if file is large enough
 	if fileSize > pe.config.HeaderScanSize+pe.config.FooterScanSize {
 		if _, err := file.Seek(-pe.config.FooterScanSize, 2); err != nil {
-			return data, nil // Return header only
+			return data, nil //nolint:nilerr // footer seek failure is non-fatal; return header data only
 		}
 
 		footer := make([]byte, pe.config.FooterScanSize)
@@ -1102,7 +1101,7 @@ func (pe *PatternEngine) readHeaderAndFooter(file *os.File, fileSize int64) ([]b
 	return data, nil
 }
 
-// fuzzyMatch performs fuzzy pattern matching
+// fuzzyMatch performs fuzzy pattern matching.
 func (pe *PatternEngine) fuzzyMatch(data, pattern []byte) bool {
 	if len(pattern) == 0 {
 		return false
@@ -1127,7 +1126,7 @@ func (pe *PatternEngine) fuzzyMatch(data, pattern []byte) bool {
 	return false
 }
 
-// matchFilename checks if filename matches pattern (supports wildcards)
+// matchFilename checks if filename matches pattern (supports wildcards).
 func (pe *PatternEngine) matchFilename(filename, pattern string) bool {
 	// Exact match
 	if strings.EqualFold(filename, pattern) {
@@ -1139,11 +1138,15 @@ func (pe *PatternEngine) matchFilename(filename, pattern string) bool {
 	pattern = strings.ReplaceAll(pattern, "[victim_id]", "*")
 	pattern = strings.ReplaceAll(pattern, "[id]", "*")
 
-	matched, _ := filepath.Match(strings.ToLower(pattern), strings.ToLower(filename))
+	matched, err := filepath.Match(strings.ToLower(pattern), strings.ToLower(filename))
+	if err != nil {
+		// Malformed pattern: treat as non-match rather than propagating the error.
+		return false
+	}
 	return matched
 }
 
-// ScanDirectory scans directory for ransom notes
+// ScanDirectory scans directory for ransom notes.
 func (pe *PatternEngine) ScanDirectory(dirPath string) ([]*RansomwareIndicator, error) {
 	var indicators []*RansomwareIndicator
 
@@ -1174,7 +1177,7 @@ func (pe *PatternEngine) ScanDirectory(dirPath string) ([]*RansomwareIndicator, 
 	return indicators, err
 }
 
-// AnalyzeFileHash checks if file hash matches known ransomware
+// AnalyzeFileHash checks if file hash matches known ransomware.
 func (pe *PatternEngine) AnalyzeFileHash(filePath string) (*HashMatchResult, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -1210,37 +1213,37 @@ func (pe *PatternEngine) AnalyzeFileHash(filePath string) (*HashMatchResult, err
 	}, nil
 }
 
-// RansomwareFamilyMatch represents a matched ransomware family
-type RansomwareFamilyMatch struct {
+// RansomwareFamilyMatch represents a matched ransomware family.
+type RansomwareFamilyMatch struct { //nolint:revive // keeps public name stable across packages
 	Family             *RansomwareFamily
 	ConfidenceScore    int
 	MatchedIndicators  []string
 	AlternativeMatches []*FamilyMatchResult
 }
 
-// FamilyMatchResult represents a match result for a family
+// FamilyMatchResult represents a match result for a family.
 type FamilyMatchResult struct {
 	Family            *RansomwareFamily
 	MatchScore        int
 	MatchedIndicators []string
 }
 
-// RansomwareIndicator represents a ransomware indicator found
-type RansomwareIndicator struct {
+// RansomwareIndicator represents a ransomware indicator found.
+type RansomwareIndicator struct { //nolint:revive // keeps public name stable across packages
 	Type        string
 	FilePath    string
 	Family      string
 	Description string
 }
 
-// HashMatchResult represents hash analysis result
+// HashMatchResult represents hash analysis result.
 type HashMatchResult struct {
 	Matched bool
 	Hash    string
 	Family  string
 }
 
-// GetFamilyInfo retrieves information about a specific ransomware family
+// GetFamilyInfo retrieves information about a specific ransomware family.
 func (pe *PatternEngine) GetFamilyInfo(name string) (*RansomwareFamily, bool) {
 	pe.mu.RLock()
 	defer pe.mu.RUnlock()
@@ -1249,7 +1252,7 @@ func (pe *PatternEngine) GetFamilyInfo(name string) (*RansomwareFamily, bool) {
 	return family, exists
 }
 
-// ListAllFamilies returns all known ransomware families
+// ListAllFamilies returns all known ransomware families.
 func (pe *PatternEngine) ListAllFamilies() []*RansomwareFamily {
 	pe.mu.RLock()
 	defer pe.mu.RUnlock()
@@ -1262,16 +1265,16 @@ func (pe *PatternEngine) ListAllFamilies() []*RansomwareFamily {
 	return families
 }
 
-// GetStatistics returns pattern database statistics
+// GetStatistics returns pattern database statistics.
 func (pe *PatternEngine) GetStatistics() *PatternEngineStats {
 	pe.mu.RLock()
 	defer pe.mu.RUnlock()
 
 	stats := &PatternEngineStats{
-		TotalFamilies:     len(pe.families),
-		BySeverity:        make(map[ThreatLevel]int),
-		TotalSignatures:   0,
-		TotalExtensions:   0,
+		TotalFamilies:         len(pe.families),
+		BySeverity:            make(map[ThreatLevel]int),
+		TotalSignatures:       0,
+		TotalExtensions:       0,
 		TotalFilenamePatterns: 0,
 	}
 
@@ -1285,7 +1288,7 @@ func (pe *PatternEngine) GetStatistics() *PatternEngineStats {
 	return stats
 }
 
-// PatternEngineStats represents statistics about the pattern database
+// PatternEngineStats represents statistics about the pattern database.
 type PatternEngineStats struct {
 	TotalFamilies         int
 	BySeverity            map[ThreatLevel]int

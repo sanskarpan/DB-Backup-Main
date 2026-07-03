@@ -12,100 +12,102 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// FailurePredictor predicts backup failures using historical analysis
+// FailurePredictor predicts backup failures using historical analysis.
 type FailurePredictor struct {
-	mu              sync.RWMutex
-	historicalData  map[string][]BackupEvent
-	patterns        map[string]*FailurePattern
-	config          *PredictorConfig
-	lastAnalysis    time.Time
+	mu             sync.RWMutex
+	historicalData map[string][]BackupEvent
+	patterns       map[string]*FailurePattern
+	config         *PredictorConfig
+	lastAnalysis   time.Time
 }
 
-// BackupEvent represents a historical backup event
+// BackupEvent represents a historical backup event.
 type BackupEvent struct {
-	ID           string
-	DatabaseName string
-	Timestamp    time.Time
-	Success      bool
-	Duration     time.Duration
-	Size         int64
-	ErrorType    string
-	ErrorMessage string
-	DayOfWeek    time.Weekday
-	HourOfDay    int
-	SystemLoad   float64
-	DiskUsage    float64
+	ID             string
+	DatabaseName   string
+	Timestamp      time.Time
+	Success        bool
+	Duration       time.Duration
+	Size           int64
+	ErrorType      string
+	ErrorMessage   string
+	DayOfWeek      time.Weekday
+	HourOfDay      int
+	SystemLoad     float64
+	DiskUsage      float64
 	NetworkLatency time.Duration
 }
 
-// FailurePattern represents identified failure patterns
+// FailurePattern represents identified failure patterns.
 type FailurePattern struct {
-	DatabaseName    string
-	PatternType     PatternType
-	Confidence      float64 // 0-100
-	Frequency       float64 // Failures per day
-	CommonErrors    map[string]int
-	RiskFactors     []RiskFactor
-	TimePatterns    *TimePattern
+	DatabaseName     string
+	PatternType      PatternType
+	Confidence       float64 // 0-100
+	Frequency        float64 // Failures per day
+	CommonErrors     map[string]int
+	RiskFactors      []RiskFactor
+	TimePatterns     *TimePattern
 	ResourcePatterns *ResourcePattern
-	LastOccurrence  time.Time
+	LastOccurrence   time.Time
 }
 
-// PatternType represents the type of failure pattern
+// PatternType represents the type of failure pattern.
 type PatternType string
 
 const (
-	PatternTypeRecurring     PatternType = "recurring"       // Recurring at specific times
-	PatternTypeTrend         PatternType = "trend"           // Increasing failure trend
-	PatternTypeResourceBased PatternType = "resource_based"  // Resource constraint failures
-	PatternTypeTimeWindow    PatternType = "time_window"     // Specific time window failures
-	PatternTypeErrorCascade  PatternType = "error_cascade"   // Cascading failures
+	PatternTypeRecurring     PatternType = "recurring"      // Recurring at specific times
+	PatternTypeTrend         PatternType = "trend"          // Increasing failure trend
+	PatternTypeResourceBased PatternType = "resource_based" // Resource constraint failures
+	PatternTypeTimeWindow    PatternType = "time_window"    // Specific time window failures
+	PatternTypeErrorCascade  PatternType = "error_cascade"  // Cascading failures
 )
 
-// RiskFactor represents a risk factor for failure
+// RiskFactor represents a risk factor for failure.
 type RiskFactor struct {
 	Factor      string
 	Impact      float64 // 0-100
 	Description string
 }
 
-// TimePattern represents time-based failure patterns
+// TimePattern represents time-based failure patterns.
 type TimePattern struct {
 	HighRiskDays  []time.Weekday
 	HighRiskHours []int
 	AvoidWindows  []TimeWindow
 }
 
-// TimeWindow represents a time window
+// TimeWindow represents a time window.
 type TimeWindow struct {
-	Start time.Time
-	End   time.Time
+	Start  time.Time
+	End    time.Time
 	Reason string
 }
 
-// ResourcePattern represents resource-based failure patterns
+// ResourcePattern represents resource-based failure patterns.
 type ResourcePattern struct {
-	DiskThreshold      float64 // Percentage
-	LoadThreshold      float64
-	NetworkThreshold   time.Duration
-	MemoryThreshold    float64
+	DiskThreshold    float64 // Percentage
+	LoadThreshold    float64
+	NetworkThreshold time.Duration
+	MemoryThreshold  float64
 }
 
-// FailurePrediction represents a prediction of backup failure
+// FailurePrediction represents a prediction of backup failure.
 type FailurePrediction struct {
-	ID               string
-	DatabaseName     string
-	PredictionTime   time.Time
+	ID                   string
+	DatabaseName         string
+	PredictionTime       time.Time
 	PredictedFailureTime time.Time
-	Confidence       float64 // 0-100
-	Severity         PredictionSeverity
-	RiskScore        float64 // 0-100
-	Reasons          []string
-	PreventiveActions []PreventiveAction
-	RelatedPatterns  []*FailurePattern
+	Confidence           float64 // 0-100
+	Severity             PredictionSeverity
+	RiskScore            float64 // 0-100
+	Reasons              []string
+	PreventiveActions    []PreventiveAction
+	RelatedPatterns      []*FailurePattern
 }
 
-// PredictionSeverity represents prediction severity
+// PredictionSeverity represents prediction severity.
+//
+//nolint:revive // keeps public name stable; PredictionSeverity is part of the package API
 type PredictionSeverity string
 
 const (
@@ -115,7 +117,7 @@ const (
 	PredictionSeverityCritical PredictionSeverity = "CRITICAL"
 )
 
-// PreventiveAction represents a suggested preventive action
+// PreventiveAction represents a suggested preventive action.
 type PreventiveAction struct {
 	Action      string
 	Priority    int // 1-5, 1 being highest
@@ -124,7 +126,7 @@ type PreventiveAction struct {
 	Description string
 }
 
-// PredictorConfig configures the failure predictor
+// PredictorConfig configures the failure predictor.
 type PredictorConfig struct {
 	MinHistoryDays      int
 	PredictionWindow    time.Duration // How far ahead to predict
@@ -132,7 +134,7 @@ type PredictorConfig struct {
 	AnalysisInterval    time.Duration
 }
 
-// NewFailurePredictor creates a new failure predictor
+// NewFailurePredictor creates a new failure predictor.
 func NewFailurePredictor(config *PredictorConfig) *FailurePredictor {
 	if config == nil {
 		config = DefaultPredictorConfig()
@@ -145,7 +147,7 @@ func NewFailurePredictor(config *PredictorConfig) *FailurePredictor {
 	}
 }
 
-// DefaultPredictorConfig returns default configuration
+// DefaultPredictorConfig returns default configuration.
 func DefaultPredictorConfig() *PredictorConfig {
 	return &PredictorConfig{
 		MinHistoryDays:      30,
@@ -155,7 +157,9 @@ func DefaultPredictorConfig() *PredictorConfig {
 	}
 }
 
-// AddBackupEvent adds a historical backup event
+// AddBackupEvent adds a historical backup event.
+//
+//nolint:gocritic // hugeParam: BackupEvent is passed by value to keep the public API stable
 func (fp *FailurePredictor) AddBackupEvent(event BackupEvent) {
 	fp.mu.Lock()
 	defer fp.mu.Unlock()
@@ -168,16 +172,17 @@ func (fp *FailurePredictor) AddBackupEvent(event BackupEvent) {
 
 	// Keep only recent history (last 90 days)
 	cutoff := time.Now().AddDate(0, 0, -90)
+	events := fp.historicalData[event.DatabaseName]
 	filtered := make([]BackupEvent, 0)
-	for _, e := range fp.historicalData[event.DatabaseName] {
-		if e.Timestamp.After(cutoff) {
-			filtered = append(filtered, e)
+	for i := range events {
+		if events[i].Timestamp.After(cutoff) {
+			filtered = append(filtered, events[i])
 		}
 	}
 	fp.historicalData[event.DatabaseName] = filtered
 }
 
-// AnalyzePatterns analyzes historical data to identify failure patterns
+// AnalyzePatterns analyzes historical data to identify failure patterns.
 func (fp *FailurePredictor) AnalyzePatterns(ctx context.Context) error {
 	fp.mu.Lock()
 	defer fp.mu.Unlock()
@@ -205,10 +210,10 @@ func (fp *FailurePredictor) AnalyzePatterns(ctx context.Context) error {
 
 		// Calculate failure frequency
 		failures := 0
-		for _, e := range events {
-			if !e.Success {
+		for i := range events {
+			if !events[i].Success {
 				failures++
-				pattern.LastOccurrence = e.Timestamp
+				pattern.LastOccurrence = events[i].Timestamp
 			}
 		}
 
@@ -219,7 +224,7 @@ func (fp *FailurePredictor) AnalyzePatterns(ctx context.Context) error {
 		pattern.PatternType, pattern.Confidence = fp.determinePatternType(events, pattern)
 
 		// Calculate risk factors
-		pattern.RiskFactors = fp.calculateRiskFactors(events, pattern)
+		pattern.RiskFactors = fp.calculateRiskFactors(pattern)
 
 		fp.patterns[dbName] = pattern
 	}
@@ -228,15 +233,15 @@ func (fp *FailurePredictor) AnalyzePatterns(ctx context.Context) error {
 	return nil
 }
 
-// analyzeTimePatterns analyzes time-based failure patterns
+// analyzeTimePatterns analyzes time-based failure patterns.
 func (fp *FailurePredictor) analyzeTimePatterns(events []BackupEvent) *TimePattern {
 	dayFailures := make(map[time.Weekday]int)
 	hourFailures := make(map[int]int)
 
-	for _, e := range events {
-		if !e.Success {
-			dayFailures[e.DayOfWeek]++
-			hourFailures[e.HourOfDay]++
+	for i := range events {
+		if !events[i].Success {
+			dayFailures[events[i].DayOfWeek]++
+			hourFailures[events[i].HourOfDay]++
 		}
 	}
 
@@ -275,16 +280,16 @@ func (fp *FailurePredictor) analyzeTimePatterns(events []BackupEvent) *TimePatte
 	}
 }
 
-// analyzeResourcePatterns analyzes resource-based failure patterns
+// analyzeResourcePatterns analyzes resource-based failure patterns.
 func (fp *FailurePredictor) analyzeResourcePatterns(events []BackupEvent) *ResourcePattern {
 	var failedDisk, failedLoad, failedNetwork []float64
 
-	for _, e := range events {
-		if !e.Success {
-			failedDisk = append(failedDisk, e.DiskUsage)
-			failedLoad = append(failedLoad, e.SystemLoad)
-			if e.NetworkLatency > 0 {
-				failedNetwork = append(failedNetwork, float64(e.NetworkLatency.Milliseconds()))
+	for i := range events {
+		if !events[i].Success {
+			failedDisk = append(failedDisk, events[i].DiskUsage)
+			failedLoad = append(failedLoad, events[i].SystemLoad)
+			if events[i].NetworkLatency > 0 {
+				failedNetwork = append(failedNetwork, float64(events[i].NetworkLatency.Milliseconds()))
 			}
 		}
 	}
@@ -316,17 +321,17 @@ func (fp *FailurePredictor) analyzeResourcePatterns(events []BackupEvent) *Resou
 	}
 }
 
-// analyzeErrorPatterns analyzes common error patterns
+// analyzeErrorPatterns analyzes common error patterns.
 func (fp *FailurePredictor) analyzeErrorPatterns(events []BackupEvent, pattern *FailurePattern) {
-	for _, e := range events {
-		if !e.Success && e.ErrorType != "" {
-			pattern.CommonErrors[e.ErrorType]++
+	for i := range events {
+		if !events[i].Success && events[i].ErrorType != "" {
+			pattern.CommonErrors[events[i].ErrorType]++
 		}
 	}
 }
 
-// determinePatternType determines the type of failure pattern
-func (fp *FailurePredictor) determinePatternType(events []BackupEvent, pattern *FailurePattern) (PatternType, float64) {
+// determinePatternType determines the type of failure pattern.
+func (fp *FailurePredictor) determinePatternType(events []BackupEvent, pattern *FailurePattern) (patternType PatternType, patternConfidence float64) {
 	// Calculate recent failure rate vs historical
 	recentEvents := 0
 	recentFailures := 0
@@ -335,14 +340,14 @@ func (fp *FailurePredictor) determinePatternType(events []BackupEvent, pattern *
 	totalEvents := len(events)
 	totalFailures := 0
 
-	for _, e := range events {
-		if e.Timestamp.After(cutoff) {
+	for i := range events {
+		if events[i].Timestamp.After(cutoff) {
 			recentEvents++
-			if !e.Success {
+			if !events[i].Success {
 				recentFailures++
 			}
 		}
-		if !e.Success {
+		if !events[i].Success {
 			totalFailures++
 		}
 	}
@@ -385,8 +390,8 @@ func (fp *FailurePredictor) determinePatternType(events []BackupEvent, pattern *
 	return PatternTypeRecurring, 50.0
 }
 
-// calculateRiskFactors calculates risk factors for failures
-func (fp *FailurePredictor) calculateRiskFactors(events []BackupEvent, pattern *FailurePattern) []RiskFactor {
+// calculateRiskFactors calculates risk factors for failures.
+func (fp *FailurePredictor) calculateRiskFactors(pattern *FailurePattern) []RiskFactor {
 	factors := make([]RiskFactor, 0)
 
 	// High failure frequency
@@ -444,7 +449,7 @@ func (fp *FailurePredictor) calculateRiskFactors(events []BackupEvent, pattern *
 	return factors
 }
 
-// PredictFailures predicts potential failures in the next 24-48 hours
+// PredictFailures predicts potential failures in the next 24-48 hours.
 func (fp *FailurePredictor) PredictFailures(ctx context.Context, databaseName string) ([]*FailurePrediction, error) {
 	fp.mu.RLock()
 	defer fp.mu.RUnlock()
@@ -485,7 +490,7 @@ func (fp *FailurePredictor) PredictFailures(ctx context.Context, databaseName st
 	return predictions, nil
 }
 
-// evaluateTimeWindow evaluates failure risk for a specific time window
+// evaluateTimeWindow evaluates failure risk for a specific time window.
 func (fp *FailurePredictor) evaluateTimeWindow(t time.Time, pattern *FailurePattern) *FailurePrediction {
 	dayOfWeek := t.Weekday()
 	hourOfDay := t.Hour()
@@ -538,12 +543,12 @@ func (fp *FailurePredictor) evaluateTimeWindow(t time.Time, pattern *FailurePatt
 
 	prediction.RiskScore = prediction.Confidence
 	prediction.Severity = fp.determineSeverity(prediction.RiskScore)
-	prediction.PreventiveActions = fp.generatePreventiveActions(pattern, prediction)
+	prediction.PreventiveActions = fp.generatePreventiveActions(pattern)
 
 	return prediction
 }
 
-// evaluateResourceRisk evaluates resource-based failure risk
+// evaluateResourceRisk evaluates resource-based failure risk.
 func (fp *FailurePredictor) evaluateResourceRisk(pattern *FailurePattern) *FailurePrediction {
 	if pattern.PatternType != PatternTypeResourceBased {
 		return nil
@@ -576,12 +581,12 @@ func (fp *FailurePredictor) evaluateResourceRisk(pattern *FailurePattern) *Failu
 
 	prediction.RiskScore = confidence
 	prediction.Severity = fp.determineSeverity(prediction.RiskScore)
-	prediction.PreventiveActions = fp.generatePreventiveActions(pattern, prediction)
+	prediction.PreventiveActions = fp.generatePreventiveActions(pattern)
 
 	return prediction
 }
 
-// evaluateTrendRisk evaluates trend-based failure risk
+// evaluateTrendRisk evaluates trend-based failure risk.
 func (fp *FailurePredictor) evaluateTrendRisk(pattern *FailurePattern) *FailurePrediction {
 	prediction := &FailurePrediction{
 		ID:                   generatePredictionID(),
@@ -598,25 +603,27 @@ func (fp *FailurePredictor) evaluateTrendRisk(pattern *FailurePattern) *FailureP
 
 	prediction.RiskScore = pattern.Confidence
 	prediction.Severity = fp.determineSeverity(prediction.RiskScore)
-	prediction.PreventiveActions = fp.generatePreventiveActions(pattern, prediction)
+	prediction.PreventiveActions = fp.generatePreventiveActions(pattern)
 
 	return prediction
 }
 
-// determineSeverity determines prediction severity based on risk score
+// determineSeverity determines prediction severity based on risk score.
 func (fp *FailurePredictor) determineSeverity(riskScore float64) PredictionSeverity {
-	if riskScore >= 90.0 {
+	switch {
+	case riskScore >= 90.0:
 		return PredictionSeverityCritical
-	} else if riskScore >= 75.0 {
+	case riskScore >= 75.0:
 		return PredictionSeverityHigh
-	} else if riskScore >= 60.0 {
+	case riskScore >= 60.0:
 		return PredictionSeverityMedium
+	default:
+		return PredictionSeverityLow
 	}
-	return PredictionSeverityLow
 }
 
-// generatePreventiveActions generates suggested preventive actions
-func (fp *FailurePredictor) generatePreventiveActions(pattern *FailurePattern, prediction *FailurePrediction) []PreventiveAction {
+// generatePreventiveActions generates suggested preventive actions.
+func (fp *FailurePredictor) generatePreventiveActions(pattern *FailurePattern) []PreventiveAction {
 	actions := make([]PreventiveAction, 0)
 
 	// Time-based actions
@@ -709,7 +716,7 @@ func (fp *FailurePredictor) generatePreventiveActions(pattern *FailurePattern, p
 	return actions
 }
 
-// GetPatterns returns all identified patterns
+// GetPatterns returns all identified patterns.
 func (fp *FailurePredictor) GetPatterns() map[string]*FailurePattern {
 	fp.mu.RLock()
 	defer fp.mu.RUnlock()
@@ -721,18 +728,18 @@ func (fp *FailurePredictor) GetPatterns() map[string]*FailurePattern {
 	return patterns
 }
 
-// GetStatistics returns statistics about failure prediction
+// GetStatistics returns statistics about failure prediction.
 func (fp *FailurePredictor) GetStatistics() map[string]interface{} {
 	fp.mu.RLock()
 	defer fp.mu.RUnlock()
 
 	stats := map[string]interface{}{
-		"total_databases":  len(fp.historicalData),
-		"patterns_found":   len(fp.patterns),
-		"last_analysis":    fp.lastAnalysis,
-		"by_pattern_type":  make(map[PatternType]int),
-		"avg_frequency":    0.0,
-		"high_risk_dbs":    0,
+		"total_databases": len(fp.historicalData),
+		"patterns_found":  len(fp.patterns),
+		"last_analysis":   fp.lastAnalysis,
+		"by_pattern_type": make(map[PatternType]int),
+		"avg_frequency":   0.0,
+		"high_risk_dbs":   0,
 	}
 
 	byType := make(map[PatternType]int)

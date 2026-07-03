@@ -188,6 +188,10 @@ func TestDatabaseCredentials(t *testing.T) {
 		t.Errorf("LeaseID = %s, want lease-123", creds.LeaseID)
 	}
 
+	if creds.LeaseDuration != 3600*time.Second {
+		t.Errorf("LeaseDuration = %s, want %s", creds.LeaseDuration, 3600*time.Second)
+	}
+
 	if !creds.Renewable {
 		t.Error("Expected credentials to be renewable")
 	}
@@ -217,99 +221,108 @@ func TestVaultIntegration(t *testing.T) {
 
 	ctx := context.Background()
 
-	t.Run("PutAndGetSecret", func(t *testing.T) {
-		data := map[string]interface{}{
-			"username": "testuser",
-			"password": "testpass",
-		}
+	t.Run("PutAndGetSecret", func(t *testing.T) { testPutAndGetSecret(t, client, ctx) })
+	t.Run("GetSecretString", func(t *testing.T) { testGetSecretString(t, client, ctx) })
+	t.Run("PutSecretString", func(t *testing.T) { testPutSecretString(t, client, ctx) })
+	t.Run("ListSecrets", func(t *testing.T) { testListSecrets(t, client, ctx) })
+	t.Run("DeleteSecret", func(t *testing.T) { testDeleteSecret(t, client, ctx) })
+}
 
-		err := client.PutSecret(ctx, "test/database", data)
-		if err != nil {
-			t.Fatalf("Failed to put secret: %v", err)
-		}
+func testPutAndGetSecret(t *testing.T, client *VaultClient, ctx context.Context) {
+	t.Helper()
+	data := map[string]interface{}{
+		"username": "testuser",
+		"password": "testpass",
+	}
 
-		retrieved, err := client.GetSecret(ctx, "test/database")
-		if err != nil {
-			t.Fatalf("Failed to get secret: %v", err)
-		}
+	if err := client.PutSecret(ctx, "test/database", data); err != nil {
+		t.Fatalf("Failed to put secret: %v", err)
+	}
 
-		if retrieved["username"] != "testuser" {
-			t.Errorf("Retrieved username = %v, want testuser", retrieved["username"])
-		}
+	retrieved, err := client.GetSecret(ctx, "test/database")
+	if err != nil {
+		t.Fatalf("Failed to get secret: %v", err)
+	}
 
-		if retrieved["password"] != "testpass" {
-			t.Errorf("Retrieved password = %v, want testpass", retrieved["password"])
-		}
-	})
+	if retrieved["username"] != "testuser" {
+		t.Errorf("Retrieved username = %v, want testuser", retrieved["username"])
+	}
 
-	t.Run("GetSecretString", func(t *testing.T) {
-		data := map[string]interface{}{
-			"api_key": "secret-key-123",
-		}
+	if retrieved["password"] != "testpass" {
+		t.Errorf("Retrieved password = %v, want testpass", retrieved["password"])
+	}
+}
 
-		err := client.PutSecret(ctx, "test/api", data)
-		if err != nil {
-			t.Fatalf("Failed to put secret: %v", err)
-		}
+func testGetSecretString(t *testing.T, client *VaultClient, ctx context.Context) {
+	t.Helper()
+	data := map[string]interface{}{
+		"api_key": "secret-key-123",
+	}
 
-		apiKey, err := client.GetSecretString(ctx, "test/api", "api_key")
-		if err != nil {
-			t.Fatalf("Failed to get secret string: %v", err)
-		}
+	if err := client.PutSecret(ctx, "test/api", data); err != nil {
+		t.Fatalf("Failed to put secret: %v", err)
+	}
 
-		if apiKey != "secret-key-123" {
-			t.Errorf("Retrieved api_key = %s, want secret-key-123", apiKey)
-		}
-	})
+	apiKey, err := client.GetSecretString(ctx, "test/api", "api_key")
+	if err != nil {
+		t.Fatalf("Failed to get secret string: %v", err)
+	}
 
-	t.Run("PutSecretString", func(t *testing.T) {
-		err := client.PutSecretString(ctx, "test/token", "jwt_secret", "my-secret-token")
-		if err != nil {
-			t.Fatalf("Failed to put secret string: %v", err)
-		}
+	if apiKey != "secret-key-123" {
+		t.Errorf("Retrieved api_key = %s, want secret-key-123", apiKey)
+	}
+}
 
-		retrieved, err := client.GetSecretString(ctx, "test/token", "jwt_secret")
-		if err != nil {
-			t.Fatalf("Failed to get secret string: %v", err)
-		}
+func testPutSecretString(t *testing.T, client *VaultClient, ctx context.Context) {
+	t.Helper()
+	if err := client.PutSecretString(ctx, "test/token", "jwt_secret", "my-secret-token"); err != nil {
+		t.Fatalf("Failed to put secret string: %v", err)
+	}
 
-		if retrieved != "my-secret-token" {
-			t.Errorf("Retrieved jwt_secret = %s, want my-secret-token", retrieved)
-		}
-	})
+	retrieved, err := client.GetSecretString(ctx, "test/token", "jwt_secret")
+	if err != nil {
+		t.Fatalf("Failed to get secret string: %v", err)
+	}
 
-	t.Run("ListSecrets", func(t *testing.T) {
-		// Create some test secrets
-		client.PutSecret(ctx, "test/list/secret1", map[string]interface{}{"key": "value1"})
-		client.PutSecret(ctx, "test/list/secret2", map[string]interface{}{"key": "value2"})
+	if retrieved != "my-secret-token" {
+		t.Errorf("Retrieved jwt_secret = %s, want my-secret-token", retrieved)
+	}
+}
 
-		secrets, err := client.ListSecrets(ctx, "test/list")
-		if err != nil {
-			t.Fatalf("Failed to list secrets: %v", err)
-		}
+func testListSecrets(t *testing.T, client *VaultClient, ctx context.Context) {
+	t.Helper()
+	// Create some test secrets
+	if err := client.PutSecret(ctx, "test/list/secret1", map[string]interface{}{"key": "value1"}); err != nil {
+		t.Fatalf("Failed to put secret: %v", err)
+	}
+	if err := client.PutSecret(ctx, "test/list/secret2", map[string]interface{}{"key": "value2"}); err != nil {
+		t.Fatalf("Failed to put secret: %v", err)
+	}
 
-		if len(secrets) < 2 {
-			t.Errorf("Expected at least 2 secrets, got %d", len(secrets))
-		}
-	})
+	secrets, err := client.ListSecrets(ctx, "test/list")
+	if err != nil {
+		t.Fatalf("Failed to list secrets: %v", err)
+	}
 
-	t.Run("DeleteSecret", func(t *testing.T) {
-		// Create a secret
-		err := client.PutSecret(ctx, "test/delete", map[string]interface{}{"key": "value"})
-		if err != nil {
-			t.Fatalf("Failed to put secret: %v", err)
-		}
+	if len(secrets) < 2 {
+		t.Errorf("Expected at least 2 secrets, got %d", len(secrets))
+	}
+}
 
-		// Delete it
-		err = client.DeleteSecret(ctx, "test/delete")
-		if err != nil {
-			t.Fatalf("Failed to delete secret: %v", err)
-		}
+func testDeleteSecret(t *testing.T, client *VaultClient, ctx context.Context) {
+	t.Helper()
+	// Create a secret
+	if err := client.PutSecret(ctx, "test/delete", map[string]interface{}{"key": "value"}); err != nil {
+		t.Fatalf("Failed to put secret: %v", err)
+	}
 
-		// Verify it's gone
-		_, err = client.GetSecret(ctx, "test/delete")
-		if err == nil {
-			t.Error("Expected error when getting deleted secret")
-		}
-	})
+	// Delete it
+	if err := client.DeleteSecret(ctx, "test/delete"); err != nil {
+		t.Fatalf("Failed to delete secret: %v", err)
+	}
+
+	// Verify it's gone
+	if _, err := client.GetSecret(ctx, "test/delete"); err == nil {
+		t.Error("Expected error when getting deleted secret")
+	}
 }

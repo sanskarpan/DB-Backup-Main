@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// CommandEntry represents a command in history
+// CommandEntry represents a command in history.
 type CommandEntry struct {
 	Command   string    `json:"command"`
 	Args      []string  `json:"args"`
@@ -17,7 +17,7 @@ type CommandEntry struct {
 	Count     int       `json:"count"`
 }
 
-// Tracker tracks command usage history
+// Tracker tracks command usage history.
 type Tracker struct {
 	mu          sync.RWMutex
 	historyFile string
@@ -25,7 +25,7 @@ type Tracker struct {
 	maxEntries  int
 }
 
-// NewTracker creates a new history tracker
+// NewTracker creates a new history tracker.
 func NewTracker(historyFile string) *Tracker {
 	return &Tracker{
 		historyFile: historyFile,
@@ -34,14 +34,14 @@ func NewTracker(historyFile string) *Tracker {
 	}
 }
 
-// Load loads history from file
+// Load loads history from file.
 func (t *Tracker) Load() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(t.historyFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 
@@ -70,7 +70,7 @@ func (t *Tracker) Load() error {
 	return nil
 }
 
-// Save saves history to file
+// Save saves history to file.
 func (t *Tracker) Save() error {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -101,10 +101,10 @@ func (t *Tracker) Save() error {
 	}
 
 	// Write to file
-	return os.WriteFile(t.historyFile, data, 0644)
+	return os.WriteFile(t.historyFile, data, 0o600)
 }
 
-// Record records a command execution
+// Record records a command execution.
 func (t *Tracker) Record(command string, args []string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -124,7 +124,7 @@ func (t *Tracker) Record(command string, args []string) {
 	}
 }
 
-// GetMostFrequent returns the most frequently used commands
+// GetMostFrequent returns the most frequently used commands.
 func (t *Tracker) GetMostFrequent(limit int) []*CommandEntry {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -149,7 +149,7 @@ func (t *Tracker) GetMostFrequent(limit int) []*CommandEntry {
 	return entries
 }
 
-// GetRecent returns recently used commands
+// GetRecent returns recently used commands.
 func (t *Tracker) GetRecent(limit int) []*CommandEntry {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -171,7 +171,7 @@ func (t *Tracker) GetRecent(limit int) []*CommandEntry {
 	return entries
 }
 
-// GetSuggestions returns command suggestions based on prefix
+// GetSuggestions returns command suggestions based on prefix.
 func (t *Tracker) GetSuggestions(prefix string, limit int) []string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -183,7 +183,7 @@ func (t *Tracker) GetSuggestions(prefix string, limit int) []string {
 			fullCmd += " " + entry.Args[0]
 		}
 
-		if len(prefix) == 0 || startsWithIgnoreCase(fullCmd, prefix) {
+		if prefix == "" || startsWithIgnoreCase(fullCmd, prefix) {
 			suggestions = append(suggestions, fullCmd)
 		}
 	}
@@ -211,7 +211,7 @@ func (t *Tracker) GetSuggestions(prefix string, limit int) []string {
 	return suggestions
 }
 
-// GetContextualSuggestions returns suggestions based on previous command
+// GetContextualSuggestions returns suggestions based on previous command.
 func (t *Tracker) GetContextualSuggestions(prevCommand string, limit int) []string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -239,7 +239,7 @@ func (t *Tracker) GetContextualSuggestions(prevCommand string, limit int) []stri
 	return suggestions
 }
 
-// Clear clears all history
+// Clear clears all history.
 func (t *Tracker) Clear() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -248,7 +248,7 @@ func (t *Tracker) Clear() error {
 	return os.Remove(t.historyFile)
 }
 
-// Stats returns usage statistics
+// Stats returns usage statistics.
 func (t *Tracker) Stats() map[string]interface{} {
 	t.mu.RLock()
 	defer t.mu.RUnlock()

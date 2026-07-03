@@ -6,29 +6,31 @@ import (
 	"net/http"
 )
 
-// OAuth2Handler handles OAuth2 HTTP requests
+// OAuth2Handler handles OAuth2 HTTP requests.
 type OAuth2Handler struct {
 	service *OAuth2Service
 }
 
-// NewOAuth2Handler creates a new OAuth2 handler
+// NewOAuth2Handler creates a new OAuth2 handler.
 func NewOAuth2Handler(service *OAuth2Service) *OAuth2Handler {
 	return &OAuth2Handler{
 		service: service,
 	}
 }
 
-// ListProviders handles GET /auth/oauth2/providers
+// ListProviders handles GET /auth/oauth2/providers.
 func (h *OAuth2Handler) ListProviders(w http.ResponseWriter, r *http.Request) {
 	providers := h.service.ListProviders()
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"providers": providers,
-	})
+	}); err != nil {
+		log.Printf("failed to encode providers response: %v", err)
+	}
 }
 
-// InitiateLogin handles GET /auth/oauth2/:provider/login
+// InitiateLogin handles GET /auth/oauth2/:provider/login.
 func (h *OAuth2Handler) InitiateLogin(w http.ResponseWriter, r *http.Request) {
 	provider := r.PathValue("provider")
 	if provider == "" {
@@ -46,7 +48,7 @@ func (h *OAuth2Handler) InitiateLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, authURL, http.StatusFound)
 }
 
-// HandleCallback handles GET /auth/oauth2/callback
+// HandleCallback handles GET /auth/oauth2/callback.
 func (h *OAuth2Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	// Get query parameters
 	code := r.URL.Query().Get("code")
@@ -95,9 +97,9 @@ func (h *OAuth2Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. Update last login time
-	if err := h.service.UpdateLastLogin(r.Context(), user.ID); err != nil {
+	if loginErr := h.service.UpdateLastLogin(r.Context(), user.ID); loginErr != nil {
 		// Log error but don't fail the request
-		log.Printf("failed to update last login for user %s: %v", user.ID, err)
+		log.Printf("failed to update last login for user %s: %v", user.ID, loginErr)
 	}
 
 	// 3. Fetch user roles from database
@@ -116,19 +118,23 @@ func (h *OAuth2Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 
 	// Return JWT and user info
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"token": jwt,
 		"user":  userInfo,
-	})
+	}); err != nil {
+		log.Printf("failed to encode callback response: %v", err)
+	}
 }
 
 // GetUserInfo handles GET /auth/oauth2/user
-// This endpoint requires a valid OAuth2 access token in the Authorization header
+// This endpoint requires a valid OAuth2 access token in the Authorization header.
 func (h *OAuth2Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 	// This would typically verify the JWT token and return user info
 	// Implementation depends on your authentication middleware
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "User info endpoint",
-	})
+	}); err != nil {
+		log.Printf("failed to encode user info response: %v", err)
+	}
 }

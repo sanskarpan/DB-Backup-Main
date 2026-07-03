@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/kurin/blazer/b2"
-	"github.com/sanskarpan/db-backup/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/sanskarpan/db-backup/internal/storage"
 )
 
 func TestBackblazeB2Provider_NewProvider(t *testing.T) {
@@ -40,7 +41,7 @@ func TestBackblazeB2Provider_NewProvider_InvalidConfig(t *testing.T) {
 		{
 			name:   "nil config",
 			config: nil,
-			errMsg: "Backblaze B2 config is required",
+			errMsg: "config is required for Backblaze B2",
 		},
 		{
 			name: "missing account ID",
@@ -48,7 +49,7 @@ func TestBackblazeB2Provider_NewProvider_InvalidConfig(t *testing.T) {
 				ApplicationKey: "key",
 				Bucket:         "bucket",
 			},
-			errMsg: "Backblaze B2 account ID is required",
+			errMsg: "account ID is required for Backblaze B2",
 		},
 		{
 			name: "missing application key",
@@ -56,7 +57,7 @@ func TestBackblazeB2Provider_NewProvider_InvalidConfig(t *testing.T) {
 				AccountID: "account",
 				Bucket:    "bucket",
 			},
-			errMsg: "Backblaze B2 application key is required",
+			errMsg: "application key is required for Backblaze B2",
 		},
 		{
 			name: "missing bucket",
@@ -64,7 +65,7 @@ func TestBackblazeB2Provider_NewProvider_InvalidConfig(t *testing.T) {
 				AccountID:      "account",
 				ApplicationKey: "key",
 			},
-			errMsg: "Backblaze B2 bucket is required",
+			errMsg: "bucket is required for Backblaze B2",
 		},
 	}
 
@@ -363,7 +364,7 @@ func TestBackblazeB2Provider_List(t *testing.T) {
 		remotePath := prefix + file
 		err := provider.UploadStream(ctx, bytes.NewReader([]byte("content")), remotePath, nil)
 		require.NoError(t, err)
-		defer provider.Delete(ctx, remotePath)
+		t.Cleanup(func() { provider.Delete(ctx, remotePath) })
 	}
 
 	// List files
@@ -420,7 +421,9 @@ func TestBackblazeB2Provider_CreateBucket(t *testing.T) {
 	}
 
 	// Cleanup
-	defer provider.DeleteBucket(ctx)
+	if err := provider.DeleteBucket(ctx); err != nil {
+		t.Logf("Cleanup DeleteBucket error: %v", err)
+	}
 }
 
 func TestBackblazeB2Provider_DeleteBucket(t *testing.T) {
@@ -518,7 +521,7 @@ func TestBackblazeB2Provider_SetLifecycleRules(t *testing.T) {
 		{
 			DaysNewUntilHidden:     30,
 			DaysHiddenUntilDeleted: 7,
-			Prefix:                    "test-lifecycle/",
+			Prefix:                 "test-lifecycle/",
 		},
 	}
 
@@ -554,6 +557,7 @@ func TestBackblazeB2Provider_GetBucketInfo(t *testing.T) {
 // Helper functions
 
 func setupTestProvider(t *testing.T) *BackblazeB2Provider {
+	t.Helper()
 	config := &storage.BackblazeB2Config{
 		AccountID:      getEnv("B2_ACCOUNT_ID", "test-account"),
 		ApplicationKey: getEnv("B2_APPLICATION_KEY", "test-key"),
@@ -569,6 +573,7 @@ func setupTestProvider(t *testing.T) *BackblazeB2Provider {
 }
 
 func createTestFile(t *testing.T, content string) string {
+	t.Helper()
 	tmpFile, err := os.CreateTemp("", "b2-test-*.txt")
 	require.NoError(t, err)
 

@@ -3,6 +3,7 @@ package gcs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,14 +17,16 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// GCSProvider implements Google Cloud Storage
+// GCSProvider implements Google Cloud Storage.
+//
+//nolint:revive // keeps public name (gcs.GCSProvider) stable for external callers
 type GCSProvider struct {
 	client *storage.Client
 	bucket *storage.BucketHandle
 	config *st.GCSConfig
 }
 
-// NewGCSProvider creates a new GCS storage provider
+// NewGCSProvider creates a new GCS storage provider.
 func NewGCSProvider(config *st.GCSConfig) (*GCSProvider, error) {
 	if config.Bucket == "" {
 		return nil, pkgErrors.New(pkgErrors.ErrorTypeConfiguration, "GCS bucket is required")
@@ -50,7 +53,7 @@ func NewGCSProvider(config *st.GCSConfig) (*GCSProvider, error) {
 	}, nil
 }
 
-// Upload uploads a file to GCS
+// Upload uploads a file to GCS.
 func (p *GCSProvider) Upload(ctx context.Context, localPath, remotePath string, opts *st.UploadOptions) error {
 	file, err := os.Open(localPath)
 	if err != nil {
@@ -70,7 +73,7 @@ func (p *GCSProvider) Upload(ctx context.Context, localPath, remotePath string, 
 	}, remotePath, opts)
 }
 
-// UploadStream uploads data from a reader to GCS
+// UploadStream uploads data from a reader to GCS.
 func (p *GCSProvider) UploadStream(ctx context.Context, reader io.Reader, remotePath string, opts *st.UploadOptions) error {
 	obj := p.bucket.Object(remotePath)
 	writer := obj.NewWriter(ctx)
@@ -101,11 +104,11 @@ func (p *GCSProvider) UploadStream(ctx context.Context, reader io.Reader, remote
 	return nil
 }
 
-// Download downloads a file from GCS
+// Download downloads a file from GCS.
 func (p *GCSProvider) Download(ctx context.Context, remotePath, localPath string) error {
 	// Create directory if needed
 	dir := filepath.Dir(localPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage, "failed to create local directory")
 	}
 
@@ -130,12 +133,12 @@ func (p *GCSProvider) Download(ctx context.Context, remotePath, localPath string
 	return nil
 }
 
-// DownloadStream downloads data to a reader
+// DownloadStream downloads data to a reader.
 func (p *GCSProvider) DownloadStream(ctx context.Context, remotePath string) (io.ReadCloser, error) {
 	obj := p.bucket.Object(remotePath)
 	reader, err := obj.NewReader(ctx)
 	if err != nil {
-		if err == storage.ErrObjectNotExist {
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			return nil, pkgErrors.New(pkgErrors.ErrorTypeNotFound, "object not found in GCS")
 		}
 		return nil, pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage, "failed to create GCS reader")
@@ -144,11 +147,11 @@ func (p *GCSProvider) DownloadStream(ctx context.Context, remotePath string) (io
 	return reader, nil
 }
 
-// Delete deletes a file from GCS
+// Delete deletes a file from GCS.
 func (p *GCSProvider) Delete(ctx context.Context, remotePath string) error {
 	obj := p.bucket.Object(remotePath)
 	if err := obj.Delete(ctx); err != nil {
-		if err == storage.ErrObjectNotExist {
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			return pkgErrors.New(pkgErrors.ErrorTypeNotFound, "object not found in GCS")
 		}
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage, "failed to delete from GCS")
@@ -157,12 +160,12 @@ func (p *GCSProvider) Delete(ctx context.Context, remotePath string) error {
 	return nil
 }
 
-// Exists checks if a file exists in GCS
+// Exists checks if a file exists in GCS.
 func (p *GCSProvider) Exists(ctx context.Context, remotePath string) (bool, error) {
 	obj := p.bucket.Object(remotePath)
 	_, err := obj.Attrs(ctx)
 	if err != nil {
-		if err == storage.ErrObjectNotExist {
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			return false, nil
 		}
 		return false, pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage, "failed to check GCS object")
@@ -171,12 +174,12 @@ func (p *GCSProvider) Exists(ctx context.Context, remotePath string) (bool, erro
 	return true, nil
 }
 
-// GetMetadata retrieves file metadata
+// GetMetadata retrieves file metadata.
 func (p *GCSProvider) GetMetadata(ctx context.Context, remotePath string) (*st.FileMetadata, error) {
 	obj := p.bucket.Object(remotePath)
 	attrs, err := obj.Attrs(ctx)
 	if err != nil {
-		if err == storage.ErrObjectNotExist {
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			return nil, pkgErrors.New(pkgErrors.ErrorTypeNotFound, "object not found in GCS")
 		}
 		return nil, pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage, "failed to get GCS metadata")
@@ -203,7 +206,7 @@ func (p *GCSProvider) GetMetadata(ctx context.Context, remotePath string) (*st.F
 	return metadata, nil
 }
 
-// List lists files with a given prefix
+// List lists files with a given prefix.
 func (p *GCSProvider) List(ctx context.Context, prefix string) ([]*st.FileMetadata, error) {
 	var files []*st.FileMetadata
 
@@ -212,7 +215,7 @@ func (p *GCSProvider) List(ctx context.Context, prefix string) ([]*st.FileMetada
 
 	for {
 		attrs, err := it.Next()
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			break
 		}
 		if err != nil {
@@ -247,12 +250,12 @@ func (p *GCSProvider) List(ctx context.Context, prefix string) ([]*st.FileMetada
 	return files, nil
 }
 
-// GetType returns the provider type
+// GetType returns the provider type.
 func (p *GCSProvider) GetType() st.ProviderType {
 	return st.ProviderTypeGCS
 }
 
-// ValidateConfig validates the provider configuration
+// ValidateConfig validates the provider configuration.
 func (p *GCSProvider) ValidateConfig() error {
 	if p.config.Bucket == "" {
 		return pkgErrors.New(pkgErrors.ErrorTypeConfiguration, "GCS bucket is required")
@@ -260,7 +263,7 @@ func (p *GCSProvider) ValidateConfig() error {
 	return nil
 }
 
-// Close closes the GCS client
+// Close closes the GCS client.
 func (p *GCSProvider) Close() error {
 	if p.client != nil {
 		return p.client.Close()
@@ -268,7 +271,7 @@ func (p *GCSProvider) Close() error {
 	return nil
 }
 
-// progressReader wraps a reader to track progress
+// progressReader wraps a reader to track progress.
 type progressReader struct {
 	reader   io.Reader
 	total    int64

@@ -26,20 +26,20 @@ func TestAddMetrics(t *testing.T) {
 	bo := NewBackupOptimizer(nil)
 
 	metrics := OptimizationMetrics{
-		ID:              "metrics-1",
-		DatabaseName:    "testdb",
-		Timestamp:       time.Now(),
-		Duration:        30 * time.Minute,
-		OriginalSize:    1024 * 1024 * 1024,
-		CompressedSize:  512 * 1024 * 1024,
-		CompressionAlgo: CompressionGzip,
+		ID:               "metrics-1",
+		DatabaseName:     "testdb",
+		Timestamp:        time.Now(),
+		Duration:         30 * time.Minute,
+		OriginalSize:     1024 * 1024 * 1024,
+		CompressedSize:   512 * 1024 * 1024,
+		CompressionAlgo:  CompressionGzip,
 		CompressionRatio: 0.5,
-		ParallelWorkers: 4,
-		CPUUsage:        60.0,
-		MemoryUsage:     50.0,
-		Success:         true,
-		DataType:        DataTypeText,
-		StorageTier:     StorageTierHot,
+		ParallelWorkers:  4,
+		CPUUsage:         60.0,
+		MemoryUsage:      50.0,
+		Success:          true,
+		DataType:         DataTypeText,
+		StorageTier:      StorageTierHot,
 	}
 
 	bo.AddMetrics(metrics)
@@ -171,10 +171,10 @@ func TestRecommendCompression_MultipleAlgorithms(t *testing.T) {
 		cpuUsage := 50.0
 
 		if algo == CompressionZstd {
-			ratio = 0.8 // Better compression
+			ratio = 0.8     // Better compression
 			cpuUsage = 70.0 // Higher CPU
 		} else if algo == CompressionLZ4 {
-			ratio = 0.5 // Lower compression
+			ratio = 0.5     // Lower compression
 			cpuUsage = 30.0 // Lower CPU
 		}
 
@@ -466,9 +466,9 @@ func TestCostCalculator_CalculateMonthlyCost(t *testing.T) {
 		tier         StorageTier
 		expectedCost float64
 	}{
-		{StorageTierHot, 2.30},     // 100 * 0.023
-		{StorageTierCool, 1.25},    // 100 * 0.0125
-		{StorageTierArchive, 0.40}, // 100 * 0.004
+		{StorageTierHot, 2.30},      // 100 * 0.023
+		{StorageTierCool, 1.25},     // 100 * 0.0125
+		{StorageTierArchive, 0.40},  // 100 * 0.004
 		{StorageTierGlacier, 0.099}, // 100 * 0.00099
 	}
 
@@ -488,25 +488,25 @@ func TestGenerateRecommendations_Complete(t *testing.T) {
 	for i := 0; i < 30; i++ {
 		timestamp := time.Now().AddDate(0, 0, -i)
 		m := OptimizationMetrics{
-			ID:               "metrics-" + string(rune(i)),
-			DatabaseName:     "testdb",
-			Timestamp:        timestamp,
-			Duration:         30 * time.Minute,
-			OriginalSize:     1024 * 1024 * 1024,
-			CompressedSize:   512 * 1024 * 1024,
-			CompressionAlgo:  CompressionGzip,
-			CompressionRatio: 0.5,
-			ParallelWorkers:  4,
-			CPUUsage:         60.0,
-			MemoryUsage:      50.0,
-			DiskIOPS:         100.0,
+			ID:                "metrics-" + string(rune(i)),
+			DatabaseName:      "testdb",
+			Timestamp:         timestamp,
+			Duration:          30 * time.Minute,
+			OriginalSize:      1024 * 1024 * 1024,
+			CompressedSize:    512 * 1024 * 1024,
+			CompressionAlgo:   CompressionGzip,
+			CompressionRatio:  0.5,
+			ParallelWorkers:   4,
+			CPUUsage:          60.0,
+			MemoryUsage:       50.0,
+			DiskIOPS:          100.0,
 			NetworkThroughput: 100.0,
-			Success:          true,
-			StartHour:        2,
-			DayOfWeek:        timestamp.Weekday(),
-			DataType:         DataTypeText,
-			StorageTier:      StorageTierHot,
-			Cost:             11.5,
+			Success:           true,
+			StartHour:         2,
+			DayOfWeek:         timestamp.Weekday(),
+			DataType:          DataTypeText,
+			StorageTier:       StorageTierHot,
+			Cost:              11.5,
 		}
 		bo.AddMetrics(m)
 	}
@@ -701,20 +701,20 @@ func TestCalculateParallelismEfficiency(t *testing.T) {
 
 	// Efficient parallelism
 	efficientStats := &ParallelismStats{
-		Workers:         4,
-		AvgDuration:     30 * time.Minute,
-		AvgCPUUsage:     60.0,
-		AvgMemoryUsage:  50.0,
+		Workers:        4,
+		AvgDuration:    30 * time.Minute,
+		AvgCPUUsage:    60.0,
+		AvgMemoryUsage: 50.0,
 	}
 
 	efficientScore := bo.calculateParallelismEfficiency(efficientStats)
 
 	// Inefficient parallelism (high resource cost, similar duration)
 	inefficientStats := &ParallelismStats{
-		Workers:         8,
-		AvgDuration:     28 * time.Minute,
-		AvgCPUUsage:     95.0,
-		AvgMemoryUsage:  90.0,
+		Workers:        8,
+		AvgDuration:    28 * time.Minute,
+		AvgCPUUsage:    95.0,
+		AvgMemoryUsage: 90.0,
 	}
 
 	inefficientScore := bo.calculateParallelismEfficiency(inefficientStats)

@@ -7,16 +7,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
+
 	"github.com/sanskarpan/db-backup/internal/database"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 	"github.com/sanskarpan/db-backup/pkg/utils"
 )
 
-// ElasticsearchDriver implements the database.Driver interface for Elasticsearch/OpenSearch
+// ElasticsearchDriver implements the database.Driver interface for Elasticsearch/OpenSearch.
+//
+//nolint:revive // keeps public name stable across packages
 type ElasticsearchDriver struct {
 	client        *elasticsearch.Client
 	config        *database.ConnectionConfig
@@ -35,16 +40,16 @@ func init() {
 	})
 }
 
-// NewElasticsearchDriver creates a new Elasticsearch driver instance
+// NewElasticsearchDriver creates a new Elasticsearch driver instance.
 func NewElasticsearchDriver() *ElasticsearchDriver {
 	return &ElasticsearchDriver{}
 }
 
-// Connect establishes a connection to the Elasticsearch cluster
+// Connect establishes a connection to the Elasticsearch cluster.
 func (d *ElasticsearchDriver) Connect(ctx context.Context, config *database.ConnectionConfig) error {
 	cfg := elasticsearch.Config{
 		Addresses: []string{
-			fmt.Sprintf("http://%s:%d", config.Host, config.Port),
+			fmt.Sprintf("http://%s", net.JoinHostPort(config.Host, strconv.Itoa(config.Port))),
 		},
 		Username: config.Username,
 		Password: config.Password,
@@ -72,13 +77,13 @@ func (d *ElasticsearchDriver) Connect(ctx context.Context, config *database.Conn
 	return nil
 }
 
-// Disconnect closes the database connection
+// Disconnect closes the database connection.
 func (d *ElasticsearchDriver) Disconnect() error {
 	// Elasticsearch client doesn't need explicit disconnect
 	return nil
 }
 
-// Ping tests the database connection
+// Ping tests the database connection.
 func (d *ElasticsearchDriver) Ping(ctx context.Context) error {
 	if d.client == nil {
 		return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "not connected to database")
@@ -97,7 +102,7 @@ func (d *ElasticsearchDriver) Ping(ctx context.Context) error {
 	return nil
 }
 
-// Backup creates a backup of the Elasticsearch cluster
+// Backup creates a backup of the Elasticsearch cluster.
 func (d *ElasticsearchDriver) Backup(ctx context.Context, opts *database.BackupOptions) (*database.BackupResult, error) {
 	result := &database.BackupResult{
 		ID:        utils.GenerateBackupID(),
@@ -151,16 +156,16 @@ func (d *ElasticsearchDriver) Backup(ctx context.Context, opts *database.BackupO
 	return result, nil
 }
 
-// createSnapshot creates a new snapshot
+// createSnapshot creates a new snapshot.
 func (d *ElasticsearchDriver) createSnapshot(ctx context.Context, repo, snapshot string, opts *database.BackupOptions) error {
 	body := map[string]interface{}{
-		"indices": "*",
-		"ignore_unavailable": true,
+		"indices":              "*",
+		"ignore_unavailable":   true,
 		"include_global_state": true,
 	}
 
 	// Filter by indices if specified
-	if opts.IncludeSchemas != nil && len(opts.IncludeSchemas) > 0 {
+	if len(opts.IncludeSchemas) > 0 {
 		body["indices"] = strings.Join(opts.IncludeSchemas, ",")
 	}
 
@@ -181,14 +186,17 @@ func (d *ElasticsearchDriver) createSnapshot(ctx context.Context, repo, snapshot
 	defer res.Body.Close()
 
 	if res.IsError() {
-		body, _ := io.ReadAll(res.Body)
+		body, readErr := io.ReadAll(res.Body)
+		if readErr != nil {
+			return fmt.Errorf("snapshot creation failed: %s", res.Status())
+		}
 		return fmt.Errorf("snapshot creation failed: %s, body: %s", res.Status(), string(body))
 	}
 
 	return nil
 }
 
-// waitForSnapshot waits for snapshot to complete
+// waitForSnapshot waits for snapshot to complete.
 func (d *ElasticsearchDriver) waitForSnapshot(ctx context.Context, repo, snapshot string) error {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -209,11 +217,12 @@ func (d *ElasticsearchDriver) waitForSnapshot(ctx context.Context, repo, snapsho
 			if err != nil {
 				return err
 			}
-			defer res.Body.Close()
 
 			var status map[string]interface{}
-			if err := json.NewDecoder(res.Body).Decode(&status); err != nil {
-				return err
+			decodeErr := json.NewDecoder(res.Body).Decode(&status)
+			res.Body.Close()
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			snapshots, ok := status["snapshots"].([]interface{})
@@ -221,21 +230,32 @@ func (d *ElasticsearchDriver) waitForSnapshot(ctx context.Context, repo, snapsho
 				return nil // Snapshot completed
 			}
 
-			snap := snapshots[0].(map[string]interface{})
-			state := snap["state"].(string)
+			snap, ok := snapshots[0].(map[string]interface{})
+			if !ok {
+				return fmt.Errorf("unexpected snapshot status format")
+			}
+			state, ok := snap["state"].(string)
+			if !ok {
+				return fmt.Errorf("unexpected snapshot state format")
+			}
 
-			if state == "SUCCESS" {
+			switch state {
+			case "SUCCESS":
 				return nil
-			} else if state == "FAILED" || state == "PARTIAL" {
+			case "FAILED", "PARTIAL":
 				return fmt.Errorf("snapshot failed with state: %s", state)
 			}
 		}
 	}
 }
 
-// getSnapshotInfo retrieves snapshot information
+// getSnapshotInfo retrieves snapshot information.
 func (d *ElasticsearchDriver) getSnapshotInfo(ctx context.Context, repo, snapshot string) (*SnapshotInfo, error) {
-	res, err := d.client.Snapshot.Get(repo, []string{snapshot})
+	res, err := d.client.Snapshot.Get(
+		repo,
+		[]string{snapshot},
+		d.client.Snapshot.Get.WithContext(ctx),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +291,7 @@ func (d *ElasticsearchDriver) getSnapshotInfo(ctx context.Context, repo, snapsho
 	}, nil
 }
 
-// Restore restores the Elasticsearch cluster from a backup
+// Restore restores the Elasticsearch cluster from a backup.
 func (d *ElasticsearchDriver) Restore(ctx context.Context, opts *database.RestoreOptions) (*database.RestoreResult, error) {
 	result := &database.RestoreResult{
 		ID:        utils.GenerateRestoreID(),
@@ -304,11 +324,17 @@ func (d *ElasticsearchDriver) Restore(ctx context.Context, opts *database.Restor
 
 	// Restore snapshot
 	body := map[string]interface{}{
-		"indices": "*",
+		"indices":              "*",
 		"include_global_state": true,
 	}
 
-	bodyJSON, _ := json.Marshal(body)
+	bodyJSON, err := json.Marshal(body)
+	if err != nil {
+		result.Status = database.RestoreStatusFailed
+		result.Error = err
+		result.EndTime = time.Now()
+		return result, pkgErrors.ErrDatabaseRestore(err)
+	}
 
 	res, err := d.client.Snapshot.Restore(
 		repo,
@@ -324,9 +350,12 @@ func (d *ElasticsearchDriver) Restore(ctx context.Context, opts *database.Restor
 	defer res.Body.Close()
 
 	if res.IsError() {
-		body, _ := io.ReadAll(res.Body)
 		result.Status = database.RestoreStatusFailed
-		result.Error = fmt.Errorf("restore failed: %s, body: %s", res.Status(), string(body))
+		if body, readErr := io.ReadAll(res.Body); readErr == nil {
+			result.Error = fmt.Errorf("restore failed: %s, body: %s", res.Status(), string(body))
+		} else {
+			result.Error = fmt.Errorf("restore failed: %s", res.Status())
+		}
 		result.EndTime = time.Now()
 		return result, pkgErrors.ErrDatabaseRestore(result.Error)
 	}
@@ -336,7 +365,7 @@ func (d *ElasticsearchDriver) Restore(ctx context.Context, opts *database.Restor
 	return result, nil
 }
 
-// GetDatabaseSize returns the total size of the Elasticsearch cluster
+// GetDatabaseSize returns the total size of the Elasticsearch cluster.
 func (d *ElasticsearchDriver) GetDatabaseSize(ctx context.Context) (int64, error) {
 	res, err := d.client.Cat.Indices(
 		d.client.Cat.Indices.WithFormat("json"),
@@ -358,14 +387,16 @@ func (d *ElasticsearchDriver) GetDatabaseSize(ctx context.Context) (int64, error
 	var totalSize int64
 	for _, idx := range indices {
 		var size int64
-		fmt.Sscanf(idx.StoreSize, "%d", &size)
+		if _, err := fmt.Sscanf(idx.StoreSize, "%d", &size); err != nil {
+			continue
+		}
 		totalSize += size
 	}
 
 	return totalSize, nil
 }
 
-// GetVersion returns the Elasticsearch/OpenSearch version
+// GetVersion returns the Elasticsearch/OpenSearch version.
 func (d *ElasticsearchDriver) GetVersion(ctx context.Context) (string, error) {
 	res, err := d.client.Info()
 	if err != nil {
@@ -389,7 +420,7 @@ func (d *ElasticsearchDriver) GetVersion(ctx context.Context) (string, error) {
 	return fmt.Sprintf("Elasticsearch %s", info.Version.Number), nil
 }
 
-// SnapshotInfo contains snapshot information
+// SnapshotInfo contains snapshot information.
 type SnapshotInfo struct {
 	Name    string
 	Indices []string
@@ -397,22 +428,22 @@ type SnapshotInfo struct {
 	State   string
 }
 
-// GetBackupSize estimates the size of a backup
+// GetBackupSize estimates the size of a backup.
 func (d *ElasticsearchDriver) GetBackupSize(ctx context.Context, opts *database.BackupOptions) (int64, error) {
 	return d.GetDatabaseSize(ctx)
 }
 
-// StreamBackup streams a backup to the provided writer
+// StreamBackup streams a backup to the provided writer.
 func (d *ElasticsearchDriver) StreamBackup(ctx context.Context, opts *database.BackupOptions, writer io.Writer) error {
 	return fmt.Errorf("streaming backup not implemented for Elasticsearch")
 }
 
-// StreamRestore restores from a reader
+// StreamRestore restores from a reader.
 func (d *ElasticsearchDriver) StreamRestore(ctx context.Context, opts *database.RestoreOptions, reader io.Reader) error {
 	return fmt.Errorf("streaming restore not implemented for Elasticsearch")
 }
 
-// ValidateRestore validates that a restore can be performed
+// ValidateRestore validates that a restore can be performed.
 func (d *ElasticsearchDriver) ValidateRestore(ctx context.Context, opts *database.RestoreOptions) error {
 	if opts.BackupPath == "" {
 		return fmt.Errorf("backup path is required")
@@ -420,7 +451,7 @@ func (d *ElasticsearchDriver) ValidateRestore(ctx context.Context, opts *databas
 	return nil
 }
 
-// GetDatabases returns list of indices (Elasticsearch doesn't have databases)
+// GetDatabases returns list of indices (Elasticsearch doesn't have databases).
 func (d *ElasticsearchDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	res, err := d.client.Cat.Indices(
 		d.client.Cat.Indices.WithFormat("json"),
@@ -449,13 +480,13 @@ func (d *ElasticsearchDriver) GetDatabases(ctx context.Context) ([]string, error
 	return indexNames, nil
 }
 
-// GetTables returns list of indices in an index pattern (not applicable for Elasticsearch)
+// GetTables returns list of indices in an index pattern (not applicable for Elasticsearch).
 func (d *ElasticsearchDriver) GetTables(ctx context.Context, indexPattern string) ([]string, error) {
 	// For Elasticsearch, tables are essentially indices
 	return d.GetDatabases(ctx)
 }
 
-// GetTableSize returns the size of an index
+// GetTableSize returns the size of an index.
 func (d *ElasticsearchDriver) GetTableSize(ctx context.Context, database, index string) (int64, error) {
 	res, err := d.client.Cat.Indices(
 		d.client.Cat.Indices.WithIndex(index),
@@ -480,11 +511,13 @@ func (d *ElasticsearchDriver) GetTableSize(ctx context.Context, database, index 
 	}
 
 	var size int64
-	fmt.Sscanf(indices[0].StoreSize, "%d", &size)
+	if _, err := fmt.Sscanf(indices[0].StoreSize, "%d", &size); err != nil {
+		return 0, nil
+	}
 	return size, nil
 }
 
-// GetType returns the database type
+// GetType returns the database type.
 func (d *ElasticsearchDriver) GetType() database.DatabaseType {
 	if d.isOpenSearch {
 		return "opensearch"
@@ -492,12 +525,12 @@ func (d *ElasticsearchDriver) GetType() database.DatabaseType {
 	return "elasticsearch"
 }
 
-// SupportsIncremental returns whether incremental backups are supported
+// SupportsIncremental returns whether incremental backups are supported.
 func (d *ElasticsearchDriver) SupportsIncremental() bool {
 	return false
 }
 
-// SupportsPITR returns whether point-in-time recovery is supported
+// SupportsPITR returns whether point-in-time recovery is supported.
 func (d *ElasticsearchDriver) SupportsPITR() bool {
 	return false
 }

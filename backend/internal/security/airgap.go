@@ -10,7 +10,7 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// AirGapManager manages air-gapped backup copies
+// AirGapManager manages air-gapped backup copies.
 type AirGapManager struct {
 	mu               sync.RWMutex
 	airGapCopies     map[string]*AirGapBackup
@@ -19,7 +19,7 @@ type AirGapManager struct {
 	retentionDays    int
 }
 
-// AirGapBackup represents an air-gapped backup copy
+// AirGapBackup represents an air-gapped backup copy.
 type AirGapBackup struct {
 	ID                string
 	OriginalBackupID  string
@@ -38,39 +38,39 @@ type AirGapBackup struct {
 	AccessLog         []AccessLogEntry
 }
 
-// IsolationType represents the type of air-gap isolation
+// IsolationType represents the type of air-gap isolation.
 type IsolationType string
 
 const (
-	IsolationTypePhysical     IsolationType = "physical"      // Physically disconnected storage
-	IsolationTypeLogical      IsolationType = "logical"       // Logically isolated network segment
-	IsolationTypeWriteOnce    IsolationType = "write_once"    // WORM (Write Once Read Many)
-	IsolationTypeOfflineTape  IsolationType = "offline_tape"  // Offline tape storage
-	IsolationTypeImmutable    IsolationType = "immutable"     // Cloud immutable storage
-	IsolationTypeVaultLock    IsolationType = "vault_lock"    // AWS Glacier Vault Lock
+	IsolationTypePhysical    IsolationType = "physical"     // Physically disconnected storage
+	IsolationTypeLogical     IsolationType = "logical"      // Logically isolated network segment
+	IsolationTypeWriteOnce   IsolationType = "write_once"   // WORM (Write Once Read Many)
+	IsolationTypeOfflineTape IsolationType = "offline_tape" // Offline tape storage
+	IsolationTypeImmutable   IsolationType = "immutable"    // Cloud immutable storage
+	IsolationTypeVaultLock   IsolationType = "vault_lock"   // AWS Glacier Vault Lock
 )
 
-// VerificationState represents the verification state of an air-gapped backup
+// VerificationState represents the verification state of an air-gapped backup.
 type VerificationState string
 
 const (
-	VerificationStatePending  VerificationState = "pending"
-	VerificationStateVerified VerificationState = "verified"
-	VerificationStateFailed   VerificationState = "failed"
+	VerificationStatePending   VerificationState = "pending"
+	VerificationStateVerified  VerificationState = "verified"
+	VerificationStateFailed    VerificationState = "failed"
 	VerificationStateCorrupted VerificationState = "corrupted"
 )
 
-// AccessLogEntry represents an access log entry
+// AccessLogEntry represents an access log entry.
 type AccessLogEntry struct {
-	Timestamp   time.Time
-	Action      string
-	User        string
-	IPAddress   string
-	Success     bool
-	Reason      string
+	Timestamp time.Time
+	Action    string
+	User      string
+	IPAddress string
+	Success   bool
+	Reason    string
 }
 
-// AirGapStorage interface for different air-gap storage backends
+// AirGapStorage interface for different air-gap storage backends.
 type AirGapStorage interface {
 	Store(ctx context.Context, backup *AirGapBackup, data []byte) error
 	Retrieve(ctx context.Context, backupID string) ([]byte, error)
@@ -79,7 +79,7 @@ type AirGapStorage interface {
 	List(ctx context.Context) ([]*AirGapBackup, error)
 }
 
-// NewAirGapManager creates a new air-gap manager
+// NewAirGapManager creates a new air-gap manager.
 func NewAirGapManager(storage AirGapStorage, verificationFreq time.Duration, retentionDays int) *AirGapManager {
 	return &AirGapManager{
 		airGapCopies:     make(map[string]*AirGapBackup),
@@ -89,25 +89,25 @@ func NewAirGapManager(storage AirGapStorage, verificationFreq time.Duration, ret
 	}
 }
 
-// CreateAirGapCopy creates an air-gapped copy of a backup
+// CreateAirGapCopy creates an air-gapped copy of a backup.
 func (agm *AirGapManager) CreateAirGapCopy(ctx context.Context, originalBackupID, databaseName string, data []byte, isolationType IsolationType) (*AirGapBackup, error) {
 	// Calculate checksum
 	checksum := calculateChecksum(data)
 
 	// Create air-gap backup record
 	airGapBackup := &AirGapBackup{
-		ID:               generateAirGapID(),
-		OriginalBackupID: originalBackupID,
-		DatabaseName:     databaseName,
-		CreatedAt:        time.Now(),
-		Size:             int64(len(data)),
-		Checksum:         checksum,
-		IsolationType:    isolationType,
+		ID:                generateAirGapID(),
+		OriginalBackupID:  originalBackupID,
+		DatabaseName:      databaseName,
+		CreatedAt:         time.Now(),
+		Size:              int64(len(data)),
+		Checksum:          checksum,
+		IsolationType:     isolationType,
 		VerificationState: VerificationStatePending,
-		Metadata:         make(map[string]string),
-		RetainUntil:      time.Now().AddDate(0, 0, agm.retentionDays),
-		Immutable:        true, // Air-gapped backups are always immutable
-		AccessLog:        make([]AccessLogEntry, 0),
+		Metadata:          make(map[string]string),
+		RetainUntil:       time.Now().AddDate(0, 0, agm.retentionDays),
+		Immutable:         true, // Air-gapped backups are always immutable
+		AccessLog:         make([]AccessLogEntry, 0),
 	}
 
 	// Store the backup in air-gapped storage
@@ -117,12 +117,13 @@ func (agm *AirGapManager) CreateAirGapCopy(ctx context.Context, originalBackupID
 
 	// Immediate verification
 	verified, err := agm.storage.Verify(ctx, airGapBackup.ID)
-	if err != nil {
+	switch {
+	case err != nil:
 		airGapBackup.VerificationState = VerificationStateFailed
-	} else if verified {
+	case verified:
 		airGapBackup.VerificationState = VerificationStateVerified
 		airGapBackup.VerifiedAt = time.Now()
-	} else {
+	default:
 		airGapBackup.VerificationState = VerificationStateCorrupted
 	}
 
@@ -137,7 +138,7 @@ func (agm *AirGapManager) CreateAirGapCopy(ctx context.Context, originalBackupID
 	return airGapBackup, nil
 }
 
-// VerifyAirGapCopy verifies an air-gapped backup
+// VerifyAirGapCopy verifies an air-gapped backup.
 func (agm *AirGapManager) VerifyAirGapCopy(ctx context.Context, backupID string) (bool, error) {
 	agm.mu.RLock()
 	backup, exists := agm.airGapCopies[backupID]
@@ -167,7 +168,7 @@ func (agm *AirGapManager) VerifyAirGapCopy(ctx context.Context, backupID string)
 	return verified, nil
 }
 
-// RetrieveAirGapCopy retrieves an air-gapped backup
+// RetrieveAirGapCopy retrieves an air-gapped backup.
 func (agm *AirGapManager) RetrieveAirGapCopy(ctx context.Context, backupID, user, ipAddress string) ([]byte, error) {
 	agm.mu.RLock()
 	backup, exists := agm.airGapCopies[backupID]
@@ -205,7 +206,7 @@ func (agm *AirGapManager) RetrieveAirGapCopy(ctx context.Context, backupID, user
 	return data, nil
 }
 
-// ListAirGapBackups lists all air-gapped backups
+// ListAirGapBackups lists all air-gapped backups.
 func (agm *AirGapManager) ListAirGapBackups(databaseName string) []*AirGapBackup {
 	agm.mu.RLock()
 	defer agm.mu.RUnlock()
@@ -220,7 +221,7 @@ func (agm *AirGapManager) ListAirGapBackups(databaseName string) []*AirGapBackup
 	return backups
 }
 
-// CleanupExpiredBackups removes expired air-gapped backups
+// CleanupExpiredBackups removes expired air-gapped backups.
 func (agm *AirGapManager) CleanupExpiredBackups(ctx context.Context) (int, error) {
 	agm.mu.Lock()
 	defer agm.mu.Unlock()
@@ -245,7 +246,7 @@ func (agm *AirGapManager) CleanupExpiredBackups(ctx context.Context) (int, error
 	return removed, nil
 }
 
-// VerifyAllBackups verifies all air-gapped backups
+// VerifyAllBackups verifies all air-gapped backups.
 func (agm *AirGapManager) VerifyAllBackups(ctx context.Context) (verified, failed int, errors []error) {
 	agm.mu.RLock()
 	backups := make([]*AirGapBackup, 0, len(agm.airGapCopies))
@@ -256,12 +257,13 @@ func (agm *AirGapManager) VerifyAllBackups(ctx context.Context) (verified, faile
 
 	for _, backup := range backups {
 		ok, err := agm.VerifyAirGapCopy(ctx, backup.ID)
-		if err != nil {
+		switch {
+		case err != nil:
 			failed++
 			errors = append(errors, fmt.Errorf("backup %s: %w", backup.ID, err))
-		} else if ok {
+		case ok:
 			verified++
-		} else {
+		default:
 			failed++
 			errors = append(errors, fmt.Errorf("backup %s: verification failed", backup.ID))
 		}
@@ -270,7 +272,7 @@ func (agm *AirGapManager) VerifyAllBackups(ctx context.Context) (verified, faile
 	return verified, failed, errors
 }
 
-// GetStatistics returns statistics about air-gapped backups
+// GetStatistics returns statistics about air-gapped backups.
 func (agm *AirGapManager) GetStatistics() map[string]interface{} {
 	agm.mu.RLock()
 	defer agm.mu.RUnlock()
@@ -310,7 +312,7 @@ func (agm *AirGapManager) GetStatistics() map[string]interface{} {
 	return stats
 }
 
-// AddAccessLog adds an access log entry
+// AddAccessLog adds an access log entry.
 func (agb *AirGapBackup) AddAccessLog(action, user, ipAddress string, success bool, reason string) {
 	entry := AccessLogEntry{
 		Timestamp: time.Now(),
@@ -328,13 +330,13 @@ func (agb *AirGapBackup) AddAccessLog(action, user, ipAddress string, success bo
 	}
 }
 
-// MockAirGapStorage is a mock implementation for testing
+// MockAirGapStorage is a mock implementation for testing.
 type MockAirGapStorage struct {
 	mu      sync.RWMutex
 	backups map[string][]byte
 }
 
-// NewMockAirGapStorage creates a new mock air-gap storage
+// NewMockAirGapStorage creates a new mock air-gap storage.
 func NewMockAirGapStorage() *MockAirGapStorage {
 	return &MockAirGapStorage{
 		backups: make(map[string][]byte),

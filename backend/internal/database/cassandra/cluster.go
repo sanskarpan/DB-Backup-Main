@@ -10,23 +10,24 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
+
 	"github.com/sanskarpan/db-backup/internal/database"
 )
 
-// MultiDCDriver handles multi-datacenter Cassandra backups
+// MultiDCDriver handles multi-datacenter Cassandra backups.
 type MultiDCDriver struct {
 	sessions map[string]*gocql.Session
 	config   *database.ConnectionConfig
 }
 
-// NewMultiDCDriver creates a new multi-datacenter driver
+// NewMultiDCDriver creates a new multi-datacenter driver.
 func NewMultiDCDriver() *MultiDCDriver {
 	return &MultiDCDriver{
 		sessions: make(map[string]*gocql.Session),
 	}
 }
 
-// Connect establishes connections to all datacenters
+// Connect establishes connections to all datacenters.
 func (m *MultiDCDriver) Connect(ctx context.Context, config *database.ConnectionConfig, datacenters map[string][]string) error {
 	for dc, hosts := range datacenters {
 		cluster := gocql.NewCluster(hosts...)
@@ -53,7 +54,7 @@ func (m *MultiDCDriver) Connect(ctx context.Context, config *database.Connection
 	return nil
 }
 
-// Disconnect closes all datacenter connections
+// Disconnect closes all datacenter connections.
 func (m *MultiDCDriver) Disconnect() error {
 	for dc, session := range m.sessions {
 		if session != nil {
@@ -64,7 +65,7 @@ func (m *MultiDCDriver) Disconnect() error {
 	return nil
 }
 
-// BackupAllDatacenters backs up all datacenters in parallel
+// BackupAllDatacenters backs up all datacenters in parallel.
 func (m *MultiDCDriver) BackupAllDatacenters(ctx context.Context, opts *database.BackupOptions) (*database.BackupResult, error) {
 	result := &database.BackupResult{
 		ID:        fmt.Sprintf("multidc_%s", time.Now().Format("20060102_150405")),
@@ -78,7 +79,7 @@ func (m *MultiDCDriver) BackupAllDatacenters(ctx context.Context, opts *database
 	backups := make(map[string]string)
 	var mu sync.Mutex
 
-	for dc, _ := range m.sessions {
+	for dc := range m.sessions {
 		wg.Add(1)
 		go func(datacenter string) {
 			defer wg.Done()
@@ -105,7 +106,7 @@ func (m *MultiDCDriver) BackupAllDatacenters(ctx context.Context, opts *database
 	wg.Wait()
 	close(errors)
 
-	var backupErrors []string
+	backupErrors := make([]string, 0, len(m.sessions))
 	for err := range errors {
 		backupErrors = append(backupErrors, err.Error())
 	}
@@ -123,7 +124,7 @@ func (m *MultiDCDriver) BackupAllDatacenters(ctx context.Context, opts *database
 	return result, nil
 }
 
-// EnableIncrementalBackups enables incremental backups on all nodes
+// EnableIncrementalBackups enables incremental backups on all nodes.
 func (m *MultiDCDriver) EnableIncrementalBackups(ctx context.Context) error {
 	// Use nodetool to enable incremental backups
 	cmd := exec.CommandContext(ctx, "nodetool", "enablebackup")
@@ -134,7 +135,7 @@ func (m *MultiDCDriver) EnableIncrementalBackups(ctx context.Context) error {
 	return nil
 }
 
-// DisableIncrementalBackups disables incremental backups
+// DisableIncrementalBackups disables incremental backups.
 func (m *MultiDCDriver) DisableIncrementalBackups(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, "nodetool", "disablebackup")
 	return cmd.Run()

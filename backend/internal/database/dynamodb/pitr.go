@@ -8,22 +8,23 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+
 	"github.com/sanskarpan/db-backup/internal/database"
 )
 
-// PITRManager handles Point-in-Time Recovery for DynamoDB
+// PITRManager handles Point-in-Time Recovery for DynamoDB.
 type PITRManager struct {
 	driver *DynamoDBDriver
 }
 
-// NewPITRManager creates a new PITR manager
+// NewPITRManager creates a new PITR manager.
 func NewPITRManager(driver *DynamoDBDriver) *PITRManager {
 	return &PITRManager{
 		driver: driver,
 	}
 }
 
-// RestoreToPIT restores a table to a specific point in time
+// RestoreToPIT restores a table to a specific point in time.
 func (p *PITRManager) RestoreToPIT(ctx context.Context, targetTime time.Time, opts *database.RestoreOptions) (*database.RestoreResult, error) {
 	result := &database.RestoreResult{
 		ID:        fmt.Sprintf("pitr_%s", time.Now().Format("20060102_150405")),
@@ -78,7 +79,7 @@ func (p *PITRManager) RestoreToPIT(ctx context.Context, targetTime time.Time, op
 	return result, nil
 }
 
-// GetRecoveryRange returns the available recovery time range for a table
+// GetRecoveryRange returns the available recovery time range for a table.
 func (p *PITRManager) GetRecoveryRange(ctx context.Context, tableName string) (start, end time.Time, err error) {
 	output, err := p.driver.client.DescribeContinuousBackups(ctx, &dynamodb.DescribeContinuousBackupsInput{
 		TableName: aws.String(tableName),
@@ -103,7 +104,7 @@ func (p *PITRManager) GetRecoveryRange(ctx context.Context, tableName string) (s
 	return start, end, nil
 }
 
-// IsPITREnabled checks if PITR is enabled for a table
+// IsPITREnabled checks if PITR is enabled for a table.
 func (p *PITRManager) IsPITREnabled(ctx context.Context, tableName string) (bool, error) {
 	output, err := p.driver.client.DescribeContinuousBackups(ctx, &dynamodb.DescribeContinuousBackupsInput{
 		TableName: aws.String(tableName),

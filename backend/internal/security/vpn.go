@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"os"
@@ -17,7 +18,10 @@ import (
 	"golang.org/x/crypto/curve25519"
 )
 
-// VPNType represents the VPN implementation type
+// wireGuardConfigDir is the base directory for WireGuard configuration files.
+const wireGuardConfigDir = "/etc/wireguard"
+
+// VPNType represents the VPN implementation type.
 type VPNType string
 
 const (
@@ -25,69 +29,69 @@ const (
 	VPNTypeOpenVPN   VPNType = "openvpn"
 )
 
-// VPNConfig contains configuration for VPN support
+// VPNConfig contains configuration for VPN support.
 type VPNConfig struct {
 	// Type of VPN
 	Type VPNType `mapstructure:"type"`
 
 	// General settings
-	Enabled           bool   `mapstructure:"enabled"`
-	ServerAddress     string `mapstructure:"server_address"`
-	ServerPort        int    `mapstructure:"server_port"`
-	Network           string `mapstructure:"network"`           // e.g., "10.0.0.0/24"
-	DNS               string `mapstructure:"dns"`
-	MTU               int    `mapstructure:"mtu"`
-	KeepAlive         int    `mapstructure:"keep_alive"`
-	AllowedIPs        string `mapstructure:"allowed_ips"`       // e.g., "0.0.0.0/0"
+	Enabled       bool   `mapstructure:"enabled"`
+	ServerAddress string `mapstructure:"server_address"`
+	ServerPort    int    `mapstructure:"server_port"`
+	Network       string `mapstructure:"network"` // e.g., "10.0.0.0/24"
+	DNS           string `mapstructure:"dns"`
+	MTU           int    `mapstructure:"mtu"`
+	KeepAlive     int    `mapstructure:"keep_alive"`
+	AllowedIPs    string `mapstructure:"allowed_ips"` // e.g., "0.0.0.0/0"
 
 	// WireGuard specific
-	WireGuardInterface string `mapstructure:"wireguard_interface"`
+	WireGuardInterface  string `mapstructure:"wireguard_interface"`
 	WireGuardPrivateKey string `mapstructure:"wireguard_private_key"`
 	WireGuardListenPort int    `mapstructure:"wireguard_listen_port"`
 
 	// OpenVPN specific
 	OpenVPNConfigPath  string `mapstructure:"openvpn_config_path"`
-	OpenVPNProtocol    string `mapstructure:"openvpn_protocol"`    // udp or tcp
+	OpenVPNProtocol    string `mapstructure:"openvpn_protocol"` // udp or tcp
 	OpenVPNCipher      string `mapstructure:"openvpn_cipher"`
 	OpenVPNTLSAuth     string `mapstructure:"openvpn_tls_auth"`
 	OpenVPNCompression bool   `mapstructure:"openvpn_compression"`
 
 	// Certificate paths (for OpenVPN)
-	CAPath         string `mapstructure:"ca_path"`
-	CertPath       string `mapstructure:"cert_path"`
-	KeyPath        string `mapstructure:"key_path"`
-	TLSAuthPath    string `mapstructure:"tls_auth_path"`
+	CAPath      string `mapstructure:"ca_path"`
+	CertPath    string `mapstructure:"cert_path"`
+	KeyPath     string `mapstructure:"key_path"`
+	TLSAuthPath string `mapstructure:"tls_auth_path"`
 
 	// Client management
-	MaxClients         int           `mapstructure:"max_clients"`
-	ClientIdleTimeout  time.Duration `mapstructure:"client_idle_timeout"`
-	ClientIPPoolStart  string        `mapstructure:"client_ip_pool_start"`
-	ClientIPPoolEnd    string        `mapstructure:"client_ip_pool_end"`
+	MaxClients        int           `mapstructure:"max_clients"`
+	ClientIdleTimeout time.Duration `mapstructure:"client_idle_timeout"`
+	ClientIPPoolStart string        `mapstructure:"client_ip_pool_start"`
+	ClientIPPoolEnd   string        `mapstructure:"client_ip_pool_end"`
 }
 
-// VPNManager manages VPN connections and clients
+// VPNManager manages VPN connections and clients.
 type VPNManager struct {
-	config      *VPNConfig
-	mu          sync.RWMutex
+	config *VPNConfig
+	mu     sync.RWMutex
 
 	// Client management
-	clients     map[string]*VPNClient
-	ipPool      *IPPool
+	clients map[string]*VPNClient
+	ipPool  *IPPool
 
 	// Server state
-	running     bool
-	serverProc  *exec.Cmd
+	running    bool
+	serverProc *exec.Cmd
 
 	// Metrics
-	metrics     *VPNMetrics
+	metrics *VPNMetrics
 }
 
-// VPNClient represents a VPN client
+// VPNClient represents a VPN client.
 type VPNClient struct {
 	ID            string
 	Name          string
-	PublicKey     string    // For WireGuard
-	PrivateKey    string    // For WireGuard client config
+	PublicKey     string // For WireGuard
+	PrivateKey    string // For WireGuard client config
 	AssignedIP    string
 	AllowedIPs    []string
 	Endpoint      string
@@ -100,25 +104,25 @@ type VPNClient struct {
 	Enabled       bool
 }
 
-// VPNMetrics tracks VPN usage metrics
+// VPNMetrics tracks VPN usage metrics.
 type VPNMetrics struct {
-	TotalClients      int
-	ActiveClients     int
-	TotalBytesSent    int64
+	TotalClients       int
+	ActiveClients      int
+	TotalBytesSent     int64
 	TotalBytesReceived int64
-	Uptime            time.Duration
-	StartTime         time.Time
-	mu                sync.RWMutex
+	Uptime             time.Duration
+	StartTime          time.Time
+	mu                 sync.RWMutex
 }
 
-// IPPool manages IP address allocation
+// IPPool manages IP address allocation.
 type IPPool struct {
-	network    *net.IPNet
-	allocated  map[string]bool
-	mu         sync.RWMutex
+	network   *net.IPNet
+	allocated map[string]bool
+	mu        sync.RWMutex
 }
 
-// NewVPNManager creates a new VPN manager
+// NewVPNManager creates a new VPN manager.
 func NewVPNManager(config *VPNConfig) (*VPNManager, error) {
 	if config == nil {
 		return nil, fmt.Errorf("VPN config is required")
@@ -163,7 +167,7 @@ func NewVPNManager(config *VPNConfig) (*VPNManager, error) {
 	return manager, nil
 }
 
-// validateVPNConfig validates VPN configuration
+// validateVPNConfig validates VPN configuration.
 func validateVPNConfig(config *VPNConfig) error {
 	if config.ServerAddress == "" {
 		return fmt.Errorf("server address is required")
@@ -192,7 +196,7 @@ func validateVPNConfig(config *VPNConfig) error {
 	return nil
 }
 
-// Start starts the VPN server
+// Start starts the VPN server.
 func (m *VPNManager) Start(ctx context.Context) error {
 	if !m.config.Enabled {
 		return fmt.Errorf("VPN is not enabled")
@@ -225,7 +229,7 @@ func (m *VPNManager) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop stops the VPN server
+// Stop stops the VPN server.
 func (m *VPNManager) Stop() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -244,7 +248,7 @@ func (m *VPNManager) Stop() error {
 	return nil
 }
 
-// startWireGuard starts a WireGuard VPN server
+// startWireGuard starts a WireGuard VPN server.
 func (m *VPNManager) startWireGuard() error {
 	// Generate WireGuard configuration
 	config, err := m.generateWireGuardServerConfig()
@@ -253,12 +257,13 @@ func (m *VPNManager) startWireGuard() error {
 	}
 
 	// Write configuration to file
-	configPath := filepath.Join("/etc/wireguard", m.config.WireGuardInterface+".conf")
-	if err := os.WriteFile(configPath, []byte(config), 0600); err != nil {
+	configPath := filepath.Join(wireGuardConfigDir, m.config.WireGuardInterface+".conf")
+	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
 		return fmt.Errorf("failed to write WireGuard config: %w", err)
 	}
 
 	// Start WireGuard interface
+	//nolint:gosec // G204: interface name comes from operator-supplied configuration, not untrusted input.
 	cmd := exec.Command("wg-quick", "up", m.config.WireGuardInterface)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to start WireGuard: %w", err)
@@ -267,7 +272,7 @@ func (m *VPNManager) startWireGuard() error {
 	return nil
 }
 
-// startOpenVPN starts an OpenVPN server
+// startOpenVPN starts an OpenVPN server.
 func (m *VPNManager) startOpenVPN() error {
 	// Generate OpenVPN configuration if needed
 	if m.config.OpenVPNConfigPath == "" {
@@ -277,12 +282,13 @@ func (m *VPNManager) startOpenVPN() error {
 		}
 
 		m.config.OpenVPNConfigPath = "/etc/openvpn/server.conf"
-		if err := os.WriteFile(m.config.OpenVPNConfigPath, []byte(config), 0600); err != nil {
+		if err := os.WriteFile(m.config.OpenVPNConfigPath, []byte(config), 0o600); err != nil {
 			return fmt.Errorf("failed to write OpenVPN config: %w", err)
 		}
 	}
 
 	// Start OpenVPN server
+	//nolint:gosec // G204: config path comes from operator-supplied configuration, not untrusted input.
 	m.serverProc = exec.Command("openvpn", "--config", m.config.OpenVPNConfigPath)
 	if err := m.serverProc.Start(); err != nil {
 		return fmt.Errorf("failed to start OpenVPN: %w", err)
@@ -291,7 +297,7 @@ func (m *VPNManager) startOpenVPN() error {
 	return nil
 }
 
-// AddClient adds a new VPN client
+// AddClient adds a new VPN client.
 func (m *VPNManager) AddClient(name string) (*VPNClient, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -339,7 +345,7 @@ func (m *VPNManager) AddClient(name string) (*VPNClient, error) {
 	return client, nil
 }
 
-// RemoveClient removes a VPN client
+// RemoveClient removes a VPN client.
 func (m *VPNManager) RemoveClient(clientID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -356,7 +362,7 @@ func (m *VPNManager) RemoveClient(clientID string) error {
 	return nil
 }
 
-// GetClient retrieves a client by ID
+// GetClient retrieves a client by ID.
 func (m *VPNManager) GetClient(clientID string) (*VPNClient, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -369,7 +375,7 @@ func (m *VPNManager) GetClient(clientID string) (*VPNClient, error) {
 	return client, nil
 }
 
-// ListClients returns all clients
+// ListClients returns all clients.
 func (m *VPNManager) ListClients() []*VPNClient {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -382,7 +388,7 @@ func (m *VPNManager) ListClients() []*VPNClient {
 	return clients
 }
 
-// GenerateClientConfig generates VPN client configuration
+// GenerateClientConfig generates VPN client configuration.
 func (m *VPNManager) GenerateClientConfig(clientID string) (string, error) {
 	client, err := m.GetClient(clientID)
 	if err != nil {
@@ -393,13 +399,13 @@ func (m *VPNManager) GenerateClientConfig(clientID string) (string, error) {
 	case VPNTypeWireGuard:
 		return m.generateWireGuardClientConfig(client)
 	case VPNTypeOpenVPN:
-		return m.generateOpenVPNClientConfig(client)
+		return m.generateOpenVPNClientConfig()
 	default:
 		return "", fmt.Errorf("unsupported VPN type: %s", m.config.Type)
 	}
 }
 
-// generateWireGuardServerConfig generates WireGuard server configuration
+// generateWireGuardServerConfig generates WireGuard server configuration.
 func (m *VPNManager) generateWireGuardServerConfig() (string, error) {
 	tmpl := `[Interface]
 Address = {{.ServerAddress}}
@@ -443,7 +449,7 @@ AllowedIPs = {{.AssignedIP}}/32
 	return buf.String(), nil
 }
 
-// generateWireGuardClientConfig generates WireGuard client configuration
+// generateWireGuardClientConfig generates WireGuard client configuration.
 func (m *VPNManager) generateWireGuardClientConfig(client *VPNClient) (string, error) {
 	serverPublicKey, err := deriveWireGuardPublicKey(m.config.WireGuardPrivateKey)
 	if err != nil {
@@ -495,7 +501,7 @@ PersistentKeepalive = {{.KeepAlive}}
 	return buf.String(), nil
 }
 
-// generateOpenVPNServerConfig generates OpenVPN server configuration
+// generateOpenVPNServerConfig generates OpenVPN server configuration.
 func (m *VPNManager) generateOpenVPNServerConfig() (string, error) {
 	tmpl := `port {{.Port}}
 proto {{.Protocol}}
@@ -523,7 +529,10 @@ verb 3
 
 	t := template.Must(template.New("openvpn-server").Parse(tmpl))
 
-	_, ipnet, _ := net.ParseCIDR(m.config.Network)
+	_, ipnet, err := net.ParseCIDR(m.config.Network)
+	if err != nil {
+		return "", fmt.Errorf("invalid network CIDR %q: %w", m.config.Network, err)
+	}
 	networkIP := ipnet.IP.String()
 	netmask := net.IP(ipnet.Mask).String()
 
@@ -563,8 +572,8 @@ verb 3
 	return buf.String(), nil
 }
 
-// generateOpenVPNClientConfig generates OpenVPN client configuration
-func (m *VPNManager) generateOpenVPNClientConfig(client *VPNClient) (string, error) {
+// generateOpenVPNClientConfig generates OpenVPN client configuration.
+func (m *VPNManager) generateOpenVPNClientConfig() (string, error) {
 	tmpl := `client
 dev tun
 proto {{.Protocol}}
@@ -606,7 +615,7 @@ verb 3
 	return buf.String(), nil
 }
 
-// GetMetrics returns VPN metrics
+// GetMetrics returns VPN metrics.
 func (m *VPNManager) GetMetrics() *VPNMetrics {
 	m.metrics.mu.Lock()
 	defer m.metrics.mu.Unlock()
@@ -626,7 +635,7 @@ func (m *VPNManager) GetMetrics() *VPNMetrics {
 
 // IP Pool methods
 
-// Allocate allocates an IP from the pool
+// Allocate allocates an IP from the pool.
 func (p *IPPool) Allocate() (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -647,7 +656,7 @@ func (p *IPPool) Allocate() (string, error) {
 	return "", fmt.Errorf("no available IPs in pool")
 }
 
-// Release releases an IP back to the pool
+// Release releases an IP back to the pool.
 func (p *IPPool) Release(ip string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -659,7 +668,11 @@ func (p *IPPool) Release(ip string) {
 
 func generateClientID() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		// crypto/rand should never fail; fall back to time-based entropy.
+		binary.BigEndian.PutUint64(b, uint64(time.Now().UnixNano()))     //nolint:gosec // G115: UnixNano is non-negative
+		binary.BigEndian.PutUint64(b[8:], uint64(time.Now().UnixNano())) //nolint:gosec // G115: UnixNano is non-negative
+	}
 	return base64.URLEncoding.EncodeToString(b)
 }
 

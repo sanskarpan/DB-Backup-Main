@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/config"
 	"golang.org/x/oauth2"
+
+	"github.com/sanskarpan/db-backup/internal/config"
 )
 
 func TestNewOAuth2Service(t *testing.T) {
@@ -103,7 +104,7 @@ func TestGetProvider(t *testing.T) {
 			t.Errorf("Failed to get provider: %v", err)
 		}
 		if provider == nil {
-			t.Error("Provider should not be nil")
+			t.Fatal("Provider should not be nil")
 		}
 		if provider.ClientID != "test-client-id" {
 			t.Errorf("Expected ClientID 'test-client-id', got '%s'", provider.ClientID)
@@ -247,9 +248,9 @@ func TestMapUserInfo(t *testing.T) {
 
 	t.Run("microsoft provider", func(t *testing.T) {
 		raw := map[string]interface{}{
-			"id":                 "abcd-1234",
-			"userPrincipalName":  "user@example.com",
-			"displayName":        "Test User",
+			"id":                "abcd-1234",
+			"userPrincipalName": "user@example.com",
+			"displayName":       "Test User",
 		}
 
 		userInfo := mapUserInfo("microsoft", raw)

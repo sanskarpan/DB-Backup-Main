@@ -9,20 +9,21 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
+
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// ImmutabilityPolicyMode defines the immutability policy mode
+// ImmutabilityPolicyMode defines the immutability policy mode.
 type ImmutabilityPolicyMode string
 
 const (
-	// ImmutabilityPolicyModeUnlocked allows policy modification
+	// ImmutabilityPolicyModeUnlocked allows policy modification.
 	ImmutabilityPolicyModeUnlocked ImmutabilityPolicyMode = "Unlocked"
-	// ImmutabilityPolicyModeLocked prevents policy modification
+	// ImmutabilityPolicyModeLocked prevents policy modification.
 	ImmutabilityPolicyModeLocked ImmutabilityPolicyMode = "Locked"
 )
 
-// ImmutableBlobConfig represents Azure immutable blob configuration
+// ImmutableBlobConfig represents Azure immutable blob configuration.
 type ImmutableBlobConfig struct {
 	// ImmutabilityPeriodDays specifies retention period in days
 	ImmutabilityPeriodDays int
@@ -38,7 +39,7 @@ type ImmutableBlobConfig struct {
 }
 
 // ContainerImmutabilityPolicy represents container-level immutability
-// Note: Container-level policies require Azure Management API, not available in data plane SDK
+// Note: Container-level policies require Azure Management API, not available in data plane SDK.
 type ContainerImmutabilityPolicy struct {
 	// ImmutabilityPeriodDays is the retention period
 	ImmutabilityPeriodDays int
@@ -53,7 +54,7 @@ type ContainerImmutabilityPolicy struct {
 	AllowProtectedAppendWritesAll bool
 }
 
-// EnableVersioning enables blob versioning which is required for immutability
+// EnableVersioning enables blob versioning which is required for immutability.
 func (p *AzureProvider) EnableVersioning(ctx context.Context) error {
 	// Blob versioning is a prerequisite for immutability
 	// This is typically done at the storage account level via Azure Portal or ARM templates
@@ -63,10 +64,10 @@ func (p *AzureProvider) EnableVersioning(ctx context.Context) error {
 		"versioning must be enabled at storage account level via Azure Management API or Portal")
 }
 
-// SetContainerImmutabilityPolicy sets an immutability policy on the container
+// SetContainerImmutabilityPolicy sets an immutability policy on the container.
 func (p *AzureProvider) SetContainerImmutabilityPolicy(ctx context.Context,
-	periodDays int, allowAppendWrites bool) error {
-
+	periodDays int, allowAppendWrites bool,
+) error {
 	// Container-level immutability policies require Azure Management API
 	// Not available in the data plane SDK (azblob package)
 	// Use Azure Management SDK: github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage
@@ -74,7 +75,7 @@ func (p *AzureProvider) SetContainerImmutabilityPolicy(ctx context.Context,
 		"container-level policies require Azure Management API (use armstorage package)")
 }
 
-// LockContainerImmutabilityPolicy locks the immutability policy (irreversible)
+// LockContainerImmutabilityPolicy locks the immutability policy (irreversible).
 func (p *AzureProvider) LockContainerImmutabilityPolicy(ctx context.Context) error {
 	// WARNING: This operation would be IRREVERSIBLE
 	// Container-level operations require Azure Management API
@@ -82,26 +83,25 @@ func (p *AzureProvider) LockContainerImmutabilityPolicy(ctx context.Context) err
 		"container-level policy locking requires Azure Management API")
 }
 
-// ExtendContainerImmutabilityPolicy extends the immutability period
+// ExtendContainerImmutabilityPolicy extends the immutability period.
 func (p *AzureProvider) ExtendContainerImmutabilityPolicy(ctx context.Context, newPeriodDays int) error {
 	// Container-level operations require Azure Management API
 	return pkgErrors.New(pkgErrors.ErrorTypeOperation,
 		"container-level policy extension requires Azure Management API")
 }
 
-// DeleteContainerImmutabilityPolicy deletes an unlocked immutability policy
+// DeleteContainerImmutabilityPolicy deletes an unlocked immutability policy.
 func (p *AzureProvider) DeleteContainerImmutabilityPolicy(ctx context.Context) error {
 	// Container-level operations require Azure Management API
 	return pkgErrors.New(pkgErrors.ErrorTypeOperation,
 		"container-level policy deletion requires Azure Management API")
 }
 
-// SetBlobLegalHold sets or removes legal hold on a blob
+// SetBlobLegalHold sets or removes legal hold on a blob.
 func (p *AzureProvider) SetBlobLegalHold(ctx context.Context, blobName string, enabled bool) error {
 	blobClient := p.container.NewBlobClient(blobName)
 
 	_, err := blobClient.SetLegalHold(ctx, enabled, &blob.SetLegalHoldOptions{})
-
 	if err != nil {
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
 			fmt.Sprintf("failed to set legal hold to %v", enabled))
@@ -110,7 +110,7 @@ func (p *AzureProvider) SetBlobLegalHold(ctx context.Context, blobName string, e
 	return nil
 }
 
-// GetBlobLegalHold retrieves legal hold status for a blob
+// GetBlobLegalHold retrieves legal hold status for a blob.
 func (p *AzureProvider) GetBlobLegalHold(ctx context.Context, blobName string) (bool, error) {
 	blobClient := p.container.NewBlobClient(blobName)
 
@@ -133,10 +133,10 @@ func (p *AzureProvider) GetBlobLegalHold(ctx context.Context, blobName string) (
 	return false, nil
 }
 
-// SetBlobImmutabilityPolicy sets an immutability policy on a specific blob
+// SetBlobImmutabilityPolicy sets an immutability policy on a specific blob.
 func (p *AzureProvider) SetBlobImmutabilityPolicy(ctx context.Context, blobName string,
-	expiryTime time.Time, mode ImmutabilityPolicyMode) error {
-
+	expiryTime time.Time, mode ImmutabilityPolicyMode,
+) error {
 	blobClient := p.container.NewBlobClient(blobName)
 
 	// Convert our mode to Azure SDK mode
@@ -150,7 +150,6 @@ func (p *AzureProvider) SetBlobImmutabilityPolicy(ctx context.Context, blobName 
 	_, err := blobClient.SetImmutabilityPolicy(ctx, expiryTime, &blob.SetImmutabilityPolicyOptions{
 		Mode: &policySetting,
 	})
-
 	if err != nil {
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
 			"failed to set blob immutability policy")
@@ -159,12 +158,11 @@ func (p *AzureProvider) SetBlobImmutabilityPolicy(ctx context.Context, blobName 
 	return nil
 }
 
-// DeleteBlobImmutabilityPolicy deletes an unlocked blob immutability policy
+// DeleteBlobImmutabilityPolicy deletes an unlocked blob immutability policy.
 func (p *AzureProvider) DeleteBlobImmutabilityPolicy(ctx context.Context, blobName string) error {
 	blobClient := p.container.NewBlobClient(blobName)
 
 	_, err := blobClient.DeleteImmutabilityPolicy(ctx, nil)
-
 	if err != nil {
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
 			"failed to delete blob immutability policy")
@@ -173,7 +171,7 @@ func (p *AzureProvider) DeleteBlobImmutabilityPolicy(ctx context.Context, blobNa
 	return nil
 }
 
-// GetBlobImmutabilityPolicy retrieves blob immutability policy
+// GetBlobImmutabilityPolicy retrieves blob immutability policy.
 func (p *AzureProvider) GetBlobImmutabilityPolicy(ctx context.Context, blobName string) (*AzureImmutableBlobInfo, error) {
 	blobClient := p.container.NewBlobClient(blobName)
 
@@ -210,15 +208,15 @@ func (p *AzureProvider) GetBlobImmutabilityPolicy(ctx context.Context, blobName 
 	return info, nil
 }
 
-// ListImmutableBlobs lists all blobs with immutability information
+// ListImmutableBlobs lists all blobs with immutability information.
 func (p *AzureProvider) ListImmutableBlobs(ctx context.Context, prefix string) ([]AzureImmutableBlobInfo, error) {
-	var blobs []AzureImmutableBlobInfo
-
 	// Use the List method from the base provider to get blobs
 	files, err := p.List(ctx, prefix)
 	if err != nil {
 		return nil, err
 	}
+
+	blobs := make([]AzureImmutableBlobInfo, 0, len(files))
 
 	// For each blob, get immutability info
 	for _, file := range files {
@@ -257,7 +255,9 @@ func (p *AzureProvider) ListImmutableBlobs(ctx context.Context, prefix string) (
 	return blobs, nil
 }
 
-// AzureImmutableBlobInfo represents information about an immutable blob
+// AzureImmutableBlobInfo represents information about an immutable blob.
+//
+//nolint:revive // AzureImmutableBlobInfo keeps the public API stable across packages
 type AzureImmutableBlobInfo struct {
 	BlobName               string
 	LastModified           *time.Time
@@ -267,7 +267,7 @@ type AzureImmutableBlobInfo struct {
 	ImmutabilityPolicyMode string
 }
 
-// IsProtected returns true if the blob is currently protected
+// IsProtected returns true if the blob is currently protected.
 func (i *AzureImmutableBlobInfo) IsProtected() bool {
 	// Protected by legal hold
 	if i.LegalHold {
@@ -282,7 +282,7 @@ func (i *AzureImmutableBlobInfo) IsProtected() bool {
 	return false
 }
 
-// DaysUntilUnlock returns the number of days until the blob can be deleted
+// DaysUntilUnlock returns the number of days until the blob can be deleted.
 func (i *AzureImmutableBlobInfo) DaysUntilUnlock() int {
 	if i.LegalHold {
 		return -1 // Indefinite
@@ -302,7 +302,7 @@ func (i *AzureImmutableBlobInfo) DaysUntilUnlock() int {
 	return days
 }
 
-// IsLocked returns true if the immutability policy is locked
+// IsLocked returns true if the immutability policy is locked.
 func (i *AzureImmutableBlobInfo) IsLocked() bool {
 	return i.ImmutabilityPolicyMode == string(ImmutabilityPolicyModeLocked)
 }

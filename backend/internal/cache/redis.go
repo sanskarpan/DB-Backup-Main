@@ -3,20 +3,21 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
-// RedisCache implements a Redis-based caching layer
+// RedisCache implements a Redis-based caching layer.
 type RedisCache struct {
 	client *redis.Client
 	prefix string
 	ttl    time.Duration
 }
 
-// RedisConfig holds Redis cache configuration
+// RedisConfig holds Redis cache configuration.
 type RedisConfig struct {
 	Addr     string
 	Password string
@@ -25,7 +26,7 @@ type RedisConfig struct {
 	TTL      time.Duration
 }
 
-// NewRedisCache creates a new Redis cache instance
+// NewRedisCache creates a new Redis cache instance.
 func NewRedisCache(config RedisConfig) (*RedisCache, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:     config.Addr,
@@ -48,12 +49,12 @@ func NewRedisCache(config RedisConfig) (*RedisCache, error) {
 	}, nil
 }
 
-// Get retrieves a value from cache
+// Get retrieves a value from cache.
 func (r *RedisCache) Get(ctx context.Context, key string, dest interface{}) error {
 	fullKey := r.makeKey(key)
 
 	data, err := r.client.Get(ctx, fullKey).Bytes()
-	if err == redis.Nil {
+	if errors.Is(err, redis.Nil) {
 		return ErrCacheMiss
 	}
 	if err != nil {
@@ -67,7 +68,7 @@ func (r *RedisCache) Get(ctx context.Context, key string, dest interface{}) erro
 	return nil
 }
 
-// Set stores a value in cache
+// Set stores a value in cache.
 func (r *RedisCache) Set(ctx context.Context, key string, value interface{}, ttl ...time.Duration) error {
 	fullKey := r.makeKey(key)
 
@@ -88,7 +89,7 @@ func (r *RedisCache) Set(ctx context.Context, key string, value interface{}, ttl
 	return nil
 }
 
-// Delete removes a value from cache
+// Delete removes a value from cache.
 func (r *RedisCache) Delete(ctx context.Context, key string) error {
 	fullKey := r.makeKey(key)
 
@@ -99,7 +100,7 @@ func (r *RedisCache) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-// DeletePattern deletes all keys matching a pattern
+// DeletePattern deletes all keys matching a pattern.
 func (r *RedisCache) DeletePattern(ctx context.Context, pattern string) error {
 	fullPattern := r.makeKey(pattern)
 
@@ -117,7 +118,7 @@ func (r *RedisCache) DeletePattern(ctx context.Context, pattern string) error {
 	return nil
 }
 
-// Exists checks if a key exists in cache
+// Exists checks if a key exists in cache.
 func (r *RedisCache) Exists(ctx context.Context, key string) (bool, error) {
 	fullKey := r.makeKey(key)
 
@@ -129,19 +130,19 @@ func (r *RedisCache) Exists(ctx context.Context, key string) (bool, error) {
 	return result > 0, nil
 }
 
-// SetWithExpiry stores a value with custom expiration
+// SetWithExpiry stores a value with custom expiration.
 func (r *RedisCache) SetWithExpiry(ctx context.Context, key string, value interface{}, expiry time.Duration) error {
 	return r.Set(ctx, key, value, expiry)
 }
 
-// GetOrSet retrieves a value from cache, or computes and stores it if missing
+// GetOrSet retrieves a value from cache, or computes and stores it if missing.
 func (r *RedisCache) GetOrSet(ctx context.Context, key string, dest interface{}, compute func() (interface{}, error)) error {
 	// Try to get from cache first
 	err := r.Get(ctx, key, dest)
 	if err == nil {
 		return nil // Cache hit
 	}
-	if err != ErrCacheMiss {
+	if !errors.Is(err, ErrCacheMiss) {
 		// Real error occurred
 		return err
 	}
@@ -153,8 +154,9 @@ func (r *RedisCache) GetOrSet(ctx context.Context, key string, dest interface{},
 	}
 
 	// Store in cache
-	if err := r.Set(ctx, key, value); err != nil {
-		// Log error but don't fail - we have the computed value
+	if setErr := r.Set(ctx, key, value); setErr != nil {
+		// Cache write failure is non-fatal - we already have the computed value.
+		//nolint:nilerr // best-effort cache write; computed value is still returned to caller
 		return nil
 	}
 
@@ -171,7 +173,7 @@ func (r *RedisCache) GetOrSet(ctx context.Context, key string, dest interface{},
 	return nil
 }
 
-// Increment atomically increments a counter
+// Increment atomically increments a counter.
 func (r *RedisCache) Increment(ctx context.Context, key string, delta int64) (int64, error) {
 	fullKey := r.makeKey(key)
 
@@ -183,12 +185,12 @@ func (r *RedisCache) Increment(ctx context.Context, key string, delta int64) (in
 	return result, nil
 }
 
-// Decrement atomically decrements a counter
+// Decrement atomically decrements a counter.
 func (r *RedisCache) Decrement(ctx context.Context, key string, delta int64) (int64, error) {
 	return r.Increment(ctx, key, -delta)
 }
 
-// GetTTL returns the remaining time to live for a key
+// GetTTL returns the remaining time to live for a key.
 func (r *RedisCache) GetTTL(ctx context.Context, key string) (time.Duration, error) {
 	fullKey := r.makeKey(key)
 
@@ -200,7 +202,7 @@ func (r *RedisCache) GetTTL(ctx context.Context, key string) (time.Duration, err
 	return ttl, nil
 }
 
-// SetTTL updates the expiration time for a key
+// SetTTL updates the expiration time for a key.
 func (r *RedisCache) SetTTL(ctx context.Context, key string, ttl time.Duration) error {
 	fullKey := r.makeKey(key)
 
@@ -211,17 +213,17 @@ func (r *RedisCache) SetTTL(ctx context.Context, key string, ttl time.Duration) 
 	return nil
 }
 
-// Clear removes all keys with the cache prefix
+// Clear removes all keys with the cache prefix.
 func (r *RedisCache) Clear(ctx context.Context) error {
 	return r.DeletePattern(ctx, "*")
 }
 
-// Close closes the Redis connection
+// Close closes the Redis connection.
 func (r *RedisCache) Close() error {
 	return r.client.Close()
 }
 
-// makeKey creates a full key with prefix
+// makeKey creates a full key with prefix.
 func (r *RedisCache) makeKey(key string) string {
 	if r.prefix == "" {
 		return key
@@ -229,7 +231,7 @@ func (r *RedisCache) makeKey(key string) string {
 	return fmt.Sprintf("%s:%s", r.prefix, key)
 }
 
-// GetClient returns the underlying Redis client for advanced operations
+// GetClient returns the underlying Redis client for advanced operations.
 func (r *RedisCache) GetClient() *redis.Client {
 	return r.client
 }

@@ -350,6 +350,9 @@ func TestTestEnvironment_Fields(t *testing.T) {
 
 	assert.Equal(t, "env-123", env.ID)
 	assert.Equal(t, "test-db-test", env.DatabaseName)
+	assert.Equal(t, "postgresql://localhost:5432/test-db-test", env.ConnectionString)
+	assert.True(t, env.IsolatedNetwork)
+	assert.True(t, env.EphemeralDatabase)
 	assert.Equal(t, "ready", env.Status)
 	assert.Equal(t, now, env.CreatedAt)
 }

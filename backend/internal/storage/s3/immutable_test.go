@@ -86,6 +86,7 @@ func TestImmutableBackupConfig(t *testing.T) {
 		assert.True(t, config.Enabled)
 		assert.Equal(t, ObjectLockModeCompliance, config.DefaultMode)
 		assert.Equal(t, 90, config.DefaultRetentionDays)
+		assert.False(t, config.AllowBypass)
 	})
 }
 
@@ -271,6 +272,7 @@ func TestImmutableBackupConfig_Validation(t *testing.T) {
 		assert.True(t, config.Enabled)
 		assert.True(t, config.AllowBypass)
 		assert.Equal(t, ObjectLockModeGovernance, config.DefaultMode)
+		assert.Equal(t, 30, config.DefaultRetentionDays)
 	})
 
 	t.Run("compliance never allows bypass", func(t *testing.T) {
@@ -284,6 +286,7 @@ func TestImmutableBackupConfig_Validation(t *testing.T) {
 		assert.True(t, config.Enabled)
 		assert.False(t, config.AllowBypass)
 		assert.Equal(t, ObjectLockModeCompliance, config.DefaultMode)
+		assert.Equal(t, 90, config.DefaultRetentionDays)
 	})
 }
 
@@ -306,7 +309,7 @@ func TestImmutableBackupInfo_SizeAndMetadata(t *testing.T) {
 	})
 }
 
-// Helper function to create time pointers
+// Helper function to create time pointers.
 func timePtr(t time.Time) *time.Time {
 	return &t
 }
@@ -391,7 +394,7 @@ func TestS3Provider_LegalHold_Integration(t *testing.T) {
 }
 */
 
-// Benchmark tests
+// Benchmark tests.
 func BenchmarkIsProtected(b *testing.B) {
 	info := ImmutableBackupInfo{
 		RetainUntilDate: timePtr(time.Now().AddDate(0, 0, 30)),

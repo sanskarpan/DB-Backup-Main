@@ -11,12 +11,12 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// AESEncryptor implements AES-256-GCM encryption
+// AESEncryptor implements AES-256-GCM encryption.
 type AESEncryptor struct {
 	key []byte
 }
 
-// NewAESEncryptor creates a new AES encryptor
+// NewAESEncryptor creates a new AES encryptor.
 func NewAESEncryptor(key []byte) (*AESEncryptor, error) {
 	// Ensure key is 32 bytes (256 bits)
 	if len(key) != 32 {
@@ -30,7 +30,7 @@ func NewAESEncryptor(key []byte) (*AESEncryptor, error) {
 	}, nil
 }
 
-// Encrypt encrypts data using AES-256-GCM
+// Encrypt encrypts data using AES-256-GCM.
 func (e *AESEncryptor) Encrypt(plaintext []byte) ([]byte, error) {
 	block, err := aes.NewCipher(e.key)
 	if err != nil {
@@ -53,7 +53,7 @@ func (e *AESEncryptor) Encrypt(plaintext []byte) ([]byte, error) {
 	return ciphertext, nil
 }
 
-// Decrypt decrypts data using AES-256-GCM
+// Decrypt decrypts data using AES-256-GCM.
 func (e *AESEncryptor) Decrypt(ciphertext []byte) ([]byte, error) {
 	block, err := aes.NewCipher(e.key)
 	if err != nil {
@@ -82,7 +82,7 @@ func (e *AESEncryptor) Decrypt(ciphertext []byte) ([]byte, error) {
 	return plaintext, nil
 }
 
-// EncryptStream encrypts a stream of data
+// EncryptStream encrypts a stream of data.
 func (e *AESEncryptor) EncryptStream(input io.Reader, output io.Writer) error {
 	block, err := aes.NewCipher(e.key)
 	if err != nil {
@@ -112,7 +112,7 @@ func (e *AESEncryptor) EncryptStream(input io.Reader, output io.Writer) error {
 	return nil
 }
 
-// DecryptStream decrypts a stream of data
+// DecryptStream decrypts a stream of data.
 func (e *AESEncryptor) DecryptStream(input io.Reader, output io.Writer) error {
 	block, err := aes.NewCipher(e.key)
 	if err != nil {

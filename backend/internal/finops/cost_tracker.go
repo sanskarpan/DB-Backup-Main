@@ -8,30 +8,30 @@ import (
 	"time"
 )
 
-// CostTracker tracks real-time storage and operational costs
+// CostTracker tracks real-time storage and operational costs.
 type CostTracker struct {
-	mu              sync.RWMutex
-	costs           map[string]*DatabaseCosts
-	providerRates   map[StorageProvider]*ProviderRates
-	computeRates    *ComputeRates
-	transferRates   *TransferRates
-	costHistory     []*CostSnapshot
-	maxHistoryDays  int
+	mu             sync.RWMutex
+	costs          map[string]*DatabaseCosts
+	providerRates  map[StorageProvider]*ProviderRates
+	computeRates   *ComputeRates
+	transferRates  *TransferRates
+	costHistory    []*CostSnapshot
+	maxHistoryDays int
 }
 
-// DatabaseCosts represents costs for a specific database
+// DatabaseCosts represents costs for a specific database.
 type DatabaseCosts struct {
-	DatabaseName     string
-	StorageCosts     *StorageCosts
-	TransferCosts    *TransferCosts
-	ComputeCosts     *ComputeCosts
-	TotalCost        float64
-	LastUpdated      time.Time
-	CostBreakdown    map[string]float64
-	Tags             map[string]string
+	DatabaseName  string
+	StorageCosts  *StorageCosts
+	TransferCosts *TransferCosts
+	ComputeCosts  *ComputeCosts
+	TotalCost     float64
+	LastUpdated   time.Time
+	CostBreakdown map[string]float64
+	Tags          map[string]string
 }
 
-// StorageCosts represents storage-related costs
+// StorageCosts represents storage-related costs.
 type StorageCosts struct {
 	Provider         StorageProvider
 	Region           string
@@ -49,33 +49,33 @@ type StorageCosts struct {
 	CostPerGB        float64
 }
 
-// TransferCosts represents data transfer costs
+// TransferCosts represents data transfer costs.
 type TransferCosts struct {
-	IngressGB        float64
-	EgressGB         float64
-	CrossRegionGB    float64
-	IngressCost      float64
-	EgressCost       float64
-	CrossRegionCost  float64
-	TotalCost        float64
+	IngressGB       float64
+	EgressGB        float64
+	CrossRegionGB   float64
+	IngressCost     float64
+	EgressCost      float64
+	CrossRegionCost float64
+	TotalCost       float64
 }
 
-// ComputeCosts represents compute-related costs
+// ComputeCosts represents compute-related costs.
 type ComputeCosts struct {
-	BackupDuration   time.Duration
-	RestoreDuration  time.Duration
-	CompressionTime  time.Duration
-	EncryptionTime   time.Duration
-	CPUHours         float64
-	MemoryGBHours    float64
-	BackupCost       float64
-	RestoreCost      float64
-	CompressionCost  float64
-	EncryptionCost   float64
-	TotalCost        float64
+	BackupDuration  time.Duration
+	RestoreDuration time.Duration
+	CompressionTime time.Duration
+	EncryptionTime  time.Duration
+	CPUHours        float64
+	MemoryGBHours   float64
+	BackupCost      float64
+	RestoreCost     float64
+	CompressionCost float64
+	EncryptionCost  float64
+	TotalCost       float64
 }
 
-// StorageProvider represents a cloud storage provider
+// StorageProvider represents a cloud storage provider.
 type StorageProvider string
 
 const (
@@ -85,7 +85,7 @@ const (
 	ProviderLocal StorageProvider = "Local"
 )
 
-// StorageTier represents storage tier
+// StorageTier represents storage tier.
 type StorageTier string
 
 const (
@@ -95,7 +95,7 @@ const (
 	TierGlacier StorageTier = "glacier"
 )
 
-// ProviderRates represents pricing rates for a provider
+// ProviderRates represents pricing rates for a provider.
 type ProviderRates struct {
 	Provider     StorageProvider
 	Region       string
@@ -103,72 +103,72 @@ type ProviderRates struct {
 	LastUpdated  time.Time
 }
 
-// ComputeRates represents compute pricing
+// ComputeRates represents compute pricing.
 type ComputeRates struct {
-	CPUCostPerHour    float64
-	MemoryCostPerGBH  float64
-	LastUpdated       time.Time
+	CPUCostPerHour   float64
+	MemoryCostPerGBH float64
+	LastUpdated      time.Time
 }
 
-// TransferRates represents data transfer pricing
+// TransferRates represents data transfer pricing.
 type TransferRates struct {
-	IngressCostPerGB      float64
-	EgressCostPerGB       float64
-	CrossRegionCostPerGB  float64
-	LastUpdated           time.Time
+	IngressCostPerGB     float64
+	EgressCostPerGB      float64
+	CrossRegionCostPerGB float64
+	LastUpdated          time.Time
 }
 
-// CostSnapshot represents a point-in-time cost snapshot
+// CostSnapshot represents a point-in-time cost snapshot.
 type CostSnapshot struct {
-	Timestamp      time.Time
-	TotalCost      float64
-	StorageCost    float64
-	TransferCost   float64
-	ComputeCost    float64
-	ByProvider     map[StorageProvider]float64
-	ByDatabase     map[string]float64
-	ByTag          map[string]float64
+	Timestamp    time.Time
+	TotalCost    float64
+	StorageCost  float64
+	TransferCost float64
+	ComputeCost  float64
+	ByProvider   map[StorageProvider]float64
+	ByDatabase   map[string]float64
+	ByTag        map[string]float64
 }
 
-// BackupOperation represents a backup operation for cost tracking
+// BackupOperation represents a backup operation for cost tracking.
 type BackupOperation struct {
-	DatabaseName     string
-	Provider         StorageProvider
-	Region           string
-	Tier             StorageTier
-	SizeGB           float64
-	Duration         time.Duration
-	IngressGB        float64
-	EgressGB         float64
-	CrossRegionGB    float64
-	CPUHours         float64
-	MemoryGBHours    float64
-	Timestamp        time.Time
-	Tags             map[string]string
+	DatabaseName  string
+	Provider      StorageProvider
+	Region        string
+	Tier          StorageTier
+	SizeGB        float64
+	Duration      time.Duration
+	IngressGB     float64
+	EgressGB      float64
+	CrossRegionGB float64
+	CPUHours      float64
+	MemoryGBHours float64
+	Timestamp     time.Time
+	Tags          map[string]string
 }
 
-// NewCostTracker creates a new cost tracker
+// NewCostTracker creates a new cost tracker.
 func NewCostTracker(maxHistoryDays int) *CostTracker {
 	return &CostTracker{
-		costs:           make(map[string]*DatabaseCosts),
-		providerRates:   make(map[StorageProvider]*ProviderRates),
-		computeRates:    DefaultComputeRates(),
-		transferRates:   DefaultTransferRates(),
-		costHistory:     make([]*CostSnapshot, 0),
-		maxHistoryDays:  maxHistoryDays,
+		costs:          make(map[string]*DatabaseCosts),
+		providerRates:  make(map[StorageProvider]*ProviderRates),
+		computeRates:   DefaultComputeRates(),
+		transferRates:  DefaultTransferRates(),
+		costHistory:    make([]*CostSnapshot, 0),
+		maxHistoryDays: maxHistoryDays,
 	}
 }
 
-// DefaultProviderRates returns default pricing rates
+// DefaultProviderRates returns default pricing rates.
 func DefaultProviderRates() map[StorageProvider]*ProviderRates {
 	return map[StorageProvider]*ProviderRates{
 		ProviderAWS: {
 			Provider: ProviderAWS,
 			Region:   "us-east-1",
 			StorageRates: map[StorageTier]float64{
-				TierHot:     0.023,  // S3 Standard
-				TierCool:    0.0125, // S3 IA
-				TierArchive: 0.004,  // S3 Glacier Flexible
+				TierHot:     0.023,   // S3 Standard
+				TierCool:    0.0125,  // S3 IA
+				TierArchive: 0.004,   // S3 Glacier Flexible
 				TierGlacier: 0.00099, // S3 Glacier Deep Archive
 			},
 			LastUpdated: time.Now(),
@@ -198,7 +198,7 @@ func DefaultProviderRates() map[StorageProvider]*ProviderRates {
 	}
 }
 
-// DefaultComputeRates returns default compute pricing
+// DefaultComputeRates returns default compute pricing.
 func DefaultComputeRates() *ComputeRates {
 	return &ComputeRates{
 		CPUCostPerHour:   0.05,
@@ -207,38 +207,38 @@ func DefaultComputeRates() *ComputeRates {
 	}
 }
 
-// DefaultTransferRates returns default transfer pricing
+// DefaultTransferRates returns default transfer pricing.
 func DefaultTransferRates() *TransferRates {
 	return &TransferRates{
-		IngressCostPerGB:     0.0,   // Usually free
-		EgressCostPerGB:      0.09,  // Standard egress
-		CrossRegionCostPerGB: 0.02,  // Cross-region transfer
+		IngressCostPerGB:     0.0,  // Usually free
+		EgressCostPerGB:      0.09, // Standard egress
+		CrossRegionCostPerGB: 0.02, // Cross-region transfer
 		LastUpdated:          time.Now(),
 	}
 }
 
-// SetProviderRates sets pricing rates for a provider
+// SetProviderRates sets pricing rates for a provider.
 func (ct *CostTracker) SetProviderRates(provider StorageProvider, rates *ProviderRates) {
 	ct.mu.Lock()
 	defer ct.mu.Unlock()
 	ct.providerRates[provider] = rates
 }
 
-// SetComputeRates sets compute pricing rates
+// SetComputeRates sets compute pricing rates.
 func (ct *CostTracker) SetComputeRates(rates *ComputeRates) {
 	ct.mu.Lock()
 	defer ct.mu.Unlock()
 	ct.computeRates = rates
 }
 
-// SetTransferRates sets data transfer pricing rates
+// SetTransferRates sets data transfer pricing rates.
 func (ct *CostTracker) SetTransferRates(rates *TransferRates) {
 	ct.mu.Lock()
 	defer ct.mu.Unlock()
 	ct.transferRates = rates
 }
 
-// TrackBackupOperation tracks costs for a backup operation
+// TrackBackupOperation tracks costs for a backup operation.
 func (ct *CostTracker) TrackBackupOperation(ctx context.Context, op *BackupOperation) error {
 	ct.mu.Lock()
 	defer ct.mu.Unlock()
@@ -284,7 +284,7 @@ func (ct *CostTracker) TrackBackupOperation(ctx context.Context, op *BackupOpera
 	return nil
 }
 
-// updateStorageCosts updates storage costs
+// updateStorageCosts updates storage costs.
 func (ct *CostTracker) updateStorageCosts(storageCosts *StorageCosts, op *BackupOperation) {
 	// Get provider rates
 	rates, exists := ct.providerRates[op.Provider]
@@ -324,7 +324,7 @@ func (ct *CostTracker) updateStorageCosts(storageCosts *StorageCosts, op *Backup
 	}
 }
 
-// updateTransferCosts updates data transfer costs
+// updateTransferCosts updates data transfer costs.
 func (ct *CostTracker) updateTransferCosts(transferCosts *TransferCosts, op *BackupOperation) {
 	// Update transfer volumes
 	transferCosts.IngressGB += op.IngressGB
@@ -343,7 +343,7 @@ func (ct *CostTracker) updateTransferCosts(transferCosts *TransferCosts, op *Bac
 	}
 }
 
-// updateComputeCosts updates compute costs
+// updateComputeCosts updates compute costs.
 func (ct *CostTracker) updateComputeCosts(computeCosts *ComputeCosts, op *BackupOperation) {
 	// Update compute time
 	computeCosts.BackupDuration += op.Duration
@@ -360,7 +360,7 @@ func (ct *CostTracker) updateComputeCosts(computeCosts *ComputeCosts, op *Backup
 	}
 }
 
-// GetDatabaseCosts returns costs for a specific database
+// GetDatabaseCosts returns costs for a specific database.
 func (ct *CostTracker) GetDatabaseCosts(databaseName string) (*DatabaseCosts, error) {
 	ct.mu.RLock()
 	defer ct.mu.RUnlock()
@@ -373,7 +373,7 @@ func (ct *CostTracker) GetDatabaseCosts(databaseName string) (*DatabaseCosts, er
 	return costs, nil
 }
 
-// GetAllDatabaseCosts returns costs for all databases
+// GetAllDatabaseCosts returns costs for all databases.
 func (ct *CostTracker) GetAllDatabaseCosts() map[string]*DatabaseCosts {
 	ct.mu.RLock()
 	defer ct.mu.RUnlock()
@@ -386,16 +386,16 @@ func (ct *CostTracker) GetAllDatabaseCosts() map[string]*DatabaseCosts {
 	return result
 }
 
-// GetTotalCosts returns total costs across all databases
+// GetTotalCosts returns total costs across all databases.
 func (ct *CostTracker) GetTotalCosts() *CostSnapshot {
 	ct.mu.RLock()
 	defer ct.mu.RUnlock()
 
 	snapshot := &CostSnapshot{
-		Timestamp:    time.Now(),
-		ByProvider:   make(map[StorageProvider]float64),
-		ByDatabase:   make(map[string]float64),
-		ByTag:        make(map[string]float64),
+		Timestamp:  time.Now(),
+		ByProvider: make(map[StorageProvider]float64),
+		ByDatabase: make(map[string]float64),
+		ByTag:      make(map[string]float64),
 	}
 
 	for dbName, dbCosts := range ct.costs {
@@ -420,7 +420,7 @@ func (ct *CostTracker) GetTotalCosts() *CostSnapshot {
 	return snapshot
 }
 
-// GetCostsByProvider returns costs grouped by provider
+// GetCostsByProvider returns costs grouped by provider.
 func (ct *CostTracker) GetCostsByProvider() map[StorageProvider]float64 {
 	ct.mu.RLock()
 	defer ct.mu.RUnlock()
@@ -434,7 +434,7 @@ func (ct *CostTracker) GetCostsByProvider() map[StorageProvider]float64 {
 	return result
 }
 
-// GetCostsByTag returns costs grouped by tag
+// GetCostsByTag returns costs grouped by tag.
 func (ct *CostTracker) GetCostsByTag(tagKey string) map[string]float64 {
 	ct.mu.RLock()
 	defer ct.mu.RUnlock()
@@ -450,7 +450,7 @@ func (ct *CostTracker) GetCostsByTag(tagKey string) map[string]float64 {
 	return result
 }
 
-// TakeSnapshot creates a cost snapshot and stores it in history
+// TakeSnapshot creates a cost snapshot and stores it in history.
 func (ct *CostTracker) TakeSnapshot() *CostSnapshot {
 	ct.mu.Lock()
 	defer ct.mu.Unlock()
@@ -473,7 +473,7 @@ func (ct *CostTracker) TakeSnapshot() *CostSnapshot {
 	return snapshot
 }
 
-// getTotalCostsInternal is the internal version without lock
+// getTotalCostsInternal is the internal version without lock.
 func (ct *CostTracker) getTotalCostsInternal() *CostSnapshot {
 	snapshot := &CostSnapshot{
 		Timestamp:  time.Now(),
@@ -499,7 +499,7 @@ func (ct *CostTracker) getTotalCostsInternal() *CostSnapshot {
 	return snapshot
 }
 
-// GetCostHistory returns cost snapshots for the specified period
+// GetCostHistory returns cost snapshots for the specified period.
 func (ct *CostTracker) GetCostHistory(start, end time.Time) []*CostSnapshot {
 	ct.mu.RLock()
 	defer ct.mu.RUnlock()
@@ -514,7 +514,7 @@ func (ct *CostTracker) GetCostHistory(start, end time.Time) []*CostSnapshot {
 	return result
 }
 
-// GetCostTrend calculates cost trend over time
+// GetCostTrend calculates cost trend over time.
 func (ct *CostTracker) GetCostTrend(days int) *CostTrend {
 	ct.mu.RLock()
 	defer ct.mu.RUnlock()
@@ -573,7 +573,7 @@ func (ct *CostTracker) GetCostTrend(days int) *CostTrend {
 	}
 }
 
-// CostTrend represents cost trend over time
+// CostTrend represents cost trend over time.
 type CostTrend struct {
 	Period           int
 	CurrentCost      float64
@@ -584,7 +584,7 @@ type CostTrend struct {
 	Trend            string // increasing, decreasing, stable
 }
 
-// GetCostProjection projects costs for the next period
+// GetCostProjection projects costs for the next period.
 func (ct *CostTracker) GetCostProjection(days int) *CostProjection {
 	trend := ct.GetCostTrend(30) // Use last 30 days
 
@@ -598,15 +598,15 @@ func (ct *CostTracker) GetCostProjection(days int) *CostProjection {
 	}
 
 	return &CostProjection{
-		Period:           days,
-		ProjectedCost:    projectedCost,
-		DailyRate:        dailyRate,
-		GrowthRate:       trend.ChangePercent,
-		Confidence:       calculateConfidence(len(ct.costHistory)),
+		Period:        days,
+		ProjectedCost: projectedCost,
+		DailyRate:     dailyRate,
+		GrowthRate:    trend.ChangePercent,
+		Confidence:    calculateConfidence(len(ct.costHistory)),
 	}
 }
 
-// CostProjection represents projected costs
+// CostProjection represents projected costs.
 type CostProjection struct {
 	Period        int
 	ProjectedCost float64
@@ -624,7 +624,7 @@ func calculateConfidence(dataPoints int) float64 {
 	return 90.0
 }
 
-// GetStatistics returns cost tracking statistics
+// GetStatistics returns cost tracking statistics.
 func (ct *CostTracker) GetStatistics() map[string]interface{} {
 	ct.mu.RLock()
 	defer ct.mu.RUnlock()

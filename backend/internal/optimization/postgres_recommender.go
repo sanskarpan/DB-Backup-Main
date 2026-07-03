@@ -11,19 +11,19 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/validation"
 )
 
-// PostgreSQLIndexRecommender implements IndexRecommender for PostgreSQL
+// PostgreSQLIndexRecommender implements IndexRecommender for PostgreSQL.
 type PostgreSQLIndexRecommender struct {
 	db *sql.DB
 }
 
-// NewPostgreSQLIndexRecommender creates a new PostgreSQL index recommender
+// NewPostgreSQLIndexRecommender creates a new PostgreSQL index recommender.
 func NewPostgreSQLIndexRecommender(db *sql.DB) *PostgreSQLIndexRecommender {
 	return &PostgreSQLIndexRecommender{
 		db: db,
 	}
 }
 
-// RecommendIndexes recommends indexes based on query patterns
+// RecommendIndexes recommends indexes based on query patterns.
 func (pir *PostgreSQLIndexRecommender) RecommendIndexes(ctx context.Context, queries []string) ([]*IndexRecommendation, error) {
 	recommendations := make([]*IndexRecommendation, 0)
 
@@ -40,7 +40,7 @@ func (pir *PostgreSQLIndexRecommender) RecommendIndexes(ctx context.Context, que
 	return recommendations, nil
 }
 
-// AnalyzeIndexUsage analyzes current index usage
+// AnalyzeIndexUsage analyzes current index usage.
 func (pir *PostgreSQLIndexRecommender) AnalyzeIndexUsage(ctx context.Context) ([]*IndexUsage, error) {
 	query := `
 		SELECT
@@ -96,12 +96,12 @@ func (pir *PostgreSQLIndexRecommender) AnalyzeIndexUsage(ctx context.Context) ([
 	return usages, rows.Err()
 }
 
-// ValidateIndex checks if an index would be beneficial
+// ValidateIndex checks if an index would be beneficial.
 func (pir *PostgreSQLIndexRecommender) ValidateIndex(ctx context.Context, table string, columns []string) (*IndexValidation, error) {
 	validation := &IndexValidation{
-		Table:   table,
-		Columns: columns,
-		Warnings: make([]string, 0),
+		Table:        table,
+		Columns:      columns,
+		Warnings:     make([]string, 0),
 		Alternatives: make([]*IndexRecommendation, 0),
 	}
 
@@ -127,13 +127,14 @@ func (pir *PostgreSQLIndexRecommender) ValidateIndex(ctx context.Context, table 
 	validation.IsValid = true
 
 	// High selectivity = beneficial index
-	if selectivity > 0.01 && selectivity < 0.9 {
+	switch {
+	case selectivity > 0.01 && selectivity < 0.9:
 		validation.IsBeneficial = true
 		validation.ExpectedGain = (1.0 - selectivity) * 100
-	} else if selectivity >= 0.9 {
+	case selectivity >= 0.9:
 		validation.IsBeneficial = false
 		validation.Warnings = append(validation.Warnings, "Low selectivity - index may not be beneficial")
-	} else {
+	default:
 		validation.IsBeneficial = true
 		validation.ExpectedGain = 80.0 // High selectivity = good gain
 	}
@@ -151,10 +152,10 @@ func (pir *PostgreSQLIndexRecommender) analyzeQueryForIndexes(query string) []*I
 	if len(whereColumns) > 0 {
 		for table, columns := range whereColumns {
 			rec := &IndexRecommendation{
-				Table:     table,
-				Columns:   columns,
-				IndexType: IndexTypeBTree,
-				Reason:    "Frequently used in WHERE clause",
+				Table:      table,
+				Columns:    columns,
+				IndexType:  IndexTypeBTree,
+				Reason:     "Frequently used in WHERE clause",
 				Confidence: 0.8,
 				Priority:   PriorityMedium,
 				CreatedAt:  time.Now(),
@@ -168,10 +169,10 @@ func (pir *PostgreSQLIndexRecommender) analyzeQueryForIndexes(query string) []*I
 	if len(joinColumns) > 0 {
 		for table, columns := range joinColumns {
 			rec := &IndexRecommendation{
-				Table:     table,
-				Columns:   columns,
-				IndexType: IndexTypeBTree,
-				Reason:    "Used in JOIN condition",
+				Table:      table,
+				Columns:    columns,
+				IndexType:  IndexTypeBTree,
+				Reason:     "Used in JOIN condition",
 				Confidence: 0.9,
 				Priority:   PriorityHigh,
 				CreatedAt:  time.Now(),
@@ -185,10 +186,10 @@ func (pir *PostgreSQLIndexRecommender) analyzeQueryForIndexes(query string) []*I
 	if len(orderColumns) > 0 {
 		for table, columns := range orderColumns {
 			rec := &IndexRecommendation{
-				Table:     table,
-				Columns:   columns,
-				IndexType: IndexTypeBTree,
-				Reason:    "Used in ORDER BY clause",
+				Table:      table,
+				Columns:    columns,
+				IndexType:  IndexTypeBTree,
+				Reason:     "Used in ORDER BY clause",
 				Confidence: 0.7,
 				Priority:   PriorityMedium,
 				CreatedAt:  time.Now(),
@@ -287,6 +288,7 @@ func (pir *PostgreSQLIndexRecommender) estimateSelectivity(ctx context.Context, 
 	}
 
 	// Simple selectivity estimation — identifiers are validated above.
+	//nolint:gosec // G201: table and column identifiers are validated by ValidateTableName above
 	query := fmt.Sprintf("SELECT COUNT(DISTINCT %s)::float / COUNT(*)::float FROM %s", columns[0], table)
 
 	var selectivity float64

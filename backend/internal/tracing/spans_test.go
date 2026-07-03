@@ -23,7 +23,8 @@ func TestStartSpan(t *testing.T) {
 	ctx := context.Background()
 
 	// Start a span with attributes
-	ctx, span := StartSpan(ctx, "test-tracer", "test-operation",
+	_, span := StartSpan(
+		ctx, "test-tracer", "test-operation",
 		WithAttributes(
 			attribute.String("key1", "value1"),
 			attribute.Int("key2", 42),
@@ -307,7 +308,8 @@ func TestAddEvent(t *testing.T) {
 	tracer := otel.Tracer("test")
 	ctx, span := tracer.Start(context.Background(), "test-operation")
 
-	AddEvent(ctx, "checkpoint",
+	AddEvent(
+		ctx, "checkpoint",
 		attribute.String("step", "validation"),
 		attribute.Int("count", 5),
 	)
@@ -339,7 +341,8 @@ func TestAddSpanAttributes(t *testing.T) {
 	tracer := otel.Tracer("test")
 	ctx, span := tracer.Start(context.Background(), "test-operation")
 
-	AddSpanAttributes(ctx,
+	AddSpanAttributes(
+		ctx,
 		attribute.String("user_id", "123"),
 		attribute.Bool("premium", true),
 	)
@@ -460,7 +463,6 @@ func TestTraceFunc(t *testing.T) {
 			}
 			return nil
 		})
-
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -483,7 +485,7 @@ func TestTraceFunc(t *testing.T) {
 			return testErr
 		})
 
-		if err != testErr {
+		if !errors.Is(err, testErr) {
 			t.Errorf("Expected error %v, got %v", testErr, err)
 		}
 
@@ -513,7 +515,6 @@ func TestTraceFuncWithResult(t *testing.T) {
 			func(ctx context.Context) (string, error) {
 				return "success", nil
 			})
-
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -537,7 +538,7 @@ func TestTraceFuncWithResult(t *testing.T) {
 				return 0, testErr
 			})
 
-		if err != testErr {
+		if !errors.Is(err, testErr) {
 			t.Errorf("Expected error %v, got %v", testErr, err)
 		}
 

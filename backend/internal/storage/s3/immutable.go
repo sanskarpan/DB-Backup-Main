@@ -3,6 +3,7 @@ package s3
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -10,20 +11,24 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// ObjectLockMode defines the S3 Object Lock mode
+// ErrNoRetention indicates that an object has no Object Lock retention configured.
+var ErrNoRetention = errors.New("object has no retention configuration")
+
+// ObjectLockMode defines the S3 Object Lock mode.
 type ObjectLockMode string
 
 const (
-	// ObjectLockModeGovernance allows users with special permissions to alter retention
+	// ObjectLockModeGovernance allows users with special permissions to alter retention.
 	ObjectLockModeGovernance ObjectLockMode = "GOVERNANCE"
-	// ObjectLockModeCompliance prevents anyone, including root, from altering retention
+	// ObjectLockModeCompliance prevents anyone, including root, from altering retention.
 	ObjectLockModeCompliance ObjectLockMode = "COMPLIANCE"
 )
 
-// ObjectLockConfig represents object lock configuration
+// ObjectLockConfig represents object lock configuration.
 type ObjectLockConfig struct {
 	// Mode specifies the object lock mode (GOVERNANCE or COMPLIANCE)
 	Mode ObjectLockMode
@@ -39,7 +44,7 @@ type ObjectLockConfig struct {
 	RetainUntilDate *time.Time
 }
 
-// ImmutableBackupConfig represents immutable backup configuration
+// ImmutableBackupConfig represents immutable backup configuration.
 type ImmutableBackupConfig struct {
 	// Enabled determines if immutable backups are enabled
 	Enabled bool
@@ -55,7 +60,7 @@ type ImmutableBackupConfig struct {
 }
 
 // EnableObjectLock enables Object Lock on the S3 bucket
-// This operation can only be done when creating a new bucket or on a bucket without versioning
+// This operation can only be done when creating a new bucket or on a bucket without versioning.
 func (p *S3Provider) EnableObjectLock(ctx context.Context) error {
 	// Check if Object Lock is already enabled
 	output, err := p.client.GetObjectLockConfiguration(ctx, &s3.GetObjectLockConfigurationInput{
@@ -74,7 +79,6 @@ func (p *S3Provider) EnableObjectLock(ctx context.Context) error {
 			ObjectLockEnabled: types.ObjectLockEnabledEnabled,
 		},
 	})
-
 	if err != nil {
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
 			"failed to enable S3 Object Lock")
@@ -83,7 +87,7 @@ func (p *S3Provider) EnableObjectLock(ctx context.Context) error {
 	return nil
 }
 
-// SetDefaultRetention sets the default retention policy for the bucket
+// SetDefaultRetention sets the default retention policy for the bucket.
 func (p *S3Provider) SetDefaultRetention(ctx context.Context, mode ObjectLockMode, days int) error {
 	s3Mode := types.ObjectLockRetentionModeGovernance
 	if mode == ObjectLockModeCompliance {
@@ -97,12 +101,11 @@ func (p *S3Provider) SetDefaultRetention(ctx context.Context, mode ObjectLockMod
 			Rule: &types.ObjectLockRule{
 				DefaultRetention: &types.DefaultRetention{
 					Mode: s3Mode,
-					Days: aws.Int32(int32(days)),
+					Days: aws.Int32(int32(days)), //nolint:gosec // G115: retention days is a small, operator-supplied bounded value
 				},
 			},
 		},
 	})
-
 	if err != nil {
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
 			"failed to set default retention policy")
@@ -111,10 +114,10 @@ func (p *S3Provider) SetDefaultRetention(ctx context.Context, mode ObjectLockMod
 	return nil
 }
 
-// UploadImmutable uploads a file with Object Lock protection
+// UploadImmutable uploads a file with Object Lock protection.
 func (p *S3Provider) UploadImmutable(ctx context.Context, localPath, remotePath string,
-	lockConfig *ObjectLockConfig) error {
-
+	lockConfig *ObjectLockConfig,
+) error {
 	// Calculate retention date
 	var retainUntilDate time.Time
 	if lockConfig.RetainUntilDate != nil {
@@ -159,20 +162,19 @@ func (p *S3Provider) UploadImmutable(ctx context.Context, localPath, remotePath 
 	return nil
 }
 
-// GetObjectRetention retrieves the retention configuration for an object
+// GetObjectRetention retrieves the retention configuration for an object.
 func (p *S3Provider) GetObjectRetention(ctx context.Context, remotePath string) (*ObjectLockConfig, error) {
 	output, err := p.client.GetObjectRetention(ctx, &s3.GetObjectRetentionInput{
 		Bucket: aws.String(p.config.Bucket),
 		Key:    aws.String(remotePath),
 	})
-
 	if err != nil {
 		return nil, pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
 			"failed to get object retention")
 	}
 
 	if output.Retention == nil {
-		return nil, nil
+		return nil, ErrNoRetention
 	}
 
 	config := &ObjectLockConfig{
@@ -193,13 +195,12 @@ func (p *S3Provider) GetObjectRetention(ctx context.Context, remotePath string) 
 	return config, nil
 }
 
-// GetLegalHoldStatus retrieves the legal hold status for an object
+// GetLegalHoldStatus retrieves the legal hold status for an object.
 func (p *S3Provider) GetLegalHoldStatus(ctx context.Context, remotePath string) (bool, error) {
 	output, err := p.client.GetObjectLegalHold(ctx, &s3.GetObjectLegalHoldInput{
 		Bucket: aws.String(p.config.Bucket),
 		Key:    aws.String(remotePath),
 	})
-
 	if err != nil {
 		return false, pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
 			"failed to get legal hold status")
@@ -209,7 +210,7 @@ func (p *S3Provider) GetLegalHoldStatus(ctx context.Context, remotePath string) 
 		output.LegalHold.Status == types.ObjectLockLegalHoldStatusOn, nil
 }
 
-// SetLegalHold sets or removes legal hold on an object
+// SetLegalHold sets or removes legal hold on an object.
 func (p *S3Provider) SetLegalHold(ctx context.Context, remotePath string, enabled bool) error {
 	status := types.ObjectLockLegalHoldStatusOff
 	if enabled {
@@ -223,7 +224,6 @@ func (p *S3Provider) SetLegalHold(ctx context.Context, remotePath string, enable
 			Status: status,
 		},
 	})
-
 	if err != nil {
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
 			"failed to set legal hold")
@@ -232,19 +232,18 @@ func (p *S3Provider) SetLegalHold(ctx context.Context, remotePath string, enable
 	return nil
 }
 
-// ExtendRetention extends the retention period for an object
+// ExtendRetention extends the retention period for an object.
 func (p *S3Provider) ExtendRetention(ctx context.Context, remotePath string,
-	newRetentionDays int) error {
-
+	newRetentionDays int,
+) error {
 	// Get current retention
 	current, err := p.GetObjectRetention(ctx, remotePath)
-	if err != nil {
-		return err
-	}
-
-	if current == nil {
+	if errors.Is(err, ErrNoRetention) {
 		return pkgErrors.New(pkgErrors.ErrorTypeValidation,
 			"object does not have retention set")
+	}
+	if err != nil {
+		return err
 	}
 
 	// Calculate new retention date
@@ -270,7 +269,6 @@ func (p *S3Provider) ExtendRetention(ctx context.Context, remotePath string,
 			RetainUntilDate: aws.Time(newRetainUntil),
 		},
 	})
-
 	if err != nil {
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
 			"failed to extend retention")
@@ -279,14 +277,13 @@ func (p *S3Provider) ExtendRetention(ctx context.Context, remotePath string,
 	return nil
 }
 
-// BypassGovernanceDelete deletes an object in GOVERNANCE mode with bypass permissions
+// BypassGovernanceDelete deletes an object in GOVERNANCE mode with bypass permissions.
 func (p *S3Provider) BypassGovernanceDelete(ctx context.Context, remotePath string) error {
 	_, err := p.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket:                    aws.String(p.config.Bucket),
 		Key:                       aws.String(remotePath),
 		BypassGovernanceRetention: aws.Bool(true),
 	})
-
 	if err != nil {
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
 			"failed to bypass governance and delete object")
@@ -295,7 +292,7 @@ func (p *S3Provider) BypassGovernanceDelete(ctx context.Context, remotePath stri
 	return nil
 }
 
-// ListImmutableBackups lists all backups with object lock configuration
+// ListImmutableBackups lists all backups with object lock configuration.
 func (p *S3Provider) ListImmutableBackups(ctx context.Context, prefix string) ([]ImmutableBackupInfo, error) {
 	var backups []ImmutableBackupInfo
 
@@ -343,7 +340,7 @@ func (p *S3Provider) ListImmutableBackups(ctx context.Context, prefix string) ([
 	return backups, nil
 }
 
-// ImmutableBackupInfo represents information about an immutable backup
+// ImmutableBackupInfo represents information about an immutable backup.
 type ImmutableBackupInfo struct {
 	Key             string
 	Size            *int64
@@ -353,7 +350,7 @@ type ImmutableBackupInfo struct {
 	LegalHold       bool
 }
 
-// IsProtected returns true if the backup is currently protected
+// IsProtected returns true if the backup is currently protected.
 func (i *ImmutableBackupInfo) IsProtected() bool {
 	if i.LegalHold {
 		return true
@@ -366,7 +363,7 @@ func (i *ImmutableBackupInfo) IsProtected() bool {
 	return false
 }
 
-// DaysUntilUnlock returns the number of days until the backup can be deleted
+// DaysUntilUnlock returns the number of days until the backup can be deleted.
 func (i *ImmutableBackupInfo) DaysUntilUnlock() int {
 	if i.LegalHold {
 		return -1 // Indefinite
@@ -386,7 +383,7 @@ func (i *ImmutableBackupInfo) DaysUntilUnlock() int {
 	return days
 }
 
-// openFile is a helper function to open a file
+// openFile is a helper function to open a file.
 func (p *S3Provider) openFile(path string) (*os.File, error) {
 	file, err := os.Open(path)
 	if err != nil {

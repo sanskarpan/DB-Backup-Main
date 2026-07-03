@@ -54,6 +54,7 @@ func TestRetentionPolicyConfig(t *testing.T) {
 
 		assert.Equal(t, 90*24*time.Hour, config.RetentionPeriod)
 		assert.True(t, config.IsLocked)
+		assert.NotZero(t, config.EffectiveTime)
 	})
 }
 
@@ -245,9 +246,9 @@ func TestGCSObjectRetentionInfo_DaysUntilUnlock(t *testing.T) {
 		{
 			name: "longer of object and bucket retention",
 			info: GCSObjectRetentionInfo{
-				RetainUntilTime:       timePtr(time.Now().AddDate(0, 0, 60)),  // 60 days
-				Created:               time.Now().AddDate(0, 0, -5),            // Created 5 days ago
-				BucketRetentionPeriod: 30 * 24 * time.Hour,                    // 30-day retention
+				RetainUntilTime:       timePtr(time.Now().AddDate(0, 0, 60)), // 60 days
+				Created:               time.Now().AddDate(0, 0, -5),          // Created 5 days ago
+				BucketRetentionPeriod: 30 * 24 * time.Hour,                   // 30-day retention
 			},
 			expected: 60, // Object retention is longer
 		},
@@ -296,8 +297,8 @@ func TestGCSObjectRetentionInfo_IsLocked(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "no retention",
-			info: GCSObjectRetentionInfo{},
+			name:     "no retention",
+			info:     GCSObjectRetentionInfo{},
 			expected: false,
 		},
 	}
@@ -396,7 +397,7 @@ func TestRetentionModeValidation(t *testing.T) {
 func TestGCSObjectRetentionInfo_EdgeCases(t *testing.T) {
 	t.Run("protection with nil retain time but holds", func(t *testing.T) {
 		info := GCSObjectRetentionInfo{
-			ObjectName:     "test.sql",
+			ObjectName:      "test.sql",
 			RetainUntilTime: nil,
 			EventBasedHold:  true,
 		}
@@ -484,12 +485,12 @@ func TestGCSObjectRetentionInfo_SizeAndMetadata(t *testing.T) {
 	})
 }
 
-// Helper function to create time pointers
+// Helper function to create time pointers.
 func timePtr(t time.Time) *time.Time {
 	return &t
 }
 
-// Benchmark tests
+// Benchmark tests.
 func BenchmarkGCSIsProtected(b *testing.B) {
 	info := GCSObjectRetentionInfo{
 		RetainUntilTime: timePtr(time.Now().AddDate(0, 0, 30)),

@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// MemoryProfilerConfig contains configuration for memory profiling
+// MemoryProfilerConfig contains configuration for memory profiling.
 type MemoryProfilerConfig struct {
 	// Enable profiling
 	Enabled bool `mapstructure:"enabled"`
@@ -51,66 +51,66 @@ type MemoryProfilerConfig struct {
 	LeakDetectionWindow time.Duration `mapstructure:"leak_detection_window"`
 }
 
-// MemoryProfiler provides memory profiling and leak detection
+// MemoryProfiler provides memory profiling and leak detection.
 type MemoryProfiler struct {
-	config    *MemoryProfilerConfig
-	mu        sync.RWMutex
+	config *MemoryProfilerConfig
+	mu     sync.RWMutex
 
 	// Baseline measurements
-	baselineHeap      uint64
+	baselineHeap       uint64
 	baselineGoroutines int
 	baselineTimestamp  time.Time
 
 	// Tracking
-	snapshots     []*MemorySnapshot
-	leaks         []*LeakReport
+	snapshots      []*MemorySnapshot
+	leaks          []*LeakReport
 	cpuProfileFile *os.File
 	traceFile      *os.File
 
 	// Control
-	stopChan      chan struct{}
-	running       bool
+	stopChan chan struct{}
+	running  bool
 }
 
-// MemorySnapshot represents a point-in-time memory snapshot
+// MemorySnapshot represents a point-in-time memory snapshot.
 type MemorySnapshot struct {
-	Timestamp      time.Time
-	HeapAlloc      uint64
-	HeapSys        uint64
-	HeapIdle       uint64
-	HeapInuse      uint64
-	HeapReleased   uint64
-	HeapObjects    uint64
-	StackInuse     uint64
-	StackSys       uint64
-	NumGoroutine   int
-	NumCgoCall     int64
-	GCCycles       uint32
-	NextGC         uint64
-	LastGC         time.Time
+	Timestamp    time.Time
+	HeapAlloc    uint64
+	HeapSys      uint64
+	HeapIdle     uint64
+	HeapInuse    uint64
+	HeapReleased uint64
+	HeapObjects  uint64
+	StackInuse   uint64
+	StackSys     uint64
+	NumGoroutine int
+	NumCgoCall   int64
+	GCCycles     uint32
+	NextGC       uint64
+	LastGC       time.Time
 }
 
-// LeakReport contains information about a detected leak
+// LeakReport contains information about a detected leak.
 type LeakReport struct {
-	DetectedAt     time.Time
-	LeakType       LeakType
-	Description    string
-	Severity       Severity
-	HeapGrowth     int64 // bytes
+	DetectedAt      time.Time
+	LeakType        LeakType
+	Description     string
+	Severity        Severity
+	HeapGrowth      int64 // bytes
 	GoroutineGrowth int
 	Recommendations []string
 }
 
-// LeakType represents the type of memory leak
+// LeakType represents the type of memory leak.
 type LeakType string
 
 const (
-	LeakTypeMemory     LeakType = "memory"
-	LeakTypeGoroutine  LeakType = "goroutine"
-	LeakTypeBoth       LeakType = "both"
+	LeakTypeMemory    LeakType = "memory"
+	LeakTypeGoroutine LeakType = "goroutine"
+	LeakTypeBoth      LeakType = "both"
 )
 
-// Severity represents leak severity
+// Severity represents leak severity.
 type Severity string
 
 const (
@@ -120,7 +120,11 @@ const (
 	SeverityCritical Severity = "critical"
 )
 
-// NewMemoryProfiler creates a new memory profiler
+// trendInsufficientData is the trend result returned when there are not enough
+// snapshots to compute a meaningful growth trend.
+const trendInsufficientData = "insufficient_data"
+
+// NewMemoryProfiler creates a new memory profiler.
 func NewMemoryProfiler(config *MemoryProfilerConfig) (*MemoryProfiler, error) {
 	if config == nil {
 		return nil, fmt.Errorf("profiler config is required")
@@ -144,15 +148,15 @@ func NewMemoryProfiler(config *MemoryProfilerConfig) (*MemoryProfiler, error) {
 	}
 
 	// Create profile directory
-	if err := os.MkdirAll(config.ProfileDir, 0755); err != nil {
+	if err := os.MkdirAll(config.ProfileDir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create profile directory: %w", err)
 	}
 
 	profiler := &MemoryProfiler{
-		config:     config,
-		snapshots:  make([]*MemorySnapshot, 0),
-		leaks:      make([]*LeakReport, 0),
-		stopChan:   make(chan struct{}),
+		config:    config,
+		snapshots: make([]*MemorySnapshot, 0),
+		leaks:     make([]*LeakReport, 0),
+		stopChan:  make(chan struct{}),
 	}
 
 	// Take baseline snapshot
@@ -161,7 +165,7 @@ func NewMemoryProfiler(config *MemoryProfilerConfig) (*MemoryProfiler, error) {
 	return profiler, nil
 }
 
-// Start starts the memory profiler
+// Start starts the memory profiler.
 func (p *MemoryProfiler) Start(ctx context.Context) error {
 	if !p.config.Enabled {
 		return nil
@@ -195,7 +199,7 @@ func (p *MemoryProfiler) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop stops the memory profiler
+// Stop stops the memory profiler.
 func (p *MemoryProfiler) Stop() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -224,7 +228,7 @@ func (p *MemoryProfiler) Stop() error {
 	return nil
 }
 
-// monitorLoop performs periodic memory monitoring
+// monitorLoop performs periodic memory monitoring.
 func (p *MemoryProfiler) monitorLoop(ctx context.Context) {
 	ticker := time.NewTicker(p.config.Interval)
 	defer ticker.Stop()
@@ -240,13 +244,19 @@ func (p *MemoryProfiler) monitorLoop(ctx context.Context) {
 
 			// Write profiles if enabled
 			if p.config.HeapProfile {
-				p.writeHeapProfile()
+				if err := p.writeHeapProfile(); err != nil {
+					fmt.Printf("[PROFILING] failed to write heap profile: %v\n", err)
+				}
 			}
 			if p.config.GoroutineProfile {
-				p.writeGoroutineProfile()
+				if err := p.writeGoroutineProfile(); err != nil {
+					fmt.Printf("[PROFILING] failed to write goroutine profile: %v\n", err)
+				}
 			}
 			if p.config.AllocProfile {
-				p.writeAllocProfile()
+				if err := p.writeAllocProfile(); err != nil {
+					fmt.Printf("[PROFILING] failed to write alloc profile: %v\n", err)
+				}
 			}
 
 			// Check for leaks if enabled
@@ -257,7 +267,7 @@ func (p *MemoryProfiler) monitorLoop(ctx context.Context) {
 	}
 }
 
-// takeBaseline takes a baseline memory snapshot
+// takeBaseline takes a baseline memory snapshot.
 func (p *MemoryProfiler) takeBaseline() {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
@@ -270,7 +280,7 @@ func (p *MemoryProfiler) takeBaseline() {
 	p.baselineTimestamp = time.Now()
 }
 
-// takeSnapshot takes a memory snapshot
+// takeSnapshot takes a memory snapshot.
 func (p *MemoryProfiler) takeSnapshot() *MemorySnapshot {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
@@ -289,7 +299,8 @@ func (p *MemoryProfiler) takeSnapshot() *MemorySnapshot {
 		NumCgoCall:   runtime.NumCgoCall(),
 		GCCycles:     m.NumGC,
 		NextGC:       m.NextGC,
-		LastGC:       time.Unix(0, int64(m.LastGC)),
+		//nolint:gosec // G115: m.LastGC is a runtime nanosecond timestamp that fits in int64
+		LastGC: time.Unix(0, int64(m.LastGC)),
 	}
 
 	p.mu.Lock()
@@ -304,7 +315,7 @@ func (p *MemoryProfiler) takeSnapshot() *MemorySnapshot {
 	return snapshot
 }
 
-// detectLeaks analyzes snapshots to detect memory leaks
+// detectLeaks analyzes snapshots to detect memory leaks.
 func (p *MemoryProfiler) detectLeaks() {
 	p.mu.RLock()
 	if len(p.snapshots) < 2 {
@@ -331,11 +342,12 @@ func (p *MemoryProfiler) detectLeaks() {
 	firstSnap := windowSnapshots[0]
 	lastSnap := windowSnapshots[len(windowSnapshots)-1]
 
+	//nolint:gosec // G115: heap sizes are well within int64 range; subtraction yields signed growth
 	heapGrowth := int64(lastSnap.HeapAlloc) - int64(firstSnap.HeapAlloc)
 	goroutineGrowth := lastSnap.NumGoroutine - firstSnap.NumGoroutine
 
 	// Check for memory leak
-	memoryLeak := heapGrowth > int64(p.config.MemoryThreshold)
+	memoryLeak := heapGrowth > p.config.MemoryThreshold
 	goroutineLeak := goroutineGrowth > p.config.GoroutineThreshold
 
 	if memoryLeak || goroutineLeak {
@@ -345,17 +357,18 @@ func (p *MemoryProfiler) detectLeaks() {
 			GoroutineGrowth: goroutineGrowth,
 		}
 
-		if memoryLeak && goroutineLeak {
+		switch {
+		case memoryLeak && goroutineLeak:
 			leak.LeakType = LeakTypeBoth
 			leak.Description = fmt.Sprintf("Both memory and goroutine leaks detected. Heap grew by %d MB, goroutines grew by %d",
 				heapGrowth/(1024*1024), goroutineGrowth)
 			leak.Severity = SeverityCritical
-		} else if memoryLeak {
+		case memoryLeak:
 			leak.LeakType = LeakTypeMemory
 			leak.Description = fmt.Sprintf("Memory leak detected. Heap grew by %d MB in %v",
 				heapGrowth/(1024*1024), p.config.LeakDetectionWindow)
 			leak.Severity = p.calculateSeverity(heapGrowth, 0)
-		} else {
+		default:
 			leak.LeakType = LeakTypeGoroutine
 			leak.Description = fmt.Sprintf("Goroutine leak detected. Count grew by %d in %v",
 				goroutineGrowth, p.config.LeakDetectionWindow)
@@ -376,41 +389,44 @@ func (p *MemoryProfiler) detectLeaks() {
 	}
 }
 
-// calculateSeverity calculates leak severity
+// calculateSeverity calculates leak severity.
 func (p *MemoryProfiler) calculateSeverity(heapGrowth int64, goroutineGrowth int) Severity {
-	if heapGrowth > int64(p.config.MemoryThreshold)*5 || goroutineGrowth > p.config.GoroutineThreshold*5 {
+	if heapGrowth > p.config.MemoryThreshold*5 || goroutineGrowth > p.config.GoroutineThreshold*5 {
 		return SeverityCritical
 	}
-	if heapGrowth > int64(p.config.MemoryThreshold)*2 || goroutineGrowth > p.config.GoroutineThreshold*2 {
+	if heapGrowth > p.config.MemoryThreshold*2 || goroutineGrowth > p.config.GoroutineThreshold*2 {
 		return SeverityHigh
 	}
-	if heapGrowth > int64(p.config.MemoryThreshold) || goroutineGrowth > p.config.GoroutineThreshold {
+	if heapGrowth > p.config.MemoryThreshold || goroutineGrowth > p.config.GoroutineThreshold {
 		return SeverityMedium
 	}
 	return SeverityLow
 }
 
-// generateRecommendations generates leak fix recommendations
+// generateRecommendations generates leak fix recommendations.
 func (p *MemoryProfiler) generateRecommendations(leak *LeakReport) []string {
 	recommendations := make([]string, 0)
 
 	switch leak.LeakType {
 	case LeakTypeMemory:
-		recommendations = append(recommendations,
+		recommendations = append(
+			recommendations,
 			"Review heap profile to identify allocation hotspots",
 			"Check for unbounded slice/map growth",
 			"Verify proper closure of resources (files, connections)",
 			"Look for circular references preventing GC",
 		)
 	case LeakTypeGoroutine:
-		recommendations = append(recommendations,
+		recommendations = append(
+			recommendations,
 			"Review goroutine profile to identify leak sources",
 			"Check for goroutines waiting on never-closing channels",
 			"Verify context cancellation is properly propagated",
 			"Look for missing return statements in goroutines",
 		)
 	case LeakTypeBoth:
-		recommendations = append(recommendations,
+		recommendations = append(
+			recommendations,
 			"CRITICAL: Both memory and goroutine leaks detected",
 			"Review both heap and goroutine profiles",
 			"Check for goroutines holding references to large data structures",
@@ -422,7 +438,7 @@ func (p *MemoryProfiler) generateRecommendations(leak *LeakReport) []string {
 	return recommendations
 }
 
-// writeHeapProfile writes a heap profile to disk
+// writeHeapProfile writes a heap profile to disk.
 func (p *MemoryProfiler) writeHeapProfile() error {
 	filename := filepath.Join(p.config.ProfileDir,
 		fmt.Sprintf("heap-%d.prof", time.Now().Unix()))
@@ -437,7 +453,7 @@ func (p *MemoryProfiler) writeHeapProfile() error {
 	return pprof.WriteHeapProfile(f)
 }
 
-// writeGoroutineProfile writes a goroutine profile to disk
+// writeGoroutineProfile writes a goroutine profile to disk.
 func (p *MemoryProfiler) writeGoroutineProfile() error {
 	filename := filepath.Join(p.config.ProfileDir,
 		fmt.Sprintf("goroutine-%d.prof", time.Now().Unix()))
@@ -451,7 +467,7 @@ func (p *MemoryProfiler) writeGoroutineProfile() error {
 	return pprof.Lookup("goroutine").WriteTo(f, 0)
 }
 
-// writeAllocProfile writes an allocation profile to disk
+// writeAllocProfile writes an allocation profile to disk.
 func (p *MemoryProfiler) writeAllocProfile() error {
 	filename := filepath.Join(p.config.ProfileDir,
 		fmt.Sprintf("allocs-%d.prof", time.Now().Unix()))
@@ -465,7 +481,7 @@ func (p *MemoryProfiler) writeAllocProfile() error {
 	return pprof.Lookup("allocs").WriteTo(f, 0)
 }
 
-// startCPUProfile starts CPU profiling
+// startCPUProfile starts CPU profiling.
 func (p *MemoryProfiler) startCPUProfile() error {
 	filename := filepath.Join(p.config.ProfileDir,
 		fmt.Sprintf("cpu-%d.prof", time.Now().Unix()))
@@ -479,7 +495,7 @@ func (p *MemoryProfiler) startCPUProfile() error {
 	return pprof.StartCPUProfile(f)
 }
 
-// startTrace starts execution trace
+// startTrace starts execution trace.
 func (p *MemoryProfiler) startTrace() error {
 	filename := filepath.Join(p.config.ProfileDir,
 		fmt.Sprintf("trace-%d.out", time.Now().Unix()))
@@ -493,7 +509,7 @@ func (p *MemoryProfiler) startTrace() error {
 	return trace.Start(f)
 }
 
-// GetSnapshots returns all memory snapshots
+// GetSnapshots returns all memory snapshots.
 func (p *MemoryProfiler) GetSnapshots() []*MemorySnapshot {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -503,7 +519,7 @@ func (p *MemoryProfiler) GetSnapshots() []*MemorySnapshot {
 	return snapshots
 }
 
-// GetLeaks returns all detected leaks
+// GetLeaks returns all detected leaks.
 func (p *MemoryProfiler) GetLeaks() []*LeakReport {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -513,12 +529,12 @@ func (p *MemoryProfiler) GetLeaks() []*LeakReport {
 	return leaks
 }
 
-// GetCurrentStats returns current memory statistics
+// GetCurrentStats returns current memory statistics.
 func (p *MemoryProfiler) GetCurrentStats() *MemorySnapshot {
 	return p.takeSnapshot()
 }
 
-// ForceGC forces a garbage collection and returns before/after stats
+// ForceGC forces a garbage collection and returns before/after stats.
 func (p *MemoryProfiler) ForceGC() (before, after *MemorySnapshot) {
 	before = p.takeSnapshot()
 	runtime.GC()
@@ -527,7 +543,7 @@ func (p *MemoryProfiler) ForceGC() (before, after *MemorySnapshot) {
 	return
 }
 
-// GetMemoryGrowth returns memory growth since baseline
+// GetMemoryGrowth returns memory growth since baseline.
 func (p *MemoryProfiler) GetMemoryGrowth() (heapGrowth int64, goroutineGrowth int, duration time.Duration) {
 	// takeSnapshot acquires mu.Lock internally, so snapshot must be taken before acquiring RLock
 	current := p.takeSnapshot()
@@ -535,6 +551,7 @@ func (p *MemoryProfiler) GetMemoryGrowth() (heapGrowth int64, goroutineGrowth in
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
+	//nolint:gosec // G115: heap sizes are well within int64 range; subtraction yields signed growth
 	heapGrowth = int64(current.HeapAlloc) - int64(p.baselineHeap)
 	goroutineGrowth = current.NumGoroutine - p.baselineGoroutines
 	duration = time.Since(p.baselineTimestamp)
@@ -542,13 +559,13 @@ func (p *MemoryProfiler) GetMemoryGrowth() (heapGrowth int64, goroutineGrowth in
 	return
 }
 
-// AnalyzeGrowthTrend analyzes if memory/goroutines are trending upward
+// AnalyzeGrowthTrend analyzes if memory/goroutines are trending upward.
 func (p *MemoryProfiler) AnalyzeGrowthTrend() (memoryTrend, goroutineTrend string) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
 	if len(p.snapshots) < 10 {
-		return "insufficient_data", "insufficient_data"
+		return trendInsufficientData, trendInsufficientData
 	}
 
 	// Take last 10 snapshots
@@ -569,7 +586,7 @@ func (p *MemoryProfiler) AnalyzeGrowthTrend() (memoryTrend, goroutineTrend strin
 	return
 }
 
-// calculateSlope calculates the slope of a metric over time
+// calculateSlope calculates the slope of a metric over time.
 func (p *MemoryProfiler) calculateSlope(snapshots []*MemorySnapshot, getValue func(*MemorySnapshot) float64) float64 {
 	if len(snapshots) < 2 {
 		return 0
@@ -596,16 +613,16 @@ func (p *MemoryProfiler) calculateSlope(snapshots []*MemorySnapshot, getValue fu
 	return slope
 }
 
-// classifyTrend classifies the trend based on slope
+// classifyTrend classifies the trend based on slope.
 func (p *MemoryProfiler) classifyTrend(slope float64) string {
-	if slope > 1000000 { // >1MB per snapshot
+	switch {
+	case slope > 1000000: // >1MB per snapshot
 		return "rapidly_increasing"
-	} else if slope > 100000 { // >100KB per snapshot
+	case slope > 100000: // >100KB per snapshot
 		return "increasing"
-	} else if slope > -100000 && slope < 100000 {
-		return "stable"
-	} else if slope < -100000 {
+	case slope < -100000:
 		return "decreasing"
+	default:
+		return "stable"
 	}
-	return "stable"
 }

@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Engine is the core gamification engine
+// Engine is the core gamification engine.
 type Engine struct {
 	achievementMgr *AchievementManager
 	streakMgr      *StreakManager
@@ -21,18 +21,18 @@ type Engine struct {
 	mu             sync.RWMutex
 }
 
-// Config holds gamification engine configuration
+// Config holds gamification engine configuration.
 type Config struct {
-	EnableAchievements bool
-	EnableStreaks      bool
-	EnableXP           bool
-	EnableLeaderboards bool
-	EnableChallenges   bool
-	EnableRewards      bool
+	EnableAchievements  bool
+	EnableStreaks       bool
+	EnableXP            bool
+	EnableLeaderboards  bool
+	EnableChallenges    bool
+	EnableRewards       bool
 	NotifyOnAchievement bool
 }
 
-// EventNotifier sends notifications for gamification events
+// EventNotifier sends notifications for gamification events.
 type EventNotifier interface {
 	NotifyAchievement(ctx context.Context, userID string, achievement *Achievement) error
 	NotifyLevelUp(ctx context.Context, userID string, level int) error
@@ -40,7 +40,7 @@ type EventNotifier interface {
 	NotifyReward(ctx context.Context, userID string, reward *Reward) error
 }
 
-// NewEngine creates a new gamification engine
+// NewEngine creates a new gamification engine.
 func NewEngine(cfg *Config, notifier EventNotifier) *Engine {
 	return &Engine{
 		achievementMgr: NewAchievementManager(),
@@ -54,12 +54,12 @@ func NewEngine(cfg *Config, notifier EventNotifier) *Engine {
 	}
 }
 
-// RecordBackup records a backup completion event
-func (e *Engine) RecordBackup(ctx context.Context, userID string, backupData *BackupData) (*GamificationResult, error) {
+// RecordBackup records a backup completion event.
+func (e *Engine) RecordBackup(ctx context.Context, userID string, backupData *BackupData) (*Result, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	result := &GamificationResult{
+	result := &Result{
 		UserID:        userID,
 		Timestamp:     time.Now(),
 		Achievements:  make([]*Achievement, 0),
@@ -101,26 +101,32 @@ func (e *Engine) RecordBackup(ctx context.Context, userID string, backupData *Ba
 		}
 	}
 
-	// Send notifications
+	// Send notifications (best-effort: notification failures must not fail the backup recording)
 	if e.notifier != nil {
 		for _, achievement := range newAchievements {
-			_ = e.notifier.NotifyAchievement(ctx, userID, achievement)
+			if err := e.notifier.NotifyAchievement(ctx, userID, achievement); err != nil {
+				result.NotificationErrors = append(result.NotificationErrors, err)
+			}
 		}
 
 		if result.LevelUps > 0 {
-			_ = e.notifier.NotifyLevelUp(ctx, userID, result.CurrentLevel)
+			if err := e.notifier.NotifyLevelUp(ctx, userID, result.CurrentLevel); err != nil {
+				result.NotificationErrors = append(result.NotificationErrors, err)
+			}
 		}
 
 		// Notify on streak milestones (every 7 days)
 		if streak%7 == 0 && streak > 0 {
-			_ = e.notifier.NotifyStreakMilestone(ctx, userID, streak)
+			if err := e.notifier.NotifyStreakMilestone(ctx, userID, streak); err != nil {
+				result.NotificationErrors = append(result.NotificationErrors, err)
+			}
 		}
 	}
 
 	return result, nil
 }
 
-// calculateXP calculates XP earned from a backup
+// calculateXP calculates XP earned from a backup.
 func (e *Engine) calculateXP(data *BackupData) int {
 	baseXP := 10
 
@@ -150,29 +156,29 @@ func (e *Engine) calculateXP(data *BackupData) int {
 	return baseXP + sizeXP + compressionBonus + encryptionBonus + speedBonus
 }
 
-// GetUserProgress returns comprehensive user progress
+// GetUserProgress returns comprehensive user progress.
 func (e *Engine) GetUserProgress(userID string) *UserProgress {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
 	return &UserProgress{
-		UserID:             userID,
-		Level:              e.xpMgr.GetLevel(userID),
-		XP:                 e.xpMgr.GetXP(userID),
-		XPToNextLevel:      e.xpMgr.GetXPToNextLevel(userID),
-		Achievements:       e.achievementMgr.GetUserAchievements(userID),
-		CurrentStreak:      e.streakMgr.GetStreak(userID),
-		LongestStreak:      e.streakMgr.GetLongestStreak(userID),
-		TotalBackups:       e.statsMgr.GetTotalBackups(userID),
-		TotalDataBackedUp:  e.statsMgr.GetTotalSize(userID),
-		ActiveChallenges:   e.challengeMgr.GetActiveChallenges(userID),
-		AvailableRewards:   e.rewardMgr.GetAvailableRewards(userID),
-		LeaderboardRank:    e.leaderboardMgr.GetUserRank(userID),
-		Stats:              e.statsMgr.GetStats(userID),
+		UserID:            userID,
+		Level:             e.xpMgr.GetLevel(userID),
+		XP:                e.xpMgr.GetXP(userID),
+		XPToNextLevel:     e.xpMgr.GetXPToNextLevel(userID),
+		Achievements:      e.achievementMgr.GetUserAchievements(userID),
+		CurrentStreak:     e.streakMgr.GetStreak(userID),
+		LongestStreak:     e.streakMgr.GetLongestStreak(userID),
+		TotalBackups:      e.statsMgr.GetTotalBackups(userID),
+		TotalDataBackedUp: e.statsMgr.GetTotalSize(userID),
+		ActiveChallenges:  e.challengeMgr.GetActiveChallenges(userID),
+		AvailableRewards:  e.rewardMgr.GetAvailableRewards(userID),
+		LeaderboardRank:   e.leaderboardMgr.GetUserRank(userID),
+		Stats:             e.statsMgr.GetStats(userID),
 	}
 }
 
-// GetLeaderboard returns leaderboard data
+// GetLeaderboard returns leaderboard data.
 func (e *Engine) GetLeaderboard(leaderboardType LeaderboardType, limit int) []*LeaderboardEntry {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -180,7 +186,7 @@ func (e *Engine) GetLeaderboard(leaderboardType LeaderboardType, limit int) []*L
 	return e.leaderboardMgr.GetLeaderboard(leaderboardType, limit)
 }
 
-// GetTeamLeaderboard returns team-specific leaderboard
+// GetTeamLeaderboard returns team-specific leaderboard.
 func (e *Engine) GetTeamLeaderboard(teamID string, limit int) []*LeaderboardEntry {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -188,7 +194,7 @@ func (e *Engine) GetTeamLeaderboard(teamID string, limit int) []*LeaderboardEntr
 	return e.leaderboardMgr.GetTeamLeaderboard(teamID, limit)
 }
 
-// CreateChallenge creates a new challenge
+// CreateChallenge creates a new challenge.
 func (e *Engine) CreateChallenge(challenge *Challenge) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -196,7 +202,7 @@ func (e *Engine) CreateChallenge(challenge *Challenge) error {
 	return e.challengeMgr.CreateChallenge(challenge)
 }
 
-// ShareAchievement generates shareable content for an achievement
+// ShareAchievement generates shareable content for an achievement.
 func (e *Engine) ShareAchievement(userID, achievementID string) (*ShareableContent, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -223,7 +229,7 @@ func (e *Engine) ShareAchievement(userID, achievementID string) (*ShareableConte
 	}, nil
 }
 
-// BackupData contains information about a backup
+// BackupData contains information about a backup.
 type BackupData struct {
 	Size             int64
 	Duration         int64
@@ -235,8 +241,8 @@ type BackupData struct {
 	DatabaseType     string
 }
 
-// GamificationResult contains the results of a gamification event
-type GamificationResult struct {
+// Result contains the results of a gamification event.
+type Result struct {
 	UserID              string
 	Timestamp           time.Time
 	XPGained            int
@@ -246,9 +252,12 @@ type GamificationResult struct {
 	CurrentStreak       int
 	CompletedChallenges []*Challenge
 	RewardsEarned       []*Reward
+	// NotificationErrors holds any best-effort notification failures; they do not
+	// fail the event recording.
+	NotificationErrors []error
 }
 
-// UserProgress represents comprehensive user progress
+// UserProgress represents comprehensive user progress.
 type UserProgress struct {
 	UserID            string
 	Level             int
@@ -265,7 +274,7 @@ type UserProgress struct {
 	Stats             *UserStats
 }
 
-// ShareableContent represents content that can be shared socially
+// ShareableContent represents content that can be shared socially.
 type ShareableContent struct {
 	Type        string
 	Title       string

@@ -6,20 +6,20 @@ import (
 	"unicode"
 )
 
-// Match represents a fuzzy match result
+// Match represents a fuzzy match result.
 type Match struct {
 	Text  string
 	Score int
 	Index int
 }
 
-// Matcher provides fuzzy matching capabilities
+// Matcher provides fuzzy matching capabilities.
 type Matcher struct {
 	caseSensitive bool
 	maxResults    int
 }
 
-// NewMatcher creates a new fuzzy matcher
+// NewMatcher creates a new fuzzy matcher.
 func NewMatcher() *Matcher {
 	return &Matcher{
 		caseSensitive: false,
@@ -27,19 +27,19 @@ func NewMatcher() *Matcher {
 	}
 }
 
-// WithCaseSensitive enables case-sensitive matching
+// WithCaseSensitive enables case-sensitive matching.
 func (m *Matcher) WithCaseSensitive(enabled bool) *Matcher {
 	m.caseSensitive = enabled
 	return m
 }
 
-// WithMaxResults sets the maximum number of results
-func (m *Matcher) WithMaxResults(max int) *Matcher {
-	m.maxResults = max
+// WithMaxResults sets the maximum number of results.
+func (m *Matcher) WithMaxResults(n int) *Matcher {
+	m.maxResults = n
 	return m
 }
 
-// Match performs fuzzy matching on the candidates
+// Match performs fuzzy matching on the candidates.
 func (m *Matcher) Match(query string, candidates []string) []Match {
 	if query == "" {
 		return m.exactMatches(candidates)
@@ -72,7 +72,7 @@ func (m *Matcher) Match(query string, candidates []string) []Match {
 	return matches
 }
 
-// exactMatches returns exact prefix matches
+// exactMatches returns exact prefix matches.
 func (m *Matcher) exactMatches(candidates []string) []Match {
 	matches := make([]Match, 0, len(candidates))
 	for i, candidate := range candidates {
@@ -86,7 +86,7 @@ func (m *Matcher) exactMatches(candidates []string) []Match {
 }
 
 // calculateScore calculates fuzzy match score
-// Higher score = better match
+// Higher score = better match.
 func (m *Matcher) calculateScore(query, candidate string) int {
 	if !m.caseSensitive {
 		query = strings.ToLower(query)
@@ -154,7 +154,7 @@ func (m *Matcher) calculateScore(query, candidate string) int {
 	return score
 }
 
-// FindBestMatch returns the best matching candidate
+// FindBestMatch returns the best matching candidate.
 func (m *Matcher) FindBestMatch(query string, candidates []string) string {
 	matches := m.Match(query, candidates)
 	if len(matches) == 0 {
@@ -163,7 +163,7 @@ func (m *Matcher) FindBestMatch(query string, candidates []string) string {
 	return matches[0].Text
 }
 
-// DidYouMean suggests corrections for typos
+// DidYouMean suggests corrections for typos.
 func (m *Matcher) DidYouMean(query string, candidates []string, threshold int) []string {
 	matches := m.Match(query, candidates)
 
@@ -177,16 +177,16 @@ func (m *Matcher) DidYouMean(query string, candidates []string, threshold int) [
 	return suggestions
 }
 
-// LevenshteinDistance calculates edit distance between two strings
+// LevenshteinDistance calculates edit distance between two strings.
 func LevenshteinDistance(s1, s2 string) int {
 	if s1 == s2 {
 		return 0
 	}
 
-	if len(s1) == 0 {
+	if s1 == "" {
 		return len(s2)
 	}
-	if len(s2) == 0 {
+	if s2 == "" {
 		return len(s1)
 	}
 
@@ -219,7 +219,7 @@ func LevenshteinDistance(s1, s2 string) int {
 	return matrix[len(s1)][len(s2)]
 }
 
-// SimilarityRatio returns similarity ratio between 0 and 1
+// SimilarityRatio returns similarity ratio between 0 and 1.
 func SimilarityRatio(s1, s2 string) float64 {
 	if s1 == s2 {
 		return 1.0
@@ -232,24 +232,4 @@ func SimilarityRatio(s1, s2 string) float64 {
 
 	distance := LevenshteinDistance(s1, s2)
 	return 1.0 - float64(distance)/float64(maxLen)
-}
-
-func min(a, b, c int) int {
-	if a < b {
-		if a < c {
-			return a
-		}
-		return c
-	}
-	if b < c {
-		return b
-	}
-	return c
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

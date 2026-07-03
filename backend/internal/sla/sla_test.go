@@ -165,7 +165,7 @@ func TestRecordBackup(t *testing.T) {
 
 	// Record successful backups
 	for i := 0; i < 10; i++ {
-		err := monitor.RecordBackup("db-001", true, 30*time.Minute, 1024*1024*100)
+		err = monitor.RecordBackup("db-001", true, 30*time.Minute, 1024*1024*100)
 		if err != nil {
 			t.Errorf("Failed to record backup: %v", err)
 		}
@@ -592,20 +592,23 @@ func TestGetComplianceSummary(t *testing.T) {
 
 	summary := monitor.GetComplianceSummary()
 
-	if summary["total_databases"].(int) != 3 {
-		t.Errorf("Expected 3 total databases, got %d", summary["total_databases"].(int))
+	totalDatabases, _ := summary["total_databases"].(int)
+	if totalDatabases != 3 {
+		t.Errorf("Expected 3 total databases, got %d", totalDatabases)
 	}
 
-	if summary["compliant_databases"].(int) != 2 {
-		t.Errorf("Expected 2 compliant databases, got %d", summary["compliant_databases"].(int))
+	compliantDatabases, _ := summary["compliant_databases"].(int)
+	if compliantDatabases != 2 {
+		t.Errorf("Expected 2 compliant databases, got %d", compliantDatabases)
 	}
 
-	avgSuccessRate := summary["average_success_rate"].(float64)
+	avgSuccessRate, _ := summary["average_success_rate"].(float64)
 	if avgSuccessRate < 60 || avgSuccessRate > 70 {
 		t.Errorf("Expected average success rate around 66%%, got %.2f%%", avgSuccessRate)
 	}
 
-	if summary["unresolved_violations"].(int) == 0 {
+	unresolvedViolations, _ := summary["unresolved_violations"].(int)
+	if unresolvedViolations == 0 {
 		t.Error("Expected some unresolved violations")
 	}
 }
@@ -647,7 +650,6 @@ func TestComplianceReporter_GenerateExecutiveReport(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			report, err := reporter.GenerateReport(ReportTypeExecutive, tt.format, periodStart, periodEnd)
-
 			if err != nil {
 				t.Fatalf("Failed to generate executive report: %v", err)
 			}
@@ -715,7 +717,6 @@ func TestComplianceReporter_GenerateDetailedReport(t *testing.T) {
 	periodEnd := time.Now()
 
 	report, err := reporter.GenerateReport(ReportTypeDetailed, ReportFormatMarkdown, periodStart, periodEnd)
-
 	if err != nil {
 		t.Fatalf("Failed to generate detailed report: %v", err)
 	}
@@ -754,7 +755,6 @@ func TestComplianceReporter_GenerateViolationReport(t *testing.T) {
 	periodEnd := time.Now()
 
 	report, err := reporter.GenerateReport(ReportTypeViolation, ReportFormatMarkdown, periodStart, periodEnd)
-
 	if err != nil {
 		t.Fatalf("Failed to generate violation report: %v", err)
 	}
@@ -789,7 +789,6 @@ func TestComplianceReporter_GenerateTrendReport(t *testing.T) {
 	periodEnd := time.Now()
 
 	report, err := reporter.GenerateReport(ReportTypeTrend, ReportFormatMarkdown, periodStart, periodEnd)
-
 	if err != nil {
 		t.Fatalf("Failed to generate trend report: %v", err)
 	}
@@ -832,7 +831,6 @@ func TestComplianceReporter_GenerateComplianceStandardReport(t *testing.T) {
 	periodEnd := time.Now()
 
 	report, err := reporter.GenerateReport(ReportTypeCompliance, ReportFormatMarkdown, periodStart, periodEnd)
-
 	if err != nil {
 		t.Fatalf("Failed to generate compliance standard report: %v", err)
 	}
@@ -1022,7 +1020,7 @@ func TestDatabaseComplianceDetail_Sorting(t *testing.T) {
 	}
 }
 
-// Helper function to check if a string contains a substring
+// Helper function to check if a string contains a substring.
 func containsString(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && stringContains(s, substr))
 }

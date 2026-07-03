@@ -13,7 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Styles
+// Styles.
 var (
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -40,7 +40,7 @@ var (
 	docStyle = lipgloss.NewStyle().Padding(1, 2, 1, 2)
 )
 
-// Screen types
+// Screen types.
 type screen int
 
 const (
@@ -50,17 +50,17 @@ const (
 	screenSettings
 )
 
-// Key bindings
+// Key bindings.
 type keyMap struct {
-	Up       key.Binding
-	Down     key.Binding
-	Left     key.Binding
-	Right    key.Binding
-	Enter    key.Binding
-	Back     key.Binding
-	Quit     key.Binding
-	Help     key.Binding
-	Refresh  key.Binding
+	Up        key.Binding
+	Down      key.Binding
+	Left      key.Binding
+	Right     key.Binding
+	Enter     key.Binding
+	Back      key.Binding
+	Quit      key.Binding
+	Help      key.Binding
+	Refresh   key.Binding
 	NewBackup key.Binding
 }
 
@@ -107,13 +107,12 @@ var keys = keyMap{
 	),
 }
 
-// Model
+// Model.
 type model struct {
 	currentScreen screen
 	spinner       spinner.Model
 	table         table.Model
 	list          list.Model
-	menuIndex     int
 	backups       []Backup
 	databases     []Database
 	loading       bool
@@ -218,7 +217,7 @@ func initialModel() model {
 	}
 }
 
-// Menu item for list
+// Menu item for list.
 type menuItem struct {
 	title string
 	desc  string
@@ -228,11 +227,11 @@ func (i menuItem) Title() string       { return i.title }
 func (i menuItem) Description() string { return i.desc }
 func (i menuItem) FilterValue() string { return i.title }
 
-func (m model) Init() tea.Cmd {
+func (m *model) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, tickCmd())
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -289,7 +288,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m model) View() string {
+func (m *model) View() string {
 	// Header
 	header := titleStyle.Render("🗄️  DB Backup Terminal UI")
 
@@ -326,7 +325,7 @@ func (m model) View() string {
 	)
 }
 
-func (m model) viewDashboard() string {
+func (m *model) viewDashboard() string {
 	stats := fmt.Sprintf(
 		"📊 Statistics:\n"+
 			"Total Backups: %d\n"+
@@ -344,7 +343,7 @@ func (m model) viewDashboard() string {
 	)
 }
 
-func (m model) viewBackups() string {
+func (m *model) viewBackups() string {
 	// Convert backups to table rows
 	rows := []table.Row{}
 	for _, b := range m.backups {
@@ -367,7 +366,7 @@ func (m model) viewBackups() string {
 	)
 }
 
-func (m model) viewDatabases() string {
+func (m *model) viewDatabases() string {
 	content := titleStyle.Render("Databases") + "\n\n"
 
 	for _, db := range m.databases {
@@ -382,7 +381,7 @@ func (m model) viewDatabases() string {
 	return content
 }
 
-func (m model) viewSettings() string {
+func (m *model) viewSettings() string {
 	content := titleStyle.Render("Settings") + "\n\n"
 	content += "⚙️  Configuration\n\n"
 	content += "API URL: http://localhost:8080\n"
@@ -393,7 +392,7 @@ func (m model) viewSettings() string {
 	return content
 }
 
-func (m model) renderStatusBar() string {
+func (m *model) renderStatusBar() string {
 	status := "Ready"
 	if m.loading {
 		status = fmt.Sprintf("%s Loading...", m.spinner.View())
@@ -420,7 +419,8 @@ func formatBytes(b int64) string {
 }
 
 func main() {
-	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	m := initialModel()
+	p := tea.NewProgram(&m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)

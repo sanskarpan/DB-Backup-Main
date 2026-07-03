@@ -9,39 +9,39 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// ContextPropagator handles trace context propagation across service boundaries
+// ContextPropagator handles trace context propagation across service boundaries.
 type ContextPropagator struct {
 	propagator propagation.TextMapPropagator
 }
 
-// NewContextPropagator creates a new context propagator
+// NewContextPropagator creates a new context propagator.
 func NewContextPropagator() *ContextPropagator {
 	return &ContextPropagator{
 		propagator: otel.GetTextMapPropagator(),
 	}
 }
 
-// InjectHTTP injects trace context into HTTP headers
+// InjectHTTP injects trace context into HTTP headers.
 func (cp *ContextPropagator) InjectHTTP(ctx context.Context, req *http.Request) {
 	cp.propagator.Inject(ctx, propagation.HeaderCarrier(req.Header))
 }
 
-// ExtractHTTP extracts trace context from HTTP headers
+// ExtractHTTP extracts trace context from HTTP headers.
 func (cp *ContextPropagator) ExtractHTTP(ctx context.Context, req *http.Request) context.Context {
 	return cp.propagator.Extract(ctx, propagation.HeaderCarrier(req.Header))
 }
 
-// InjectMap injects trace context into a map
+// InjectMap injects trace context into a map.
 func (cp *ContextPropagator) InjectMap(ctx context.Context, carrier map[string]string) {
 	cp.propagator.Inject(ctx, propagation.MapCarrier(carrier))
 }
 
-// ExtractMap extracts trace context from a map
+// ExtractMap extracts trace context from a map.
 func (cp *ContextPropagator) ExtractMap(ctx context.Context, carrier map[string]string) context.Context {
 	return cp.propagator.Extract(ctx, propagation.MapCarrier(carrier))
 }
 
-// GetTraceID returns the trace ID from the context
+// GetTraceID returns the trace ID from the context.
 func GetTraceID(ctx context.Context) string {
 	span := trace.SpanFromContext(ctx)
 	if span.SpanContext().IsValid() {
@@ -50,7 +50,7 @@ func GetTraceID(ctx context.Context) string {
 	return ""
 }
 
-// GetSpanID returns the span ID from the context
+// GetSpanID returns the span ID from the context.
 func GetSpanID(ctx context.Context) string {
 	span := trace.SpanFromContext(ctx)
 	if span.SpanContext().IsValid() {
@@ -59,19 +59,19 @@ func GetSpanID(ctx context.Context) string {
 	return ""
 }
 
-// IsTraced returns true if the context has an active trace
+// IsTraced returns true if the context has an active trace.
 func IsTraced(ctx context.Context) bool {
 	span := trace.SpanFromContext(ctx)
 	return span.SpanContext().IsValid()
 }
 
-// GetSpanContext returns the span context from the given context
+// GetSpanContext returns the span context from the given context.
 func GetSpanContext(ctx context.Context) trace.SpanContext {
 	span := trace.SpanFromContext(ctx)
 	return span.SpanContext()
 }
 
-// HTTPMiddleware creates an HTTP middleware that extracts and injects trace context
+// HTTPMiddleware creates an HTTP middleware that extracts and injects trace context.
 func HTTPMiddleware(next http.Handler) http.Handler {
 	propagator := NewContextPropagator()
 
@@ -95,7 +95,7 @@ func HTTPMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// PropagateContext propagates trace context from one context to another
+// PropagateContext propagates trace context from one context to another.
 func PropagateContext(from, to context.Context) context.Context {
 	span := trace.SpanFromContext(from)
 	if !span.SpanContext().IsValid() {

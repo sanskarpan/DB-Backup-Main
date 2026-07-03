@@ -2,46 +2,47 @@ package enhanced
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"sync"
 	"time"
 )
 
-// AnalyticsTracker tracks notification metrics and analytics
+// AnalyticsTracker tracks notification metrics and analytics.
 type AnalyticsTracker struct {
-	mu             sync.RWMutex
-	dataFile       string
-	metrics        *NotificationStats
-	events         []AnalyticsEvent
-	maxEvents      int
-	aggregations   map[string]*TimeSeriesData
-	realtimeStats  *RealtimeStats
+	mu            sync.RWMutex
+	dataFile      string
+	metrics       *NotificationStats
+	events        []AnalyticsEvent
+	maxEvents     int
+	aggregations  map[string]*TimeSeriesData
+	realtimeStats *RealtimeStats
 }
 
-// AnalyticsEvent represents a single analytics event
+// AnalyticsEvent represents a single analytics event.
 type AnalyticsEvent struct {
-	ID            string                 `json:"id"`
-	Timestamp     time.Time              `json:"timestamp"`
-	EventType     string                 `json:"event_type"` // sent, delivered, failed, read, dismissed, action
-	UserID        string                 `json:"user_id"`
-	NotificationID string                `json:"notification_id"`
-	Type          NotificationType       `json:"type"`
-	Priority      Priority               `json:"priority"`
-	Channel       DeliveryChannel        `json:"channel,omitempty"`
-	Metadata      map[string]interface{} `json:"metadata,omitempty"`
-	Duration      float64                `json:"duration_ms,omitempty"`
-	Success       bool                   `json:"success"`
-	Error         string                 `json:"error,omitempty"`
+	ID             string                 `json:"id"`
+	Timestamp      time.Time              `json:"timestamp"`
+	EventType      string                 `json:"event_type"` // sent, delivered, failed, read, dismissed, action
+	UserID         string                 `json:"user_id"`
+	NotificationID string                 `json:"notification_id"`
+	Type           NotificationType       `json:"type"`
+	Priority       Priority               `json:"priority"`
+	Channel        DeliveryChannel        `json:"channel,omitempty"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+	Duration       float64                `json:"duration_ms,omitempty"`
+	Success        bool                   `json:"success"`
+	Error          string                 `json:"error,omitempty"`
 }
 
-// TimeSeriesData represents time-series metrics
+// TimeSeriesData represents time-series metrics.
 type TimeSeriesData struct {
-	Interval      string                   `json:"interval"` // hourly, daily, weekly, monthly
-	DataPoints    []TimeSeriesDataPoint    `json:"data_points"`
-	Aggregates    map[string]float64       `json:"aggregates"`
+	Interval   string                `json:"interval"` // hourly, daily, weekly, monthly
+	DataPoints []TimeSeriesDataPoint `json:"data_points"`
+	Aggregates map[string]float64    `json:"aggregates"`
 }
 
-// TimeSeriesDataPoint represents a single data point in time series
+// TimeSeriesDataPoint represents a single data point in time series.
 type TimeSeriesDataPoint struct {
 	Timestamp    time.Time              `json:"timestamp"`
 	Count        int                    `json:"count"`
@@ -51,46 +52,46 @@ type TimeSeriesDataPoint struct {
 	Metadata     map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// RealtimeStats represents real-time statistics
+// RealtimeStats represents real-time statistics.
 type RealtimeStats struct {
-	LastUpdated        time.Time              `json:"last_updated"`
-	ActiveNotifications int                   `json:"active_notifications"`
-	QueueSize          int                    `json:"queue_size"`
-	ProcessingRate     float64                `json:"processing_rate"` // notifications/sec
-	AvgLatency         float64                `json:"avg_latency_ms"`
-	ErrorRate          float64                `json:"error_rate"`
-	ChannelHealth      map[DeliveryChannel]ChannelHealth `json:"channel_health"`
+	LastUpdated         time.Time                         `json:"last_updated"`
+	ActiveNotifications int                               `json:"active_notifications"`
+	QueueSize           int                               `json:"queue_size"`
+	ProcessingRate      float64                           `json:"processing_rate"` // notifications/sec
+	AvgLatency          float64                           `json:"avg_latency_ms"`
+	ErrorRate           float64                           `json:"error_rate"`
+	ChannelHealth       map[DeliveryChannel]ChannelHealth `json:"channel_health"`
 }
 
-// ChannelHealth represents health status of a delivery channel
+// ChannelHealth represents health status of a delivery channel.
 type ChannelHealth struct {
-	Status        string    `json:"status"` // healthy, degraded, down
-	SuccessRate   float64   `json:"success_rate"`
-	AvgLatency    float64   `json:"avg_latency_ms"`
-	ErrorCount    int       `json:"error_count"`
-	LastError     string    `json:"last_error,omitempty"`
-	LastSuccess   time.Time `json:"last_success"`
+	Status      string    `json:"status"` // healthy, degraded, down
+	SuccessRate float64   `json:"success_rate"`
+	AvgLatency  float64   `json:"avg_latency_ms"`
+	ErrorCount  int       `json:"error_count"`
+	LastError   string    `json:"last_error,omitempty"`
+	LastSuccess time.Time `json:"last_success"`
 }
 
-// UserEngagementMetrics represents user engagement analytics
+// UserEngagementMetrics represents user engagement analytics.
 type UserEngagementMetrics struct {
-	UserID              string                       `json:"user_id"`
-	TotalNotifications  int                          `json:"total_notifications"`
-	ReadNotifications   int                          `json:"read_notifications"`
-	ActionedNotifications int                        `json:"actioned_notifications"`
-	DismissedNotifications int                       `json:"dismissed_notifications"`
-	ReadRate            float64                      `json:"read_rate"`
-	ActionRate          float64                      `json:"action_rate"`
-	DismissRate         float64                      `json:"dismiss_rate"`
-	AvgTimeToRead       float64                      `json:"avg_time_to_read_seconds"`
-	AvgTimeToAction     float64                      `json:"avg_time_to_action_seconds"`
-	PreferredChannels   map[DeliveryChannel]int      `json:"preferred_channels"`
-	PreferredTypes      map[NotificationType]int     `json:"preferred_types"`
-	MostActiveHours     []int                        `json:"most_active_hours"`
-	EngagementScore     float64                      `json:"engagement_score"` // 0-100
+	UserID                 string                   `json:"user_id"`
+	TotalNotifications     int                      `json:"total_notifications"`
+	ReadNotifications      int                      `json:"read_notifications"`
+	ActionedNotifications  int                      `json:"actioned_notifications"`
+	DismissedNotifications int                      `json:"dismissed_notifications"`
+	ReadRate               float64                  `json:"read_rate"`
+	ActionRate             float64                  `json:"action_rate"`
+	DismissRate            float64                  `json:"dismiss_rate"`
+	AvgTimeToRead          float64                  `json:"avg_time_to_read_seconds"`
+	AvgTimeToAction        float64                  `json:"avg_time_to_action_seconds"`
+	PreferredChannels      map[DeliveryChannel]int  `json:"preferred_channels"`
+	PreferredTypes         map[NotificationType]int `json:"preferred_types"`
+	MostActiveHours        []int                    `json:"most_active_hours"`
+	EngagementScore        float64                  `json:"engagement_score"` // 0-100
 }
 
-// CohortAnalysis represents cohort-based analytics
+// CohortAnalysis represents cohort-based analytics.
 type CohortAnalysis struct {
 	CohortID           string                 `json:"cohort_id"`
 	Name               string                 `json:"name"`
@@ -101,13 +102,13 @@ type CohortAnalysis struct {
 	Metadata           map[string]interface{} `json:"metadata"`
 }
 
-// NewAnalyticsTracker creates a new analytics tracker
+// NewAnalyticsTracker creates a new analytics tracker.
 func NewAnalyticsTracker(dataFile string, maxEvents int) *AnalyticsTracker {
 	return &AnalyticsTracker{
-		dataFile:      dataFile,
-		maxEvents:     maxEvents,
-		events:        make([]AnalyticsEvent, 0),
-		aggregations:  make(map[string]*TimeSeriesData),
+		dataFile:     dataFile,
+		maxEvents:    maxEvents,
+		events:       make([]AnalyticsEvent, 0),
+		aggregations: make(map[string]*TimeSeriesData),
 		metrics: &NotificationStats{
 			ByChannel:  make(map[DeliveryChannel]ChannelStats),
 			ByType:     make(map[NotificationType]TypeStats),
@@ -119,7 +120,7 @@ func NewAnalyticsTracker(dataFile string, maxEvents int) *AnalyticsTracker {
 	}
 }
 
-// Load loads analytics data from file
+// Load loads analytics data from file.
 func (a *AnalyticsTracker) Load() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -150,7 +151,7 @@ func (a *AnalyticsTracker) Load() error {
 	return nil
 }
 
-// Save saves analytics data to file
+// Save saves analytics data to file.
 func (a *AnalyticsTracker) Save() error {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -172,11 +173,11 @@ func (a *AnalyticsTracker) Save() error {
 		return err
 	}
 
-	return os.WriteFile(a.dataFile, data, 0644)
+	return os.WriteFile(a.dataFile, data, 0o600)
 }
 
-// TrackEvent tracks a single analytics event
-func (a *AnalyticsTracker) TrackEvent(event AnalyticsEvent) {
+// TrackEvent tracks a single analytics event.
+func (a *AnalyticsTracker) TrackEvent(event AnalyticsEvent) { //nolint:gocritic // hugeParam: exported API uses value semantics for AnalyticsEvent
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -192,18 +193,22 @@ func (a *AnalyticsTracker) TrackEvent(event AnalyticsEvent) {
 	}
 
 	// Update metrics based on event type
-	a.updateMetrics(event)
+	a.updateMetrics(&event)
 
 	// Update realtime stats
-	a.updateRealtimeStats(event)
+	a.updateRealtimeStats(&event)
 
 	// Auto-save periodically
 	if len(a.events)%100 == 0 {
-		go a.Save()
+		go func() {
+			if err := a.Save(); err != nil {
+				fmt.Printf("Error saving analytics: %v\n", err)
+			}
+		}()
 	}
 }
 
-// TrackNotificationSent tracks when a notification is sent
+// TrackNotificationSent tracks when a notification is sent.
 func (a *AnalyticsTracker) TrackNotificationSent(notification *Notification) {
 	a.TrackEvent(AnalyticsEvent{
 		ID:             notification.ID + "_sent",
@@ -216,11 +221,11 @@ func (a *AnalyticsTracker) TrackNotificationSent(notification *Notification) {
 	})
 }
 
-// TrackDelivery tracks notification delivery to a channel
-func (a *AnalyticsTracker) TrackDelivery(notification *Notification, result DeliveryResult) {
+// TrackDelivery tracks notification delivery to a channel.
+func (a *AnalyticsTracker) TrackDelivery(notification *Notification, result DeliveryResult) { //nolint:gocritic // hugeParam: exported API uses value semantics for DeliveryResult
 	a.TrackEvent(AnalyticsEvent{
 		ID:             notification.ID + "_delivered_" + string(result.Channel),
-		EventType:      "delivered",
+		EventType:      string(StatusDelivered),
 		UserID:         notification.UserID,
 		NotificationID: notification.ID,
 		Type:           notification.Type,
@@ -235,11 +240,11 @@ func (a *AnalyticsTracker) TrackDelivery(notification *Notification, result Deli
 	})
 }
 
-// TrackRead tracks when a notification is read
+// TrackRead tracks when a notification is read.
 func (a *AnalyticsTracker) TrackRead(notification *Notification, timeToRead time.Duration) {
 	a.TrackEvent(AnalyticsEvent{
 		ID:             notification.ID + "_read",
-		EventType:      "read",
+		EventType:      string(StatusRead),
 		UserID:         notification.UserID,
 		NotificationID: notification.ID,
 		Type:           notification.Type,
@@ -249,7 +254,7 @@ func (a *AnalyticsTracker) TrackRead(notification *Notification, timeToRead time
 	})
 }
 
-// TrackAction tracks when user takes action on notification
+// TrackAction tracks when user takes action on notification.
 func (a *AnalyticsTracker) TrackAction(notification *Notification, actionID string, timeToAction time.Duration) {
 	a.TrackEvent(AnalyticsEvent{
 		ID:             notification.ID + "_action_" + actionID,
@@ -266,7 +271,7 @@ func (a *AnalyticsTracker) TrackAction(notification *Notification, actionID stri
 	})
 }
 
-// TrackDismiss tracks when notification is dismissed
+// TrackDismiss tracks when notification is dismissed.
 func (a *AnalyticsTracker) TrackDismiss(notification *Notification) {
 	a.TrackEvent(AnalyticsEvent{
 		ID:             notification.ID + "_dismissed",
@@ -279,7 +284,7 @@ func (a *AnalyticsTracker) TrackDismiss(notification *Notification) {
 	})
 }
 
-// GetMetrics returns overall notification statistics
+// GetMetrics returns overall notification statistics.
 func (a *AnalyticsTracker) GetMetrics() *NotificationStats {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -288,7 +293,7 @@ func (a *AnalyticsTracker) GetMetrics() *NotificationStats {
 	return a.copyMetrics(a.metrics)
 }
 
-// GetRealtimeStats returns real-time statistics
+// GetRealtimeStats returns real-time statistics.
 func (a *AnalyticsTracker) GetRealtimeStats() *RealtimeStats {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -303,7 +308,7 @@ func (a *AnalyticsTracker) GetRealtimeStats() *RealtimeStats {
 	return &stats
 }
 
-// GetUserEngagement returns engagement metrics for a user
+// GetUserEngagement returns engagement metrics for a user.
 func (a *AnalyticsTracker) GetUserEngagement(userID string) *UserEngagementMetrics {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -319,7 +324,8 @@ func (a *AnalyticsTracker) GetUserEngagement(userID string) *UserEngagementMetri
 	var readCount, actionCount int
 	hourActivity := make(map[int]int)
 
-	for _, event := range a.events {
+	for i := range a.events {
+		event := &a.events[i]
 		if event.UserID != userID {
 			continue
 		}
@@ -333,7 +339,7 @@ func (a *AnalyticsTracker) GetUserEngagement(userID string) *UserEngagementMetri
 			metrics.PreferredTypes[event.Type]++
 			hourActivity[event.Timestamp.Hour()]++
 
-		case "read":
+		case string(StatusRead):
 			metrics.ReadNotifications++
 			totalTimeToRead += event.Duration / 1000 // Convert to seconds
 			readCount++
@@ -390,7 +396,7 @@ func (a *AnalyticsTracker) GetUserEngagement(userID string) *UserEngagementMetri
 	return metrics
 }
 
-// GetTimeSeries returns time-series data for a given interval
+// GetTimeSeries returns time-series data for a given interval.
 func (a *AnalyticsTracker) GetTimeSeries(interval string, startTime, endTime time.Time) *TimeSeriesData {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -404,7 +410,8 @@ func (a *AnalyticsTracker) GetTimeSeries(interval string, startTime, endTime tim
 	// Group events by interval
 	buckets := make(map[time.Time]*TimeSeriesDataPoint)
 
-	for _, event := range a.events {
+	for i := range a.events {
+		event := &a.events[i]
 		if event.Timestamp.Before(startTime) || event.Timestamp.After(endTime) {
 			continue
 		}
@@ -421,7 +428,7 @@ func (a *AnalyticsTracker) GetTimeSeries(interval string, startTime, endTime tim
 		bucket.Count++
 
 		// Track delivery metrics
-		if event.EventType == "delivered" && event.Success {
+		if event.EventType == string(StatusDelivered) && event.Success {
 			if avgTime, ok := bucket.Metadata["total_time"].(float64); ok {
 				bucket.Metadata["total_time"] = avgTime + event.Duration
 			} else {
@@ -450,15 +457,16 @@ func (a *AnalyticsTracker) GetTimeSeries(interval string, startTime, endTime tim
 	return data
 }
 
-// ExportEvents exports analytics events to JSON
+// ExportEvents exports analytics events to JSON.
 func (a *AnalyticsTracker) ExportEvents(startTime, endTime time.Time) ([]byte, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
 	filteredEvents := make([]AnalyticsEvent, 0)
-	for _, event := range a.events {
+	for i := range a.events {
+		event := &a.events[i]
 		if event.Timestamp.After(startTime) && event.Timestamp.Before(endTime) {
-			filteredEvents = append(filteredEvents, event)
+			filteredEvents = append(filteredEvents, *event)
 		}
 	}
 
@@ -467,12 +475,12 @@ func (a *AnalyticsTracker) ExportEvents(startTime, endTime time.Time) ([]byte, e
 
 // Helper methods
 
-func (a *AnalyticsTracker) updateMetrics(event AnalyticsEvent) {
+func (a *AnalyticsTracker) updateMetrics(event *AnalyticsEvent) {
 	switch event.EventType {
 	case "sent":
 		a.metrics.TotalSent++
 
-	case "delivered":
+	case string(StatusDelivered):
 		if event.Success {
 			a.metrics.TotalDelivered++
 
@@ -499,7 +507,7 @@ func (a *AnalyticsTracker) updateMetrics(event AnalyticsEvent) {
 			a.metrics.ByChannel[event.Channel] = channelStats
 		}
 
-	case "read":
+	case string(StatusRead):
 		a.metrics.TotalRead++
 
 		// Update type stats
@@ -525,10 +533,10 @@ func (a *AnalyticsTracker) updateMetrics(event AnalyticsEvent) {
 	}
 }
 
-func (a *AnalyticsTracker) updateRealtimeStats(event AnalyticsEvent) {
+func (a *AnalyticsTracker) updateRealtimeStats(event *AnalyticsEvent) {
 	a.realtimeStats.LastUpdated = time.Now()
 
-	if event.EventType == "delivered" {
+	if event.EventType == string(StatusDelivered) {
 		health := a.realtimeStats.ChannelHealth[event.Channel]
 		if event.Success {
 			health.Status = "healthy"
@@ -546,7 +554,7 @@ func (a *AnalyticsTracker) updateRealtimeStats(event AnalyticsEvent) {
 		} else {
 			health.ErrorCount++
 			health.LastError = event.Error
-			health.SuccessRate = health.SuccessRate * 0.9
+			health.SuccessRate *= 0.9
 
 			if health.SuccessRate < 0.5 {
 				health.Status = "down"

@@ -1,6 +1,7 @@
 package security
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -11,7 +12,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/secrets"
 )
 
-// MTLSConfig contains configuration for mutual TLS
+// MTLSConfig contains configuration for mutual TLS.
 type MTLSConfig struct {
 	// Certificate files
 	CertFile string `mapstructure:"cert_file"`
@@ -19,27 +20,27 @@ type MTLSConfig struct {
 	CAFile   string `mapstructure:"ca_file"`
 
 	// Vault integration for certificate management
-	VaultEnabled    bool   `mapstructure:"vault_enabled"`
-	VaultCertPath   string `mapstructure:"vault_cert_path"`
-	VaultKeyPath    string `mapstructure:"vault_key_path"`
-	VaultCAPath     string `mapstructure:"vault_ca_path"`
-	VaultRotation   bool   `mapstructure:"vault_rotation"`
+	VaultEnabled     bool          `mapstructure:"vault_enabled"`
+	VaultCertPath    string        `mapstructure:"vault_cert_path"`
+	VaultKeyPath     string        `mapstructure:"vault_key_path"`
+	VaultCAPath      string        `mapstructure:"vault_ca_path"`
+	VaultRotation    bool          `mapstructure:"vault_rotation"`
 	RotationInterval time.Duration `mapstructure:"rotation_interval"`
 
 	// TLS configuration
-	MinVersion            uint16   `mapstructure:"min_version"` // tls.VersionTLS12, tls.VersionTLS13
-	MaxVersion            uint16   `mapstructure:"max_version"`
-	CipherSuites          []uint16 `mapstructure:"cipher_suites"`
-	PreferServerCiphers   bool     `mapstructure:"prefer_server_ciphers"`
-	ClientAuth            tls.ClientAuthType `mapstructure:"client_auth"`
-	InsecureSkipVerify    bool     `mapstructure:"insecure_skip_verify"` // Only for testing
+	MinVersion          uint16             `mapstructure:"min_version"` // tls.VersionTLS12, tls.VersionTLS13
+	MaxVersion          uint16             `mapstructure:"max_version"`
+	CipherSuites        []uint16           `mapstructure:"cipher_suites"`
+	PreferServerCiphers bool               `mapstructure:"prefer_server_ciphers"`
+	ClientAuth          tls.ClientAuthType `mapstructure:"client_auth"`
+	InsecureSkipVerify  bool               `mapstructure:"insecure_skip_verify"` // Only for testing
 
 	// Certificate validation
 	ValidateCertExpiry    bool          `mapstructure:"validate_cert_expiry"`
 	ExpiryWarningDuration time.Duration `mapstructure:"expiry_warning_duration"`
 }
 
-// MTLSManager manages mutual TLS configuration and certificate rotation
+// MTLSManager manages mutual TLS configuration and certificate rotation.
 type MTLSManager struct {
 	config       *MTLSConfig
 	vault        *secrets.VaultClient
@@ -50,7 +51,7 @@ type MTLSManager struct {
 	stopRotation chan struct{}
 }
 
-// CertificateInfo contains information about a certificate
+// CertificateInfo contains information about a certificate.
 type CertificateInfo struct {
 	Subject      string
 	Issuer       string
@@ -62,7 +63,7 @@ type CertificateInfo struct {
 	SerialNumber string
 }
 
-// NewMTLSManager creates a new mTLS manager
+// NewMTLSManager creates a new mTLS manager.
 func NewMTLSManager(config *MTLSConfig, vault *secrets.VaultClient) (*MTLSManager, error) {
 	if config == nil {
 		return nil, fmt.Errorf("mTLS config is required")
@@ -101,7 +102,7 @@ func NewMTLSManager(config *MTLSConfig, vault *secrets.VaultClient) (*MTLSManage
 	return manager, nil
 }
 
-// loadCertificates loads certificates from files or Vault
+// loadCertificates loads certificates from files or Vault.
 func (m *MTLSManager) loadCertificates() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -170,13 +171,13 @@ func (m *MTLSManager) loadCertificates() error {
 	return nil
 }
 
-// loadFromVault loads a certificate or key from Vault
+// loadFromVault loads a certificate or key from Vault.
 func (m *MTLSManager) loadFromVault(path string) ([]byte, error) {
 	if path == "" {
 		return nil, fmt.Errorf("vault path is empty")
 	}
 
-	secret, err := m.vault.GetSecret(nil, path)
+	secret, err := m.vault.GetSecret(context.TODO(), path)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +191,7 @@ func (m *MTLSManager) loadFromVault(path string) ([]byte, error) {
 	return []byte(data), nil
 }
 
-// buildTLSConfig builds the TLS configuration
+// buildTLSConfig builds the TLS configuration.
 func (m *MTLSManager) buildTLSConfig() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -229,7 +230,7 @@ func (m *MTLSManager) buildTLSConfig() error {
 	return nil
 }
 
-// validateCertificate validates the certificate expiry and chain
+// validateCertificate validates the certificate expiry and chain.
 func (m *MTLSManager) validateCertificate() error {
 	if m.certificate == nil {
 		return fmt.Errorf("no certificate loaded")
@@ -270,14 +271,14 @@ func (m *MTLSManager) validateCertificate() error {
 	return nil
 }
 
-// GetServerTLSConfig returns TLS config for server use
+// GetServerTLSConfig returns TLS config for server use.
 func (m *MTLSManager) GetServerTLSConfig() *tls.Config {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.tlsConfig.Clone()
 }
 
-// GetClientTLSConfig returns TLS config for client use
+// GetClientTLSConfig returns TLS config for client use.
 func (m *MTLSManager) GetClientTLSConfig() *tls.Config {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -287,7 +288,7 @@ func (m *MTLSManager) GetClientTLSConfig() *tls.Config {
 	return clientConfig
 }
 
-// GetCertificateInfo returns information about the current certificate
+// GetCertificateInfo returns information about the current certificate.
 func (m *MTLSManager) GetCertificateInfo() (*CertificateInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -319,7 +320,7 @@ func (m *MTLSManager) GetCertificateInfo() (*CertificateInfo, error) {
 	return info, nil
 }
 
-// StartCertificateRotation starts automatic certificate rotation
+// StartCertificateRotation starts automatic certificate rotation.
 func (m *MTLSManager) StartCertificateRotation() error {
 	if !m.config.VaultEnabled || !m.config.VaultRotation {
 		return fmt.Errorf("certificate rotation requires vault integration")
@@ -333,7 +334,7 @@ func (m *MTLSManager) StartCertificateRotation() error {
 	return nil
 }
 
-// rotationLoop periodically checks and rotates certificates
+// rotationLoop periodically checks and rotates certificates.
 func (m *MTLSManager) rotationLoop() {
 	ticker := time.NewTicker(m.config.RotationInterval)
 	defer ticker.Stop()
@@ -350,7 +351,7 @@ func (m *MTLSManager) rotationLoop() {
 	}
 }
 
-// checkAndRotate checks if certificates need rotation and rotates them
+// checkAndRotate checks if certificates need rotation and rotates them.
 func (m *MTLSManager) checkAndRotate() error {
 	info, err := m.GetCertificateInfo()
 	if err != nil {
@@ -372,7 +373,7 @@ func (m *MTLSManager) checkAndRotate() error {
 	return nil
 }
 
-// RotateCertificates manually rotates the certificates
+// RotateCertificates manually rotates the certificates.
 func (m *MTLSManager) RotateCertificates() error {
 	// Reload certificates from source
 	if err := m.loadCertificates(); err != nil {
@@ -394,12 +395,12 @@ func (m *MTLSManager) RotateCertificates() error {
 	return nil
 }
 
-// Stop stops the certificate rotation loop
+// Stop stops the certificate rotation loop.
 func (m *MTLSManager) Stop() {
 	close(m.stopRotation)
 }
 
-// VerifyPeerCertificate is a custom verification function for additional checks
+// VerifyPeerCertificate is a custom verification function for additional checks.
 func (m *MTLSManager) VerifyPeerCertificate(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	if len(rawCerts) == 0 {
 		return fmt.Errorf("no certificates provided")
@@ -422,7 +423,7 @@ func (m *MTLSManager) VerifyPeerCertificate(rawCerts [][]byte, verifiedChains []
 	return nil
 }
 
-// GetTLSVersion returns the TLS version string
+// GetTLSVersion returns the TLS version string.
 func GetTLSVersion(version uint16) string {
 	switch version {
 	case tls.VersionTLS10:
@@ -438,7 +439,7 @@ func GetTLSVersion(version uint16) string {
 	}
 }
 
-// GetCipherSuiteName returns the cipher suite name
+// GetCipherSuiteName returns the cipher suite name.
 func GetCipherSuiteName(cipherSuite uint16) string {
 	switch cipherSuite {
 	case tls.TLS_RSA_WITH_RC4_128_SHA:
@@ -484,7 +485,9 @@ func GetCipherSuiteName(cipherSuite uint16) string {
 	}
 }
 
-// ValidateTLSConnection validates a TLS connection state
+// ValidateTLSConnection validates a TLS connection state.
+//
+//nolint:gocritic // hugeParam: exported API mirrors tls.ConnectionState value semantics; changing to pointer would break the public signature.
 func ValidateTLSConnection(state tls.ConnectionState) error {
 	// Check TLS version
 	if state.Version < tls.VersionTLS12 {

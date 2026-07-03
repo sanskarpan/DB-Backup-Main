@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Intent represents the user's intention
+// Intent represents the user's intention.
 type Intent string
 
 const (
@@ -24,13 +24,13 @@ const (
 	IntentUnknown           Intent = "unknown"
 )
 
-// Entity represents extracted information from the query
+// Entity represents extracted information from the query.
 type Entity struct {
 	Type  string      `json:"type"`
 	Value interface{} `json:"value"`
 }
 
-// ParsedQuery represents the result of query parsing
+// ParsedQuery represents the result of query parsing.
 type ParsedQuery struct {
 	OriginalQuery string            `json:"original_query"`
 	Intent        Intent            `json:"intent"`
@@ -40,19 +40,19 @@ type ParsedQuery struct {
 	Timestamp     time.Time         `json:"timestamp"`
 }
 
-// QueryParser parses natural language queries
+// QueryParser parses natural language queries.
 type QueryParser struct {
 	patterns map[Intent][]Pattern
 }
 
-// Pattern represents a regex pattern for intent matching
+// Pattern represents a regex pattern for intent matching.
 type Pattern struct {
 	Regex      *regexp.Regexp
 	EntityKeys []string
 	Priority   int
 }
 
-// NewQueryParser creates a new query parser
+// NewQueryParser creates a new query parser.
 func NewQueryParser() *QueryParser {
 	parser := &QueryParser{
 		patterns: make(map[Intent][]Pattern),
@@ -62,7 +62,7 @@ func NewQueryParser() *QueryParser {
 	return parser
 }
 
-// initializePatterns sets up intent matching patterns
+// initializePatterns sets up intent matching patterns.
 func (qp *QueryParser) initializePatterns() {
 	// List backups patterns
 	qp.addPattern(IntentListBackups, `(?i)(list|show|display|get).*backups?`, []string{}, 10)
@@ -111,7 +111,7 @@ func (qp *QueryParser) initializePatterns() {
 	qp.addPattern(IntentGetHelp, `(?i)^(help|how|what can)`, []string{}, 5)
 }
 
-// addPattern adds a pattern for an intent
+// addPattern adds a pattern for an intent.
 func (qp *QueryParser) addPattern(intent Intent, pattern string, entityKeys []string, priority int) {
 	regex := regexp.MustCompile(pattern)
 	qp.patterns[intent] = append(qp.patterns[intent], Pattern{
@@ -121,7 +121,7 @@ func (qp *QueryParser) addPattern(intent Intent, pattern string, entityKeys []st
 	})
 }
 
-// Parse parses a natural language query
+// Parse parses a natural language query.
 func (qp *QueryParser) Parse(query string) *ParsedQuery {
 	parsed := &ParsedQuery{
 		OriginalQuery: query,
@@ -149,10 +149,10 @@ func (qp *QueryParser) Parse(query string) *ParsedQuery {
 	return parsed
 }
 
-// matchIntent finds the best matching intent
-func (qp *QueryParser) matchIntent(query string) (Intent, float64) {
-	var bestIntent Intent = IntentUnknown
-	var bestScore float64 = 0.0
+// matchIntent finds the best matching intent.
+func (qp *QueryParser) matchIntent(query string) (bestIntent Intent, confidence float64) {
+	bestIntent = IntentUnknown
+	bestScore := 0.0
 
 	for intent, patterns := range qp.patterns {
 		for _, pattern := range patterns {
@@ -175,7 +175,7 @@ func (qp *QueryParser) matchIntent(query string) (Intent, float64) {
 	}
 
 	// Normalize confidence to 0-1 range
-	confidence := bestScore
+	confidence = bestScore
 	if confidence > 1.0 {
 		confidence = 1.0
 	}
@@ -183,7 +183,7 @@ func (qp *QueryParser) matchIntent(query string) (Intent, float64) {
 	return bestIntent, confidence
 }
 
-// extractEntities extracts entities from the query
+// extractEntities extracts entities from the query.
 func (qp *QueryParser) extractEntities(query string, parsed *ParsedQuery) {
 	// Extract database names
 	dbPattern := regexp.MustCompile(`(?i)database\s+(\w+)`)
@@ -237,30 +237,31 @@ func (qp *QueryParser) extractEntities(query string, parsed *ParsedQuery) {
 	}
 }
 
-// extractDates extracts date references from query
+// extractDates extracts date references from query.
 func (qp *QueryParser) extractDates(query string, parsed *ParsedQuery) {
 	// Relative dates
-	if regexp.MustCompile(`(?i)today`).MatchString(query) {
+	switch {
+	case regexp.MustCompile(`(?i)today`).MatchString(query):
 		parsed.Entities["date"] = Entity{
 			Type:  "date",
 			Value: "today",
 		}
-	} else if regexp.MustCompile(`(?i)yesterday`).MatchString(query) {
+	case regexp.MustCompile(`(?i)yesterday`).MatchString(query):
 		parsed.Entities["date"] = Entity{
 			Type:  "date",
 			Value: "yesterday",
 		}
-	} else if regexp.MustCompile(`(?i)this\s+week`).MatchString(query) {
+	case regexp.MustCompile(`(?i)this\s+week`).MatchString(query):
 		parsed.Entities["date_range"] = Entity{
 			Type:  "date_range",
 			Value: "this_week",
 		}
-	} else if regexp.MustCompile(`(?i)this\s+month`).MatchString(query) {
+	case regexp.MustCompile(`(?i)this\s+month`).MatchString(query):
 		parsed.Entities["date_range"] = Entity{
 			Type:  "date_range",
 			Value: "this_month",
 		}
-	} else if regexp.MustCompile(`(?i)last\s+week`).MatchString(query) {
+	case regexp.MustCompile(`(?i)last\s+week`).MatchString(query):
 		parsed.Entities["date_range"] = Entity{
 			Type:  "date_range",
 			Value: "last_week",
@@ -277,13 +278,13 @@ func (qp *QueryParser) extractDates(query string, parsed *ParsedQuery) {
 	}
 }
 
-// extractTimeRanges extracts time range information
+// extractTimeRanges extracts time range information.
 func (qp *QueryParser) extractTimeRanges(query string, parsed *ParsedQuery) {
 	// "in the last N hours/days/weeks"
 	timeRangePattern := regexp.MustCompile(`(?i)(?:in\s+the\s+)?last\s+(\d+)\s+(hour|day|week|month)s?`)
 	if matches := timeRangePattern.FindStringSubmatch(query); len(matches) > 2 {
 		parsed.Entities["time_range"] = Entity{
-			Type:  "time_range",
+			Type: "time_range",
 			Value: map[string]string{
 				"amount": matches[1],
 				"unit":   matches[2],
@@ -292,7 +293,7 @@ func (qp *QueryParser) extractTimeRanges(query string, parsed *ParsedQuery) {
 	}
 }
 
-// extractParameters extracts common parameters
+// extractParameters extracts common parameters.
 func (qp *QueryParser) extractParameters(query string, parsed *ParsedQuery) {
 	// Extract sort order
 	if regexp.MustCompile(`(?i)(latest|newest|recent)`).MatchString(query) {
@@ -325,7 +326,7 @@ func (qp *QueryParser) extractParameters(query string, parsed *ParsedQuery) {
 	}
 }
 
-// GetIntentDescription returns a human-readable description of the intent
+// GetIntentDescription returns a human-readable description of the intent.
 func (qp *QueryParser) GetIntentDescription(intent Intent) string {
 	descriptions := map[Intent]string{
 		IntentListBackups:       "List available backups",
@@ -347,7 +348,7 @@ func (qp *QueryParser) GetIntentDescription(intent Intent) string {
 	return "Unknown intent"
 }
 
-// GenerateSuggestions generates query suggestions based on partial input
+// GenerateSuggestions generates query suggestions based on partial input.
 func (qp *QueryParser) GenerateSuggestions(partial string) []string {
 	suggestions := []string{
 		"List all backups from last week",
@@ -379,9 +380,9 @@ func (qp *QueryParser) GenerateSuggestions(partial string) []string {
 	return filtered
 }
 
-// ValidateQuery checks if a query is valid and provides feedback
-func (qp *QueryParser) ValidateQuery(query string) (bool, string) {
-	if len(strings.TrimSpace(query)) == 0 {
+// ValidateQuery checks if a query is valid and provides feedback.
+func (qp *QueryParser) ValidateQuery(query string) (valid bool, message string) {
+	if strings.TrimSpace(query) == "" {
 		return false, "Query cannot be empty"
 	}
 
@@ -403,7 +404,7 @@ func (qp *QueryParser) ValidateQuery(query string) (bool, string) {
 	return true, ""
 }
 
-// GetEntityValue safely retrieves an entity value
+// GetEntityValue safely retrieves an entity value.
 func (pq *ParsedQuery) GetEntityValue(key string) (interface{}, bool) {
 	if entity, exists := pq.Entities[key]; exists {
 		return entity.Value, true
@@ -411,13 +412,13 @@ func (pq *ParsedQuery) GetEntityValue(key string) (interface{}, bool) {
 	return nil, false
 }
 
-// GetParameter safely retrieves a parameter value
+// GetParameter safely retrieves a parameter value.
 func (pq *ParsedQuery) GetParameter(key string) (string, bool) {
 	value, exists := pq.Parameters[key]
 	return value, exists
 }
 
-// String returns a string representation of the parsed query
+// String returns a string representation of the parsed query.
 func (pq *ParsedQuery) String() string {
 	return fmt.Sprintf("Intent: %s (%.2f confidence), Entities: %d, Params: %d",
 		pq.Intent, pq.Confidence, len(pq.Entities), len(pq.Parameters))

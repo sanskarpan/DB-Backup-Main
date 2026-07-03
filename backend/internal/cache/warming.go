@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// WarmingStrategy defines how cache should be warmed
+// WarmingStrategy defines how cache should be warmed.
 type WarmingStrategy interface {
 	// Warm populates the cache with data
 	Warm(ctx context.Context) error
@@ -16,7 +16,9 @@ type WarmingStrategy interface {
 	GetKeys(ctx context.Context) ([]string, error)
 }
 
-// CacheWarmer handles cache warming operations
+// CacheWarmer handles cache warming operations.
+//
+//nolint:revive // keeps public name stable across packages
 type CacheWarmer struct {
 	cache     Cache
 	strategy  WarmingStrategy
@@ -27,7 +29,7 @@ type CacheWarmer struct {
 	mu        sync.Mutex
 }
 
-// NewCacheWarmer creates a new cache warmer
+// NewCacheWarmer creates a new cache warmer.
 func NewCacheWarmer(cache Cache, strategy WarmingStrategy, interval time.Duration) *CacheWarmer {
 	return &CacheWarmer{
 		cache:    cache,
@@ -37,7 +39,7 @@ func NewCacheWarmer(cache Cache, strategy WarmingStrategy, interval time.Duratio
 	}
 }
 
-// Start begins the cache warming process
+// Start begins the cache warming process.
 func (w *CacheWarmer) Start(ctx context.Context) error {
 	w.mu.Lock()
 	if w.isRunning {
@@ -59,7 +61,7 @@ func (w *CacheWarmer) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop stops the cache warming process
+// Stop stops the cache warming process.
 func (w *CacheWarmer) Stop() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -75,12 +77,12 @@ func (w *CacheWarmer) Stop() error {
 	return nil
 }
 
-// WarmNow immediately warms the cache
+// WarmNow immediately warms the cache.
 func (w *CacheWarmer) WarmNow(ctx context.Context) error {
 	return w.strategy.Warm(ctx)
 }
 
-// periodicWarm runs periodic cache warming
+// periodicWarm runs periodic cache warming.
 func (w *CacheWarmer) periodicWarm(ctx context.Context) {
 	defer w.wg.Done()
 
@@ -102,14 +104,14 @@ func (w *CacheWarmer) periodicWarm(ctx context.Context) {
 	}
 }
 
-// PreloadStrategy preloads specific keys into cache
+// PreloadStrategy preloads specific keys into cache.
 type PreloadStrategy struct {
 	cache     Cache
 	preloader func(ctx context.Context) (map[string]interface{}, error)
 	ttl       time.Duration
 }
 
-// NewPreloadStrategy creates a new preload strategy
+// NewPreloadStrategy creates a new preload strategy.
 func NewPreloadStrategy(cache Cache, preloader func(ctx context.Context) (map[string]interface{}, error), ttl time.Duration) *PreloadStrategy {
 	return &PreloadStrategy{
 		cache:     cache,
@@ -118,7 +120,7 @@ func NewPreloadStrategy(cache Cache, preloader func(ctx context.Context) (map[st
 	}
 }
 
-// Warm preloads data into cache
+// Warm preloads data into cache.
 func (s *PreloadStrategy) Warm(ctx context.Context) error {
 	data, err := s.preloader(ctx)
 	if err != nil {
@@ -134,7 +136,7 @@ func (s *PreloadStrategy) Warm(ctx context.Context) error {
 	return nil
 }
 
-// GetKeys returns all preloaded keys
+// GetKeys returns all preloaded keys.
 func (s *PreloadStrategy) GetKeys(ctx context.Context) ([]string, error) {
 	data, err := s.preloader(ctx)
 	if err != nil {
@@ -149,7 +151,7 @@ func (s *PreloadStrategy) GetKeys(ctx context.Context) ([]string, error) {
 	return keys, nil
 }
 
-// QueryResultWarmer warms cache with query results
+// QueryResultWarmer warms cache with query results.
 type QueryResultWarmer struct {
 	cache   Cache
 	queries []string
@@ -157,7 +159,7 @@ type QueryResultWarmer struct {
 	ttl     time.Duration
 }
 
-// NewQueryResultWarmer creates a new query result warmer
+// NewQueryResultWarmer creates a new query result warmer.
 func NewQueryResultWarmer(cache Cache, queries []string, fetcher func(ctx context.Context, query string) (interface{}, error), ttl time.Duration) *QueryResultWarmer {
 	return &QueryResultWarmer{
 		cache:   cache,
@@ -167,7 +169,7 @@ func NewQueryResultWarmer(cache Cache, queries []string, fetcher func(ctx contex
 	}
 }
 
-// Warm executes queries and caches results
+// Warm executes queries and caches results.
 func (w *QueryResultWarmer) Warm(ctx context.Context) error {
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(w.queries))
@@ -201,7 +203,7 @@ func (w *QueryResultWarmer) Warm(ctx context.Context) error {
 	return nil
 }
 
-// GetKeys returns query keys
+// GetKeys returns query keys.
 func (w *QueryResultWarmer) GetKeys(ctx context.Context) ([]string, error) {
 	keys := make([]string, len(w.queries))
 	for i, query := range w.queries {
@@ -210,14 +212,14 @@ func (w *QueryResultWarmer) GetKeys(ctx context.Context) ([]string, error) {
 	return keys, nil
 }
 
-// MetadataWarmer warms cache with metadata
+// MetadataWarmer warms cache with metadata.
 type MetadataWarmer struct {
 	cache    Cache
 	metadata map[string]interface{}
 	ttl      time.Duration
 }
 
-// NewMetadataWarmer creates a new metadata warmer
+// NewMetadataWarmer creates a new metadata warmer.
 func NewMetadataWarmer(cache Cache, metadata map[string]interface{}, ttl time.Duration) *MetadataWarmer {
 	return &MetadataWarmer{
 		cache:    cache,
@@ -226,7 +228,7 @@ func NewMetadataWarmer(cache Cache, metadata map[string]interface{}, ttl time.Du
 	}
 }
 
-// Warm preloads metadata into cache
+// Warm preloads metadata into cache.
 func (w *MetadataWarmer) Warm(ctx context.Context) error {
 	for key, value := range w.metadata {
 		metadataKey := fmt.Sprintf("metadata:%s", key)
@@ -237,7 +239,7 @@ func (w *MetadataWarmer) Warm(ctx context.Context) error {
 	return nil
 }
 
-// GetKeys returns metadata keys
+// GetKeys returns metadata keys.
 func (w *MetadataWarmer) GetKeys(ctx context.Context) ([]string, error) {
 	keys := make([]string, 0, len(w.metadata))
 	for key := range w.metadata {

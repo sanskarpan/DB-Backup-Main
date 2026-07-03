@@ -9,19 +9,19 @@ import (
 	"time"
 )
 
-// PostgreSQLAnalyzer implements QueryAnalyzer for PostgreSQL
+// PostgreSQLAnalyzer implements QueryAnalyzer for PostgreSQL.
 type PostgreSQLAnalyzer struct {
 	db *sql.DB
 }
 
-// NewPostgreSQLAnalyzer creates a new PostgreSQL query analyzer
+// NewPostgreSQLAnalyzer creates a new PostgreSQL query analyzer.
 func NewPostgreSQLAnalyzer(db *sql.DB) *PostgreSQLAnalyzer {
 	return &PostgreSQLAnalyzer{
 		db: db,
 	}
 }
 
-// AnalyzeQueryPlan analyzes the execution plan for a PostgreSQL query
+// AnalyzeQueryPlan analyzes the execution plan for a PostgreSQL query.
 func (pa *PostgreSQLAnalyzer) AnalyzeQueryPlan(ctx context.Context, query string) (*QueryPlan, error) {
 	// Use EXPLAIN (ANALYZE, FORMAT JSON) for detailed plan
 	explainQuery := fmt.Sprintf("EXPLAIN (ANALYZE, FORMAT JSON) %s", query)
@@ -51,17 +51,17 @@ func (pa *PostgreSQLAnalyzer) AnalyzeQueryPlan(ctx context.Context, query string
 	// Parse JSON plan
 	var plans []struct {
 		Plan struct {
-			NodeType       string  `json:"Node Type"`
-			TotalCost      float64 `json:"Total Cost"`
-			PlanRows       int64   `json:"Plan Rows"`
-			PlanWidth      int     `json:"Plan Width"`
-			ActualRows     int64   `json:"Actual Rows"`
-			ActualTime     float64 `json:"Actual Total Time"`
-			RelationName   string  `json:"Relation Name"`
-			IndexName      string  `json:"Index Name"`
-			Filter         string  `json:"Filter"`
-			JoinType       string  `json:"Join Type"`
-			Plans          []interface{} `json:"Plans"`
+			NodeType     string        `json:"Node Type"`
+			TotalCost    float64       `json:"Total Cost"`
+			PlanRows     int64         `json:"Plan Rows"`
+			PlanWidth    int           `json:"Plan Width"`
+			ActualRows   int64         `json:"Actual Rows"`
+			ActualTime   float64       `json:"Actual Total Time"`
+			RelationName string        `json:"Relation Name"`
+			IndexName    string        `json:"Index Name"`
+			Filter       string        `json:"Filter"`
+			JoinType     string        `json:"Join Type"`
+			Plans        []interface{} `json:"Plans"`
 		} `json:"Plan"`
 		ExecutionTime float64 `json:"Execution Time"`
 	}
@@ -78,16 +78,16 @@ func (pa *PostgreSQLAnalyzer) AnalyzeQueryPlan(ctx context.Context, query string
 
 	// Create query plan
 	plan := &QueryPlan{
-		Query:         query,
-		DatabaseType:  DatabaseTypePostgreSQL,
-		EstimatedCost: planData.Plan.TotalCost,
-		EstimatedRows: planData.Plan.PlanRows,
-		ActualRows:    planData.Plan.ActualRows,
-		ExecutionTime: time.Duration(planData.ExecutionTime * float64(time.Millisecond)),
-		AnalyzedAt:    time.Now(),
-		PlanNodes:     make([]*PlanNode, 0),
-		UsedIndexes:   make([]string, 0),
-		Warnings:      make([]string, 0),
+		Query:           query,
+		DatabaseType:    DatabaseTypePostgreSQL,
+		EstimatedCost:   planData.Plan.TotalCost,
+		EstimatedRows:   planData.Plan.PlanRows,
+		ActualRows:      planData.Plan.ActualRows,
+		ExecutionTime:   time.Duration(planData.ExecutionTime * float64(time.Millisecond)),
+		AnalyzedAt:      time.Now(),
+		PlanNodes:       make([]*PlanNode, 0),
+		UsedIndexes:     make([]string, 0),
+		Warnings:        make([]string, 0),
 		Recommendations: make([]string, 0),
 	}
 
@@ -109,12 +109,12 @@ func (pa *PostgreSQLAnalyzer) AnalyzeQueryPlan(ctx context.Context, query string
 	return plan, nil
 }
 
-// GetDatabaseType returns the database type
+// GetDatabaseType returns the database type.
 func (pa *PostgreSQLAnalyzer) GetDatabaseType() DatabaseType {
 	return DatabaseTypePostgreSQL
 }
 
-// EstimateCost estimates the cost of executing a query
+// EstimateCost estimates the cost of executing a query.
 func (pa *PostgreSQLAnalyzer) EstimateCost(ctx context.Context, query string) (float64, error) {
 	explainQuery := fmt.Sprintf("EXPLAIN (FORMAT JSON) %s", query)
 
@@ -148,7 +148,7 @@ func (pa *PostgreSQLAnalyzer) EstimateCost(ctx context.Context, query string) (f
 	return plans[0].Plan.TotalCost, nil
 }
 
-// GetTableStatistics gets statistics for a table
+// GetTableStatistics gets statistics for a table.
 func (pa *PostgreSQLAnalyzer) GetTableStatistics(ctx context.Context, table string) (*TableStatistics, error) {
 	// Parse schema and table name
 	parts := strings.Split(table, ".")
@@ -191,7 +191,6 @@ func (pa *PostgreSQLAnalyzer) GetTableStatistics(ctx context.Context, table stri
 		&lastAnalyze,
 		&lastAutoAnalyze,
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to get table statistics: %w", err)
 	}

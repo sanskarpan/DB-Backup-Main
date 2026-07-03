@@ -12,12 +12,21 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
+
 	"github.com/sanskarpan/db-backup/internal/database"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 	"github.com/sanskarpan/db-backup/pkg/utils"
 )
 
-// CassandraDriver implements the database.Driver interface for Cassandra/ScyllaDB
+const (
+	snapshotBackupType = "snapshot"
+	cassandraDataDir   = "/var/lib/cassandra/data"
+	scyllaDataDir      = "/var/lib/scylla/data"
+)
+
+// CassandraDriver implements the database.Driver interface for Cassandra/ScyllaDB.
+//
+//nolint:revive // keeps public name stable across dependent packages
 type CassandraDriver struct {
 	session        *gocql.Session
 	config         *database.ConnectionConfig
@@ -35,12 +44,12 @@ func init() {
 	})
 }
 
-// NewCassandraDriver creates a new Cassandra driver instance
+// NewCassandraDriver creates a new Cassandra driver instance.
 func NewCassandraDriver() *CassandraDriver {
 	return &CassandraDriver{}
 }
 
-// Connect establishes a connection to the Cassandra database
+// Connect establishes a connection to the Cassandra database.
 func (d *CassandraDriver) Connect(ctx context.Context, config *database.ConnectionConfig) error {
 	// Create cluster configuration
 	cluster := gocql.NewCluster(config.Host)
@@ -73,7 +82,7 @@ func (d *CassandraDriver) Connect(ctx context.Context, config *database.Connecti
 	return nil
 }
 
-// Disconnect closes the database connection
+// Disconnect closes the database connection.
 func (d *CassandraDriver) Disconnect() error {
 	if d.session != nil {
 		d.session.Close()
@@ -81,7 +90,7 @@ func (d *CassandraDriver) Disconnect() error {
 	return nil
 }
 
-// Ping tests the database connection
+// Ping tests the database connection.
 func (d *CassandraDriver) Ping(ctx context.Context) error {
 	if d.session == nil {
 		return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "not connected to database")
@@ -99,7 +108,7 @@ func (d *CassandraDriver) Ping(ctx context.Context) error {
 	return iter.Close()
 }
 
-// Backup creates a backup of the Cassandra database
+// Backup creates a backup of the Cassandra database.
 func (d *CassandraDriver) Backup(ctx context.Context, opts *database.BackupOptions) (*database.BackupResult, error) {
 	result := &database.BackupResult{
 		ID:        utils.GenerateBackupID(),
@@ -111,15 +120,15 @@ func (d *CassandraDriver) Backup(ctx context.Context, opts *database.BackupOptio
 	// Determine backup type
 	backupType := opts.BackupType
 	if backupType == "" {
-		backupType = "snapshot"
+		backupType = snapshotBackupType
 	}
 
 	var err error
 	switch backupType {
-	case "snapshot":
+	case snapshotBackupType:
 		err = d.backupSnapshot(ctx, opts, result)
 	case "incremental":
-		err = d.backupIncremental(ctx, opts, result)
+		err = d.backupIncremental(opts, result)
 	default:
 		err = fmt.Errorf("unsupported backup type: %s", backupType)
 	}
@@ -136,7 +145,7 @@ func (d *CassandraDriver) Backup(ctx context.Context, opts *database.BackupOptio
 	return result, nil
 }
 
-// backupSnapshot creates a snapshot backup using nodetool
+// backupSnapshot creates a snapshot backup using nodetool.
 func (d *CassandraDriver) backupSnapshot(ctx context.Context, opts *database.BackupOptions, result *database.BackupResult) error {
 	snapshotName := fmt.Sprintf("backup_%s", result.ID)
 
@@ -144,7 +153,7 @@ func (d *CassandraDriver) backupSnapshot(ctx context.Context, opts *database.Bac
 	args := []string{"snapshot"}
 
 	// Add keyspace if specified
-	if opts.IncludeSchemas != nil && len(opts.IncludeSchemas) > 0 {
+	if len(opts.IncludeSchemas) > 0 {
 		args = append(args, "-kt", strings.Join(opts.IncludeSchemas, ","))
 	}
 
@@ -158,13 +167,13 @@ func (d *CassandraDriver) backupSnapshot(ctx context.Context, opts *database.Bac
 	}
 
 	// Copy snapshot files to backup location
-	dataDir := "/var/lib/cassandra/data" // Default Cassandra data directory
+	dataDir := cassandraDataDir // Default Cassandra data directory
 	if d.isScyllaDB {
-		dataDir = "/var/lib/scylla/data"
+		dataDir = scyllaDataDir
 	}
 
 	backupDir := filepath.Join(opts.OutputDir, result.ID)
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err = os.MkdirAll(backupDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
@@ -183,12 +192,14 @@ func (d *CassandraDriver) backupSnapshot(ctx context.Context, opts *database.Bac
 
 	// Get backup size
 	var totalSize int64
-	filepath.Walk(backupDir, func(path string, info os.FileInfo, err error) error {
+	if walkErr := filepath.Walk(backupDir, func(_ string, info os.FileInfo, err error) error {
 		if err == nil && !info.IsDir() {
 			totalSize += info.Size()
 		}
 		return nil
-	})
+	}); walkErr != nil {
+		return fmt.Errorf("failed to calculate backup size: %w", walkErr)
+	}
 
 	result.BackupPath = backupDir
 	result.BackupSize = totalSize
@@ -199,15 +210,15 @@ func (d *CassandraDriver) backupSnapshot(ctx context.Context, opts *database.Bac
 	return nil
 }
 
-// backupIncremental creates an incremental backup
-func (d *CassandraDriver) backupIncremental(ctx context.Context, opts *database.BackupOptions, result *database.BackupResult) error {
+// backupIncremental creates an incremental backup.
+func (d *CassandraDriver) backupIncremental(opts *database.BackupOptions, result *database.BackupResult) error {
 	// Cassandra incremental backups are enabled via configuration
 	// and create hard links in the backups directory
 
 	// Get incremental backup directory
-	dataDir := "/var/lib/cassandra/data"
+	dataDir := cassandraDataDir
 	if d.isScyllaDB {
-		dataDir = "/var/lib/scylla/data"
+		dataDir = scyllaDataDir
 	}
 
 	backupsDir := filepath.Join(dataDir, "backups")
@@ -220,12 +231,14 @@ func (d *CassandraDriver) backupIncremental(ctx context.Context, opts *database.
 
 	// Get backup size
 	var totalSize int64
-	filepath.Walk(outputDir, func(path string, info os.FileInfo, err error) error {
+	if walkErr := filepath.Walk(outputDir, func(_ string, info os.FileInfo, err error) error {
 		if err == nil && !info.IsDir() {
 			totalSize += info.Size()
 		}
 		return nil
-	})
+	}); walkErr != nil {
+		return fmt.Errorf("failed to calculate backup size: %w", walkErr)
+	}
 
 	result.BackupPath = outputDir
 	result.BackupSize = totalSize
@@ -235,23 +248,23 @@ func (d *CassandraDriver) backupIncremental(ctx context.Context, opts *database.
 	return nil
 }
 
-// GetBackupSize estimates the size of a backup
+// GetBackupSize estimates the size of a backup.
 func (d *CassandraDriver) GetBackupSize(ctx context.Context, opts *database.BackupOptions) (int64, error) {
 	// For Cassandra, estimate based on current data size
 	return d.GetDatabaseSize(ctx)
 }
 
-// StreamBackup streams a backup to the provided writer
+// StreamBackup streams a backup to the provided writer.
 func (d *CassandraDriver) StreamBackup(ctx context.Context, opts *database.BackupOptions, writer io.Writer) error {
 	return fmt.Errorf("streaming backup not implemented for Cassandra")
 }
 
-// StreamRestore restores from a reader
+// StreamRestore restores from a reader.
 func (d *CassandraDriver) StreamRestore(ctx context.Context, opts *database.RestoreOptions, reader io.Reader) error {
 	return fmt.Errorf("streaming restore not implemented for Cassandra")
 }
 
-// ValidateRestore validates that a restore can be performed
+// ValidateRestore validates that a restore can be performed.
 func (d *CassandraDriver) ValidateRestore(ctx context.Context, opts *database.RestoreOptions) error {
 	if opts.BackupPath == "" {
 		return fmt.Errorf("backup path is required")
@@ -259,7 +272,7 @@ func (d *CassandraDriver) ValidateRestore(ctx context.Context, opts *database.Re
 	return nil
 }
 
-// GetDatabases returns list of keyspaces
+// GetDatabases returns list of keyspaces.
 func (d *CassandraDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	query := "SELECT keyspace_name FROM system_schema.keyspaces"
 	iter := d.session.Query(query).Iter()
@@ -274,7 +287,7 @@ func (d *CassandraDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	return keyspaces, iter.Close()
 }
 
-// GetTables returns list of tables in a keyspace
+// GetTables returns list of tables in a keyspace.
 func (d *CassandraDriver) GetTables(ctx context.Context, keyspace string) ([]string, error) {
 	query := "SELECT table_name FROM system_schema.tables WHERE keyspace_name = ?"
 	iter := d.session.Query(query, keyspace).Iter()
@@ -289,7 +302,7 @@ func (d *CassandraDriver) GetTables(ctx context.Context, keyspace string) ([]str
 	return tables, iter.Close()
 }
 
-// GetTableSize returns the size of a table
+// GetTableSize returns the size of a table.
 func (d *CassandraDriver) GetTableSize(ctx context.Context, keyspace, table string) (int64, error) {
 	// Cassandra doesn't provide direct table size - estimate from size_estimates
 	query := "SELECT mean_partition_size, partitions_count FROM system.size_estimates WHERE keyspace_name = ? AND table_name = ?"
@@ -304,7 +317,7 @@ func (d *CassandraDriver) GetTableSize(ctx context.Context, keyspace, table stri
 	return 0, fmt.Errorf("could not determine table size")
 }
 
-// GetType returns the database type
+// GetType returns the database type.
 func (d *CassandraDriver) GetType() database.DatabaseType {
 	if d.isScyllaDB {
 		return "scylladb"
@@ -312,17 +325,17 @@ func (d *CassandraDriver) GetType() database.DatabaseType {
 	return "cassandra"
 }
 
-// SupportsIncremental returns whether incremental backups are supported
+// SupportsIncremental returns whether incremental backups are supported.
 func (d *CassandraDriver) SupportsIncremental() bool {
 	return true
 }
 
-// SupportsPITR returns whether point-in-time recovery is supported
+// SupportsPITR returns whether point-in-time recovery is supported.
 func (d *CassandraDriver) SupportsPITR() bool {
 	return false // Cassandra doesn't support PITR natively
 }
 
-// Restore restores the Cassandra database from a backup
+// Restore restores the Cassandra database from a backup.
 func (d *CassandraDriver) Restore(ctx context.Context, opts *database.RestoreOptions) (*database.RestoreResult, error) {
 	result := &database.RestoreResult{
 		ID:        utils.GenerateRestoreID(),
@@ -334,9 +347,9 @@ func (d *CassandraDriver) Restore(ctx context.Context, opts *database.RestoreOpt
 	// This is a simplified implementation
 
 	// Copy backup files to data directory
-	dataDir := "/var/lib/cassandra/data"
+	dataDir := cassandraDataDir
 	if d.isScyllaDB {
-		dataDir = "/var/lib/scylla/data"
+		dataDir = scyllaDataDir
 	}
 
 	// Copy files
@@ -362,7 +375,7 @@ func (d *CassandraDriver) Restore(ctx context.Context, opts *database.RestoreOpt
 	return result, nil
 }
 
-// GetDatabaseSize returns the total size of the database
+// GetDatabaseSize returns the total size of the database.
 func (d *CassandraDriver) GetDatabaseSize(ctx context.Context) (int64, error) {
 	// Query system tables for size information
 	query := "SELECT sum(total_disk_space_used) as size FROM system.size_estimates"
@@ -377,7 +390,7 @@ func (d *CassandraDriver) GetDatabaseSize(ctx context.Context) (int64, error) {
 	return 0, fmt.Errorf("failed to get database size")
 }
 
-// GetVersion returns the Cassandra/ScyllaDB version
+// GetVersion returns the Cassandra/ScyllaDB version.
 func (d *CassandraDriver) GetVersion(ctx context.Context) (string, error) {
 	query := "SELECT release_version FROM system.local"
 	iter := d.session.Query(query).Iter()
@@ -394,7 +407,7 @@ func (d *CassandraDriver) GetVersion(ctx context.Context) (string, error) {
 	return "unknown", nil
 }
 
-// detectScyllaDB detects if the database is ScyllaDB
+// detectScyllaDB detects if the database is ScyllaDB.
 func (d *CassandraDriver) detectScyllaDB(session *gocql.Session) bool {
 	query := "SELECT release_version FROM system.local"
 	iter := session.Query(query).Iter()
@@ -408,7 +421,7 @@ func (d *CassandraDriver) detectScyllaDB(session *gocql.Session) bool {
 	return false
 }
 
-// copySnapshotFiles copies snapshot files from source to destination
+// copySnapshotFiles copies snapshot files from source to destination.
 func (d *CassandraDriver) copySnapshotFiles(dataDir, snapshotName, destDir string) error {
 	return filepath.Walk(dataDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -424,7 +437,7 @@ func (d *CassandraDriver) copySnapshotFiles(dataDir, snapshotName, destDir strin
 			destPath := filepath.Join(destDir, rel)
 			destPathDir := filepath.Dir(destPath)
 
-			if err := os.MkdirAll(destPathDir, 0755); err != nil {
+			if err := os.MkdirAll(destPathDir, 0o755); err != nil {
 				return err
 			}
 
@@ -435,7 +448,7 @@ func (d *CassandraDriver) copySnapshotFiles(dataDir, snapshotName, destDir strin
 	})
 }
 
-// copyDirectory recursively copies a directory
+// copyDirectory recursively copies a directory.
 func (d *CassandraDriver) copyDirectory(src, dst string) error {
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -457,7 +470,7 @@ func (d *CassandraDriver) copyDirectory(src, dst string) error {
 	})
 }
 
-// copyFile copies a single file
+// copyFile copies a single file.
 func (d *CassandraDriver) copyFile(src, dst string) error {
 	source, err := os.Open(src)
 	if err != nil {
@@ -475,53 +488,53 @@ func (d *CassandraDriver) copyFile(src, dst string) error {
 	return err
 }
 
-// ClusterManager manages Cassandra cluster operations
+// ClusterManager manages Cassandra cluster operations.
 type ClusterManager struct {
 	driver *CassandraDriver
 }
 
-// NewClusterManager creates a new cluster manager
+// NewClusterManager creates a new cluster manager.
 func NewClusterManager(driver *CassandraDriver) *ClusterManager {
 	return &ClusterManager{driver: driver}
 }
 
-// BackupMultiDC creates a backup across multiple datacenters
+// BackupMultiDC creates a backup across multiple datacenters.
 func (cm *ClusterManager) BackupMultiDC(ctx context.Context, opts *database.BackupOptions) (*database.BackupResult, error) {
 	// Stub implementation for multi-DC backup
 	return nil, fmt.Errorf("multi-DC backup not implemented")
 }
 
-// EnableIncrementalBackup enables incremental backups on the cluster
+// EnableIncrementalBackup enables incremental backups on the cluster.
 func (cm *ClusterManager) EnableIncrementalBackup(ctx context.Context) error {
 	// Stub implementation
 	return fmt.Errorf("incremental backup enable not implemented")
 }
 
-// DisableIncrementalBackup disables incremental backups on the cluster
+// DisableIncrementalBackup disables incremental backups on the cluster.
 func (cm *ClusterManager) DisableIncrementalBackup(ctx context.Context) error {
 	// Stub implementation
 	return fmt.Errorf("incremental backup disable not implemented")
 }
 
-// IsIncrementalBackupEnabled checks if incremental backup is enabled
+// IsIncrementalBackupEnabled checks if incremental backup is enabled.
 func (cm *ClusterManager) IsIncrementalBackupEnabled(ctx context.Context) (bool, error) {
 	// Stub implementation
 	return false, fmt.Errorf("incremental backup status check not implemented")
 }
 
-// testSSHConnection tests SSH connection for nodetool access
+// testSSHConnection tests SSH connection for nodetool access.
 func (d *CassandraDriver) testSSHConnection(ctx context.Context) error {
 	// Stub implementation for SSH connection testing
 	return fmt.Errorf("SSH connection testing not implemented")
 }
 
-// createSnapshot creates a Cassandra snapshot
-func (d *CassandraDriver) createSnapshot(ctx context.Context, snapshotName, outputDir string, keyspaces []string) error {
+// createSnapshot creates a Cassandra snapshot.
+func (d *CassandraDriver) createSnapshot(ctx context.Context, snapshotName string, keyspaces []string) error {
 	// Execute nodetool snapshot command
 	args := []string{"snapshot"}
 
 	// Add keyspace if specified
-	if keyspaces != nil && len(keyspaces) > 0 {
+	if len(keyspaces) > 0 {
 		args = append(args, "-kt", strings.Join(keyspaces, ","))
 	}
 
@@ -537,7 +550,7 @@ func (d *CassandraDriver) createSnapshot(ctx context.Context, snapshotName, outp
 	return nil
 }
 
-// clearSnapshot clears a Cassandra snapshot
+// clearSnapshot clears a Cassandra snapshot.
 func (d *CassandraDriver) clearSnapshot(ctx context.Context, snapshotName string) error {
 	// Execute nodetool clearsnapshot command
 	cmd := exec.CommandContext(ctx, "nodetool", "clearsnapshot", "-t", snapshotName)

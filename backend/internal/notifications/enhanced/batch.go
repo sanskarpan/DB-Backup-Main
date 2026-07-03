@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// BatchProcessor handles intelligent notification batching and digests
+// BatchProcessor handles intelligent notification batching and digests.
 type BatchProcessor struct {
 	mu               sync.RWMutex
 	engine           *Engine
@@ -21,7 +21,7 @@ type BatchProcessor struct {
 	groupingStrategy GroupingStrategy
 }
 
-// Batch represents a batch of notifications
+// Batch represents a batch of notifications.
 type Batch struct {
 	ID            string                 `json:"id"`
 	UserID        string                 `json:"user_id"`
@@ -35,18 +35,18 @@ type Batch struct {
 	Metadata      map[string]interface{} `json:"metadata"`
 }
 
-// GroupingStrategy defines how notifications should be grouped
+// GroupingStrategy defines how notifications should be grouped.
 type GroupingStrategy string
 
 const (
-	GroupByType     GroupingStrategy = "type"      // Group by notification type
-	GroupByCategory GroupingStrategy = "category"  // Group by category
-	GroupByPriority GroupingStrategy = "priority"  // Group by priority
-	GroupBySmart    GroupingStrategy = "smart"     // AI-based smart grouping
-	GroupByNone     GroupingStrategy = "none"      // No grouping
+	GroupByType     GroupingStrategy = "type"     // Group by notification type
+	GroupByCategory GroupingStrategy = "category" // Group by category
+	GroupByPriority GroupingStrategy = "priority" // Group by priority
+	GroupBySmart    GroupingStrategy = "smart"    // AI-based smart grouping
+	GroupByNone     GroupingStrategy = "none"     // No grouping
 )
 
-// BatchConfig represents batch processor configuration
+// BatchConfig represents batch processor configuration.
 type BatchConfig struct {
 	Interval         time.Duration
 	MinBatchSize     int
@@ -57,7 +57,7 @@ type BatchConfig struct {
 	DigestSchedule   string // cron format
 }
 
-// NewBatchProcessor creates a new batch processor
+// NewBatchProcessor creates a new batch processor.
 func NewBatchProcessor(engine *Engine, config BatchConfig) *BatchProcessor {
 	if config.Interval == 0 {
 		config.Interval = 5 * time.Minute
@@ -87,13 +87,13 @@ func NewBatchProcessor(engine *Engine, config BatchConfig) *BatchProcessor {
 	}
 }
 
-// Start starts the batch processor
+// Start starts the batch processor.
 func (bp *BatchProcessor) Start() {
 	bp.ticker = time.NewTicker(bp.batchInterval)
 	go bp.processBatches()
 }
 
-// Stop stops the batch processor
+// Stop stops the batch processor.
 func (bp *BatchProcessor) Stop() {
 	if bp.ticker != nil {
 		bp.ticker.Stop()
@@ -101,7 +101,7 @@ func (bp *BatchProcessor) Stop() {
 	close(bp.stopChan)
 }
 
-// AddToBatch adds a notification to appropriate batch
+// AddToBatch adds a notification to appropriate batch.
 func (bp *BatchProcessor) AddToBatch(notification *Notification) bool {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
@@ -158,7 +158,7 @@ func (bp *BatchProcessor) AddToBatch(notification *Notification) bool {
 	return true
 }
 
-// processBatches periodically processes batches
+// processBatches periodically processes batches.
 func (bp *BatchProcessor) processBatches() {
 	for {
 		select {
@@ -170,7 +170,7 @@ func (bp *BatchProcessor) processBatches() {
 	}
 }
 
-// checkAndSendBatches checks batches and sends ready ones
+// checkAndSendBatches checks batches and sends ready ones.
 func (bp *BatchProcessor) checkAndSendBatches() {
 	bp.mu.Lock()
 	toSend := make([]*Batch, 0)
@@ -211,7 +211,7 @@ func (bp *BatchProcessor) checkAndSendBatches() {
 	}
 }
 
-// sendBatch sends a batch as a grouped notification
+// sendBatch sends a batch as a grouped notification.
 func (bp *BatchProcessor) sendBatch(batch *Batch) {
 	if len(batch.Notifications) == 0 {
 		return
@@ -231,7 +231,7 @@ func (bp *BatchProcessor) sendBatch(batch *Batch) {
 	}
 }
 
-// createGroupedNotification creates a single notification from a batch
+// createGroupedNotification creates a single notification from a batch.
 func (bp *BatchProcessor) createGroupedNotification(batch *Batch) *Notification {
 	firstNotif := batch.Notifications[0]
 
@@ -254,10 +254,10 @@ func (bp *BatchProcessor) createGroupedNotification(batch *Batch) *Notification 
 		Category: batch.Category,
 		Tags:     []string{"batch", "digest"},
 		Metadata: map[string]interface{}{
-			"batch_id":          batch.ID,
+			"batch_id":           batch.ID,
 			"notification_count": len(batch.Notifications),
 			"notification_ids":   bp.getNotificationIDs(batch),
-			"types":             bp.getUniqueTypes(batch),
+			"types":              bp.getUniqueTypes(batch),
 			"time_range": map[string]interface{}{
 				"start": batch.CreatedAt,
 				"end":   batch.UpdatedAt,
@@ -277,7 +277,7 @@ func (bp *BatchProcessor) createGroupedNotification(batch *Batch) *Notification 
 	return notification
 }
 
-// generateBatchSummary generates a summary for the batch
+// generateBatchSummary generates a summary for the batch.
 func (bp *BatchProcessor) generateBatchSummary(batch *Batch) struct {
 	Title   string
 	Message string
@@ -286,17 +286,18 @@ func (bp *BatchProcessor) generateBatchSummary(batch *Batch) struct {
 
 	var title, message string
 
-	if batch.Type != "" {
+	switch {
+	case batch.Type != "":
 		// Type-specific summary
 		title = fmt.Sprintf("%d %s notifications", count, batch.Type)
 		message = fmt.Sprintf("You have %d %s notifications from the last %s",
 			count, batch.Type, bp.formatDuration(time.Since(batch.CreatedAt)))
-	} else if batch.Category != "" {
+	case batch.Category != "":
 		// Category-specific summary
 		title = fmt.Sprintf("%d %s updates", count, batch.Category)
 		message = fmt.Sprintf("You have %d updates in %s category",
 			count, batch.Category)
-	} else {
+	default:
 		// Generic summary
 		title = fmt.Sprintf("%d notifications", count)
 		message = fmt.Sprintf("You have %d notifications waiting for you", count)
@@ -317,7 +318,7 @@ func (bp *BatchProcessor) generateBatchSummary(batch *Batch) struct {
 	}{title, message}
 }
 
-// generateBatchActions generates action buttons for batch
+// generateBatchActions generates action buttons for batch.
 func (bp *BatchProcessor) generateBatchActions(batch *Batch) []NotificationAction {
 	return []NotificationAction{
 		{
@@ -348,7 +349,7 @@ func (bp *BatchProcessor) generateBatchActions(batch *Batch) []NotificationActio
 	}
 }
 
-// generateBatchChartData generates chart data for visualization
+// generateBatchChartData generates chart data for visualization.
 func (bp *BatchProcessor) generateBatchChartData(batch *Batch) map[string]interface{} {
 	typeCounts := bp.getTypeCounts(batch)
 	priorityCounts := bp.getPriorityCounts(batch)
@@ -356,14 +357,14 @@ func (bp *BatchProcessor) generateBatchChartData(batch *Batch) map[string]interf
 	return map[string]interface{}{
 		"type": "batch_summary",
 		"data": map[string]interface{}{
-			"by_type": typeCounts,
+			"by_type":     typeCounts,
 			"by_priority": priorityCounts,
 			"timeline":    bp.getTimeline(batch),
 		},
 	}
 }
 
-// getBatchKey generates a unique key for batching
+// getBatchKey generates a unique key for batching.
 func (bp *BatchProcessor) getBatchKey(notification *Notification) string {
 	switch bp.groupingStrategy {
 	case GroupByType:
@@ -439,28 +440,27 @@ func (bp *BatchProcessor) getTimeline(batch *Batch) []map[string]interface{} {
 }
 
 func (bp *BatchProcessor) formatDuration(d time.Duration) string {
-	if d < time.Minute {
+	switch {
+	case d < time.Minute:
 		return fmt.Sprintf("%d seconds", int(d.Seconds()))
-	} else if d < time.Hour {
+	case d < time.Hour:
 		return fmt.Sprintf("%d minutes", int(d.Minutes()))
-	} else if d < 24*time.Hour {
+	case d < 24*time.Hour:
 		return fmt.Sprintf("%d hours", int(d.Hours()))
-	} else {
+	default:
 		return fmt.Sprintf("%d days", int(d.Hours()/24))
 	}
 }
 
-// DigestGenerator generates periodic notification digests
+// DigestGenerator generates periodic notification digests.
 type DigestGenerator struct {
-	mu           sync.RWMutex
-	engine       *Engine
-	frequency    string // daily, weekly, monthly
-	scheduledFor time.Time
-	ticker       *time.Ticker
-	stopChan     chan struct{}
+	engine    *Engine
+	frequency string // daily, weekly, monthly
+	ticker    *time.Ticker
+	stopChan  chan struct{}
 }
 
-// DigestConfig represents digest configuration
+// DigestConfig represents digest configuration.
 type DigestConfig struct {
 	Frequency    string // daily, weekly, monthly
 	TimeOfDay    string // HH:MM format
@@ -470,7 +470,7 @@ type DigestConfig struct {
 	IncludeChart bool
 }
 
-// NewDigestGenerator creates a new digest generator
+// NewDigestGenerator creates a new digest generator.
 func NewDigestGenerator(engine *Engine, config DigestConfig) *DigestGenerator {
 	return &DigestGenerator{
 		engine:    engine,
@@ -479,7 +479,7 @@ func NewDigestGenerator(engine *Engine, config DigestConfig) *DigestGenerator {
 	}
 }
 
-// Start starts the digest generator
+// Start starts the digest generator.
 func (dg *DigestGenerator) Start() {
 	// Calculate next digest time
 	interval := dg.getInterval()
@@ -488,7 +488,7 @@ func (dg *DigestGenerator) Start() {
 	go dg.generateDigests()
 }
 
-// Stop stops the digest generator
+// Stop stops the digest generator.
 func (dg *DigestGenerator) Stop() {
 	if dg.ticker != nil {
 		dg.ticker.Stop()
@@ -496,7 +496,7 @@ func (dg *DigestGenerator) Stop() {
 	close(dg.stopChan)
 }
 
-// generateDigests periodically generates digests
+// generateDigests periodically generates digests.
 func (dg *DigestGenerator) generateDigests() {
 	for {
 		select {
@@ -508,7 +508,7 @@ func (dg *DigestGenerator) generateDigests() {
 	}
 }
 
-// generateAndSendDigests generates and sends digests for all users
+// generateAndSendDigests generates and sends digests for all users.
 func (dg *DigestGenerator) generateAndSendDigests() {
 	// In a real implementation, would iterate through all users
 	// For now, this is a placeholder
@@ -520,7 +520,7 @@ func (dg *DigestGenerator) generateAndSendDigests() {
 	//   - Send digest
 }
 
-// getInterval returns the ticker interval based on frequency
+// getInterval returns the ticker interval based on frequency.
 func (dg *DigestGenerator) getInterval() time.Duration {
 	switch dg.frequency {
 	case "daily":

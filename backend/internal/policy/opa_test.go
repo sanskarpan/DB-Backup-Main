@@ -11,7 +11,7 @@ import (
 func TestEvaluatePolicy(t *testing.T) {
 	// Mock OPA server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
+		if r.Method != http.MethodPost {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
 
@@ -57,7 +57,7 @@ func TestEvaluatePolicy(t *testing.T) {
 func TestLoadPolicy(t *testing.T) {
 	// Mock OPA server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "PUT" {
+		if r.Method != http.MethodPut {
 			t.Errorf("Expected PUT request, got %s", r.Method)
 		}
 
@@ -87,7 +87,7 @@ allow {
 func TestDeletePolicy(t *testing.T) {
 	// Mock OPA server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "DELETE" {
+		if r.Method != http.MethodDelete {
 			t.Errorf("Expected DELETE request, got %s", r.Method)
 		}
 
@@ -111,7 +111,7 @@ func TestDeletePolicy(t *testing.T) {
 func TestGetPolicies(t *testing.T) {
 	// Mock OPA server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "GET" {
+		if r.Method != http.MethodGet {
 			t.Errorf("Expected GET request, got %s", r.Method)
 		}
 
@@ -143,7 +143,7 @@ func TestGetPolicies(t *testing.T) {
 func TestHealthCheck(t *testing.T) {
 	// Mock OPA server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "GET" {
+		if r.Method != http.MethodGet {
 			t.Errorf("Expected GET request, got %s", r.Method)
 		}
 
@@ -185,7 +185,6 @@ func TestCheckBackupPermission(t *testing.T) {
 	allow, reason, err := pm.CheckBackupPermission(ctx, "user-123", "create", "db-1", map[string]interface{}{
 		"user_role": "admin",
 	})
-
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -220,7 +219,6 @@ func TestCheckStoragePolicy(t *testing.T) {
 	allow, reason, err := pm.CheckStoragePolicy(ctx, "s3", "eu-west", true, map[string]interface{}{
 		"data_classification": "confidential",
 	})
-
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -253,7 +251,6 @@ func TestCheckSecurityPolicy(t *testing.T) {
 	ctx := context.Background()
 
 	allow, reason, err := pm.CheckSecurityPolicy(ctx, "delete", "user_data", "user", "192.0.2.0")
-
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -286,7 +283,6 @@ func TestCheckDataResidencyPolicy(t *testing.T) {
 	ctx := context.Background()
 
 	allow, reason, err := pm.CheckDataResidencyPolicy(ctx, "backup", "eu-west", "us-east", "confidential")
-
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -295,7 +291,7 @@ func TestCheckDataResidencyPolicy(t *testing.T) {
 		t.Errorf("Expected allow=false, got allow=true")
 	}
 
-	if len(reason) == 0 {
+	if reason == "" {
 		t.Errorf("Expected non-empty reason")
 	}
 }

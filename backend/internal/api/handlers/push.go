@@ -8,12 +8,12 @@ import (
 	"github.com/sanskarpan/db-backup/internal/notification"
 )
 
-// PushHandler handles push notification related requests
+// PushHandler handles push notification related requests.
 type PushHandler struct {
 	pushService *notification.PushService
 }
 
-// NewPushHandler creates a new push notification handler
+// NewPushHandler creates a new push notification handler.
 func NewPushHandler(pushService *notification.PushService) *PushHandler {
 	return &PushHandler{
 		pushService: pushService,
@@ -21,7 +21,7 @@ func NewPushHandler(pushService *notification.PushService) *PushHandler {
 }
 
 // GetPublicKey returns the VAPID public key for client-side subscription
-// GET /api/push/public-key
+// GET /api/push/public-key.
 func (h *PushHandler) GetPublicKey(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -33,11 +33,13 @@ func (h *PushHandler) GetPublicKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 // Subscribe handles push notification subscription
-// POST /api/push/subscribe
+// POST /api/push/subscribe.
 func (h *PushHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -45,11 +47,11 @@ func (h *PushHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		UserID     string                             `json:"user_id"`
-		Endpoint   string                             `json:"endpoint"`
-		Keys       notification.SubscriptionKeys      `json:"keys"`
+		UserID      string                               `json:"user_id"`
+		Endpoint    string                               `json:"endpoint"`
+		Keys        notification.SubscriptionKeys        `json:"keys"`
 		Preferences notification.NotificationPreferences `json:"preferences,omitempty"`
-		DeviceInfo map[string]string                  `json:"device_info,omitempty"`
+		DeviceInfo  map[string]string                    `json:"device_info,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -90,11 +92,13 @@ func (h *PushHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		return
+	}
 }
 
 // Unsubscribe handles push notification unsubscription
-// POST /api/push/unsubscribe
+// POST /api/push/unsubscribe.
 func (h *PushHandler) Unsubscribe(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -125,11 +129,13 @@ func (h *PushHandler) Unsubscribe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 // UpdatePreferences updates notification preferences for a subscription
-// POST /api/push/preferences
+// POST /api/push/preferences.
 func (h *PushHandler) UpdatePreferences(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -137,7 +143,7 @@ func (h *PushHandler) UpdatePreferences(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var req struct {
-		Endpoint    string                             `json:"endpoint"`
+		Endpoint    string                               `json:"endpoint"`
 		Preferences notification.NotificationPreferences `json:"preferences"`
 	}
 
@@ -161,11 +167,13 @@ func (h *PushHandler) UpdatePreferences(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 // SendTestNotification sends a test push notification
-// POST /api/push/test
+// POST /api/push/test.
 func (h *PushHandler) SendTestNotification(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -218,11 +226,13 @@ func (h *PushHandler) SendTestNotification(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 // GetSubscriptions retrieves all subscriptions for a user
-// GET /api/push/subscriptions?user_id=xxx
+// GET /api/push/subscriptions?user_id=xxx.
 func (h *PushHandler) GetSubscriptions(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -243,11 +253,13 @@ func (h *PushHandler) GetSubscriptions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 // GetStats returns statistics about push subscriptions
-// GET /api/push/stats
+// GET /api/push/stats.
 func (h *PushHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -257,10 +269,12 @@ func (h *PushHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	stats := h.pushService.GetStats()
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	if err := json.NewEncoder(w).Encode(stats); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
-// Helper function to generate unique IDs
+// Helper function to generate unique IDs.
 func generateID() string {
 	return time.Now().Format("20060102150405") + randomString(8)
 }

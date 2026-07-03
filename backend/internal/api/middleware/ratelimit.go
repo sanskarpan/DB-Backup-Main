@@ -80,7 +80,7 @@ func (rl *rateLimiter) cleanupVisitors() {
 	}
 }
 
-// RateLimit returns a gin middleware for rate limiting
+// RateLimit returns a gin middleware for rate limiting.
 func RateLimit(requestsPerMinute int) gin.HandlerFunc {
 	limiter := newRateLimiter(requestsPerMinute, time.Minute)
 

@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/sanskarpan/db-backup/internal/database"
 )
 
 func TestMySQLPITR_BackupBinaryLogs(t *testing.T) {
@@ -196,8 +197,9 @@ func TestBinaryLogPosition_String(t *testing.T) {
 	assert.Equal(t, "mysql-bin.000001:12345", str)
 }
 
-// Helper function to setup test MySQL connection
+// Helper function to setup test MySQL connection.
 func setupTestMySQL(t *testing.T) *MySQLDriver {
+	t.Helper()
 	// Check if MySQL is available via environment variables
 	host := os.Getenv("MYSQL_TEST_HOST")
 	if host == "" {

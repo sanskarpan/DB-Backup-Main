@@ -1,6 +1,7 @@
 package incremental
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -258,7 +259,7 @@ func TestIncrementalForeverStrategy_RestoreFromBackup(t *testing.T) {
 		t.Fatalf("Failed to read restored file: %v", err)
 	}
 
-	if string(restoredData) != string(modifiedData) {
+	if !bytes.Equal(restoredData, modifiedData) {
 		t.Errorf("Restored data does not match. Expected '%s', got '%s'", string(modifiedData), string(restoredData))
 	}
 }
@@ -286,7 +287,7 @@ func TestGetBackupChain(t *testing.T) {
 	}
 
 	// Create multiple incrementals (each based on the full backup for simplicity)
-	var lastManifest *BackupManifest = fullManifest
+	lastManifest := fullManifest
 	for i := 0; i < 3; i++ {
 		time.Sleep(10 * time.Millisecond)
 		data := []byte("Modified data iteration " + string(rune(i+'0')))
@@ -296,9 +297,9 @@ func TestGetBackupChain(t *testing.T) {
 		}
 
 		// All incrementals are based on the full backup (forever incremental strategy)
-		incrManifest, err := strategy.PerformIncrementalBackup(testFile, "db-001", "Test Database", fullManifest.ID)
-		if err != nil {
-			t.Fatalf("Failed to perform incremental backup %d: %v", i, err)
+		incrManifest, incrErr := strategy.PerformIncrementalBackup(testFile, "db-001", "Test Database", fullManifest.ID)
+		if incrErr != nil {
+			t.Fatalf("Failed to perform incremental backup %d: %v", i, incrErr)
 		}
 		lastManifest = incrManifest
 	}
@@ -422,7 +423,7 @@ func TestSyntheticBackupGenerator_ShouldGenerateSynthetic(t *testing.T) {
 	}
 
 	// Create multiple incrementals
-	var lastManifest *BackupManifest = fullManifest
+	lastManifest := fullManifest
 	for i := 0; i < 5; i++ {
 		time.Sleep(10 * time.Millisecond)
 		data := []byte("Data " + string(rune(i+'0')))
@@ -431,9 +432,9 @@ func TestSyntheticBackupGenerator_ShouldGenerateSynthetic(t *testing.T) {
 			t.Fatalf("Failed to modify test file: %v", err)
 		}
 
-		incrManifest, err := strategy.PerformIncrementalBackup(testFile, "db-001", "Test Database", fullManifest.ID)
-		if err != nil {
-			t.Fatalf("Failed to perform incremental backup: %v", err)
+		incrManifest, incrErr := strategy.PerformIncrementalBackup(testFile, "db-001", "Test Database", fullManifest.ID)
+		if incrErr != nil {
+			t.Fatalf("Failed to perform incremental backup: %v", incrErr)
 		}
 		lastManifest = incrManifest
 	}
@@ -591,12 +592,14 @@ func TestChangeTrackerGetStatistics(t *testing.T) {
 
 	stats := tracker.GetStatistics()
 
-	if stats["total_snapshots"].(int) != 1 {
-		t.Errorf("Expected 1 snapshot, got %d", stats["total_snapshots"].(int))
+	totalSnapshots, ok := stats["total_snapshots"].(int)
+	if !ok || totalSnapshots != 1 {
+		t.Errorf("Expected 1 snapshot, got %v", stats["total_snapshots"])
 	}
 
-	if stats["block_size"].(BlockSize) != BlockSize4KB {
-		t.Errorf("Expected block size %d, got %d", BlockSize4KB, stats["block_size"].(BlockSize))
+	blockSize, ok := stats["block_size"].(BlockSize)
+	if !ok || blockSize != BlockSize4KB {
+		t.Errorf("Expected block size %d, got %v", BlockSize4KB, stats["block_size"])
 	}
 }
 
@@ -624,12 +627,14 @@ func TestStrategyGetStatistics(t *testing.T) {
 
 	stats := strategy.GetStatistics()
 
-	if stats["total_backups"].(int) != 1 {
-		t.Errorf("Expected 1 backup, got %d", stats["total_backups"].(int))
+	totalBackups, ok := stats["total_backups"].(int)
+	if !ok || totalBackups != 1 {
+		t.Errorf("Expected 1 backup, got %v", stats["total_backups"])
 	}
 
-	if stats["full_backups"].(int) != 1 {
-		t.Errorf("Expected 1 full backup, got %d", stats["full_backups"].(int))
+	fullBackups, ok := stats["full_backups"].(int)
+	if !ok || fullBackups != 1 {
+		t.Errorf("Expected 1 full backup, got %v", stats["full_backups"])
 	}
 }
 
@@ -655,13 +660,18 @@ func TestChainManagerGetStatistics(t *testing.T) {
 
 	stats := chainMgr.GetStatistics()
 
-	if stats["total_chains"].(int) != 0 {
-		t.Errorf("Expected 0 chains initially, got %d", stats["total_chains"].(int))
+	totalChains, ok := stats["total_chains"].(int)
+	if !ok || totalChains != 0 {
+		t.Errorf("Expected 0 chains initially, got %v", stats["total_chains"])
 	}
 
-	policyStats := stats["policy"].(map[string]interface{})
-	if policyStats["max_chain_length"].(int) != 10 {
-		t.Errorf("Expected max chain length 10, got %d", policyStats["max_chain_length"].(int))
+	policyStats, ok := stats["policy"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected policy stats to be a map, got %T", stats["policy"])
+	}
+	maxChainLength, ok := policyStats["max_chain_length"].(int)
+	if !ok || maxChainLength != 10 {
+		t.Errorf("Expected max chain length 10, got %v", policyStats["max_chain_length"])
 	}
 }
 

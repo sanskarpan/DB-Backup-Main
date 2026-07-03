@@ -334,12 +334,12 @@ func TestStatisticalFunctions(t *testing.T) {
 
 	t.Run("min", func(t *testing.T) {
 		values := []float64{5, 2, 9, 1, 7}
-		assert.Equal(t, 1.0, min(values))
+		assert.Equal(t, 1.0, minFloat(values))
 	})
 
 	t.Run("max", func(t *testing.T) {
 		values := []float64{5, 2, 9, 1, 7}
-		assert.Equal(t, 9.0, max(values))
+		assert.Equal(t, 9.0, maxFloat(values))
 	})
 
 	t.Run("percentile", func(t *testing.T) {

@@ -5,14 +5,14 @@ import (
 	"time"
 )
 
-// ErrorEntry represents a tracked error
+// ErrorEntry represents a tracked error.
 type ErrorEntry struct {
 	Error     error                  `json:"error"`
 	Timestamp time.Time              `json:"timestamp"`
 	Context   map[string]interface{} `json:"context"`
 }
 
-// ErrorTracker tracks errors and calculates error rates
+// ErrorTracker tracks errors and calculates error rates.
 type ErrorTracker struct {
 	mu         sync.RWMutex
 	errors     []ErrorEntry
@@ -20,7 +20,7 @@ type ErrorTracker struct {
 	windowSize time.Duration
 }
 
-// NewErrorTracker creates a new error tracker
+// NewErrorTracker creates a new error tracker.
 func NewErrorTracker() *ErrorTracker {
 	return &ErrorTracker{
 		errors:     make([]ErrorEntry, 0),
@@ -29,7 +29,7 @@ func NewErrorTracker() *ErrorTracker {
 	}
 }
 
-// RecordError records an error
+// RecordError records an error.
 func (et *ErrorTracker) RecordError(err error, context map[string]interface{}) {
 	et.mu.Lock()
 	defer et.mu.Unlock()
@@ -46,7 +46,7 @@ func (et *ErrorTracker) RecordError(err error, context map[string]interface{}) {
 	}
 }
 
-// GetErrorRate calculates the error rate (errors per second)
+// GetErrorRate calculates the error rate (errors per second).
 func (et *ErrorTracker) GetErrorRate() float64 {
 	et.mu.RLock()
 	defer et.mu.RUnlock()
@@ -63,7 +63,7 @@ func (et *ErrorTracker) GetErrorRate() float64 {
 	return float64(count) / et.windowSize.Seconds()
 }
 
-// GetRecentErrors returns recent errors within the window
+// GetRecentErrors returns recent errors within the window.
 func (et *ErrorTracker) GetRecentErrors(limit int) []ErrorEntry {
 	et.mu.RLock()
 	defer et.mu.RUnlock()
@@ -80,7 +80,7 @@ func (et *ErrorTracker) GetRecentErrors(limit int) []ErrorEntry {
 	return recent
 }
 
-// ClearOldErrors clears errors older than the window
+// ClearOldErrors clears errors older than the window.
 func (et *ErrorTracker) ClearOldErrors() int {
 	et.mu.Lock()
 	defer et.mu.Unlock()

@@ -98,8 +98,8 @@ func TestPIIDetector_DetectCreditCard(t *testing.T) {
 		input    string
 		expected bool
 	}{
-		{"4111111111111111", true}, // Valid Visa test number
-		{"5500000000000004", true}, // Valid Mastercard test number
+		{"4111111111111111", true},  // Valid Visa test number
+		{"5500000000000004", true},  // Valid Mastercard test number
 		{"1234567890123456", false}, // Invalid (doesn't pass Luhn)
 	}
 
@@ -556,9 +556,9 @@ func TestLuhnValidate(t *testing.T) {
 		card  string
 		valid bool
 	}{
-		{"4111111111111111", true},  // Valid Visa test
-		{"5500000000000004", true},  // Valid Mastercard test
-		{"1234567890123456", false}, // Invalid
+		{"4111111111111111", true},    // Valid Visa test
+		{"5500000000000004", true},    // Valid Mastercard test
+		{"1234567890123456", false},   // Invalid
 		{"4111-1111-1111-1111", true}, // Valid with dashes
 	}
 

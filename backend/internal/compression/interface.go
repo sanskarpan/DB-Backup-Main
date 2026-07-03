@@ -7,7 +7,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/types"
 )
 
-// Compressor interface for compression operations
+// Compressor interface for compression operations.
 type Compressor interface {
 	// Compress compresses the input reader to the output writer
 	Compress(input io.Reader, output io.Writer, level int) error
@@ -22,7 +22,7 @@ type Compressor interface {
 	GetExtension() string
 }
 
-// NewCompressor creates a new compressor based on the compression type
+// NewCompressor creates a new compressor based on the compression type.
 func NewCompressor(compressionType types.CompressionType) (Compressor, error) {
 	switch compressionType {
 	case types.CompressionGzip:

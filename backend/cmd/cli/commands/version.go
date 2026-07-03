@@ -8,13 +8,13 @@ import (
 )
 
 var (
-	// Version information (set via ldflags during build)
+	// Version information (set via ldflags during build).
 	Version   = "dev"
 	BuildTime = "unknown"
 	GitCommit = "unknown"
 )
 
-// versionCmd represents the version command
+// versionCmd represents the version command.
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Show version information",
@@ -30,7 +30,7 @@ func init() {
 }
 
 func runVersion(cmd *cobra.Command, args []string) {
-	short, _ := cmd.Flags().GetBool("short")
+	short := flagBool(cmd, "short")
 
 	if short {
 		fmt.Println(Version)

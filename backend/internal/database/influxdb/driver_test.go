@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/sanskarpan/db-backup/internal/database"
 )
 
 // TestBackupRecord_RoundTrip proves that a v2 record survives the
@@ -656,6 +657,7 @@ func TestInfluxDB_GetBackupSize(t *testing.T) {
 // Helper functions
 
 func setupTestDriver(t *testing.T) *InfluxDBDriver {
+	t.Helper()
 	skipIfInfluxDBUnavailable(t)
 	driver := NewInfluxDBDriver()
 	config := &database.ConnectionConfig{

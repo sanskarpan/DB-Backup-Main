@@ -13,21 +13,23 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// WebhookNotifier implements generic webhook notifications
+// WebhookNotifier implements generic webhook notifications.
+//
+//nolint:revive // keeps public name stable; used by other packages
 type WebhookNotifier struct {
-	url            string
-	method         string
-	headers        map[string]string
-	timeout        time.Duration
-	retries        int
-	retryDelay     time.Duration
-	client         *http.Client
-	authenticated  bool
-	authType       string
-	authToken      string
+	url           string
+	method        string
+	headers       map[string]string
+	timeout       time.Duration
+	retries       int
+	retryDelay    time.Duration
+	client        *http.Client
+	authenticated bool
+	authType      string
+	authToken     string
 }
 
-// Config holds webhook notifier configuration
+// Config holds webhook notifier configuration.
 type Config struct {
 	URL        string
 	Method     string // GET, POST, PUT
@@ -40,7 +42,7 @@ type Config struct {
 	AuthHeader string
 }
 
-// NewWebhookNotifier creates a new webhook notifier
+// NewWebhookNotifier creates a new webhook notifier.
 func NewWebhookNotifier(cfg *Config) (*WebhookNotifier, error) {
 	if cfg.URL == "" {
 		return nil, pkgErrors.New(pkgErrors.ErrorTypeConfiguration, "webhook URL is required")
@@ -88,11 +90,12 @@ func NewWebhookNotifier(cfg *Config) (*WebhookNotifier, error) {
 		}
 
 		// Add auth header if not custom
-		if authType == "bearer" {
+		switch {
+		case authType == "bearer":
 			headers["Authorization"] = fmt.Sprintf("Bearer %s", authToken)
-		} else if authType == "basic" {
+		case authType == "basic":
 			headers["Authorization"] = fmt.Sprintf("Basic %s", authToken)
-		} else if cfg.AuthHeader != "" {
+		case cfg.AuthHeader != "":
 			headers[cfg.AuthHeader] = authToken
 		}
 	}
@@ -113,7 +116,7 @@ func NewWebhookNotifier(cfg *Config) (*WebhookNotifier, error) {
 	}, nil
 }
 
-// Send sends a notification via webhook
+// Send sends a notification via webhook.
 func (w *WebhookNotifier) Send(ctx context.Context, notif *notification.Notification) error {
 	payload := w.buildPayload(notif)
 
@@ -140,7 +143,7 @@ func (w *WebhookNotifier) Send(ctx context.Context, notif *notification.Notifica
 		fmt.Sprintf("webhook failed after %d retries", w.retries))
 }
 
-// sendRequest sends the HTTP request
+// sendRequest sends the HTTP request.
 func (w *WebhookNotifier) sendRequest(ctx context.Context, data []byte) error {
 	req, err := http.NewRequestWithContext(ctx, w.method, w.url, bytes.NewBuffer(data))
 	if err != nil {
@@ -167,12 +170,12 @@ func (w *WebhookNotifier) sendRequest(ctx context.Context, data []byte) error {
 	return nil
 }
 
-// GetType returns the provider type
+// GetType returns the provider type.
 func (w *WebhookNotifier) GetType() notification.ProviderType {
 	return notification.ProviderTypeWebhook
 }
 
-// ValidateConfig validates the configuration
+// ValidateConfig validates the configuration.
 func (w *WebhookNotifier) ValidateConfig() error {
 	if w.url == "" {
 		return pkgErrors.New(pkgErrors.ErrorTypeConfiguration, "webhook URL is required")
@@ -180,7 +183,9 @@ func (w *WebhookNotifier) ValidateConfig() error {
 	return nil
 }
 
-// WebhookPayload represents the webhook JSON payload
+// WebhookPayload represents the webhook JSON payload.
+//
+//nolint:revive // keeps public name stable; used by other packages
 type WebhookPayload struct {
 	Event     string                 `json:"event"`
 	Level     string                 `json:"level"`
@@ -191,7 +196,7 @@ type WebhookPayload struct {
 	Tags      []string               `json:"tags,omitempty"`
 }
 
-// buildPayload builds the webhook payload
+// buildPayload builds the webhook payload.
 func (w *WebhookNotifier) buildPayload(notif *notification.Notification) *WebhookPayload {
 	return &WebhookPayload{
 		Event:     "backup.notification",

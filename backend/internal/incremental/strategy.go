@@ -14,7 +14,7 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// BackupType represents the type of backup
+// BackupType represents the type of backup.
 type BackupType string
 
 const (
@@ -23,7 +23,16 @@ const (
 	BackupTypeSynthetic   BackupType = "synthetic"   // Synthetic full backup
 )
 
-// BackupManifest represents metadata for a backup
+// compressionGzip is the identifier for gzip-compressed backup artifacts.
+const compressionGzip = "gzip"
+
+// Backup manifest status values.
+const (
+	backupStatusCompleted = "completed"
+	backupStatusFailed    = "failed"
+)
+
+// BackupManifest represents metadata for a backup.
 type BackupManifest struct {
 	ID             string
 	Type           BackupType
@@ -50,7 +59,7 @@ type BackupManifest struct {
 	Metadata       map[string]interface{}
 }
 
-// BackupBlock represents a backed up block with its data
+// BackupBlock represents a backed up block with its data.
 type BackupBlock struct {
 	Offset   int64
 	Size     int64
@@ -58,7 +67,9 @@ type BackupBlock struct {
 	Data     []byte
 }
 
-// IncrementalForeverStrategy implements the incremental forever backup strategy
+// IncrementalForeverStrategy implements the incremental forever backup strategy.
+//
+//nolint:revive // keeps public name stable across packages
 type IncrementalForeverStrategy struct {
 	mu                 sync.RWMutex
 	tracker            *ChangeTracker
@@ -172,7 +183,7 @@ func (ifs *IncrementalForeverStrategy) RemoveBackup(backupID string) error {
 	return nil
 }
 
-// PerformFullBackup performs an initial full backup
+// PerformFullBackup performs an initial full backup.
 func (ifs *IncrementalForeverStrategy) PerformFullBackup(sourcePath, databaseID, databaseName string) (*BackupManifest, error) {
 	manifest := &BackupManifest{
 		ID:           uid.New("full"),
@@ -188,7 +199,7 @@ func (ifs *IncrementalForeverStrategy) PerformFullBackup(sourcePath, databaseID,
 	}
 
 	if ifs.compressionEnabled {
-		manifest.Compression = "gzip"
+		manifest.Compression = compressionGzip
 	}
 
 	// Create backup path
@@ -198,7 +209,7 @@ func (ifs *IncrementalForeverStrategy) PerformFullBackup(sourcePath, databaseID,
 	// Create snapshot
 	snapshot, err := ifs.tracker.CreateSnapshot(sourcePath)
 	if err != nil {
-		manifest.Status = "failed"
+		manifest.Status = backupStatusFailed
 		manifest.Error = err.Error()
 		return manifest, fmt.Errorf("failed to create snapshot: %w", err)
 	}
@@ -212,7 +223,7 @@ func (ifs *IncrementalForeverStrategy) PerformFullBackup(sourcePath, databaseID,
 	// Copy file to backup location
 	err = ifs.copyWithCompression(sourcePath, manifest.BackupPath, manifest.Compression)
 	if err != nil {
-		manifest.Status = "failed"
+		manifest.Status = backupStatusFailed
 		manifest.Error = err.Error()
 		return manifest, fmt.Errorf("failed to copy file: %w", err)
 	}
@@ -225,7 +236,7 @@ func (ifs *IncrementalForeverStrategy) PerformFullBackup(sourcePath, databaseID,
 
 	manifest.CompletedAt = time.Now()
 	manifest.Duration = manifest.CompletedAt.Sub(manifest.CreatedAt)
-	manifest.Status = "completed"
+	manifest.Status = backupStatusCompleted
 
 	// Save manifest
 	err = ifs.saveManifest(manifest)
@@ -240,8 +251,8 @@ func (ifs *IncrementalForeverStrategy) PerformFullBackup(sourcePath, databaseID,
 	return manifest, nil
 }
 
-// PerformIncrementalBackup performs an incremental backup
-func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, databaseID, databaseName string, baseBackupID string) (*BackupManifest, error) {
+// PerformIncrementalBackup performs an incremental backup.
+func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, databaseID, databaseName, baseBackupID string) (*BackupManifest, error) {
 	// Find base backup
 	ifs.mu.RLock()
 	baseManifest, exists := ifs.manifests[baseBackupID]
@@ -267,7 +278,7 @@ func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, data
 	}
 
 	if ifs.compressionEnabled {
-		manifest.Compression = "gzip"
+		manifest.Compression = compressionGzip
 	}
 
 	// Create backup path
@@ -277,7 +288,7 @@ func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, data
 	// Detect changes
 	changeSet, err := ifs.tracker.DetectChanges(sourcePath, baseManifest.SnapshotID)
 	if err != nil {
-		manifest.Status = "failed"
+		manifest.Status = backupStatusFailed
 		manifest.Error = err.Error()
 		return manifest, fmt.Errorf("failed to detect changes: %w", err)
 	}
@@ -297,7 +308,7 @@ func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, data
 	// Extract changed block data
 	changedData, err := ifs.tracker.GetChangedBlockData(sourcePath, changeSet)
 	if err != nil {
-		manifest.Status = "failed"
+		manifest.Status = backupStatusFailed
 		manifest.Error = err.Error()
 		return manifest, fmt.Errorf("failed to get changed blocks: %w", err)
 	}
@@ -305,7 +316,7 @@ func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, data
 	// Save incremental backup (changed blocks only)
 	err = ifs.saveIncrementalBackup(manifest.BackupPath, changedData, changeSet, manifest.Compression)
 	if err != nil {
-		manifest.Status = "failed"
+		manifest.Status = backupStatusFailed
 		manifest.Error = err.Error()
 		return manifest, fmt.Errorf("failed to save incremental backup: %w", err)
 	}
@@ -318,7 +329,7 @@ func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, data
 
 	manifest.CompletedAt = time.Now()
 	manifest.Duration = manifest.CompletedAt.Sub(manifest.CreatedAt)
-	manifest.Status = "completed"
+	manifest.Status = backupStatusCompleted
 
 	// Save manifest
 	err = ifs.saveManifest(manifest)
@@ -333,7 +344,7 @@ func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, data
 	return manifest, nil
 }
 
-// RestoreFromBackup restores data from a backup chain
+// RestoreFromBackup restores data from a backup chain.
 func (ifs *IncrementalForeverStrategy) RestoreFromBackup(backupID, targetPath string) error {
 	// Build restore chain
 	chain, err := ifs.buildRestoreChain(backupID)
@@ -363,7 +374,7 @@ func (ifs *IncrementalForeverStrategy) RestoreFromBackup(backupID, targetPath st
 	return nil
 }
 
-// buildRestoreChain builds the chain of backups needed for restore
+// buildRestoreChain builds the chain of backups needed for restore.
 func (ifs *IncrementalForeverStrategy) buildRestoreChain(backupID string) ([]*BackupManifest, error) {
 	ifs.mu.RLock()
 	defer ifs.mu.RUnlock()
@@ -399,7 +410,7 @@ func (ifs *IncrementalForeverStrategy) buildRestoreChain(backupID string) ([]*Ba
 	return chain, nil
 }
 
-// applyIncrementalBackup applies an incremental backup to a file
+// applyIncrementalBackup applies an incremental backup to a file.
 func (ifs *IncrementalForeverStrategy) applyIncrementalBackup(filePath string, manifest *BackupManifest) error {
 	// Load incremental backup data
 	backupData, err := ifs.loadIncrementalBackup(manifest.BackupPath, manifest.Compression)
@@ -430,7 +441,7 @@ func (ifs *IncrementalForeverStrategy) applyIncrementalBackup(filePath string, m
 	return nil
 }
 
-// saveIncrementalBackup saves an incremental backup
+// saveIncrementalBackup saves an incremental backup.
 func (ifs *IncrementalForeverStrategy) saveIncrementalBackup(backupPath string, blockData map[int64][]byte, changeSet *ChangeSet, compression string) error {
 	// Create backup structure
 	backup := struct {
@@ -482,7 +493,7 @@ func (ifs *IncrementalForeverStrategy) saveIncrementalBackup(backupPath string, 
 	}
 	defer file.Close()
 
-	if compression == "gzip" {
+	if compression == compressionGzip {
 		gzipWriter := gzip.NewWriter(file)
 		defer gzipWriter.Close()
 
@@ -500,8 +511,8 @@ func (ifs *IncrementalForeverStrategy) saveIncrementalBackup(backupPath string, 
 	return nil
 }
 
-// loadIncrementalBackup loads an incremental backup
-func (ifs *IncrementalForeverStrategy) loadIncrementalBackup(backupPath string, compression string) (map[int64][]byte, error) {
+// loadIncrementalBackup loads an incremental backup.
+func (ifs *IncrementalForeverStrategy) loadIncrementalBackup(backupPath, compression string) (map[int64][]byte, error) {
 	file, err := os.Open(backupPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open backup file: %w", err)
@@ -510,10 +521,10 @@ func (ifs *IncrementalForeverStrategy) loadIncrementalBackup(backupPath string, 
 
 	var reader io.Reader = file
 
-	if compression == "gzip" {
-		gzipReader, err := gzip.NewReader(file)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+	if compression == compressionGzip {
+		gzipReader, gzErr := gzip.NewReader(file)
+		if gzErr != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %w", gzErr)
 		}
 		defer gzipReader.Close()
 		reader = gzipReader
@@ -546,7 +557,7 @@ func (ifs *IncrementalForeverStrategy) loadIncrementalBackup(backupPath string, 
 	return blockData, nil
 }
 
-// copyWithCompression copies a file with optional compression
+// copyWithCompression copies a file with optional compression.
 func (ifs *IncrementalForeverStrategy) copyWithCompression(sourcePath, destPath, compression string) error {
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
@@ -560,7 +571,7 @@ func (ifs *IncrementalForeverStrategy) copyWithCompression(sourcePath, destPath,
 	}
 	defer destFile.Close()
 
-	if compression == "gzip" {
+	if compression == compressionGzip {
 		gzipWriter := gzip.NewWriter(destFile)
 		defer gzipWriter.Close()
 
@@ -578,7 +589,7 @@ func (ifs *IncrementalForeverStrategy) copyWithCompression(sourcePath, destPath,
 	return nil
 }
 
-// extractWithDecompression extracts a file with optional decompression
+// extractWithDecompression extracts a file with optional decompression.
 func (ifs *IncrementalForeverStrategy) extractWithDecompression(sourcePath, destPath, compression string) error {
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
@@ -592,13 +603,14 @@ func (ifs *IncrementalForeverStrategy) extractWithDecompression(sourcePath, dest
 	}
 	defer destFile.Close()
 
-	if compression == "gzip" {
-		gzipReader, err := gzip.NewReader(sourceFile)
-		if err != nil {
-			return fmt.Errorf("failed to create gzip reader: %w", err)
+	if compression == compressionGzip {
+		gzipReader, gzErr := gzip.NewReader(sourceFile)
+		if gzErr != nil {
+			return fmt.Errorf("failed to create gzip reader: %w", gzErr)
 		}
 		defer gzipReader.Close()
 
+		//nolint:gosec // G110: decompressing our own trusted backup artifacts, not untrusted input
 		_, err = io.Copy(destFile, gzipReader)
 		if err != nil {
 			return fmt.Errorf("failed to extract with decompression: %w", err)
@@ -613,7 +625,7 @@ func (ifs *IncrementalForeverStrategy) extractWithDecompression(sourcePath, dest
 	return nil
 }
 
-// saveManifest saves a backup manifest to disk
+// saveManifest saves a backup manifest to disk.
 func (ifs *IncrementalForeverStrategy) saveManifest(manifest *BackupManifest) error {
 	manifestPath := filepath.Join(ifs.backupDir, fmt.Sprintf("%s-manifest.json", manifest.ID))
 
@@ -624,7 +636,7 @@ func (ifs *IncrementalForeverStrategy) saveManifest(manifest *BackupManifest) er
 	return nil
 }
 
-// LoadManifest loads a backup manifest from disk
+// LoadManifest loads a backup manifest from disk.
 func (ifs *IncrementalForeverStrategy) LoadManifest(manifestPath string) (*BackupManifest, error) {
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -640,7 +652,7 @@ func (ifs *IncrementalForeverStrategy) LoadManifest(manifestPath string) (*Backu
 	return &manifest, nil
 }
 
-// GetManifest retrieves a backup manifest by ID
+// GetManifest retrieves a backup manifest by ID.
 func (ifs *IncrementalForeverStrategy) GetManifest(backupID string) (*BackupManifest, bool) {
 	ifs.mu.RLock()
 	defer ifs.mu.RUnlock()
@@ -649,7 +661,7 @@ func (ifs *IncrementalForeverStrategy) GetManifest(backupID string) (*BackupMani
 	return manifest, exists
 }
 
-// ListBackups lists all backup manifests
+// ListBackups lists all backup manifests.
 func (ifs *IncrementalForeverStrategy) ListBackups() []*BackupManifest {
 	ifs.mu.RLock()
 	defer ifs.mu.RUnlock()
@@ -662,12 +674,12 @@ func (ifs *IncrementalForeverStrategy) ListBackups() []*BackupManifest {
 	return manifests
 }
 
-// GetBackupChain returns the backup chain for a given backup
+// GetBackupChain returns the backup chain for a given backup.
 func (ifs *IncrementalForeverStrategy) GetBackupChain(backupID string) ([]*BackupManifest, error) {
 	return ifs.buildRestoreChain(backupID)
 }
 
-// VerifyBackup verifies the integrity of a backup
+// VerifyBackup verifies the integrity of a backup.
 func (ifs *IncrementalForeverStrategy) VerifyBackup(backupID string) error {
 	manifest, exists := ifs.GetManifest(backupID)
 	if !exists {
@@ -691,7 +703,7 @@ func (ifs *IncrementalForeverStrategy) VerifyBackup(backupID string) error {
 	return nil
 }
 
-// GetStatistics returns statistics about backups
+// GetStatistics returns statistics about backups.
 func (ifs *IncrementalForeverStrategy) GetStatistics() map[string]interface{} {
 	ifs.mu.RLock()
 	defer ifs.mu.RUnlock()

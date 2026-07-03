@@ -15,14 +15,14 @@ import (
 
 // ==================== 4. Auto-Categorization & Tagging ====================
 
-// AutoCategorizer automatically categorizes and tags backups using NLP
+// AutoCategorizer automatically categorizes and tags backups using NLP.
 type AutoCategorizer struct {
 	categories map[string]*Category
 	tagRules   []*TagRule
 	mu         sync.RWMutex
 }
 
-// Category represents a backup category
+// Category represents a backup category.
 type Category struct {
 	Name        string
 	Description string
@@ -31,7 +31,7 @@ type Category struct {
 	Tags        []string
 }
 
-// TagRule represents a rule for automatic tagging
+// TagRule represents a rule for automatic tagging.
 type TagRule struct {
 	Pattern     *regexp.Regexp
 	Tags        []string
@@ -39,7 +39,7 @@ type TagRule struct {
 	Description string
 }
 
-// CategoryResult represents the result of categorization
+// CategoryResult represents the result of categorization.
 type CategoryResult struct {
 	PrimaryCategory   string
 	SecondaryCategory string
@@ -48,7 +48,7 @@ type CategoryResult struct {
 	Reasoning         []string
 }
 
-// NewAutoCategorizer creates a new auto-categorizer
+// NewAutoCategorizer creates a new auto-categorizer.
 func NewAutoCategorizer() *AutoCategorizer {
 	ac := &AutoCategorizer{
 		categories: make(map[string]*Category),
@@ -62,7 +62,7 @@ func NewAutoCategorizer() *AutoCategorizer {
 	return ac
 }
 
-// initializeDefaultCategories sets up default categories
+// initializeDefaultCategories sets up default categories.
 func (ac *AutoCategorizer) initializeDefaultCategories() {
 	categories := []*Category{
 		{
@@ -121,7 +121,7 @@ func (ac *AutoCategorizer) initializeDefaultCategories() {
 	}
 }
 
-// initializeTagRules sets up automatic tagging rules
+// initializeTagRules sets up automatic tagging rules.
 func (ac *AutoCategorizer) initializeTagRules() {
 	rules := []struct {
 		pattern     string
@@ -154,7 +154,7 @@ func (ac *AutoCategorizer) initializeTagRules() {
 	}
 }
 
-// Categorize categorizes a backup based on its metadata
+// Categorize categorizes a backup based on its metadata.
 func (ac *AutoCategorizer) Categorize(ctx context.Context, backupName, databaseName, description string, metadata map[string]interface{}) (*CategoryResult, error) {
 	ac.mu.RLock()
 	defer ac.mu.RUnlock()
@@ -252,13 +252,13 @@ func (ac *AutoCategorizer) Categorize(ctx context.Context, backupName, databaseN
 
 // ==================== 5. Duplicate Detection ====================
 
-// DuplicateDetector detects duplicate backups across databases
+// DuplicateDetector detects duplicate backups across databases.
 type DuplicateDetector struct {
 	backupHashes map[string]*BackupHash // hash -> backup info
 	mu           sync.RWMutex
 }
 
-// BackupHash represents a backup's content hash
+// BackupHash represents a backup's content hash.
 type BackupHash struct {
 	Hash         string
 	DatabaseName string
@@ -269,18 +269,21 @@ type BackupHash struct {
 	MetadataHash string // SHA-256 of metadata
 }
 
-// DuplicateReport represents detected duplicates
+// DuplicateReport represents detected duplicates.
 type DuplicateReport struct {
-	BackupID          string
-	DatabaseName      string
-	Duplicates        []*DuplicateMatch
-	TotalDuplicates   int
-	PotentialSavings  int64 // bytes
-	Confidence        float64
-	Recommendations   []string
+	BackupID         string
+	DatabaseName     string
+	Duplicates       []*DuplicateMatch
+	TotalDuplicates  int
+	PotentialSavings int64 // bytes
+	Confidence       float64
+	Recommendations  []string
 }
 
-// DuplicateMatch represents a duplicate match
+// matchTypeExact is the match type for near-identical backups.
+const matchTypeExact = "exact"
+
+// DuplicateMatch represents a duplicate match.
 type DuplicateMatch struct {
 	BackupID       string
 	DatabaseName   string
@@ -290,14 +293,14 @@ type DuplicateMatch struct {
 	TimeDifference time.Duration
 }
 
-// NewDuplicateDetector creates a new duplicate detector
+// NewDuplicateDetector creates a new duplicate detector.
 func NewDuplicateDetector() *DuplicateDetector {
 	return &DuplicateDetector{
 		backupHashes: make(map[string]*BackupHash),
 	}
 }
 
-// IndexBackup indexes a backup for duplicate detection
+// IndexBackup indexes a backup for duplicate detection.
 func (dd *DuplicateDetector) IndexBackup(backupID, database string, size int64, content []byte, metadata map[string]interface{}) error {
 	dd.mu.Lock()
 	defer dd.mu.Unlock()
@@ -326,7 +329,7 @@ func (dd *DuplicateDetector) IndexBackup(backupID, database string, size int64, 
 	return nil
 }
 
-// DetectDuplicates finds duplicate backups
+// DetectDuplicates finds duplicate backups.
 func (dd *DuplicateDetector) DetectDuplicates(ctx context.Context, backupID, database string, content []byte) (*DuplicateReport, error) {
 	dd.mu.RLock()
 	defer dd.mu.RUnlock()
@@ -348,13 +351,14 @@ func (dd *DuplicateDetector) DetectDuplicates(ctx context.Context, backupID, dat
 		similarity := dd.calculateSimilarity(targetHashStr, hash)
 
 		var matchType string
-		if similarity > 0.99 {
-			matchType = "exact"
-		} else if similarity > 0.80 {
+		switch {
+		case similarity > 0.99:
+			matchType = matchTypeExact
+		case similarity > 0.80:
 			matchType = "similar"
-		} else if similarity > 0.50 {
+		case similarity > 0.50:
 			matchType = "partial"
-		} else {
+		default:
 			continue // Not similar enough
 		}
 
@@ -369,7 +373,7 @@ func (dd *DuplicateDetector) DetectDuplicates(ctx context.Context, backupID, dat
 
 		duplicates = append(duplicates, match)
 
-		if matchType == "exact" {
+		if matchType == matchTypeExact {
 			totalSavings += backup.Size
 		}
 	}
@@ -384,15 +388,14 @@ func (dd *DuplicateDetector) DetectDuplicates(ctx context.Context, backupID, dat
 	if len(duplicates) > 0 {
 		exactDuplicates := 0
 		for _, dup := range duplicates {
-			if dup.MatchType == "exact" {
+			if dup.MatchType == matchTypeExact {
 				exactDuplicates++
 			}
 		}
 
 		if exactDuplicates > 0 {
 			recommendations = append(recommendations,
-				fmt.Sprintf("Found %d exact duplicate(s) - consider deduplication", exactDuplicates))
-			recommendations = append(recommendations,
+				fmt.Sprintf("Found %d exact duplicate(s) - consider deduplication", exactDuplicates),
 				fmt.Sprintf("Potential storage savings: %s", formatBytes(totalSavings)))
 		}
 
@@ -407,7 +410,7 @@ func (dd *DuplicateDetector) DetectDuplicates(ctx context.Context, backupID, dat
 	if len(duplicates) > 0 {
 		// Higher confidence with more exact matches
 		for _, dup := range duplicates {
-			if dup.MatchType == "exact" {
+			if dup.MatchType == matchTypeExact {
 				confidence += 100.0
 			} else if dup.MatchType == "similar" {
 				confidence += dup.Similarity * 80.0
@@ -429,7 +432,7 @@ func (dd *DuplicateDetector) DetectDuplicates(ctx context.Context, backupID, dat
 	return report, nil
 }
 
-// calculateSimilarity calculates hash similarity (0-1)
+// calculateSimilarity calculates hash similarity (0-1).
 func (dd *DuplicateDetector) calculateSimilarity(hash1, hash2 string) float64 {
 	if hash1 == hash2 {
 		return 1.0
@@ -453,14 +456,14 @@ func (dd *DuplicateDetector) calculateSimilarity(hash1, hash2 string) float64 {
 
 // ==================== 6. NLP Smart Search ====================
 
-// NLPSearchEngine provides natural language search capabilities
+// NLPSearchEngine provides natural language search capabilities.
 type NLPSearchEngine struct {
 	indexedBackups map[string]*SearchableBackup
 	invertedIndex  map[string][]string // term -> backup IDs
 	mu             sync.RWMutex
 }
 
-// SearchableBackup represents a backup in the search index
+// SearchableBackup represents a backup in the search index.
 type SearchableBackup struct {
 	BackupID     string
 	DatabaseName string
@@ -472,29 +475,29 @@ type SearchableBackup struct {
 	Tokens       []string // Tokenized text for search
 }
 
-// SearchResult represents a search result
+// SearchResult represents a search result.
 type SearchResult struct {
-	BackupID       string
-	DatabaseName   string
-	Score          float64 // Relevance score 0-100
-	MatchedTerms   []string
-	Snippet        string
-	Highlights     []string
-	Timestamp      time.Time
+	BackupID     string
+	DatabaseName string
+	Score        float64 // Relevance score 0-100
+	MatchedTerms []string
+	Snippet      string
+	Highlights   []string
+	Timestamp    time.Time
 }
 
-// SearchResponse represents the complete search response
+// SearchResponse represents the complete search response.
 type SearchResponse struct {
-	Query            string
-	Results          []*SearchResult
-	TotalResults     int
-	SearchTime       time.Duration
-	DidYouMean       []string
-	RelatedQueries   []string
-	Filters          map[string]interface{}
+	Query          string
+	Results        []*SearchResult
+	TotalResults   int
+	SearchTime     time.Duration
+	DidYouMean     []string
+	RelatedQueries []string
+	Filters        map[string]interface{}
 }
 
-// NewNLPSearchEngine creates a new NLP search engine
+// NewNLPSearchEngine creates a new NLP search engine.
 func NewNLPSearchEngine() *NLPSearchEngine {
 	return &NLPSearchEngine{
 		indexedBackups: make(map[string]*SearchableBackup),
@@ -502,7 +505,7 @@ func NewNLPSearchEngine() *NLPSearchEngine {
 	}
 }
 
-// IndexBackup indexes a backup for searching
+// IndexBackup indexes a backup for searching.
 func (nse *NLPSearchEngine) IndexBackup(backup *SearchableBackup) error {
 	nse.mu.Lock()
 	defer nse.mu.Unlock()
@@ -528,7 +531,7 @@ func (nse *NLPSearchEngine) IndexBackup(backup *SearchableBackup) error {
 	return nil
 }
 
-// Search performs a natural language search
+// Search performs a natural language search.
 func (nse *NLPSearchEngine) Search(ctx context.Context, query string, filters map[string]interface{}) (*SearchResponse, error) {
 	startTime := time.Now()
 
@@ -618,7 +621,7 @@ func (nse *NLPSearchEngine) Search(ctx context.Context, query string, filters ma
 	}
 
 	// Generate related queries
-	relatedQueries := nse.generateRelatedQueries(query, queryTokens)
+	relatedQueries := nse.generateRelatedQueries(query)
 
 	// Implement spell checking for query terms
 	backups := make([]*SearchableBackup, 0, len(nse.indexedBackups))
@@ -640,7 +643,7 @@ func (nse *NLPSearchEngine) Search(ctx context.Context, query string, filters ma
 	return response, nil
 }
 
-// tokenize splits text into searchable tokens
+// tokenize splits text into searchable tokens.
 func (nse *NLPSearchEngine) tokenize(text string) []string {
 	// Convert to lowercase
 	text = strings.ToLower(text)
@@ -670,10 +673,10 @@ func (nse *NLPSearchEngine) tokenize(text string) []string {
 	return filtered
 }
 
-// generateSnippet creates a text snippet highlighting matches
+// generateSnippet creates a text snippet highlighting matches.
 func (nse *NLPSearchEngine) generateSnippet(backup *SearchableBackup, queryTokens []string) string {
 	text := backup.Description
-	if len(text) == 0 {
+	if text == "" {
 		text = fmt.Sprintf("%s backup from %s", backup.DatabaseName, backup.BackupID)
 	}
 
@@ -691,46 +694,45 @@ func (nse *NLPSearchEngine) generateSnippet(backup *SearchableBackup, queryToken
 	return text
 }
 
-// generateRelatedQueries suggests related search queries
-func (nse *NLPSearchEngine) generateRelatedQueries(original string, tokens []string) []string {
+// generateRelatedQueries suggests related search queries.
+func (nse *NLPSearchEngine) generateRelatedQueries(original string) []string {
 	related := make([]string, 0)
 
-	// Time-based variations
-	related = append(related, original+" last week")
-	related = append(related, original+" last month")
-	related = append(related, "recent "+original)
-
-	// Type-based variations
-	related = append(related, original+" full backup")
-	related = append(related, original+" incremental")
+	related = append(related,
+		// Time-based variations
+		original+" last week",
+		original+" last month",
+		"recent "+original,
+		// Type-based variations
+		original+" full backup",
+		original+" incremental",
+	)
 
 	return related
 }
 
 // ==================== 7. Smart Retention Policy Generator ====================
 
-// SmartRetentionPolicyGenerator generates intelligent retention policies
-type SmartRetentionPolicyGenerator struct {
-	mu sync.RWMutex
-}
+// SmartRetentionPolicyGenerator generates intelligent retention policies.
+type SmartRetentionPolicyGenerator struct{}
 
-// RetentionPolicy represents a smart retention policy
+// RetentionPolicy represents a smart retention policy.
 type RetentionPolicy struct {
-	Name              string
-	DatabaseName      string
-	DailyRetention    int // days
-	WeeklyRetention   int // weeks
-	MonthlyRetention  int // months
-	YearlyRetention   int // years
-	GFSEnabled        bool // Grandfather-Father-Son
+	Name               string
+	DatabaseName       string
+	DailyRetention     int  // days
+	WeeklyRetention    int  // weeks
+	MonthlyRetention   int  // months
+	YearlyRetention    int  // years
+	GFSEnabled         bool // Grandfather-Father-Son
 	TotalRetentionDays int
-	EstimatedCost     float64
-	StorageTier       string
-	Reasoning         []string
-	ComplianceRules   []string
+	EstimatedCost      float64
+	StorageTier        string
+	Reasoning          []string
+	ComplianceRules    []string
 }
 
-// RetentionRecommendation represents a policy recommendation
+// RetentionRecommendation represents a policy recommendation.
 type RetentionRecommendation struct {
 	RecommendedPolicy *RetentionPolicy
 	Alternatives      []*RetentionPolicy
@@ -739,7 +741,7 @@ type RetentionRecommendation struct {
 	Confidence        float64
 }
 
-// CostAnalysis represents storage cost analysis
+// CostAnalysis represents storage cost analysis.
 type CostAnalysis struct {
 	MonthlyStorageCost float64
 	AnnualStorageCost  float64
@@ -748,21 +750,21 @@ type CostAnalysis struct {
 	Optimizations      []string
 }
 
-// RiskAssessment represents data loss risk assessment
+// RiskAssessment represents data loss risk assessment.
 type RiskAssessment struct {
-	DataLossRisk      string // "low", "medium", "high"
+	DataLossRisk           string        // "low", "medium", "high"
 	RecoveryPointObjective time.Duration // RPO
 	RecoveryTimeObjective  time.Duration // RTO
-	ComplianceRisk    string
-	Recommendations   []string
+	ComplianceRisk         string
+	Recommendations        []string
 }
 
-// NewSmartRetentionPolicyGenerator creates a new generator
+// NewSmartRetentionPolicyGenerator creates a new generator.
 func NewSmartRetentionPolicyGenerator() *SmartRetentionPolicyGenerator {
 	return &SmartRetentionPolicyGenerator{}
 }
 
-// GeneratePolicy generates a smart retention policy
+// GeneratePolicy generates a smart retention policy.
 func (srpg *SmartRetentionPolicyGenerator) GeneratePolicy(
 	ctx context.Context,
 	database string,
@@ -771,7 +773,6 @@ func (srpg *SmartRetentionPolicyGenerator) GeneratePolicy(
 	complianceReqs []string,
 	budget float64,
 ) (*RetentionRecommendation, error) {
-
 	// Determine retention based on compliance
 	dailyRetention := 7
 	weeklyRetention := 4
@@ -783,16 +784,17 @@ func (srpg *SmartRetentionPolicyGenerator) GeneratePolicy(
 	// Adjust for compliance
 	for _, req := range complianceReqs {
 		req = strings.ToLower(req)
-		if strings.Contains(req, "gdpr") {
+		switch {
+		case strings.Contains(req, "gdpr"):
 			yearlyRetention = 6 // GDPR: 6 years max
 			reasoning = append(reasoning, "GDPR compliance: max 6 years retention")
-		} else if strings.Contains(req, "hipaa") {
+		case strings.Contains(req, "hipaa"):
 			yearlyRetention = 6 // HIPAA: 6 years
 			reasoning = append(reasoning, "HIPAA compliance: 6 years retention")
-		} else if strings.Contains(req, "sox") {
+		case strings.Contains(req, "sox"):
 			yearlyRetention = 7 // SOX: 7 years
 			reasoning = append(reasoning, "SOX compliance: 7 years retention")
-		} else if strings.Contains(req, "pci") {
+		case strings.Contains(req, "pci"):
 			yearlyRetention = 1 // PCI-DSS: 1 year minimum
 			reasoning = append(reasoning, "PCI-DSS compliance: 1 year retention")
 		}
@@ -815,18 +817,18 @@ func (srpg *SmartRetentionPolicyGenerator) GeneratePolicy(
 	}
 
 	policy := &RetentionPolicy{
-		Name:              fmt.Sprintf("%s-retention-policy", database),
-		DatabaseName:      database,
-		DailyRetention:    dailyRetention,
-		WeeklyRetention:   weeklyRetention,
-		MonthlyRetention:  monthlyRetention,
-		YearlyRetention:   yearlyRetention,
-		GFSEnabled:        true,
+		Name:               fmt.Sprintf("%s-retention-policy", database),
+		DatabaseName:       database,
+		DailyRetention:     dailyRetention,
+		WeeklyRetention:    weeklyRetention,
+		MonthlyRetention:   monthlyRetention,
+		YearlyRetention:    yearlyRetention,
+		GFSEnabled:         true,
 		TotalRetentionDays: totalDays,
-		EstimatedCost:     monthlyStorageCost,
-		StorageTier:       storageTier,
-		Reasoning:         reasoning,
-		ComplianceRules:   complianceReqs,
+		EstimatedCost:      monthlyStorageCost,
+		StorageTier:        storageTier,
+		Reasoning:          reasoning,
+		ComplianceRules:    complianceReqs,
 	}
 
 	// Generate alternatives
@@ -897,7 +899,7 @@ func (srpg *SmartRetentionPolicyGenerator) GeneratePolicy(
 	return recommendation, nil
 }
 
-// generateSpellingSuggestions generates "Did you mean?" suggestions using Levenshtein distance
+// generateSpellingSuggestions generates "Did you mean?" suggestions using Levenshtein distance.
 func (nse *NLPSearchEngine) generateSpellingSuggestions(query string, queryTokens []string, backups []*SearchableBackup) []string {
 	// Build a corpus of known terms from backups
 	corpus := make(map[string]int)
@@ -968,7 +970,7 @@ func (nse *NLPSearchEngine) generateSpellingSuggestions(query string, queryToken
 	return result
 }
 
-// levenshteinDistance calculates the Levenshtein distance between two strings
+// levenshteinDistance calculates the Levenshtein distance between two strings.
 func levenshteinDistance(s1, s2 string) int {
 	// Create matrix
 	len1 := len(s1)
@@ -1009,20 +1011,6 @@ func levenshteinDistance(s1, s2 string) int {
 	}
 
 	return matrix[len1][len2]
-}
-
-// min returns the minimum of three integers
-func min(a, b, c int) int {
-	if a < b {
-		if a < c {
-			return a
-		}
-		return c
-	}
-	if b < c {
-		return b
-	}
-	return c
 }
 
 // ==================== Continue with remaining features ====================

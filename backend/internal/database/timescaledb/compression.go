@@ -10,29 +10,29 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// CompressionManager handles TimescaleDB compression policies
+// CompressionManager handles TimescaleDB compression policies.
 type CompressionManager struct {
 	driver *TimescaleDBDriver
 }
 
-// NewCompressionManager creates a new compression manager
+// NewCompressionManager creates a new compression manager.
 func NewCompressionManager(driver *TimescaleDBDriver) *CompressionManager {
 	return &CompressionManager{
 		driver: driver,
 	}
 }
 
-// CompressionPolicy represents a TimescaleDB compression policy
+// CompressionPolicy represents a TimescaleDB compression policy.
 type CompressionPolicy struct {
-	Hypertable        string `json:"hypertable"`
-	Schema            string `json:"schema"`
-	SegmentBy         string `json:"segment_by"`
-	OrderBy           string `json:"order_by"`
-	CompressAfter     string `json:"compress_after"`
+	Hypertable         string `json:"hypertable"`
+	Schema             string `json:"schema"`
+	SegmentBy          string `json:"segment_by"`
+	OrderBy            string `json:"order_by"`
+	CompressAfter      string `json:"compress_after"`
 	CompressionEnabled bool   `json:"compression_enabled"`
 }
 
-// BackupCompressionPolicies backs up all compression policies
+// BackupCompressionPolicies backs up all compression policies.
 func (m *CompressionManager) BackupCompressionPolicies(ctx context.Context, outputDir string) error {
 	query := `
 		SELECT
@@ -70,7 +70,7 @@ func (m *CompressionManager) BackupCompressionPolicies(ctx context.Context, outp
 		var policy CompressionPolicy
 		var segmentBy, orderBy, compressAfter *string
 
-		err := rows.Scan(
+		err = rows.Scan(
 			&policy.Hypertable,
 			&policy.Schema,
 			&segmentBy,
@@ -110,7 +110,7 @@ func (m *CompressionManager) BackupCompressionPolicies(ctx context.Context, outp
 	return json.NewEncoder(file).Encode(policies)
 }
 
-// RestoreCompressionPolicies restores compression policies from backup
+// RestoreCompressionPolicies restores compression policies from backup.
 func (m *CompressionManager) RestoreCompressionPolicies(ctx context.Context, backupDir string) error {
 	policyFile := filepath.Join(backupDir, "compression_policies.json")
 
@@ -133,38 +133,40 @@ func (m *CompressionManager) RestoreCompressionPolicies(ctx context.Context, bac
 	// Restore each compression policy
 	for _, policy := range policies {
 		// Enable compression on hypertable
-		if policy.CompressionEnabled {
-			alterQuery := fmt.Sprintf(
-				"ALTER TABLE %s SET (timescaledb.compress",
+		if !policy.CompressionEnabled {
+			continue
+		}
+
+		alterQuery := fmt.Sprintf(
+			"ALTER TABLE %s SET (timescaledb.compress",
+			policy.Hypertable,
+		)
+
+		if policy.SegmentBy != "" {
+			alterQuery += fmt.Sprintf(", timescaledb.compress_segmentby = '%s'", policy.SegmentBy)
+		}
+		if policy.OrderBy != "" {
+			alterQuery += fmt.Sprintf(", timescaledb.compress_orderby = '%s'", policy.OrderBy)
+		}
+
+		alterQuery += ")"
+
+		if _, err := m.driver.pool.Exec(ctx, alterQuery); err != nil {
+			// Continue even if one fails
+			continue
+		}
+
+		// Add compression policy if compress_after is specified
+		if policy.CompressAfter != "" {
+			policyQuery := fmt.Sprintf(
+				"SELECT add_compression_policy('%s', INTERVAL '%s')",
 				policy.Hypertable,
+				policy.CompressAfter,
 			)
 
-			if policy.SegmentBy != "" {
-				alterQuery += fmt.Sprintf(", timescaledb.compress_segmentby = '%s'", policy.SegmentBy)
-			}
-			if policy.OrderBy != "" {
-				alterQuery += fmt.Sprintf(", timescaledb.compress_orderby = '%s'", policy.OrderBy)
-			}
-
-			alterQuery += ")"
-
-			if _, err := m.driver.pool.Exec(ctx, alterQuery); err != nil {
+			if _, err := m.driver.pool.Exec(ctx, policyQuery); err != nil {
 				// Continue even if one fails
 				continue
-			}
-
-			// Add compression policy if compress_after is specified
-			if policy.CompressAfter != "" {
-				policyQuery := fmt.Sprintf(
-					"SELECT add_compression_policy('%s', INTERVAL '%s')",
-					policy.Hypertable,
-					policy.CompressAfter,
-				)
-
-				if _, err := m.driver.pool.Exec(ctx, policyQuery); err != nil {
-					// Continue even if one fails
-					continue
-				}
 			}
 		}
 	}
@@ -172,7 +174,7 @@ func (m *CompressionManager) RestoreCompressionPolicies(ctx context.Context, bac
 	return nil
 }
 
-// GetCompressedChunks returns information about compressed chunks
+// GetCompressedChunks returns information about compressed chunks.
 func (m *CompressionManager) GetCompressedChunks(ctx context.Context, hypertable string) (int, error) {
 	query := `
 		SELECT count(*)
@@ -186,7 +188,7 @@ func (m *CompressionManager) GetCompressedChunks(ctx context.Context, hypertable
 	return count, err
 }
 
-// CompressChunk manually compresses a specific chunk
+// CompressChunk manually compresses a specific chunk.
 func (m *CompressionManager) CompressChunk(ctx context.Context, chunkName string) error {
 	// Use pgx.Identifier to properly quote the chunk name and prevent SQL injection.
 	query := fmt.Sprintf("SELECT compress_chunk(%s)", pgx.Identifier{chunkName}.Sanitize())
@@ -194,7 +196,7 @@ func (m *CompressionManager) CompressChunk(ctx context.Context, chunkName string
 	return err
 }
 
-// DecompressChunk manually decompresses a specific chunk
+// DecompressChunk manually decompresses a specific chunk.
 func (m *CompressionManager) DecompressChunk(ctx context.Context, chunkName string) error {
 	// Use pgx.Identifier to properly quote the chunk name and prevent SQL injection.
 	query := fmt.Sprintf("SELECT decompress_chunk(%s)", pgx.Identifier{chunkName}.Sanitize())

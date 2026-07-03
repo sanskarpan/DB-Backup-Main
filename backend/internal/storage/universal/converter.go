@@ -10,12 +10,12 @@ import (
 	"time"
 )
 
-// BackupConverter converts backups between universal format and provider-specific formats
+// BackupConverter converts backups between universal format and provider-specific formats.
 type BackupConverter struct {
 	chunkSize int64
 }
 
-// NewBackupConverter creates a new backup converter
+// NewBackupConverter creates a new backup converter.
 func NewBackupConverter(chunkSize int64) *BackupConverter {
 	if chunkSize <= 0 {
 		chunkSize = 10 * 1024 * 1024 // 10MB default
@@ -26,7 +26,7 @@ func NewBackupConverter(chunkSize int64) *BackupConverter {
 	}
 }
 
-// ToUniversalFormat converts a regular backup file to universal format
+// ToUniversalFormat converts a regular backup file to universal format.
 func (c *BackupConverter) ToUniversalFormat(ctx context.Context, inputFile, outputDir, databaseType, databaseName string) error {
 	// Open input file
 	file, err := os.Open(inputFile)
@@ -63,7 +63,7 @@ func (c *BackupConverter) ToUniversalFormat(ctx context.Context, inputFile, outp
 	return nil
 }
 
-// FromUniversalFormat converts a universal format backup to a single file
+// FromUniversalFormat converts a universal format backup to a single file.
 func (c *BackupConverter) FromUniversalFormat(ctx context.Context, inputDir, outputFile string) error {
 	// Create universal backup reader
 	reader, err := NewUniversalBackupReader(inputDir)
@@ -72,7 +72,7 @@ func (c *BackupConverter) FromUniversalFormat(ctx context.Context, inputDir, out
 	}
 
 	// Verify integrity
-	if err := reader.VerifyIntegrity(); err != nil {
+	if err = reader.VerifyIntegrity(); err != nil {
 		return fmt.Errorf("backup integrity check failed: %w", err)
 	}
 
@@ -83,14 +83,14 @@ func (c *BackupConverter) FromUniversalFormat(ctx context.Context, inputDir, out
 	}
 
 	// Write to output file
-	if err := os.WriteFile(outputFile, data, 0644); err != nil {
+	if err := os.WriteFile(outputFile, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write output file: %w", err)
 	}
 
 	return nil
 }
 
-// MigrateBetweenProviders migrates a backup from one provider to another
+// MigrateBetweenProviders migrates a backup from one provider to another.
 func (c *BackupConverter) MigrateBetweenProviders(ctx context.Context, sourceProvider, targetProvider, backupID string) error {
 	// This would integrate with the actual storage providers
 	// For now, it's a placeholder showing the structure
@@ -105,7 +105,7 @@ func (c *BackupConverter) MigrateBetweenProviders(ctx context.Context, sourcePro
 	return nil
 }
 
-// ValidateUniversalBackup validates a universal format backup
+// ValidateUniversalBackup validates a universal format backup.
 func (c *BackupConverter) ValidateUniversalBackup(inputDir string) (*ValidationResult, error) {
 	reader, err := NewUniversalBackupReader(inputDir)
 	if err != nil {
@@ -156,7 +156,7 @@ func (c *BackupConverter) ValidateUniversalBackup(inputDir string) (*ValidationR
 	return result, nil
 }
 
-// GetBackupInfo retrieves backup information without reading data
+// GetBackupInfo retrieves backup information without reading data.
 func (c *BackupConverter) GetBackupInfo(inputDir string) (*BackupInfo, error) {
 	reader, err := NewUniversalBackupReader(inputDir)
 	if err != nil {
@@ -182,7 +182,7 @@ func (c *BackupConverter) GetBackupInfo(inputDir string) (*BackupInfo, error) {
 	}, nil
 }
 
-// ExportManifest exports just the manifest for cataloging
+// ExportManifest exports just the manifest for cataloging.
 func (c *BackupConverter) ExportManifest(inputDir, outputFile string) error {
 	reader, err := NewUniversalBackupReader(inputDir)
 	if err != nil {
@@ -208,7 +208,7 @@ func (c *BackupConverter) ExportManifest(inputDir, outputFile string) error {
 	return nil
 }
 
-// StreamBackupData streams backup data without loading everything into memory
+// StreamBackupData streams backup data without loading everything into memory.
 func (c *BackupConverter) StreamBackupData(inputDir string, writer io.Writer) error {
 	reader, err := NewUniversalBackupReader(inputDir)
 	if err != nil {
@@ -232,7 +232,7 @@ func (c *BackupConverter) StreamBackupData(inputDir string, writer io.Writer) er
 	return nil
 }
 
-// ValidationResult represents the result of backup validation
+// ValidationResult represents the result of backup validation.
 type ValidationResult struct {
 	Valid        bool     `json:"valid"`
 	Errors       []string `json:"errors,omitempty"`
@@ -242,7 +242,7 @@ type ValidationResult struct {
 	BackupID     string   `json:"backup_id"`
 }
 
-// BackupInfo contains summary information about a backup
+// BackupInfo contains summary information about a backup.
 type BackupInfo struct {
 	BackupID     string            `json:"backup_id"`
 	DatabaseType string            `json:"database_type"`

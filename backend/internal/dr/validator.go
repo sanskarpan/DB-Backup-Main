@@ -15,12 +15,12 @@ import (
 // restored test target.
 type Validator struct{}
 
-// NewValidator creates a new validator
+// NewValidator creates a new validator.
 func NewValidator() *Validator {
 	return &Validator{}
 }
 
-// SchemaObject represents a database schema object
+// SchemaObject represents a database schema object.
 type SchemaObject struct {
 	Type       string // table, index, constraint, etc.
 	Name       string
@@ -28,7 +28,7 @@ type SchemaObject struct {
 	Database   string
 }
 
-// TableRowCount represents row count for a table
+// TableRowCount represents row count for a table.
 type TableRowCount struct {
 	TableName   string
 	RowCount    int64
@@ -36,7 +36,7 @@ type TableRowCount struct {
 	LastUpdated time.Time
 }
 
-// SampleDataRecord represents a sample data record
+// SampleDataRecord represents a sample data record.
 type SampleDataRecord struct {
 	TableName string
 	RecordID  string
@@ -47,7 +47,7 @@ type SampleDataRecord struct {
 // ValidateSchema validates the restored schema by querying the target's
 // catalog. If the target declares ExpectedTables, each must be present;
 // otherwise the restore is required to have produced at least one table.
-func (v *Validator) ValidateSchema(ctx context.Context, env *TestEnvironment, databaseName string) (bool, []string) {
+func (v *Validator) ValidateSchema(ctx context.Context, env *TestEnvironment, databaseName string) (valid bool, errs []string) {
 	errors := make([]string, 0)
 
 	if env == nil || env.db == nil {
@@ -87,7 +87,7 @@ func (v *Validator) ValidateSchema(ctx context.Context, env *TestEnvironment, da
 // target declares MinRowCounts, every listed table must exist and hold at
 // least the minimum number of rows; otherwise every table must simply be
 // countable.
-func (v *Validator) ValidateRowCounts(ctx context.Context, env *TestEnvironment, databaseName string) (bool, []string) {
+func (v *Validator) ValidateRowCounts(ctx context.Context, env *TestEnvironment, databaseName string) (valid bool, errs []string) {
 	errors := make([]string, 0)
 
 	if env == nil || env.db == nil {
@@ -129,7 +129,7 @@ func (v *Validator) ValidateRowCounts(ctx context.Context, env *TestEnvironment,
 
 // ValidateSampleData reads a real sample of rows from the restored database to
 // confirm the data is present and readable, computing a checksum per row.
-func (v *Validator) ValidateSampleData(ctx context.Context, env *TestEnvironment, databaseName string, samplePercent float64) (bool, []string) {
+func (v *Validator) ValidateSampleData(ctx context.Context, env *TestEnvironment, databaseName string, samplePercent float64) (valid bool, errs []string) {
 	errors := make([]string, 0)
 
 	if samplePercent <= 0 || samplePercent > 100 {
@@ -377,7 +377,7 @@ func (v *Validator) ValidateConnectivity(ctx context.Context, env *TestEnvironme
 
 // ValidatePerformance runs a real query against the restored database and
 // times it, reporting an error if the query fails or exceeds a sane ceiling.
-func (v *Validator) ValidatePerformance(ctx context.Context, env *TestEnvironment, databaseName string) (bool, []string) {
+func (v *Validator) ValidatePerformance(ctx context.Context, env *TestEnvironment, databaseName string) (valid bool, errs []string) {
 	errors := make([]string, 0)
 
 	if env == nil || env.db == nil {

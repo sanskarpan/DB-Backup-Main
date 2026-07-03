@@ -10,7 +10,7 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// Policy defines backup retention rules
+// Policy defines backup retention rules.
 type Policy struct {
 	// DailyRetention: number of daily backups to keep (most recent N days)
 	DailyRetention int
@@ -22,7 +22,7 @@ type Policy struct {
 	YearlyRetention int
 }
 
-// Backup represents a backup for retention purposes
+// Backup represents a backup for retention purposes.
 type Backup struct {
 	ID        string
 	Timestamp time.Time
@@ -30,7 +30,7 @@ type Backup struct {
 	Tags      map[string]string
 }
 
-// BackupStore interface for backup storage operations
+// BackupStore interface for backup storage operations.
 type BackupStore interface {
 	// ListBackups returns all backups
 	ListBackups(ctx context.Context) ([]*Backup, error)
@@ -38,13 +38,13 @@ type BackupStore interface {
 	DeleteBackup(ctx context.Context, id string) error
 }
 
-// Manager manages backup retention policies
+// Manager manages backup retention policies.
 type Manager struct {
 	policy *Policy
 	store  BackupStore
 }
 
-// NewManager creates a new retention manager
+// NewManager creates a new retention manager.
 func NewManager(policy *Policy, store BackupStore) *Manager {
 	return &Manager{
 		policy: policy,
@@ -52,7 +52,7 @@ func NewManager(policy *Policy, store BackupStore) *Manager {
 	}
 }
 
-// ApplyPolicy applies retention policy and deletes old backups
+// ApplyPolicy applies retention policy and deletes old backups.
 func (m *Manager) ApplyPolicy(ctx context.Context) (*ApplyResult, error) {
 	// Get all backups
 	allBackups, err := m.store.ListBackups(ctx)
@@ -92,7 +92,7 @@ func (m *Manager) ApplyPolicy(ctx context.Context) (*ApplyResult, error) {
 	return result, nil
 }
 
-// selectBackupsToKeep determines which backups to keep based on policy
+// selectBackupsToKeep determines which backups to keep based on policy.
 func (m *Manager) selectBackupsToKeep(backups []*Backup) map[string]bool {
 	toKeep := make(map[string]bool)
 	now := time.Now()
@@ -142,7 +142,7 @@ func (m *Manager) selectBackupsToKeep(backups []*Backup) map[string]bool {
 	return toKeep
 }
 
-// selectWeeklyBackups selects one backup per week
+// selectWeeklyBackups selects one backup per week.
 func (m *Manager) selectWeeklyBackups(backups []*Backup, cutoff time.Time, count int) map[string]bool {
 	selected := make(map[string]bool)
 	weeksSeen := make(map[string]bool)
@@ -169,7 +169,7 @@ func (m *Manager) selectWeeklyBackups(backups []*Backup, cutoff time.Time, count
 	return selected
 }
 
-// selectMonthlyBackups selects one backup per month
+// selectMonthlyBackups selects one backup per month.
 func (m *Manager) selectMonthlyBackups(backups []*Backup, cutoff time.Time, count int) map[string]bool {
 	selected := make(map[string]bool)
 	monthsSeen := make(map[string]bool)
@@ -195,7 +195,7 @@ func (m *Manager) selectMonthlyBackups(backups []*Backup, cutoff time.Time, coun
 	return selected
 }
 
-// selectYearlyBackups selects one backup per year
+// selectYearlyBackups selects one backup per year.
 func (m *Manager) selectYearlyBackups(backups []*Backup, cutoff time.Time, count int) map[string]bool {
 	selected := make(map[string]bool)
 	yearsSeen := make(map[string]bool)
@@ -221,7 +221,7 @@ func (m *Manager) selectYearlyBackups(backups []*Backup, cutoff time.Time, count
 	return selected
 }
 
-// findBackupsToDelete returns backups that should be deleted
+// findBackupsToDelete returns backups that should be deleted.
 func (m *Manager) findBackupsToDelete(allBackups []*Backup, toKeep map[string]bool) []*Backup {
 	var toDelete []*Backup
 
@@ -234,7 +234,7 @@ func (m *Manager) findBackupsToDelete(allBackups []*Backup, toKeep map[string]bo
 	return toDelete
 }
 
-// ApplyResult contains the results of applying a retention policy
+// ApplyResult contains the results of applying a retention policy.
 type ApplyResult struct {
 	TotalBackups   int
 	BackupsKept    int
@@ -244,7 +244,7 @@ type ApplyResult struct {
 	Errors         []error
 }
 
-// Summary returns a human-readable summary
+// Summary returns a human-readable summary.
 func (r *ApplyResult) Summary() string {
 	if len(r.Errors) > 0 {
 		return fmt.Sprintf("Retention policy applied: %d/%d backups deleted (%d kept), %.2f MB freed, %d errors",
@@ -257,7 +257,7 @@ func (r *ApplyResult) Summary() string {
 		float64(r.SpaceFreed)/(1024*1024))
 }
 
-// DefaultPolicy returns a sensible default retention policy
+// DefaultPolicy returns a sensible default retention policy.
 func DefaultPolicy() *Policy {
 	return &Policy{
 		DailyRetention:   7,  // Keep 7 days
@@ -267,17 +267,17 @@ func DefaultPolicy() *Policy {
 	}
 }
 
-// AggressivePolicy returns a more aggressive (less storage) retention policy
+// AggressivePolicy returns a more aggressive (less storage) retention policy.
 func AggressivePolicy() *Policy {
 	return &Policy{
-		DailyRetention:   3,  // Keep 3 days
-		WeeklyRetention:  2,  // Keep 2 weeks
-		MonthlyRetention: 6,  // Keep 6 months
-		YearlyRetention:  1,  // Keep 1 year
+		DailyRetention:   3, // Keep 3 days
+		WeeklyRetention:  2, // Keep 2 weeks
+		MonthlyRetention: 6, // Keep 6 months
+		YearlyRetention:  1, // Keep 1 year
 	}
 }
 
-// ConservativePolicy returns a more conservative (more storage) retention policy
+// ConservativePolicy returns a more conservative (more storage) retention policy.
 func ConservativePolicy() *Policy {
 	return &Policy{
 		DailyRetention:   14, // Keep 14 days

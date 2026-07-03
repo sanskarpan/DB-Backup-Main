@@ -30,14 +30,14 @@ type Notifier interface {
 	Send(ctx context.Context, notif *notification.Notification) error
 }
 
-// Engine orchestrates backup operations
+// Engine orchestrates backup operations.
 type Engine struct {
 	config   *Config
 	provider storage.Provider
 	notifier Notifier
 }
 
-// Config holds backup engine configuration
+// Config holds backup engine configuration.
 type Config struct {
 	TempDirectory      string
 	ParallelOperations int
@@ -56,7 +56,7 @@ type Config struct {
 	Notifier Notifier
 }
 
-// CreateOptions holds options for creating a backup
+// CreateOptions holds options for creating a backup.
 type CreateOptions struct {
 	// Database connection
 	DatabaseType database.DatabaseType
@@ -86,7 +86,7 @@ type CreateOptions struct {
 	ProgressCallback func(progress Progress)
 }
 
-// Progress represents backup progress
+// Progress represents backup progress.
 type Progress struct {
 	Stage       string
 	Percentage  float64
@@ -95,7 +95,7 @@ type Progress struct {
 	BytesCopied int64
 }
 
-// NewEngine creates a new backup engine
+// NewEngine creates a new backup engine.
 func NewEngine(config *Config) *Engine {
 	return &Engine{
 		config:   config,
@@ -241,14 +241,21 @@ func (e *Engine) createBackup(ctx context.Context, opts *CreateOptions) (*models
 
 	reportProgress(opts, "connecting", 10, "Connecting to database...")
 
-	if err := driver.Connect(ctx, connConfig); err != nil {
+	if err = driver.Connect(ctx, connConfig); err != nil {
 		metadata.Status = database.BackupStatusFailed
 		return metadata, pkgErrors.ErrDatabaseConnection(err)
 	}
-	defer driver.Disconnect()
+	defer func() {
+		if derr := driver.Disconnect(); derr != nil {
+			log.Printf("failed to disconnect database driver: %v", derr)
+		}
+	}()
 
 	// Get database version
-	version, _ := driver.GetVersion(ctx)
+	version, verr := driver.GetVersion(ctx)
+	if verr != nil {
+		log.Printf("failed to get database version: %v", verr)
+	}
 	metadata.DatabaseVersion = version
 
 	// Ensure temp directory exists
@@ -382,7 +389,7 @@ func (e *Engine) storeArtifact(ctx context.Context, metadata *models.BackupMetad
 	return nil
 }
 
-// ValidateBackup validates a backup file
+// ValidateBackup validates a backup file.
 func (e *Engine) ValidateBackup(ctx context.Context, backupID string) error {
 	// Load metadata
 	metadata, err := e.loadMetadata(backupID)
@@ -476,7 +483,7 @@ func (e *Engine) listBackups(include func(*models.BackupMetadata) bool) ([]*mode
 	return backups, nil
 }
 
-// GetBackup retrieves backup metadata
+// GetBackup retrieves backup metadata.
 func (e *Engine) GetBackup(ctx context.Context, backupID string) (*models.BackupMetadata, error) {
 	return e.loadMetadata(backupID)
 }
@@ -595,7 +602,7 @@ func (e *Engine) PurgeExpired(ctx context.Context, retention time.Duration) (int
 	return purged, nil
 }
 
-// calculateChecksum calculates SHA256 checksum of a file
+// calculateChecksum calculates SHA256 checksum of a file.
 func (e *Engine) calculateChecksum(filePath string) (string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -611,7 +618,7 @@ func (e *Engine) calculateChecksum(filePath string) (string, error) {
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
-// saveMetadata saves backup metadata to disk
+// saveMetadata saves backup metadata to disk.
 func (e *Engine) saveMetadata(metadata *models.BackupMetadata) error {
 	metadataDir := filepath.Join(e.config.TempDirectory, "metadata")
 	if err := os.MkdirAll(metadataDir, 0o700); err != nil {
@@ -628,7 +635,7 @@ func (e *Engine) saveMetadata(metadata *models.BackupMetadata) error {
 	return os.WriteFile(metadataPath, data, 0o600)
 }
 
-// loadMetadata loads backup metadata from disk
+// loadMetadata loads backup metadata from disk.
 func (e *Engine) loadMetadata(backupID string) (*models.BackupMetadata, error) {
 	metadataPath := filepath.Join(e.config.TempDirectory, "metadata", backupID+".json")
 
@@ -648,7 +655,7 @@ func (e *Engine) loadMetadata(backupID string) (*models.BackupMetadata, error) {
 	return &metadata, nil
 }
 
-// getFileExtension returns the file extension based on compression type
+// getFileExtension returns the file extension based on compression type.
 func (e *Engine) getFileExtension(compression database.CompressionType) string {
 	switch compression {
 	case database.CompressionGzip:

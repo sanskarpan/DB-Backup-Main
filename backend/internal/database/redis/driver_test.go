@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/sanskarpan/db-backup/internal/database"
 )
 
 func skipIfRedisUnavailable(t *testing.T) {
@@ -327,6 +328,7 @@ func TestClusterDriver_BackupCluster(t *testing.T) {
 // Helper functions
 
 func setupTestDriver(t *testing.T) *RedisDriver {
+	t.Helper()
 	skipIfRedisUnavailable(t)
 	driver := NewRedisDriver()
 	config := &database.ConnectionConfig{

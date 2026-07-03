@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// StorageProvider represents a cloud storage provider
+// StorageProvider represents a cloud storage provider.
 type StorageProvider string
 
 const (
@@ -19,7 +19,7 @@ const (
 	ProviderLocal StorageProvider = "local"
 )
 
-// BackupDestination represents a backup destination configuration
+// BackupDestination represents a backup destination configuration.
 type BackupDestination struct {
 	// Provider is the storage provider
 	Provider StorageProvider
@@ -49,7 +49,7 @@ type BackupDestination struct {
 	Timeout time.Duration
 }
 
-// BackupJob represents a backup job to be executed
+// BackupJob represents a backup job to be executed.
 type BackupJob struct {
 	// ID is the unique job identifier
 	ID string
@@ -76,7 +76,7 @@ type BackupJob struct {
 	CreatedAt time.Time
 }
 
-// BackupResult represents the result of a backup operation
+// BackupResult represents the result of a backup operation.
 type BackupResult struct {
 	// JobID is the backup job ID
 	JobID string
@@ -103,7 +103,9 @@ type BackupResult struct {
 	Timestamp time.Time
 }
 
-// MultiCloudOrchestrator manages multi-cloud backup operations
+// MultiCloudOrchestrator manages multi-cloud backup operations.
+//
+//nolint:revive // keeps public name stable; renaming would break other packages
 type MultiCloudOrchestrator struct {
 	mu            sync.RWMutex
 	destinations  map[string]*BackupDestination
@@ -114,14 +116,14 @@ type MultiCloudOrchestrator struct {
 	semaphore     chan struct{}
 }
 
-// Uploader is an interface for uploading backups to a provider
+// Uploader is an interface for uploading backups to a provider.
 type Uploader interface {
 	Upload(ctx context.Context, destination *BackupDestination, data []byte, metadata map[string]interface{}) (string, error)
 	Delete(ctx context.Context, destination *BackupDestination, location string) error
 	Verify(ctx context.Context, destination *BackupDestination, location string) error
 }
 
-// NewMultiCloudOrchestrator creates a new multi-cloud orchestrator
+// NewMultiCloudOrchestrator creates a new multi-cloud orchestrator.
 func NewMultiCloudOrchestrator(maxConcurrent int) *MultiCloudOrchestrator {
 	if maxConcurrent <= 0 {
 		maxConcurrent = 10
@@ -137,7 +139,7 @@ func NewMultiCloudOrchestrator(maxConcurrent int) *MultiCloudOrchestrator {
 	}
 }
 
-// RegisterDestination registers a backup destination
+// RegisterDestination registers a backup destination.
 func (mco *MultiCloudOrchestrator) RegisterDestination(id string, destination *BackupDestination) error {
 	if id == "" {
 		return fmt.Errorf("destination ID cannot be empty")
@@ -153,7 +155,7 @@ func (mco *MultiCloudOrchestrator) RegisterDestination(id string, destination *B
 	return nil
 }
 
-// RegisterUploader registers an uploader for a provider
+// RegisterUploader registers an uploader for a provider.
 func (mco *MultiCloudOrchestrator) RegisterUploader(provider StorageProvider, uploader Uploader) error {
 	if uploader == nil {
 		return fmt.Errorf("uploader cannot be nil")
@@ -166,7 +168,7 @@ func (mco *MultiCloudOrchestrator) RegisterUploader(provider StorageProvider, up
 	return nil
 }
 
-// GetDestination retrieves a destination by ID
+// GetDestination retrieves a destination by ID.
 func (mco *MultiCloudOrchestrator) GetDestination(id string) (*BackupDestination, error) {
 	mco.mu.RLock()
 	defer mco.mu.RUnlock()
@@ -179,7 +181,7 @@ func (mco *MultiCloudOrchestrator) GetDestination(id string) (*BackupDestination
 	return dest, nil
 }
 
-// ListDestinations returns all registered destinations
+// ListDestinations returns all registered destinations.
 func (mco *MultiCloudOrchestrator) ListDestinations() []*BackupDestination {
 	mco.mu.RLock()
 	defer mco.mu.RUnlock()
@@ -192,7 +194,7 @@ func (mco *MultiCloudOrchestrator) ListDestinations() []*BackupDestination {
 	return destinations
 }
 
-// ExecuteBackup executes a multi-cloud backup job
+// ExecuteBackup executes a multi-cloud backup job.
 func (mco *MultiCloudOrchestrator) ExecuteBackup(ctx context.Context, job *BackupJob) ([]*BackupResult, error) {
 	if job == nil {
 		return nil, fmt.Errorf("job cannot be nil")
@@ -273,7 +275,7 @@ func (mco *MultiCloudOrchestrator) ExecuteBackup(ctx context.Context, job *Backu
 	return results, nil
 }
 
-// executeUpload executes a single upload with retry logic
+// executeUpload executes a single upload with retry logic.
 func (mco *MultiCloudOrchestrator) executeUpload(ctx context.Context, job *BackupJob, dest *BackupDestination) *BackupResult {
 	startTime := time.Now()
 	result := &BackupResult{
@@ -298,6 +300,19 @@ func (mco *MultiCloudOrchestrator) executeUpload(ctx context.Context, job *Backu
 		maxRetries = 3
 	}
 
+	// attemptUpload performs a single upload attempt. It is a closure so that
+	// any per-attempt context cancellation is deferred within the attempt scope
+	// rather than accumulating across the retry loop.
+	attemptUpload := func() (string, error) {
+		uploadCtx := ctx
+		if dest.Timeout > 0 {
+			var cancel context.CancelFunc
+			uploadCtx, cancel = context.WithTimeout(ctx, dest.Timeout)
+			defer cancel()
+		}
+		return uploader.Upload(uploadCtx, dest, job.BackupData, job.Metadata)
+	}
+
 	// Retry loop
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
@@ -312,16 +327,8 @@ func (mco *MultiCloudOrchestrator) executeUpload(ctx context.Context, job *Backu
 			}
 		}
 
-		// Create upload context with timeout
-		uploadCtx := ctx
-		if dest.Timeout > 0 {
-			var cancel context.CancelFunc
-			uploadCtx, cancel = context.WithTimeout(ctx, dest.Timeout)
-			defer cancel()
-		}
-
 		// Execute upload
-		location, err := uploader.Upload(uploadCtx, dest, job.BackupData, job.Metadata)
+		location, err := attemptUpload()
 		if err == nil {
 			// Success
 			result.Success = true
@@ -340,7 +347,7 @@ func (mco *MultiCloudOrchestrator) executeUpload(ctx context.Context, job *Backu
 	return result
 }
 
-// GetJobResults retrieves results for a backup job
+// GetJobResults retrieves results for a backup job.
 func (mco *MultiCloudOrchestrator) GetJobResults(jobID string) ([]*BackupResult, error) {
 	mco.mu.RLock()
 	defer mco.mu.RUnlock()
@@ -353,7 +360,7 @@ func (mco *MultiCloudOrchestrator) GetJobResults(jobID string) ([]*BackupResult,
 	return results, nil
 }
 
-// GetActiveJobs returns all currently active jobs
+// GetActiveJobs returns all currently active jobs.
 func (mco *MultiCloudOrchestrator) GetActiveJobs() []*BackupJob {
 	mco.mu.RLock()
 	defer mco.mu.RUnlock()
@@ -366,7 +373,7 @@ func (mco *MultiCloudOrchestrator) GetActiveJobs() []*BackupJob {
 	return jobs
 }
 
-// DeleteBackup deletes a backup from all destinations
+// DeleteBackup deletes a backup from all destinations.
 func (mco *MultiCloudOrchestrator) DeleteBackup(ctx context.Context, jobID string) error {
 	results, err := mco.GetJobResults(jobID)
 	if err != nil {
@@ -434,7 +441,7 @@ func (mco *MultiCloudOrchestrator) DeleteBackup(ctx context.Context, jobID strin
 	return nil
 }
 
-// VerifyBackup verifies a backup across all destinations
+// VerifyBackup verifies a backup across all destinations.
 func (mco *MultiCloudOrchestrator) VerifyBackup(ctx context.Context, jobID string) (map[StorageProvider]error, error) {
 	results, err := mco.GetJobResults(jobID)
 	if err != nil {
@@ -497,7 +504,7 @@ func (mco *MultiCloudOrchestrator) VerifyBackup(ctx context.Context, jobID strin
 	return verificationResults, nil
 }
 
-// GetStatistics returns orchestrator statistics
+// GetStatistics returns orchestrator statistics.
 func (mco *MultiCloudOrchestrator) GetStatistics() *OrchestratorStats {
 	mco.mu.RLock()
 	defer mco.mu.RUnlock()
@@ -536,12 +543,12 @@ func (mco *MultiCloudOrchestrator) GetStatistics() *OrchestratorStats {
 	return stats
 }
 
-// OrchestratorStats represents orchestrator statistics
+// OrchestratorStats represents orchestrator statistics.
 type OrchestratorStats struct {
-	TotalDestinations   int                        `json:"total_destinations"`
-	EnabledDestinations int                        `json:"enabled_destinations"`
-	ActiveJobs          int                        `json:"active_jobs"`
-	CompletedJobs       int                        `json:"completed_jobs"`
-	SuccessRate         float64                    `json:"success_rate"`
-	ByProvider          map[StorageProvider]int    `json:"by_provider"`
+	TotalDestinations   int                     `json:"total_destinations"`
+	EnabledDestinations int                     `json:"enabled_destinations"`
+	ActiveJobs          int                     `json:"active_jobs"`
+	CompletedJobs       int                     `json:"completed_jobs"`
+	SuccessRate         float64                 `json:"success_rate"`
+	ByProvider          map[StorageProvider]int `json:"by_provider"`
 }

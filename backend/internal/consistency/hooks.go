@@ -2,6 +2,7 @@ package consistency
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,11 +15,14 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
+// hookOnErrorFail is the OnError policy that aborts execution when a hook fails.
+const hookOnErrorFail = "fail"
+
 // Command whitelist for security - only these commands are allowed
-// For production use, configure this via environment or config file
+// For production use, configure this via environment or config file.
 var (
 	// AllowedCommands defines the whitelist of permitted hook commands
-	// This prevents command injection attacks by restricting to known safe commands
+	// This prevents command injection attacks by restricting to known safe commands.
 	AllowedCommands = map[string]bool{
 		"/bin/sh":               true,
 		"/bin/bash":             true,
@@ -40,17 +44,17 @@ var (
 		// Add more as needed
 	}
 
-	// AllowedCommandPatterns allows commands matching these patterns
+	// AllowedCommandPatterns allows commands matching these patterns.
 	AllowedCommandPatterns = []*regexp.Regexp{
 		regexp.MustCompile(`^/usr/local/bin/[a-zA-Z0-9_-]+$`),
 		regexp.MustCompile(`^/opt/[a-zA-Z0-9_/-]+/bin/[a-zA-Z0-9_-]+$`),
 	}
 
-	// DangerousCharactersPattern matches shell metacharacters that could be used for injection
+	// DangerousCharactersPattern matches shell metacharacters that could be used for injection.
 	DangerousCharactersPattern = regexp.MustCompile(`[;&|$` + "`" + `()<>]`)
 )
 
-// validateCommand validates that a command is safe to execute
+// validateCommand validates that a command is safe to execute.
 func validateCommand(command string, args []string) error {
 	// Check if command is empty
 	if command == "" {
@@ -108,7 +112,7 @@ func validateCommand(command string, args []string) error {
 	return nil
 }
 
-// HookType represents the type of backup hook
+// HookType represents the type of backup hook.
 type HookType string
 
 const (
@@ -122,7 +126,7 @@ const (
 	HookTypeOnSuccess   HookType = "on-success"
 )
 
-// HookExecutionMode defines how hooks should be executed
+// HookExecutionMode defines how hooks should be executed.
 type HookExecutionMode string
 
 const (
@@ -132,7 +136,7 @@ const (
 	ExecutionModeBestEffort HookExecutionMode = "best-effort"
 )
 
-// Hook represents a single backup hook
+// Hook represents a single backup hook.
 type Hook struct {
 	ID          string
 	Type        HookType
@@ -151,7 +155,7 @@ type Hook struct {
 	Conditions map[string]string // e.g., "database": "postgres", "size_gt": "1GB"
 }
 
-// HookResult represents the result of hook execution
+// HookResult represents the result of hook execution.
 type HookResult struct {
 	HookID    string
 	Type      HookType
@@ -166,7 +170,7 @@ type HookResult struct {
 	Retries   int
 }
 
-// HookManager manages backup hooks lifecycle
+// HookManager manages backup hooks lifecycle.
 type HookManager struct {
 	mu            sync.RWMutex
 	hooks         map[HookType][]*Hook
@@ -177,14 +181,14 @@ type HookManager struct {
 	semaphore     chan struct{}
 }
 
-// HookConfig represents hook configuration
+// HookConfig represents hook configuration.
 type HookConfig struct {
 	ExecutionMode HookExecutionMode
 	GlobalTimeout time.Duration
 	MaxConcurrent int
 }
 
-// NewHookManager creates a new hook manager
+// NewHookManager creates a new hook manager.
 func NewHookManager(config *HookConfig) *HookManager {
 	if config == nil {
 		config = &HookConfig{
@@ -204,7 +208,7 @@ func NewHookManager(config *HookConfig) *HookManager {
 	}
 }
 
-// RegisterHook registers a new hook
+// RegisterHook registers a new hook.
 func (hm *HookManager) RegisterHook(hook *Hook) error {
 	if hook == nil {
 		return fmt.Errorf("hook cannot be nil")
@@ -223,7 +227,7 @@ func (hm *HookManager) RegisterHook(hook *Hook) error {
 	}
 
 	if hook.OnError == "" {
-		hook.OnError = "fail"
+		hook.OnError = hookOnErrorFail
 	}
 
 	if hook.Environment == nil {
@@ -241,7 +245,7 @@ func (hm *HookManager) RegisterHook(hook *Hook) error {
 	return nil
 }
 
-// ExecuteHooks executes all hooks of a specific type
+// ExecuteHooks executes all hooks of a specific type.
 func (hm *HookManager) ExecuteHooks(ctx context.Context, hookType HookType, metadata map[string]string) ([]*HookResult, error) {
 	hm.mu.RLock()
 	hooks := hm.hooks[hookType]
@@ -277,13 +281,13 @@ func (hm *HookManager) ExecuteHooks(ctx context.Context, hookType HookType, meta
 	case ExecutionModeFailFast:
 		return hm.executeFailFast(execCtx, enabledHooks, metadata)
 	case ExecutionModeBestEffort:
-		return hm.executeBestEffort(execCtx, enabledHooks, metadata)
+		return hm.executeBestEffort(execCtx, enabledHooks, metadata), nil
 	default:
 		return hm.executeSequential(execCtx, enabledHooks, metadata)
 	}
 }
 
-// executeSequential executes hooks one by one
+// executeSequential executes hooks one by one.
 func (hm *HookManager) executeSequential(ctx context.Context, hooks []*Hook, metadata map[string]string) ([]*HookResult, error) {
 	results := make([]*HookResult, 0, len(hooks))
 
@@ -295,15 +299,15 @@ func (hm *HookManager) executeSequential(ctx context.Context, hooks []*Hook, met
 		hm.results = append(hm.results, result)
 		hm.mu.Unlock()
 
-		if !result.Success && hook.OnError == "fail" {
-			return results, fmt.Errorf("hook %s failed: %v", hook.ID, result.Error)
+		if !result.Success && hook.OnError == hookOnErrorFail {
+			return results, fmt.Errorf("hook %s failed: %w", hook.ID, result.Error)
 		}
 	}
 
 	return results, nil
 }
 
-// executeParallel executes hooks in parallel
+// executeParallel executes hooks in parallel.
 func (hm *HookManager) executeParallel(ctx context.Context, hooks []*Hook, metadata map[string]string) ([]*HookResult, error) {
 	results := make([]*HookResult, len(hooks))
 	var wg sync.WaitGroup
@@ -325,8 +329,8 @@ func (hm *HookManager) executeParallel(ctx context.Context, hooks []*Hook, metad
 			hm.results = append(hm.results, result)
 			hm.mu.Unlock()
 
-			if !result.Success && h.OnError == "fail" {
-				errChan <- fmt.Errorf("hook %s failed: %v", h.ID, result.Error)
+			if !result.Success && h.OnError == hookOnErrorFail {
+				errChan <- fmt.Errorf("hook %s failed: %w", h.ID, result.Error)
 			}
 		}(i, hook)
 	}
@@ -342,7 +346,7 @@ func (hm *HookManager) executeParallel(ctx context.Context, hooks []*Hook, metad
 	return results, nil
 }
 
-// executeFailFast executes hooks and stops on first failure
+// executeFailFast executes hooks and stops on first failure.
 func (hm *HookManager) executeFailFast(ctx context.Context, hooks []*Hook, metadata map[string]string) ([]*HookResult, error) {
 	results := make([]*HookResult, 0, len(hooks))
 	failCtx, cancel := context.WithCancel(ctx)
@@ -364,15 +368,15 @@ func (hm *HookManager) executeFailFast(ctx context.Context, hooks []*Hook, metad
 
 		if !result.Success {
 			cancel()
-			return results, fmt.Errorf("hook %s failed: %v", hook.ID, result.Error)
+			return results, fmt.Errorf("hook %s failed: %w", hook.ID, result.Error)
 		}
 	}
 
 	return results, nil
 }
 
-// executeBestEffort executes all hooks regardless of failures
-func (hm *HookManager) executeBestEffort(ctx context.Context, hooks []*Hook, metadata map[string]string) ([]*HookResult, error) {
+// executeBestEffort executes all hooks regardless of failures.
+func (hm *HookManager) executeBestEffort(ctx context.Context, hooks []*Hook, metadata map[string]string) []*HookResult {
 	results := make([]*HookResult, len(hooks))
 	var wg sync.WaitGroup
 
@@ -395,10 +399,10 @@ func (hm *HookManager) executeBestEffort(ctx context.Context, hooks []*Hook, met
 	}
 
 	wg.Wait()
-	return results, nil
+	return results
 }
 
-// executeHook executes a single hook with retry logic
+// executeHook executes a single hook with retry logic.
 func (hm *HookManager) executeHook(ctx context.Context, hook *Hook, metadata map[string]string) *HookResult {
 	result := &HookResult{
 		HookID:    hook.ID,
@@ -443,14 +447,16 @@ func (hm *HookManager) executeHook(ctx context.Context, hook *Hook, metadata map
 	return result
 }
 
-// runCommand runs the hook command
-func (hm *HookManager) runCommand(ctx context.Context, hook *Hook, metadata map[string]string) (int, string, string, error) {
+// runCommand runs the hook command.
+func (hm *HookManager) runCommand(ctx context.Context, hook *Hook, metadata map[string]string) (code int, stdoutStr, stderrStr string, runErr error) {
 	// SECURITY: Validate command before execution to prevent command injection
 	if err := validateCommand(hook.Command, hook.Args); err != nil {
 		return -1, "", "", fmt.Errorf("command validation failed: %w", err)
 	}
 
-	// Build command - Now safe after validation
+	// Build command - safe after validateCommand enforces the whitelist and
+	// rejects dangerous argument characters.
+	//nolint:gosec // G204: command and args are validated by validateCommand against a whitelist
 	cmd := exec.CommandContext(ctx, hook.Command, hook.Args...)
 
 	// Set working directory
@@ -483,7 +489,8 @@ func (hm *HookManager) runCommand(ctx context.Context, hook *Hook, metadata map[
 	exitCode := 0
 
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
 			exitCode = exitErr.ExitCode()
 		} else {
 			exitCode = -1
@@ -493,7 +500,7 @@ func (hm *HookManager) runCommand(ctx context.Context, hook *Hook, metadata map[
 	return exitCode, stdout.String(), stderr.String(), err
 }
 
-// checkConditions checks if hook conditions match metadata
+// checkConditions checks if hook conditions match metadata.
 func (hm *HookManager) checkConditions(hook *Hook, metadata map[string]string) bool {
 	if len(hook.Conditions) == 0 {
 		return true
@@ -509,7 +516,7 @@ func (hm *HookManager) checkConditions(hook *Hook, metadata map[string]string) b
 	return true
 }
 
-// GetResults returns all hook execution results
+// GetResults returns all hook execution results.
 func (hm *HookManager) GetResults() []*HookResult {
 	hm.mu.RLock()
 	defer hm.mu.RUnlock()
@@ -519,7 +526,7 @@ func (hm *HookManager) GetResults() []*HookResult {
 	return results
 }
 
-// GetResultsByType returns hook execution results for a specific type
+// GetResultsByType returns hook execution results for a specific type.
 func (hm *HookManager) GetResultsByType(hookType HookType) []*HookResult {
 	hm.mu.RLock()
 	defer hm.mu.RUnlock()
@@ -534,7 +541,7 @@ func (hm *HookManager) GetResultsByType(hookType HookType) []*HookResult {
 	return results
 }
 
-// ClearResults clears all hook execution results
+// ClearResults clears all hook execution results.
 func (hm *HookManager) ClearResults() {
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
@@ -542,7 +549,7 @@ func (hm *HookManager) ClearResults() {
 	hm.results = make([]*HookResult, 0)
 }
 
-// LoadHooksFromDirectory loads hook scripts from a directory
+// LoadHooksFromDirectory loads hook scripts from a directory.
 func (hm *HookManager) LoadHooksFromDirectory(dir string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -586,7 +593,7 @@ func (hm *HookManager) LoadHooksFromDirectory(dir string) error {
 			Command: scriptPath,
 			Enabled: true,
 			Timeout: 5 * time.Minute,
-			OnError: "fail",
+			OnError: hookOnErrorFail,
 		}
 
 		if err := hm.RegisterHook(hook); err != nil {

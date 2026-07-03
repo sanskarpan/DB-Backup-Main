@@ -2,6 +2,7 @@ package genai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,38 +11,38 @@ import (
 	"time"
 )
 
-// LLMProvider represents different LLM providers
+// LLMProvider represents different LLM providers.
 type LLMProvider string
 
 const (
-	ProviderOpenAI   LLMProvider = "openai"
+	ProviderOpenAI    LLMProvider = "openai"
 	ProviderAnthropic LLMProvider = "anthropic"
 	ProviderLocal     LLMProvider = "local"
 )
 
-// LLMConfig configuration for LLM integration
+// LLMConfig configuration for LLM integration.
 type LLMConfig struct {
-	Provider   LLMProvider
-	APIKey     string
-	Model      string
-	Endpoint   string
-	MaxTokens  int
+	Provider    LLMProvider
+	APIKey      string
+	Model       string
+	Endpoint    string
+	MaxTokens   int
 	Temperature float64
-	Timeout    time.Duration
+	Timeout     time.Duration
 }
 
-// DefaultLLMConfig returns default LLM configuration
+// DefaultLLMConfig returns default LLM configuration.
 func DefaultLLMConfig() *LLMConfig {
 	return &LLMConfig{
-		Provider:   ProviderOpenAI,
-		Model:      "gpt-4",
-		MaxTokens:  1000,
+		Provider:    ProviderOpenAI,
+		Model:       "gpt-4",
+		MaxTokens:   1000,
 		Temperature: 0.7,
-		Timeout:    30 * time.Second,
+		Timeout:     30 * time.Second,
 	}
 }
 
-// LLMRequest represents a request to the LLM
+// LLMRequest represents a request to the LLM.
 type LLMRequest struct {
 	Query        string                 `json:"query"`
 	Context      map[string]interface{} `json:"context,omitempty"`
@@ -49,20 +50,20 @@ type LLMRequest struct {
 	MaxTokens    int                    `json:"max_tokens,omitempty"`
 }
 
-// LLMResponse represents a response from the LLM
+// LLMResponse represents a response from the LLM.
 type LLMResponse struct {
-	Text          string                 `json:"text"`
-	Intent        Intent                 `json:"intent,omitempty"`
-	Entities      map[string]Entity      `json:"entities,omitempty"`
-	Action        string                 `json:"action,omitempty"`
-	Parameters    map[string]interface{} `json:"parameters,omitempty"`
-	Confidence    float64                `json:"confidence"`
-	TokensUsed    int                    `json:"tokens_used"`
-	ResponseTime  time.Duration          `json:"response_time"`
-	Model         string                 `json:"model"`
+	Text         string                 `json:"text"`
+	Intent       Intent                 `json:"intent,omitempty"`
+	Entities     map[string]Entity      `json:"entities,omitempty"`
+	Action       string                 `json:"action,omitempty"`
+	Parameters   map[string]interface{} `json:"parameters,omitempty"`
+	Confidence   float64                `json:"confidence"`
+	TokensUsed   int                    `json:"tokens_used"`
+	ResponseTime time.Duration          `json:"response_time"`
+	Model        string                 `json:"model"`
 }
 
-// LLMClient handles interactions with LLM providers
+// LLMClient handles interactions with LLM providers.
 type LLMClient struct {
 	mu           sync.RWMutex
 	config       *LLMConfig
@@ -72,20 +73,20 @@ type LLMClient struct {
 	cache        *ResponseCache
 }
 
-// ResponseCache caches LLM responses
+// ResponseCache caches LLM responses.
 type ResponseCache struct {
 	mu    sync.RWMutex
 	cache map[string]*CachedResponse
 	ttl   time.Duration
 }
 
-// CachedResponse represents a cached LLM response
+// CachedResponse represents a cached LLM response.
 type CachedResponse struct {
 	Response  *LLMResponse
 	Timestamp time.Time
 }
 
-// NewLLMClient creates a new LLM client
+// NewLLMClient creates a new LLM client.
 func NewLLMClient(config *LLMConfig) *LLMClient {
 	if config == nil {
 		config = DefaultLLMConfig()
@@ -103,7 +104,7 @@ func NewLLMClient(config *LLMConfig) *LLMClient {
 	}
 }
 
-// Query sends a query to the LLM
+// Query sends a query to the LLM.
 func (llm *LLMClient) Query(req *LLMRequest) (*LLMResponse, error) {
 	startTime := time.Now()
 
@@ -151,7 +152,7 @@ func (llm *LLMClient) Query(req *LLMRequest) (*LLMResponse, error) {
 	return response, nil
 }
 
-// queryOpenAI sends a query to OpenAI API
+// queryOpenAI sends a query to OpenAI API.
 func (llm *LLMClient) queryOpenAI(req *LLMRequest) (*LLMResponse, error) {
 	endpoint := "https://api.openai.com/v1/chat/completions"
 	if llm.config.Endpoint != "" {
@@ -177,11 +178,19 @@ func (llm *LLMClient) queryOpenAI(req *LLMRequest) (*LLMResponse, error) {
 
 	// Add context if provided
 	if len(req.Context) > 0 {
-		contextJSON, _ := json.Marshal(req.Context)
-		requestBody["messages"] = append(requestBody["messages"].([]map[string]string), map[string]string{
+		contextJSON, mErr := json.Marshal(req.Context)
+		if mErr != nil {
+			return nil, fmt.Errorf("failed to marshal context: %w", mErr)
+		}
+		messages, ok := requestBody["messages"].([]map[string]string)
+		if !ok {
+			return nil, fmt.Errorf("unexpected messages type in request body")
+		}
+		messages = append(messages, map[string]string{
 			"role":    "system",
 			"content": fmt.Sprintf("Context: %s", string(contextJSON)),
 		})
+		requestBody["messages"] = messages
 	}
 
 	jsonBody, err := json.Marshal(requestBody)
@@ -190,7 +199,7 @@ func (llm *LLMClient) queryOpenAI(req *LLMRequest) (*LLMResponse, error) {
 	}
 
 	// Create HTTP request
-	httpReq, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBody))
+	httpReq, err := http.NewRequestWithContext(context.Background(), http.MethodPost, endpoint, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -248,7 +257,9 @@ func (llm *LLMClient) queryOpenAI(req *LLMRequest) (*LLMResponse, error) {
 	return llmResponse, nil
 }
 
-// queryAnthropic sends a query to Anthropic API
+// queryAnthropic sends a query to Anthropic API.
+//
+//nolint:unparam // req kept for signature parity with other providers; used once Anthropic API is wired up
 func (llm *LLMClient) queryAnthropic(req *LLMRequest) (*LLMResponse, error) {
 	// Similar implementation for Anthropic
 	return &LLMResponse{
@@ -257,11 +268,13 @@ func (llm *LLMClient) queryAnthropic(req *LLMRequest) (*LLMResponse, error) {
 	}, nil
 }
 
-// queryLocal sends a query to local LLM
+// queryLocal sends a query to local LLM.
+//
+//nolint:unparam // error return kept for signature parity with other provider query methods
 func (llm *LLMClient) queryLocal(req *LLMRequest) (*LLMResponse, error) {
 	// Mock local LLM response
 	response := &LLMResponse{
-		Text: fmt.Sprintf("Processed query: %s. This is a mock response from local LLM.", req.Query),
+		Text:       fmt.Sprintf("Processed query: %s. This is a mock response from local LLM.", req.Query),
 		Confidence: 0.6,
 		TokensUsed: 50,
 	}
@@ -276,7 +289,7 @@ func (llm *LLMClient) queryLocal(req *LLMRequest) (*LLMResponse, error) {
 	return response, nil
 }
 
-// parseStructuredResponse tries to extract structured data from LLM response
+// parseStructuredResponse tries to extract structured data from LLM response.
 func (llm *LLMClient) parseStructuredResponse(response *LLMResponse) {
 	// Try to parse JSON structure from response
 	// Look for JSON blocks in response
@@ -295,7 +308,7 @@ func (llm *LLMClient) parseStructuredResponse(response *LLMResponse) {
 	}
 }
 
-// getDefaultSystemPrompt returns the default system prompt for backup queries
+// getDefaultSystemPrompt returns the default system prompt for backup queries.
 func (llm *LLMClient) getDefaultSystemPrompt() string {
 	return `You are a helpful backup management assistant. You help users manage database backups through natural language.
 
@@ -322,7 +335,7 @@ Response format (when applicable):
 `
 }
 
-// GenerateExplanation generates a natural language explanation for an action
+// GenerateExplanation generates a natural language explanation for an action.
 func (llm *LLMClient) GenerateExplanation(action string, params map[string]interface{}) (string, error) {
 	query := fmt.Sprintf("Explain this backup operation to a user: Action=%s, Parameters=%v", action, params)
 
@@ -339,7 +352,7 @@ func (llm *LLMClient) GenerateExplanation(action string, params map[string]inter
 	return response.Text, nil
 }
 
-// SuggestNextSteps suggests next steps based on current context
+// SuggestNextSteps suggests next steps based on current context.
 func (llm *LLMClient) SuggestNextSteps(context map[string]interface{}) ([]string, error) {
 	query := "Based on the current backup state, what should the user do next?"
 
@@ -360,7 +373,7 @@ func (llm *LLMClient) SuggestNextSteps(context map[string]interface{}) ([]string
 	return suggestions, nil
 }
 
-// AnalyzeError analyzes an error and provides troubleshooting suggestions
+// AnalyzeError analyzes an error and provides troubleshooting suggestions.
 func (llm *LLMClient) AnalyzeError(errorMsg string, context map[string]interface{}) (*TroubleshootingResponse, error) {
 	query := fmt.Sprintf("Analyze this backup error and provide troubleshooting steps: %s", errorMsg)
 
@@ -384,7 +397,7 @@ func (llm *LLMClient) AnalyzeError(errorMsg string, context map[string]interface
 	return troubleshooting, nil
 }
 
-// TroubleshootingResponse represents a troubleshooting response
+// TroubleshootingResponse represents a troubleshooting response.
 type TroubleshootingResponse struct {
 	Error       string   `json:"error"`
 	Analysis    string   `json:"analysis"`
@@ -394,7 +407,7 @@ type TroubleshootingResponse struct {
 
 // ResponseCache methods
 
-// Get retrieves a cached response
+// Get retrieves a cached response.
 func (rc *ResponseCache) Get(query string) *LLMResponse {
 	rc.mu.RLock()
 	defer rc.mu.RUnlock()
@@ -410,7 +423,7 @@ func (rc *ResponseCache) Get(query string) *LLMResponse {
 	return nil
 }
 
-// Set caches a response
+// Set caches a response.
 func (rc *ResponseCache) Set(query string, response *LLMResponse) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
@@ -424,7 +437,7 @@ func (rc *ResponseCache) Set(query string, response *LLMResponse) {
 	rc.cleanup()
 }
 
-// cleanup removes expired entries from cache
+// cleanup removes expired entries from cache.
 func (rc *ResponseCache) cleanup() {
 	now := time.Now()
 	for query, cached := range rc.cache {
@@ -434,7 +447,7 @@ func (rc *ResponseCache) cleanup() {
 	}
 }
 
-// Clear clears the cache
+// Clear clears the cache.
 func (rc *ResponseCache) Clear() {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
@@ -442,7 +455,7 @@ func (rc *ResponseCache) Clear() {
 	rc.cache = make(map[string]*CachedResponse)
 }
 
-// GetStatistics returns LLM client statistics
+// GetStatistics returns LLM client statistics.
 func (llm *LLMClient) GetStatistics() map[string]interface{} {
 	llm.mu.RLock()
 	defer llm.mu.RUnlock()
@@ -450,16 +463,16 @@ func (llm *LLMClient) GetStatistics() map[string]interface{} {
 	cacheSize := len(llm.cache.cache)
 
 	return map[string]interface{}{
-		"provider":       llm.config.Provider,
-		"model":          llm.config.Model,
-		"request_count":  llm.requestCount,
-		"error_count":    llm.errorCount,
-		"cache_size":     cacheSize,
-		"success_rate":   float64(llm.requestCount-llm.errorCount) / float64(llm.requestCount) * 100,
+		"provider":      llm.config.Provider,
+		"model":         llm.config.Model,
+		"request_count": llm.requestCount,
+		"error_count":   llm.errorCount,
+		"cache_size":    cacheSize,
+		"success_rate":  float64(llm.requestCount-llm.errorCount) / float64(llm.requestCount) * 100,
 	}
 }
 
-// SetModel changes the LLM model
+// SetModel changes the LLM model.
 func (llm *LLMClient) SetModel(model string) {
 	llm.mu.Lock()
 	defer llm.mu.Unlock()
@@ -467,7 +480,7 @@ func (llm *LLMClient) SetModel(model string) {
 	llm.config.Model = model
 }
 
-// SetTemperature changes the temperature parameter
+// SetTemperature changes the temperature parameter.
 func (llm *LLMClient) SetTemperature(temperature float64) {
 	llm.mu.Lock()
 	defer llm.mu.Unlock()

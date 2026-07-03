@@ -12,13 +12,16 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
+
 	"github.com/sanskarpan/db-backup/internal/database"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 	"github.com/sanskarpan/db-backup/pkg/utils"
 	"github.com/sanskarpan/db-backup/pkg/validation"
 )
 
-// PostgreSQLDriver implements the database.Driver interface for PostgreSQL
+// PostgreSQLDriver implements the database.Driver interface for PostgreSQL.
+//
+//nolint:revive // keeps public name stable; used by other packages
 type PostgreSQLDriver struct {
 	db          *sql.DB
 	config      *database.ConnectionConfig
@@ -31,12 +34,12 @@ func init() {
 	})
 }
 
-// NewPostgreSQLDriver creates a new PostgreSQL driver instance
+// NewPostgreSQLDriver creates a new PostgreSQL driver instance.
 func NewPostgreSQLDriver() *PostgreSQLDriver {
 	return &PostgreSQLDriver{}
 }
 
-// Connect establishes a connection to the PostgreSQL database
+// Connect establishes a connection to the PostgreSQL database.
 func (d *PostgreSQLDriver) Connect(ctx context.Context, config *database.ConnectionConfig) error {
 	// Build connection string
 	connStr := d.buildConnectionString(config)
@@ -69,7 +72,7 @@ func (d *PostgreSQLDriver) Connect(ctx context.Context, config *database.Connect
 	return nil
 }
 
-// Disconnect closes the database connection
+// Disconnect closes the database connection.
 func (d *PostgreSQLDriver) Disconnect() error {
 	if d.db != nil {
 		return d.db.Close()
@@ -77,7 +80,7 @@ func (d *PostgreSQLDriver) Disconnect() error {
 	return nil
 }
 
-// Ping tests the database connection
+// Ping tests the database connection.
 func (d *PostgreSQLDriver) Ping(ctx context.Context) error {
 	if d.db == nil {
 		return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "not connected to database")
@@ -85,7 +88,7 @@ func (d *PostgreSQLDriver) Ping(ctx context.Context) error {
 	return d.db.PingContext(ctx)
 }
 
-// Backup creates a backup of the PostgreSQL database
+// Backup creates a backup of the PostgreSQL database.
 func (d *PostgreSQLDriver) Backup(ctx context.Context, opts *database.BackupOptions) (*database.BackupResult, error) {
 	result := &database.BackupResult{
 		ID:        utils.GenerateBackupID(),
@@ -129,7 +132,7 @@ func (d *PostgreSQLDriver) Backup(ctx context.Context, opts *database.BackupOpti
 	}
 
 	// Start command
-	if err := cmd.Start(); err != nil {
+	if err = cmd.Start(); err != nil {
 		result.Status = database.BackupStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseBackup(err).WithMetadata("command", "pg_dump")
@@ -142,7 +145,7 @@ func (d *PostgreSQLDriver) Backup(ctx context.Context, opts *database.BackupOpti
 	}
 
 	// Wait for command to complete
-	if err := cmd.Wait(); err != nil {
+	if err = cmd.Wait(); err != nil {
 		result.Status = database.BackupStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseBackup(err).WithMetadata("stderr", string(stderrOutput))
@@ -156,11 +159,17 @@ func (d *PostgreSQLDriver) Backup(ctx context.Context, opts *database.BackupOpti
 		return result, err
 	}
 
-	// Get database version
-	version, _ := d.GetVersion(ctx)
+	// Get database version (best-effort; ignore errors as backup already succeeded)
+	version, verErr := d.GetVersion(ctx)
+	if verErr != nil {
+		version = ""
+	}
 
-	// Get table information
-	tables, _ := d.getTableInfo(ctx, opts.Database)
+	// Get table information (best-effort; ignore errors as backup already succeeded)
+	tables, tblErr := d.getTableInfo(ctx)
+	if tblErr != nil {
+		tables = nil
+	}
 
 	// Complete result
 	result.EndTime = time.Now()
@@ -173,7 +182,7 @@ func (d *PostgreSQLDriver) Backup(ctx context.Context, opts *database.BackupOpti
 	return result, nil
 }
 
-// StreamBackup streams a backup to the provided writer
+// StreamBackup streams a backup to the provided writer.
 func (d *PostgreSQLDriver) StreamBackup(ctx context.Context, opts *database.BackupOptions, writer io.Writer) error {
 	args, err := d.buildPgDumpArgs(opts)
 	if err != nil {
@@ -187,7 +196,7 @@ func (d *PostgreSQLDriver) StreamBackup(ctx context.Context, opts *database.Back
 	return cmd.Run()
 }
 
-// GetBackupSize estimates the size of a backup
+// GetBackupSize estimates the size of a backup.
 func (d *PostgreSQLDriver) GetBackupSize(ctx context.Context, opts *database.BackupOptions) (int64, error) {
 	var totalSize int64
 
@@ -201,7 +210,7 @@ func (d *PostgreSQLDriver) GetBackupSize(ctx context.Context, opts *database.Bac
 	return totalSize, nil
 }
 
-// Restore restores a PostgreSQL database from backup
+// Restore restores a PostgreSQL database from backup.
 func (d *PostgreSQLDriver) Restore(ctx context.Context, opts *database.RestoreOptions) (*database.RestoreResult, error) {
 	result := &database.RestoreResult{
 		StartTime: time.Now(),
@@ -245,7 +254,8 @@ func (d *PostgreSQLDriver) Restore(ctx context.Context, opts *database.RestoreOp
 
 	// For SQL dumps, read from file
 	if cmdName == "psql" {
-		backupFile, err := os.Open(opts.SourceBackup)
+		var backupFile *os.File
+		backupFile, err = os.Open(opts.SourceBackup)
 		if err != nil {
 			result.Status = database.RestoreStatusFailed
 			result.Error = err
@@ -256,7 +266,12 @@ func (d *PostgreSQLDriver) Restore(ctx context.Context, opts *database.RestoreOp
 	}
 
 	// Capture stderr
-	stderrPipe, _ := cmd.StderrPipe()
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		result.Status = database.RestoreStatusFailed
+		result.Error = err
+		return result, pkgErrors.ErrDatabaseRestore(err)
+	}
 
 	// Run command
 	if err := cmd.Start(); err != nil {
@@ -283,7 +298,7 @@ func (d *PostgreSQLDriver) Restore(ctx context.Context, opts *database.RestoreOp
 	return result, nil
 }
 
-// restoreWithPITR performs point-in-time recovery
+// restoreWithPITR performs point-in-time recovery.
 func (d *PostgreSQLDriver) restoreWithPITR(ctx context.Context, opts *database.RestoreOptions) (*database.RestoreResult, error) {
 	result := &database.RestoreResult{
 		StartTime: time.Now(),
@@ -343,7 +358,7 @@ func (d *PostgreSQLDriver) restoreWithPITR(ctx context.Context, opts *database.R
 	return result, nil
 }
 
-// StreamRestore restores from a reader
+// StreamRestore restores from a reader.
 func (d *PostgreSQLDriver) StreamRestore(ctx context.Context, opts *database.RestoreOptions, reader io.Reader) error {
 	args, err := d.buildPsqlArgs(opts)
 	if err != nil {
@@ -357,7 +372,7 @@ func (d *PostgreSQLDriver) StreamRestore(ctx context.Context, opts *database.Res
 	return cmd.Run()
 }
 
-// ValidateRestore validates that a restore can be performed
+// ValidateRestore validates that a restore can be performed.
 func (d *PostgreSQLDriver) ValidateRestore(ctx context.Context, opts *database.RestoreOptions) error {
 	// Check if backup file exists
 	if _, err := os.Stat(opts.SourceBackup); os.IsNotExist(err) {
@@ -372,7 +387,7 @@ func (d *PostgreSQLDriver) ValidateRestore(ctx context.Context, opts *database.R
 	return nil
 }
 
-// GetDatabases returns list of databases
+// GetDatabases returns list of databases.
 func (d *PostgreSQLDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	query := `SELECT datname FROM pg_database WHERE datistemplate = false AND datname != 'postgres'`
 	rows, err := d.db.QueryContext(ctx, query)
@@ -393,7 +408,7 @@ func (d *PostgreSQLDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	return databases, nil
 }
 
-// GetTables returns list of tables in a database
+// GetTables returns list of tables in a database.
 func (d *PostgreSQLDriver) GetTables(ctx context.Context, database string) ([]string, error) {
 	query := `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`
 	rows, err := d.db.QueryContext(ctx, query)
@@ -414,7 +429,7 @@ func (d *PostgreSQLDriver) GetTables(ctx context.Context, database string) ([]st
 	return tables, nil
 }
 
-// GetTableSize returns the size of a table
+// GetTableSize returns the size of a table.
 func (d *PostgreSQLDriver) GetTableSize(ctx context.Context, database, table string) (int64, error) {
 	query := `SELECT pg_total_relation_size($1)`
 
@@ -423,29 +438,29 @@ func (d *PostgreSQLDriver) GetTableSize(ctx context.Context, database, table str
 	return size, err
 }
 
-// GetVersion returns the PostgreSQL server version
+// GetVersion returns the PostgreSQL server version.
 func (d *PostgreSQLDriver) GetVersion(ctx context.Context) (string, error) {
 	var version string
 	err := d.db.QueryRowContext(ctx, "SELECT version()").Scan(&version)
 	return version, err
 }
 
-// GetType returns the database type
+// GetType returns the database type.
 func (d *PostgreSQLDriver) GetType() database.DatabaseType {
 	return database.DatabaseTypePostgreSQL
 }
 
-// SupportsIncremental returns whether incremental backups are supported
+// SupportsIncremental returns whether incremental backups are supported.
 func (d *PostgreSQLDriver) SupportsIncremental() bool {
 	return true // PostgreSQL supports incremental backups via WAL
 }
 
-// SupportsPITR returns whether point-in-time recovery is supported
+// SupportsPITR returns whether point-in-time recovery is supported.
 func (d *PostgreSQLDriver) SupportsPITR() bool {
 	return true // PostgreSQL supports PITR via WAL
 }
 
-// buildConnectionString builds a PostgreSQL connection string
+// buildConnectionString builds a PostgreSQL connection string.
 func (d *PostgreSQLDriver) buildConnectionString(config *database.ConnectionConfig) string {
 	if config.ConnectionString != "" {
 		return config.ConnectionString
@@ -456,7 +471,8 @@ func (d *PostgreSQLDriver) buildConnectionString(config *database.ConnectionConf
 		sslMode = "disable"
 	}
 
-	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s connect_timeout=%d",
+	return fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s connect_timeout=%d",
 		config.Host,
 		config.Port,
 		config.Username,
@@ -467,14 +483,14 @@ func (d *PostgreSQLDriver) buildConnectionString(config *database.ConnectionConf
 	)
 }
 
-// buildPgDumpArgs builds pg_dump command arguments
+// buildPgDumpArgs builds pg_dump command arguments.
 func (d *PostgreSQLDriver) buildPgDumpArgs(opts *database.BackupOptions) ([]string, error) {
 	args := []string{
 		"-h", d.config.Host,
 		"-p", fmt.Sprintf("%d", d.config.Port),
 		"-U", d.config.Username,
 		"-F", "c", // Custom format for better compression and parallel restore
-		"-v",      // Verbose
+		"-v", // Verbose
 		"--no-owner",
 		"--no-acl",
 	}
@@ -520,7 +536,7 @@ func (d *PostgreSQLDriver) buildPgDumpArgs(opts *database.BackupOptions) ([]stri
 	return args, nil
 }
 
-// buildRestoreArgs builds pg_restore command arguments
+// buildRestoreArgs builds pg_restore command arguments.
 func (d *PostgreSQLDriver) buildRestoreArgs(opts *database.RestoreOptions) ([]string, error) {
 	// Validate database name if provided
 	if opts.Database != "" {
@@ -562,7 +578,7 @@ func (d *PostgreSQLDriver) buildRestoreArgs(opts *database.RestoreOptions) ([]st
 	return args, nil
 }
 
-// buildPsqlArgs builds psql command arguments
+// buildPsqlArgs builds psql command arguments.
 func (d *PostgreSQLDriver) buildPsqlArgs(opts *database.RestoreOptions) ([]string, error) {
 	// Validate database name if provided
 	if opts.Database != "" {
@@ -581,8 +597,8 @@ func (d *PostgreSQLDriver) buildPsqlArgs(opts *database.RestoreOptions) ([]strin
 	return args, nil
 }
 
-// getTableInfo retrieves information about tables
-func (d *PostgreSQLDriver) getTableInfo(ctx context.Context, dbName string) ([]database.TableInfo, error) {
+// getTableInfo retrieves information about tables.
+func (d *PostgreSQLDriver) getTableInfo(ctx context.Context) ([]database.TableInfo, error) {
 	query := `
 		SELECT
 			tablename,
@@ -613,7 +629,7 @@ func (d *PostgreSQLDriver) getTableInfo(ctx context.Context, dbName string) ([]d
 	return tables, nil
 }
 
-// GetDatabaseSize returns the total size of all databases on the PostgreSQL server
+// GetDatabaseSize returns the total size of all databases on the PostgreSQL server.
 func (d *PostgreSQLDriver) GetDatabaseSize(ctx context.Context) (int64, error) {
 	query := `SELECT SUM(pg_database_size(datname))::bigint as total_size
 			  FROM pg_database

@@ -9,7 +9,7 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// Region represents a geographic region for data residency
+// Region represents a geographic region for data residency.
 type Region string
 
 const (
@@ -25,7 +25,7 @@ const (
 	RegionMiddleEast    Region = "middle-east"
 )
 
-// DataClassification represents the sensitivity level of data
+// DataClassification represents the sensitivity level of data.
 type DataClassification string
 
 const (
@@ -35,7 +35,9 @@ const (
 	ClassificationRestricted   DataClassification = "restricted"
 )
 
-// ResidencyPolicy defines where data can be stored and processed
+// ResidencyPolicy defines where data can be stored and processed.
+//
+//nolint:revive // keeps public name stable; renaming would break other packages
 type ResidencyPolicy struct {
 	ID                   string             `json:"id"`
 	Name                 string             `json:"name"`
@@ -53,41 +55,43 @@ type ResidencyPolicy struct {
 	Active               bool               `json:"active"`
 }
 
-// ResidencyViolation represents a data residency policy violation
+// ResidencyViolation represents a data residency policy violation.
+//
+//nolint:revive // keeps public name stable; renaming would break other packages
 type ResidencyViolation struct {
-	ID                string    `json:"id"`
-	PolicyID          string    `json:"policy_id"`
-	ResourceID        string    `json:"resource_id"`
-	ResourceType      string    `json:"resource_type"` // backup, database, logs
-	ViolationType     string    `json:"violation_type"`
-	ExpectedRegion    Region    `json:"expected_region"`
-	ActualRegion      Region    `json:"actual_region"`
-	Severity          string    `json:"severity"` // low, medium, high, critical
-	DetectedAt        time.Time `json:"detected_at"`
+	ID                string     `json:"id"`
+	PolicyID          string     `json:"policy_id"`
+	ResourceID        string     `json:"resource_id"`
+	ResourceType      string     `json:"resource_type"` // backup, database, logs
+	ViolationType     string     `json:"violation_type"`
+	ExpectedRegion    Region     `json:"expected_region"`
+	ActualRegion      Region     `json:"actual_region"`
+	Severity          string     `json:"severity"` // low, medium, high, critical
+	DetectedAt        time.Time  `json:"detected_at"`
 	ResolvedAt        *time.Time `json:"resolved_at,omitempty"`
-	Status            string    `json:"status"` // detected, investigating, resolved, false_positive
-	RemediationAction string    `json:"remediation_action,omitempty"`
+	Status            string     `json:"status"` // detected, investigating, resolved, false_positive
+	RemediationAction string     `json:"remediation_action,omitempty"`
 }
 
-// TransferRequest represents a cross-border data transfer request
+// TransferRequest represents a cross-border data transfer request.
 type TransferRequest struct {
-	ID                string              `json:"id"`
-	ResourceID        string              `json:"resource_id"`
-	ResourceType      string              `json:"resource_type"`
-	SourceRegion      Region              `json:"source_region"`
-	DestinationRegion Region              `json:"destination_region"`
-	RequestedBy       string              `json:"requested_by"`
-	RequestedAt       time.Time           `json:"requested_at"`
-	Status            TransferStatus      `json:"status"`
-	ApprovedBy        string              `json:"approved_by,omitempty"`
-	ApprovedAt        *time.Time          `json:"approved_at,omitempty"`
-	RejectedReason    string              `json:"rejected_reason,omitempty"`
-	LegalBasis        string              `json:"legal_basis"`
-	DataCategory      DataClassification  `json:"data_category"`
-	EstimatedSize     int64               `json:"estimated_size"`
+	ID                string             `json:"id"`
+	ResourceID        string             `json:"resource_id"`
+	ResourceType      string             `json:"resource_type"`
+	SourceRegion      Region             `json:"source_region"`
+	DestinationRegion Region             `json:"destination_region"`
+	RequestedBy       string             `json:"requested_by"`
+	RequestedAt       time.Time          `json:"requested_at"`
+	Status            TransferStatus     `json:"status"`
+	ApprovedBy        string             `json:"approved_by,omitempty"`
+	ApprovedAt        *time.Time         `json:"approved_at,omitempty"`
+	RejectedReason    string             `json:"rejected_reason,omitempty"`
+	LegalBasis        string             `json:"legal_basis"`
+	DataCategory      DataClassification `json:"data_category"`
+	EstimatedSize     int64              `json:"estimated_size"`
 }
 
-// TransferStatus represents the status of a transfer request
+// TransferStatus represents the status of a transfer request.
 type TransferStatus string
 
 const (
@@ -98,7 +102,12 @@ const (
 	TransferStatusFailed    TransferStatus = "failed"
 )
 
-// ResidencyManager manages data residency policies and compliance
+// violationStatusResolved is the status marking a violation as resolved.
+const violationStatusResolved = "resolved"
+
+// ResidencyManager manages data residency policies and compliance.
+//
+//nolint:revive // keeps public name stable; renaming would break other packages
 type ResidencyManager struct {
 	policyStore    PolicyStore
 	violationStore ViolationStore
@@ -106,7 +115,7 @@ type ResidencyManager struct {
 	regionProvider RegionProvider
 }
 
-// PolicyStore defines the interface for storing residency policies
+// PolicyStore defines the interface for storing residency policies.
 type PolicyStore interface {
 	Save(ctx context.Context, policy *ResidencyPolicy) error
 	Get(ctx context.Context, policyID string) (*ResidencyPolicy, error)
@@ -116,7 +125,7 @@ type PolicyStore interface {
 	Delete(ctx context.Context, policyID string) error
 }
 
-// ViolationStore defines the interface for storing violations
+// ViolationStore defines the interface for storing violations.
 type ViolationStore interface {
 	Save(ctx context.Context, violation *ResidencyViolation) error
 	Get(ctx context.Context, violationID string) (*ResidencyViolation, error)
@@ -125,7 +134,7 @@ type ViolationStore interface {
 	Update(ctx context.Context, violation *ResidencyViolation) error
 }
 
-// TransferStore defines the interface for storing transfer requests
+// TransferStore defines the interface for storing transfer requests.
 type TransferStore interface {
 	Save(ctx context.Context, request *TransferRequest) error
 	Get(ctx context.Context, requestID string) (*TransferRequest, error)
@@ -133,12 +142,12 @@ type TransferStore interface {
 	Update(ctx context.Context, request *TransferRequest) error
 }
 
-// RegionProvider defines the interface for determining resource regions
+// RegionProvider defines the interface for determining resource regions.
 type RegionProvider interface {
 	GetResourceRegion(ctx context.Context, resourceType, resourceID string) (Region, error)
 }
 
-// NewResidencyManager creates a new residency manager
+// NewResidencyManager creates a new residency manager.
 func NewResidencyManager(policyStore PolicyStore, violationStore ViolationStore, transferStore TransferStore, regionProvider RegionProvider) *ResidencyManager {
 	return &ResidencyManager{
 		policyStore:    policyStore,
@@ -148,7 +157,7 @@ func NewResidencyManager(policyStore PolicyStore, violationStore ViolationStore,
 	}
 }
 
-// CreatePolicy creates a new data residency policy
+// CreatePolicy creates a new data residency policy.
 func (rm *ResidencyManager) CreatePolicy(ctx context.Context, policy *ResidencyPolicy) error {
 	if policy.Name == "" {
 		return errors.New("policy name is required")
@@ -166,7 +175,7 @@ func (rm *ResidencyManager) CreatePolicy(ctx context.Context, policy *ResidencyP
 	return rm.policyStore.Save(ctx, policy)
 }
 
-// UpdatePolicy updates an existing policy
+// UpdatePolicy updates an existing policy.
 func (rm *ResidencyManager) UpdatePolicy(ctx context.Context, policy *ResidencyPolicy) error {
 	existing, err := rm.policyStore.Get(ctx, policy.ID)
 	if err != nil {
@@ -179,18 +188,18 @@ func (rm *ResidencyManager) UpdatePolicy(ctx context.Context, policy *ResidencyP
 	return rm.policyStore.Update(ctx, policy)
 }
 
-// GetPolicy retrieves a policy
+// GetPolicy retrieves a policy.
 func (rm *ResidencyManager) GetPolicy(ctx context.Context, policyID string) (*ResidencyPolicy, error) {
 	return rm.policyStore.Get(ctx, policyID)
 }
 
-// GetAllPolicies retrieves all policies
+// GetAllPolicies retrieves all policies.
 func (rm *ResidencyManager) GetAllPolicies(ctx context.Context) ([]*ResidencyPolicy, error) {
 	return rm.policyStore.GetAll(ctx)
 }
 
-// ValidateResidency checks if a resource complies with residency policies
-func (rm *ResidencyManager) ValidateResidency(ctx context.Context, resourceType, resourceID string, policyID string) (bool, error) {
+// ValidateResidency checks if a resource complies with residency policies.
+func (rm *ResidencyManager) ValidateResidency(ctx context.Context, resourceType, resourceID, policyID string) (bool, error) {
 	policy, err := rm.policyStore.Get(ctx, policyID)
 	if err != nil {
 		return false, err
@@ -222,7 +231,9 @@ func (rm *ResidencyManager) ValidateResidency(ctx context.Context, resourceType,
 				DetectedAt:     time.Now(),
 				Status:         "detected",
 			}
-			_ = rm.violationStore.Save(ctx, violation)
+			if err := rm.violationStore.Save(ctx, violation); err != nil {
+				return false, fmt.Errorf("resource in restricted region %s (failed to record violation: %w)", currentRegion, err)
+			}
 			return false, fmt.Errorf("resource in restricted region: %s", currentRegion)
 		}
 	}
@@ -250,7 +261,9 @@ func (rm *ResidencyManager) ValidateResidency(ctx context.Context, resourceType,
 				DetectedAt:     time.Now(),
 				Status:         "detected",
 			}
-			_ = rm.violationStore.Save(ctx, violation)
+			if err := rm.violationStore.Save(ctx, violation); err != nil {
+				return false, fmt.Errorf("resource not in allowed region %s (failed to record violation: %w)", currentRegion, err)
+			}
 			return false, fmt.Errorf("resource not in allowed region: %s", currentRegion)
 		}
 	}
@@ -258,7 +271,7 @@ func (rm *ResidencyManager) ValidateResidency(ctx context.Context, resourceType,
 	return true, nil
 }
 
-// RequestTransfer creates a cross-border data transfer request
+// RequestTransfer creates a cross-border data transfer request.
 func (rm *ResidencyManager) RequestTransfer(ctx context.Context, resourceType, resourceID, requestedBy string, sourceRegion, destinationRegion Region, legalBasis string, dataCategory DataClassification) (*TransferRequest, error) {
 	if resourceID == "" || requestedBy == "" {
 		return nil, errors.New("resource ID and requester are required")
@@ -288,7 +301,7 @@ func (rm *ResidencyManager) RequestTransfer(ctx context.Context, resourceType, r
 	return request, nil
 }
 
-// ApproveTransfer approves a cross-border transfer request
+// ApproveTransfer approves a cross-border transfer request.
 func (rm *ResidencyManager) ApproveTransfer(ctx context.Context, requestID, approvedBy string) error {
 	request, err := rm.transferStore.Get(ctx, requestID)
 	if err != nil {
@@ -307,7 +320,7 @@ func (rm *ResidencyManager) ApproveTransfer(ctx context.Context, requestID, appr
 	return rm.transferStore.Update(ctx, request)
 }
 
-// RejectTransfer rejects a cross-border transfer request
+// RejectTransfer rejects a cross-border transfer request.
 func (rm *ResidencyManager) RejectTransfer(ctx context.Context, requestID, reason string) error {
 	request, err := rm.transferStore.Get(ctx, requestID)
 	if err != nil {
@@ -324,34 +337,34 @@ func (rm *ResidencyManager) RejectTransfer(ctx context.Context, requestID, reaso
 	return rm.transferStore.Update(ctx, request)
 }
 
-// GetTransferRequest retrieves a transfer request
+// GetTransferRequest retrieves a transfer request.
 func (rm *ResidencyManager) GetTransferRequest(ctx context.Context, requestID string) (*TransferRequest, error) {
 	return rm.transferStore.Get(ctx, requestID)
 }
 
-// GetPendingTransfers retrieves all pending transfer requests
+// GetPendingTransfers retrieves all pending transfer requests.
 func (rm *ResidencyManager) GetPendingTransfers(ctx context.Context) ([]*TransferRequest, error) {
 	return rm.transferStore.GetPending(ctx)
 }
 
-// GetViolations retrieves violations for a policy
+// GetViolations retrieves violations for a policy.
 func (rm *ResidencyManager) GetViolations(ctx context.Context, policyID string) ([]*ResidencyViolation, error) {
 	return rm.violationStore.GetByPolicy(ctx, policyID)
 }
 
-// GetUnresolvedViolations retrieves all unresolved violations
+// GetUnresolvedViolations retrieves all unresolved violations.
 func (rm *ResidencyManager) GetUnresolvedViolations(ctx context.Context) ([]*ResidencyViolation, error) {
 	return rm.violationStore.GetUnresolved(ctx)
 }
 
-// ResolveViolation marks a violation as resolved
+// ResolveViolation marks a violation as resolved.
 func (rm *ResidencyManager) ResolveViolation(ctx context.Context, violationID, remediationAction string) error {
 	violation, err := rm.violationStore.Get(ctx, violationID)
 	if err != nil {
 		return err
 	}
 
-	violation.Status = "resolved"
+	violation.Status = violationStatusResolved
 	violation.RemediationAction = remediationAction
 	now := time.Now()
 	violation.ResolvedAt = &now
@@ -359,8 +372,8 @@ func (rm *ResidencyManager) ResolveViolation(ctx context.Context, violationID, r
 	return rm.violationStore.Update(ctx, violation)
 }
 
-// GetRegionCompliance checks compliance for all resources in a region
-func (rm *ResidencyManager) GetRegionCompliance(ctx context.Context, region Region) (bool, int, int, error) {
+// GetRegionCompliance checks compliance for all resources in a region.
+func (rm *ResidencyManager) GetRegionCompliance(ctx context.Context, region Region) (compliant bool, compliantCount, totalCount int, err error) {
 	policies, err := rm.policyStore.GetByRegion(ctx, region)
 	if err != nil {
 		return false, 0, 0, err
@@ -381,7 +394,7 @@ func (rm *ResidencyManager) GetRegionCompliance(ctx context.Context, region Regi
 
 		hasUnresolvedViolations := false
 		for _, v := range violations {
-			if v.Status != "resolved" && v.Status != "false_positive" {
+			if v.Status != violationStatusResolved && v.Status != "false_positive" {
 				hasUnresolvedViolations = true
 				break
 			}
@@ -396,7 +409,7 @@ func (rm *ResidencyManager) GetRegionCompliance(ctx context.Context, region Regi
 	return isCompliant, compliantPolicies, totalPolicies, nil
 }
 
-// generateID generates a unique ID
+// generateID generates a unique ID.
 func generateID() string {
 	return uid.New("res")
 }

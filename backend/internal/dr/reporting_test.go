@@ -423,7 +423,8 @@ func TestReportGenerator_GetComplianceSummary(t *testing.T) {
 	assert.Greater(t, summary["rto_compliance"], 0.0)
 	assert.Greater(t, summary["rpo_compliance"], 0.0)
 
-	databases := summary["databases"].(map[string]int)
+	databases, ok := summary["databases"].(map[string]int)
+	require.True(t, ok)
 	assert.Equal(t, 10, databases["test-db"])
 }
 
@@ -504,6 +505,8 @@ func TestReportPeriod_Fields(t *testing.T) {
 	assert.Equal(t, "December 2025", period.Label)
 	assert.Equal(t, 2025, period.StartDate.Year())
 	assert.Equal(t, time.December, period.StartDate.Month())
+	assert.Equal(t, 2025, period.EndDate.Year())
+	assert.Equal(t, 31, period.EndDate.Day())
 }
 
 func TestComplianceStatus_Values(t *testing.T) {

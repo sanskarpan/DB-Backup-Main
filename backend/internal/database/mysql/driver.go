@@ -3,21 +3,24 @@ package mysql
 
 import (
 	"context"
+	sql "database/sql"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
-	sql "database/sql"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+
 	"github.com/sanskarpan/db-backup/internal/database"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 	"github.com/sanskarpan/db-backup/pkg/utils"
 	"github.com/sanskarpan/db-backup/pkg/validation"
 )
 
-// MySQLDriver implements the database.Driver interface for MySQL
+// MySQLDriver implements the database.Driver interface for MySQL.
+//
+//nolint:revive // keeps public name stable across packages
 type MySQLDriver struct {
 	db          *sql.DB
 	config      *database.ConnectionConfig
@@ -30,12 +33,12 @@ func init() {
 	})
 }
 
-// NewMySQLDriver creates a new MySQL driver instance
+// NewMySQLDriver creates a new MySQL driver instance.
 func NewMySQLDriver() *MySQLDriver {
 	return &MySQLDriver{}
 }
 
-// Connect establishes a connection to the MySQL database
+// Connect establishes a connection to the MySQL database.
 func (d *MySQLDriver) Connect(ctx context.Context, config *database.ConnectionConfig) error {
 	// Build DSN (Data Source Name)
 	dsn := d.buildDSN(config)
@@ -68,7 +71,7 @@ func (d *MySQLDriver) Connect(ctx context.Context, config *database.ConnectionCo
 	return nil
 }
 
-// Disconnect closes the database connection
+// Disconnect closes the database connection.
 func (d *MySQLDriver) Disconnect() error {
 	if d.db != nil {
 		return d.db.Close()
@@ -76,7 +79,7 @@ func (d *MySQLDriver) Disconnect() error {
 	return nil
 }
 
-// Ping tests the database connection
+// Ping tests the database connection.
 func (d *MySQLDriver) Ping(ctx context.Context) error {
 	if d.db == nil {
 		return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "not connected to database")
@@ -84,7 +87,7 @@ func (d *MySQLDriver) Ping(ctx context.Context) error {
 	return d.db.PingContext(ctx)
 }
 
-// Backup creates a backup of the MySQL database
+// Backup creates a backup of the MySQL database.
 func (d *MySQLDriver) Backup(ctx context.Context, opts *database.BackupOptions) (*database.BackupResult, error) {
 	result := &database.BackupResult{
 		ID:        utils.GenerateBackupID(),
@@ -128,7 +131,7 @@ func (d *MySQLDriver) Backup(ctx context.Context, opts *database.BackupOptions) 
 	}
 
 	// Start command
-	if err := cmd.Start(); err != nil {
+	if err = cmd.Start(); err != nil {
 		result.Status = database.BackupStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseBackup(err).WithMetadata("command", "mysqldump")
@@ -141,7 +144,7 @@ func (d *MySQLDriver) Backup(ctx context.Context, opts *database.BackupOptions) 
 	}
 
 	// Wait for command to complete
-	if err := cmd.Wait(); err != nil {
+	if err = cmd.Wait(); err != nil {
 		result.Status = database.BackupStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseBackup(err).WithMetadata("stderr", string(stderrOutput))
@@ -155,11 +158,17 @@ func (d *MySQLDriver) Backup(ctx context.Context, opts *database.BackupOptions) 
 		return result, err
 	}
 
-	// Get database version
-	version, _ := d.GetVersion(ctx)
+	// Get database version (best-effort; failure should not fail the backup)
+	version, verErr := d.GetVersion(ctx)
+	if verErr != nil {
+		version = "unknown"
+	}
 
-	// Get table information
-	tables, _ := d.getTableInfo(ctx, opts.Database)
+	// Get table information (best-effort; failure should not fail the backup)
+	tables, tblErr := d.getTableInfo(ctx, opts.Database)
+	if tblErr != nil {
+		tables = nil
+	}
 
 	// Complete result
 	result.EndTime = time.Now()
@@ -172,7 +181,7 @@ func (d *MySQLDriver) Backup(ctx context.Context, opts *database.BackupOptions) 
 	return result, nil
 }
 
-// StreamBackup streams a backup to the provided writer
+// StreamBackup streams a backup to the provided writer.
 func (d *MySQLDriver) StreamBackup(ctx context.Context, opts *database.BackupOptions, writer io.Writer) error {
 	args, err := d.buildMySQLDumpArgs(opts)
 	if err != nil {
@@ -186,7 +195,7 @@ func (d *MySQLDriver) StreamBackup(ctx context.Context, opts *database.BackupOpt
 	return cmd.Run()
 }
 
-// GetBackupSize estimates the size of a backup
+// GetBackupSize estimates the size of a backup.
 func (d *MySQLDriver) GetBackupSize(ctx context.Context, opts *database.BackupOptions) (int64, error) {
 	var totalSize int64
 
@@ -203,7 +212,7 @@ func (d *MySQLDriver) GetBackupSize(ctx context.Context, opts *database.BackupOp
 	return totalSize, nil
 }
 
-// Restore restores a MySQL database from backup
+// Restore restores a MySQL database from backup.
 func (d *MySQLDriver) Restore(ctx context.Context, opts *database.RestoreOptions) (*database.RestoreResult, error) {
 	result := &database.RestoreResult{
 		StartTime: time.Now(),
@@ -289,7 +298,7 @@ func (d *MySQLDriver) Restore(ctx context.Context, opts *database.RestoreOptions
 	return result, nil
 }
 
-// restoreWithPITR performs point-in-time recovery
+// restoreWithPITR performs point-in-time recovery.
 func (d *MySQLDriver) restoreWithPITR(ctx context.Context, opts *database.RestoreOptions) (*database.RestoreResult, error) {
 	result := &database.RestoreResult{
 		StartTime: time.Now(),
@@ -334,7 +343,7 @@ func (d *MySQLDriver) restoreWithPITR(ctx context.Context, opts *database.Restor
 	return result, nil
 }
 
-// StreamRestore restores from a reader
+// StreamRestore restores from a reader.
 func (d *MySQLDriver) StreamRestore(ctx context.Context, opts *database.RestoreOptions, reader io.Reader) error {
 	args := []string{
 		fmt.Sprintf("--host=%s", d.config.Host),
@@ -353,7 +362,7 @@ func (d *MySQLDriver) StreamRestore(ctx context.Context, opts *database.RestoreO
 	return cmd.Run()
 }
 
-// ValidateRestore validates that a restore can be performed
+// ValidateRestore validates that a restore can be performed.
 func (d *MySQLDriver) ValidateRestore(ctx context.Context, opts *database.RestoreOptions) error {
 	// Check if backup file exists
 	if _, err := os.Stat(opts.SourceBackup); os.IsNotExist(err) {
@@ -368,7 +377,7 @@ func (d *MySQLDriver) ValidateRestore(ctx context.Context, opts *database.Restor
 	return nil
 }
 
-// GetDatabases returns list of databases
+// GetDatabases returns list of databases.
 func (d *MySQLDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	rows, err := d.db.QueryContext(ctx, "SHOW DATABASES")
 	if err != nil {
@@ -391,9 +400,13 @@ func (d *MySQLDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	return databases, nil
 }
 
-// GetTables returns list of tables in a database
+// GetTables returns list of tables in a database.
 func (d *MySQLDriver) GetTables(ctx context.Context, database string) ([]string, error) {
-	query := "SHOW TABLES FROM " + database
+	// Identifiers cannot be parameterized in SHOW TABLES, so validate first.
+	if err := validation.ValidateDatabaseName(database); err != nil {
+		return nil, err
+	}
+	query := "SHOW TABLES FROM " + database //nolint:gosec // G202: database name validated above
 	rows, err := d.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -412,7 +425,7 @@ func (d *MySQLDriver) GetTables(ctx context.Context, database string) ([]string,
 	return tables, nil
 }
 
-// GetTableSize returns the size of a table
+// GetTableSize returns the size of a table.
 func (d *MySQLDriver) GetTableSize(ctx context.Context, database, table string) (int64, error) {
 	query := `SELECT data_length + index_length
 			  FROM information_schema.TABLES
@@ -423,35 +436,36 @@ func (d *MySQLDriver) GetTableSize(ctx context.Context, database, table string) 
 	return size, err
 }
 
-// GetVersion returns the MySQL server version
+// GetVersion returns the MySQL server version.
 func (d *MySQLDriver) GetVersion(ctx context.Context) (string, error) {
 	var version string
 	err := d.db.QueryRowContext(ctx, "SELECT VERSION()").Scan(&version)
 	return version, err
 }
 
-// GetType returns the database type
+// GetType returns the database type.
 func (d *MySQLDriver) GetType() database.DatabaseType {
 	return database.DatabaseTypeMySQL
 }
 
-// SupportsIncremental returns whether incremental backups are supported
+// SupportsIncremental returns whether incremental backups are supported.
 func (d *MySQLDriver) SupportsIncremental() bool {
 	return true // MySQL supports incremental backups via binary logs
 }
 
-// SupportsPITR returns whether point-in-time recovery is supported
+// SupportsPITR returns whether point-in-time recovery is supported.
 func (d *MySQLDriver) SupportsPITR() bool {
 	return true // MySQL supports PITR via binary logs
 }
 
-// buildDSN builds a MySQL DSN connection string
+// buildDSN builds a MySQL DSN connection string.
 func (d *MySQLDriver) buildDSN(config *database.ConnectionConfig) string {
 	if config.ConnectionString != "" {
 		return config.ConnectionString
 	}
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&timeout=%s",
+	dsn := fmt.Sprintf(
+		"%s:%s@tcp(%s:%d)/%s?parseTime=true&timeout=%s",
 		config.Username,
 		config.Password,
 		config.Host,
@@ -469,23 +483,24 @@ func (d *MySQLDriver) buildDSN(config *database.ConnectionConfig) string {
 	return dsn
 }
 
-// buildMySQLDumpArgs builds mysqldump command arguments
+// buildMySQLDumpArgs builds mysqldump command arguments.
 func (d *MySQLDriver) buildMySQLDumpArgs(opts *database.BackupOptions) ([]string, error) {
 	args := []string{
 		fmt.Sprintf("--host=%s", d.config.Host),
 		fmt.Sprintf("--port=%d", d.config.Port),
 		fmt.Sprintf("--user=%s", d.config.Username),
-		"--single-transaction",  // Consistent snapshot
-		"--routines",             // Include stored procedures
-		"--triggers",             // Include triggers
-		"--events",               // Include events
-		"--skip-lock-tables",     // Don't lock tables
+		"--single-transaction", // Consistent snapshot
+		"--routines",           // Include stored procedures
+		"--triggers",           // Include triggers
+		"--events",             // Include events
+		"--skip-lock-tables",   // Don't lock tables
 	}
 
 	// Database selection
-	if opts.AllDatabases {
+	switch {
+	case opts.AllDatabases:
 		args = append(args, "--all-databases")
-	} else if len(opts.Databases) > 0 {
+	case len(opts.Databases) > 0:
 		// Validate all database names
 		for _, db := range opts.Databases {
 			if err := validation.ValidateDatabaseName(db); err != nil {
@@ -494,7 +509,7 @@ func (d *MySQLDriver) buildMySQLDumpArgs(opts *database.BackupOptions) ([]string
 		}
 		args = append(args, "--databases")
 		args = append(args, opts.Databases...)
-	} else if opts.Database != "" {
+	case opts.Database != "":
 		// Validate single database name
 		if err := validation.ValidateDatabaseName(opts.Database); err != nil {
 			return nil, fmt.Errorf("invalid database name %q: %w", opts.Database, err)
@@ -524,7 +539,7 @@ func (d *MySQLDriver) buildMySQLDumpArgs(opts *database.BackupOptions) ([]string
 	return args, nil
 }
 
-// getTableInfo retrieves information about tables
+// getTableInfo retrieves information about tables.
 func (d *MySQLDriver) getTableInfo(ctx context.Context, dbName string) ([]database.TableInfo, error) {
 	query := `SELECT table_name, table_rows, data_length, index_length
 			  FROM information_schema.TABLES
@@ -548,7 +563,7 @@ func (d *MySQLDriver) getTableInfo(ctx context.Context, dbName string) ([]databa
 	return tables, nil
 }
 
-// GetDatabaseSize returns the total size of all databases on the MySQL server
+// GetDatabaseSize returns the total size of all databases on the MySQL server.
 func (d *MySQLDriver) GetDatabaseSize(ctx context.Context) (int64, error) {
 	query := `SELECT SUM(data_length + index_length) as total_size
 			  FROM information_schema.TABLES`

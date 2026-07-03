@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/sanskarpan/db-backup/internal/database"
 )
 
 func contains(s, sub string) bool { return strings.Contains(s, sub) }
@@ -583,6 +584,7 @@ func TestTimescaleDB_BuildConnectionString(t *testing.T) {
 // Helper functions
 
 func setupTestDriver(t *testing.T) *TimescaleDBDriver {
+	t.Helper()
 	skipIfTimescaleDBUnavailable(t)
 	driver := NewTimescaleDBDriver()
 	config := &database.ConnectionConfig{

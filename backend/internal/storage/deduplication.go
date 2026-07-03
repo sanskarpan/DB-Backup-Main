@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// DeduplicationConfig contains configuration for deduplication
+// DeduplicationConfig contains configuration for deduplication.
 type DeduplicationConfig struct {
 	// Enable deduplication
 	Enabled bool `mapstructure:"enabled"`
@@ -45,7 +45,7 @@ type DeduplicationConfig struct {
 	CacheSize int `mapstructure:"cache_size"`
 }
 
-// DeduplicationManager manages content-addressable storage with deduplication
+// DeduplicationManager manages content-addressable storage with deduplication.
 type DeduplicationManager struct {
 	config *DeduplicationConfig
 	mu     sync.RWMutex
@@ -63,37 +63,37 @@ type DeduplicationManager struct {
 	metrics *DeduplicationMetrics
 }
 
-// ChunkMetadata contains metadata about a deduplicated chunk
+// ChunkMetadata contains metadata about a deduplicated chunk.
 type ChunkMetadata struct {
-	Hash         string    `json:"hash"`
-	Size         int64     `json:"size"`
-	CompressedSize int64   `json:"compressed_size,omitempty"`
-	RefCount     int       `json:"ref_count"`
-	FirstSeen    time.Time `json:"first_seen"`
-	LastAccessed time.Time `json:"last_accessed"`
-	Compressed   bool      `json:"compressed"`
-	StoragePath  string    `json:"storage_path"`
+	Hash           string    `json:"hash"`
+	Size           int64     `json:"size"`
+	CompressedSize int64     `json:"compressed_size,omitempty"`
+	RefCount       int       `json:"ref_count"`
+	FirstSeen      time.Time `json:"first_seen"`
+	LastAccessed   time.Time `json:"last_accessed"`
+	Compressed     bool      `json:"compressed"`
+	StoragePath    string    `json:"storage_path"`
 }
 
-// ChunkReference represents a reference to a chunk in a file
+// ChunkReference represents a reference to a chunk in a file.
 type ChunkReference struct {
 	Hash   string `json:"hash"`
 	Offset int64  `json:"offset"`
 	Size   int64  `json:"size"`
 }
 
-// FileManifest contains the chunk list for a deduplicated file
+// FileManifest contains the chunk list for a deduplicated file.
 type FileManifest struct {
-	OriginalPath  string           `json:"original_path"`
-	OriginalSize  int64            `json:"original_size"`
-	Chunks        []ChunkReference `json:"chunks"`
-	TotalChunks   int              `json:"total_chunks"`
-	UniqueChunks  int              `json:"unique_chunks"`
-	DedupeRatio   float64          `json:"dedupe_ratio"`
-	CreatedAt     time.Time        `json:"created_at"`
+	OriginalPath string           `json:"original_path"`
+	OriginalSize int64            `json:"original_size"`
+	Chunks       []ChunkReference `json:"chunks"`
+	TotalChunks  int              `json:"total_chunks"`
+	UniqueChunks int              `json:"unique_chunks"`
+	DedupeRatio  float64          `json:"dedupe_ratio"`
+	CreatedAt    time.Time        `json:"created_at"`
 }
 
-// DeduplicationMetrics tracks deduplication statistics
+// DeduplicationMetrics tracks deduplication statistics.
 type DeduplicationMetrics struct {
 	TotalChunks        int64
 	UniqueChunks       int64
@@ -106,27 +106,19 @@ type DeduplicationMetrics struct {
 	mu                 sync.RWMutex
 }
 
-// ChunkCache implements a simple LRU cache
+// ChunkCache implements a simple LRU cache.
 type ChunkCache struct {
-	maxSize  int
-	cache    map[string]*cacheEntry
-	lruList  *lruNode
-	mu       sync.RWMutex
+	maxSize int
+	cache   map[string]*cacheEntry
+	mu      sync.RWMutex
 }
 
 type cacheEntry struct {
 	data     []byte
-	node     *lruNode
 	accessed time.Time
 }
 
-type lruNode struct {
-	key  string
-	prev *lruNode
-	next *lruNode
-}
-
-// NewDeduplicationManager creates a new deduplication manager
+// NewDeduplicationManager creates a new deduplication manager.
 func NewDeduplicationManager(config *DeduplicationConfig) (*DeduplicationManager, error) {
 	if config == nil {
 		return nil, fmt.Errorf("deduplication config is required")
@@ -156,12 +148,12 @@ func NewDeduplicationManager(config *DeduplicationConfig) (*DeduplicationManager
 	}
 
 	// Create directories
-	if err := os.MkdirAll(config.ChunkStorePath, 0755); err != nil {
+	if err := os.MkdirAll(config.ChunkStorePath, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create chunk store: %w", err)
 	}
 
 	indexDir := filepath.Dir(config.IndexPath)
-	if err := os.MkdirAll(indexDir, 0755); err != nil {
+	if err := os.MkdirAll(indexDir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create index directory: %w", err)
 	}
 
@@ -181,7 +173,7 @@ func NewDeduplicationManager(config *DeduplicationConfig) (*DeduplicationManager
 	return manager, nil
 }
 
-// StoreFile stores a file with deduplication
+// StoreFile stores a file with deduplication.
 func (m *DeduplicationManager) StoreFile(sourcePath string) (*FileManifest, error) {
 	if !m.config.Enabled {
 		return nil, fmt.Errorf("deduplication is not enabled")
@@ -225,8 +217,8 @@ func (m *DeduplicationManager) StoreFile(sourcePath string) (*FileManifest, erro
 		hash := m.hashChunk(chunk)
 
 		// Store chunk if not exists
-		if err := m.storeChunk(hash, chunk); err != nil {
-			return nil, fmt.Errorf("failed to store chunk: %w", err)
+		if storeErr := m.storeChunk(hash, chunk); storeErr != nil {
+			return nil, fmt.Errorf("failed to store chunk: %w", storeErr)
 		}
 
 		// Add to manifest
@@ -257,7 +249,7 @@ func (m *DeduplicationManager) StoreFile(sourcePath string) (*FileManifest, erro
 	return manifest, nil
 }
 
-// RestoreFile restores a file from its manifest
+// RestoreFile restores a file from its manifest.
 func (m *DeduplicationManager) RestoreFile(manifest *FileManifest, destPath string) error {
 	// Create destination file
 	destFile, err := os.Create(destPath)
@@ -281,7 +273,7 @@ func (m *DeduplicationManager) RestoreFile(manifest *FileManifest, destPath stri
 	return nil
 }
 
-// storeChunk stores a chunk if it doesn't already exist
+// storeChunk stores a chunk if it doesn't already exist.
 func (m *DeduplicationManager) storeChunk(hash string, data []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -311,7 +303,10 @@ func (m *DeduplicationManager) storeChunk(hash string, data []byte) error {
 
 	// Store chunk to disk
 	chunkPath := m.getChunkPath(hash)
-	if err := os.WriteFile(chunkPath, dataToStore, 0644); err != nil {
+	if err := os.MkdirAll(filepath.Dir(chunkPath), 0o755); err != nil {
+		return fmt.Errorf("failed to create chunk directory: %w", err)
+	}
+	if err := os.WriteFile(chunkPath, dataToStore, 0o600); err != nil {
 		return fmt.Errorf("failed to write chunk: %w", err)
 	}
 
@@ -344,7 +339,7 @@ func (m *DeduplicationManager) storeChunk(hash string, data []byte) error {
 	return nil
 }
 
-// retrieveChunk retrieves a chunk by hash
+// retrieveChunk retrieves a chunk by hash.
 func (m *DeduplicationManager) retrieveChunk(hash string) ([]byte, error) {
 	// Check cache first
 	if data := m.cache.Get(hash); data != nil {
@@ -388,22 +383,21 @@ func (m *DeduplicationManager) retrieveChunk(hash string) ([]byte, error) {
 	return data, nil
 }
 
-// hashChunk calculates the hash of a chunk
+// hashChunk calculates the hash of a chunk.
 func (m *DeduplicationManager) hashChunk(data []byte) string {
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:])
 }
 
-// getChunkPath returns the filesystem path for a chunk
+// getChunkPath returns the filesystem path for a chunk.
 func (m *DeduplicationManager) getChunkPath(hash string) string {
 	// Use first 2 characters as subdirectory for better filesystem performance
 	subdir := hash[:2]
 	subdirPath := filepath.Join(m.config.ChunkStorePath, subdir)
-	os.MkdirAll(subdirPath, 0755)
 	return filepath.Join(subdirPath, hash)
 }
 
-// updateMetrics updates deduplication metrics
+// updateMetrics updates deduplication metrics.
 func (m *DeduplicationManager) updateMetrics(manifest *FileManifest) {
 	m.metrics.mu.Lock()
 	defer m.metrics.mu.Unlock()
@@ -421,7 +415,7 @@ func (m *DeduplicationManager) updateMetrics(manifest *FileManifest) {
 	}
 }
 
-// GetMetrics returns current deduplication metrics
+// GetMetrics returns current deduplication metrics.
 func (m *DeduplicationManager) GetMetrics() *DeduplicationMetrics {
 	m.metrics.mu.RLock()
 	defer m.metrics.mu.RUnlock()
@@ -438,7 +432,7 @@ func (m *DeduplicationManager) GetMetrics() *DeduplicationMetrics {
 	}
 }
 
-// GarbageCollect removes unreferenced chunks
+// GarbageCollect removes unreferenced chunks.
 func (m *DeduplicationManager) GarbageCollect() (int, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -446,29 +440,31 @@ func (m *DeduplicationManager) GarbageCollect() (int, error) {
 	removed := 0
 
 	for hash, meta := range m.index {
-		if meta.RefCount == 0 {
-			// Remove chunk file
-			if err := os.Remove(meta.StoragePath); err != nil && !os.IsNotExist(err) {
-				return removed, fmt.Errorf("failed to remove chunk: %w", err)
-			}
-
-			// Remove from index
-			delete(m.index, hash)
-			delete(m.refCount, hash)
-			removed++
-
-			// Update metrics
-			m.metrics.mu.Lock()
-			m.metrics.UniqueChunks--
-			m.metrics.UniqueBytes -= meta.Size
-			m.metrics.mu.Unlock()
+		if meta.RefCount != 0 {
+			continue
 		}
+
+		// Remove chunk file
+		if err := os.Remove(meta.StoragePath); err != nil && !os.IsNotExist(err) {
+			return removed, fmt.Errorf("failed to remove chunk: %w", err)
+		}
+
+		// Remove from index
+		delete(m.index, hash)
+		delete(m.refCount, hash)
+		removed++
+
+		// Update metrics
+		m.metrics.mu.Lock()
+		m.metrics.UniqueChunks--
+		m.metrics.UniqueBytes -= meta.Size
+		m.metrics.mu.Unlock()
 	}
 
 	return removed, nil
 }
 
-// DeleteManifest decrements reference counts for all chunks in a manifest
+// DeleteManifest decrements reference counts for all chunks in a manifest.
 func (m *DeduplicationManager) DeleteManifest(manifest *FileManifest) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -488,7 +484,7 @@ func (m *DeduplicationManager) DeleteManifest(manifest *FileManifest) error {
 	return nil
 }
 
-// saveIndex saves the chunk index to disk
+// saveIndex saves the chunk index to disk.
 func (m *DeduplicationManager) saveIndex() error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -498,14 +494,14 @@ func (m *DeduplicationManager) saveIndex() error {
 		return fmt.Errorf("failed to marshal index: %w", err)
 	}
 
-	if err := os.WriteFile(m.config.IndexPath, data, 0644); err != nil {
+	if err := os.WriteFile(m.config.IndexPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write index: %w", err)
 	}
 
 	return nil
 }
 
-// loadIndex loads the chunk index from disk
+// loadIndex loads the chunk index from disk.
 func (m *DeduplicationManager) loadIndex() error {
 	if _, err := os.Stat(m.config.IndexPath); os.IsNotExist(err) {
 		return nil // Index doesn't exist yet
@@ -528,23 +524,22 @@ func (m *DeduplicationManager) loadIndex() error {
 	return nil
 }
 
-// Close saves the index and performs cleanup
+// Close saves the index and performs cleanup.
 func (m *DeduplicationManager) Close() error {
 	return m.saveIndex()
 }
 
 // ChunkCache implementation
 
-// NewChunkCache creates a new chunk cache
+// NewChunkCache creates a new chunk cache.
 func NewChunkCache(maxSize int) *ChunkCache {
 	return &ChunkCache{
 		maxSize: maxSize,
 		cache:   make(map[string]*cacheEntry),
-		lruList: &lruNode{},
 	}
 }
 
-// Get retrieves a chunk from cache
+// Get retrieves a chunk from cache.
 func (c *ChunkCache) Get(hash string) []byte {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -557,7 +552,7 @@ func (c *ChunkCache) Get(hash string) []byte {
 	return nil
 }
 
-// Put adds a chunk to cache
+// Put adds a chunk to cache.
 func (c *ChunkCache) Put(hash string, data []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -581,7 +576,7 @@ func (c *ChunkCache) Put(hash string, data []byte) {
 	}
 }
 
-// evictOldest removes the least recently accessed entry
+// evictOldest removes the least recently accessed entry.
 func (c *ChunkCache) evictOldest() {
 	var oldestHash string
 	var oldestTime time.Time
@@ -598,7 +593,7 @@ func (c *ChunkCache) evictOldest() {
 	}
 }
 
-// Clear clears the cache
+// Clear clears the cache.
 func (c *ChunkCache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -606,7 +601,7 @@ func (c *ChunkCache) Clear() {
 	c.cache = make(map[string]*cacheEntry)
 }
 
-// Size returns the number of entries in cache
+// Size returns the number of entries in cache.
 func (c *ChunkCache) Size() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

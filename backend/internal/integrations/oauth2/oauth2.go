@@ -14,34 +14,36 @@ import (
 	"github.com/sanskarpan/db-backup/internal/integrations"
 )
 
-// OAuth2Client provides OAuth2 authentication with automatic token refresh
+// OAuth2Client provides OAuth2 authentication with automatic token refresh.
+//
+//nolint:revive // OAuth2Client is a stable public API name used by other packages.
 type OAuth2Client struct {
-	config       *integrations.OAuthConfig
-	client       *http.Client
-	token        *TokenResponse
-	tokenMutex   sync.RWMutex
-	refreshTimer *time.Timer
+	config         *integrations.OAuthConfig
+	client         *http.Client
+	token          *TokenResponse
+	tokenMutex     sync.RWMutex
+	refreshTimer   *time.Timer
 	onTokenRefresh func(*TokenResponse)
 }
 
-// TokenResponse represents an OAuth2 token response
+// TokenResponse represents an OAuth2 token response.
 type TokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	TokenType    string `json:"token_type"`
-	ExpiresIn    int    `json:"expires_in"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	Scope        string `json:"scope,omitempty"`
+	AccessToken  string    `json:"access_token"`
+	TokenType    string    `json:"token_type"`
+	ExpiresIn    int       `json:"expires_in"`
+	RefreshToken string    `json:"refresh_token,omitempty"`
+	Scope        string    `json:"scope,omitempty"`
 	IssuedAt     time.Time `json:"-"`
 }
 
-// ErrorResponse represents an OAuth2 error response
+// ErrorResponse represents an OAuth2 error response.
 type ErrorResponse struct {
 	Error            string `json:"error"`
 	ErrorDescription string `json:"error_description,omitempty"`
 	ErrorURI         string `json:"error_uri,omitempty"`
 }
 
-// NewOAuth2Client creates a new OAuth2 client
+// NewOAuth2Client creates a new OAuth2 client.
 func NewOAuth2Client(config *integrations.OAuthConfig) (*OAuth2Client, error) {
 	if config == nil {
 		return nil, fmt.Errorf("OAuth config is required")
@@ -84,7 +86,7 @@ func NewOAuth2Client(config *integrations.OAuthConfig) (*OAuth2Client, error) {
 	return client, nil
 }
 
-// GetAccessToken returns the current access token, refreshing if necessary
+// GetAccessToken returns the current access token, refreshing if necessary.
 func (c *OAuth2Client) GetAccessToken(ctx context.Context) (string, error) {
 	c.tokenMutex.RLock()
 	token := c.token
@@ -114,7 +116,7 @@ func (c *OAuth2Client) GetAccessToken(ctx context.Context) (string, error) {
 	return token.AccessToken, nil
 }
 
-// AuthenticateWithClientCredentials performs OAuth2 client credentials flow
+// AuthenticateWithClientCredentials performs OAuth2 client credentials flow.
 func (c *OAuth2Client) AuthenticateWithClientCredentials(ctx context.Context, scopes []string) error {
 	if c.config.TokenURL == "" {
 		return fmt.Errorf("token URL is required")
@@ -153,8 +155,8 @@ func (c *OAuth2Client) AuthenticateWithClientCredentials(ctx context.Context, sc
 	return nil
 }
 
-// AuthenticateWithAuthorizationCode performs OAuth2 authorization code flow
-func (c *OAuth2Client) AuthenticateWithAuthorizationCode(ctx context.Context, code string, redirectURI string) error {
+// AuthenticateWithAuthorizationCode performs OAuth2 authorization code flow.
+func (c *OAuth2Client) AuthenticateWithAuthorizationCode(ctx context.Context, code, redirectURI string) error {
 	if c.config.TokenURL == "" {
 		return fmt.Errorf("token URL is required")
 	}
@@ -190,7 +192,7 @@ func (c *OAuth2Client) AuthenticateWithAuthorizationCode(ctx context.Context, co
 	return nil
 }
 
-// RefreshToken refreshes the access token using the refresh token
+// RefreshToken refreshes the access token using the refresh token.
 func (c *OAuth2Client) RefreshToken(ctx context.Context) error {
 	c.tokenMutex.RLock()
 	token := c.token
@@ -239,7 +241,7 @@ func (c *OAuth2Client) RefreshToken(ctx context.Context) error {
 	return nil
 }
 
-// GetAuthorizationURL generates the OAuth2 authorization URL
+// GetAuthorizationURL generates the OAuth2 authorization URL.
 func (c *OAuth2Client) GetAuthorizationURL(redirectURI string, scopes []string, state string) (string, error) {
 	if c.config.AuthURL == "" {
 		return "", fmt.Errorf("authorization URL is required")
@@ -267,19 +269,19 @@ func (c *OAuth2Client) GetAuthorizationURL(redirectURI string, scopes []string, 
 	return authURL.String(), nil
 }
 
-// SetTokenRefreshCallback sets a callback to be called when the token is refreshed
+// SetTokenRefreshCallback sets a callback to be called when the token is refreshed.
 func (c *OAuth2Client) SetTokenRefreshCallback(callback func(*TokenResponse)) {
 	c.onTokenRefresh = callback
 }
 
-// GetToken returns the current token (for inspection/persistence)
+// GetToken returns the current token (for inspection/persistence).
 func (c *OAuth2Client) GetToken() *TokenResponse {
 	c.tokenMutex.RLock()
 	defer c.tokenMutex.RUnlock()
 	return c.token
 }
 
-// SetToken sets the token directly (for restoring from persistence)
+// SetToken sets the token directly (for restoring from persistence).
 func (c *OAuth2Client) SetToken(token *TokenResponse) {
 	c.tokenMutex.Lock()
 	c.token = token
@@ -294,9 +296,9 @@ func (c *OAuth2Client) SetToken(token *TokenResponse) {
 
 // Helper methods
 
-// requestToken makes a token request to the OAuth2 provider
+// requestToken makes a token request to the OAuth2 provider.
 func (c *OAuth2Client) requestToken(ctx context.Context, data url.Values) (*TokenResponse, error) {
-	req, err := http.NewRequestWithContext(ctx, "POST", c.config.TokenURL, strings.NewReader(data.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.config.TokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -333,7 +335,7 @@ func (c *OAuth2Client) requestToken(ctx context.Context, data url.Values) (*Toke
 	return &token, nil
 }
 
-// isTokenExpired checks if the token is expired or about to expire
+// isTokenExpired checks if the token is expired or about to expire.
 func (c *OAuth2Client) isTokenExpired(token *TokenResponse) bool {
 	if token == nil {
 		return true
@@ -349,7 +351,7 @@ func (c *OAuth2Client) isTokenExpired(token *TokenResponse) bool {
 	return time.Now().After(expiryTime.Add(-1 * time.Minute))
 }
 
-// scheduleTokenRefresh schedules automatic token refresh
+// scheduleTokenRefresh schedules automatic token refresh.
 func (c *OAuth2Client) scheduleTokenRefresh() {
 	c.tokenMutex.RLock()
 	token := c.token
@@ -384,7 +386,7 @@ func (c *OAuth2Client) scheduleTokenRefresh() {
 	})
 }
 
-// RoundTripper returns an http.RoundTripper that adds OAuth2 authentication
+// RoundTripper returns an http.RoundTripper that adds OAuth2 authentication.
 func (c *OAuth2Client) RoundTripper(base http.RoundTripper) http.RoundTripper {
 	if base == nil {
 		base = http.DefaultTransport
@@ -395,13 +397,13 @@ func (c *OAuth2Client) RoundTripper(base http.RoundTripper) http.RoundTripper {
 	}
 }
 
-// oauth2RoundTripper implements http.RoundTripper with OAuth2 authentication
+// oauth2RoundTripper implements http.RoundTripper with OAuth2 authentication.
 type oauth2RoundTripper struct {
 	base   http.RoundTripper
 	client *OAuth2Client
 }
 
-// RoundTrip implements http.RoundTripper
+// RoundTrip implements http.RoundTripper.
 func (rt *oauth2RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Clone the request to avoid modifying the original
 	reqClone := req.Clone(req.Context())
@@ -426,8 +428,8 @@ func (rt *oauth2RoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 		resp.Body.Close()
 
 		// Try to refresh the token
-		if err := rt.client.RefreshToken(req.Context()); err != nil {
-			return nil, fmt.Errorf("failed to refresh token after 401: %w", err)
+		if refreshErr := rt.client.RefreshToken(req.Context()); refreshErr != nil {
+			return nil, fmt.Errorf("failed to refresh token after 401: %w", refreshErr)
 		}
 
 		// Get the new token
@@ -445,7 +447,7 @@ func (rt *oauth2RoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	return resp, nil
 }
 
-// ExpiresAt returns when the current token expires
+// ExpiresAt returns when the current token expires.
 func (tr *TokenResponse) ExpiresAt() time.Time {
 	if tr.ExpiresIn == 0 {
 		return time.Time{}
@@ -453,7 +455,7 @@ func (tr *TokenResponse) ExpiresAt() time.Time {
 	return tr.IssuedAt.Add(time.Duration(tr.ExpiresIn) * time.Second)
 }
 
-// IsValid checks if the token is still valid
+// IsValid checks if the token is still valid.
 func (tr *TokenResponse) IsValid() bool {
 	if tr.AccessToken == "" {
 		return false
@@ -465,7 +467,7 @@ func (tr *TokenResponse) IsValid() bool {
 	return time.Now().Before(tr.ExpiresAt())
 }
 
-// Helper function to create an HTTP client with OAuth2 authentication
+// Helper function to create an HTTP client with OAuth2 authentication.
 func NewHTTPClientWithOAuth2(config *integrations.OAuthConfig) (*http.Client, *OAuth2Client, error) {
 	oauth2Client, err := NewOAuth2Client(config)
 	if err != nil {

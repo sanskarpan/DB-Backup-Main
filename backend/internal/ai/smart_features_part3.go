@@ -12,17 +12,22 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
+// severityCritical is the severity/priority label for critical issues.
+const severityCritical = "critical"
+
 // ==================== 8. AI Advisor (Conversational Mode) ====================
 
-// AIAdvisor provides conversational AI-powered recommendations
+// AIAdvisor provides conversational AI-powered recommendations.
+//
+//nolint:revive // keeps public name stable (returned by exported GetAIAdvisor)
 type AIAdvisor struct {
 	conversationHistory map[string][]*AdvisorMessage // session ID -> messages
-	recommendations     map[string][]*Recommendation  // database -> recommendations
+	recommendations     map[string][]*Recommendation // database -> recommendations
 	mu                  sync.RWMutex
 }
 
-// AdvisorMessage represents a message in the advisor conversation
-type AdvisorMessage struct{
+// AdvisorMessage represents a message in the advisor conversation.
+type AdvisorMessage struct {
 	ID        string
 	Role      string // "user", "assistant"
 	Content   string
@@ -31,24 +36,24 @@ type AdvisorMessage struct{
 	Context   map[string]interface{}
 }
 
-// Recommendation represents an AI-generated recommendation
+// Recommendation represents an AI-generated recommendation.
 type Recommendation struct {
-	ID            string
-	Type          string  // "optimization", "cost-saving", "security", "performance"
-	Title         string
-	Description   string
-	Priority      string  // "critical", "high", "medium", "low"
-	Impact        string  // Description of expected impact
-	Effort        string  // "low", "medium", "high"
-	Confidence    float64 // 0-100
-	Reasoning     []string
-	ActionSteps   []string
-	EstimatedROI  float64 // Return on investment percentage
+	ID             string
+	Type           string // "optimization", "cost-saving", "security", "performance"
+	Title          string
+	Description    string
+	Priority       string  // "critical", "high", "medium", "low"
+	Impact         string  // Description of expected impact
+	Effort         string  // "low", "medium", "high"
+	Confidence     float64 // 0-100
+	Reasoning      []string
+	ActionSteps    []string
+	EstimatedROI   float64 // Return on investment percentage
 	RelatedMetrics map[string]interface{}
-	CreatedAt     time.Time
+	CreatedAt      time.Time
 }
 
-// AdvisorResponse represents the advisor's response
+// AdvisorResponse represents the advisor's response.
 type AdvisorResponse struct {
 	SessionID       string
 	Message         string
@@ -60,7 +65,7 @@ type AdvisorResponse struct {
 	ActionType      string
 }
 
-// NewAIAdvisor creates a new AI advisor
+// NewAIAdvisor creates a new AI advisor.
 func NewAIAdvisor() *AIAdvisor {
 	return &AIAdvisor{
 		conversationHistory: make(map[string][]*AdvisorMessage),
@@ -68,7 +73,7 @@ func NewAIAdvisor() *AIAdvisor {
 	}
 }
 
-// StartConversation starts a new advisor conversation
+// StartConversation starts a new advisor conversation.
 func (aa *AIAdvisor) StartConversation(sessionID, userID string) error {
 	aa.mu.Lock()
 	defer aa.mu.Unlock()
@@ -89,7 +94,7 @@ func (aa *AIAdvisor) StartConversation(sessionID, userID string) error {
 	return nil
 }
 
-// Ask asks the AI advisor a question
+// Ask asks the AI advisor a question.
 func (aa *AIAdvisor) Ask(ctx context.Context, sessionID, question string) (*AdvisorResponse, error) {
 	aa.mu.Lock()
 	history, exists := aa.conversationHistory[sessionID]
@@ -119,17 +124,17 @@ func (aa *AIAdvisor) Ask(ctx context.Context, sessionID, question string) (*Advi
 
 	switch intent {
 	case "optimization":
-		response, err = aa.handleOptimizationQuery(ctx, sessionID, question)
+		response, err = aa.handleOptimizationQuery(ctx, question)
 	case "cost_analysis":
-		response, err = aa.handleCostAnalysisQuery(ctx, sessionID, question)
+		response, err = aa.handleCostAnalysisQuery(ctx, question)
 	case "troubleshooting":
-		response, err = aa.handleTroubleshootingQuery(ctx, sessionID, question)
+		response, err = aa.handleTroubleshootingQuery(ctx, question)
 	case "best_practices":
-		response, err = aa.handleBestPracticesQuery(ctx, sessionID, question)
+		response, err = aa.handleBestPracticesQuery(ctx, question)
 	case "security":
-		response, err = aa.handleSecurityQuery(ctx, sessionID, question)
+		response, err = aa.handleSecurityQuery(ctx, question)
 	default:
-		response, err = aa.handleGeneralQuery(ctx, sessionID, question)
+		response, err = aa.handleGeneralQuery(ctx, question)
 	}
 
 	if err != nil {
@@ -153,16 +158,16 @@ func (aa *AIAdvisor) Ask(ctx context.Context, sessionID, question string) (*Advi
 	return response, nil
 }
 
-// detectIntent detects the user's intent from the question
+// detectIntent detects the user's intent from the question.
 func (aa *AIAdvisor) detectIntent(question string) string {
 	question = strings.ToLower(question)
 
 	intents := map[string][]string{
-		"optimization": {"optimize", "improve", "better", "faster", "efficient"},
-		"cost_analysis": {"cost", "price", "expensive", "save money", "budget"},
+		"optimization":    {"optimize", "improve", "better", "faster", "efficient"},
+		"cost_analysis":   {"cost", "price", "expensive", "save money", "budget"},
 		"troubleshooting": {"error", "fail", "problem", "issue", "not working", "debug"},
-		"best_practices": {"best practice", "recommend", "should i", "how to", "guide"},
-		"security": {"security", "encrypt", "secure", "protect", "vulnerable"},
+		"best_practices":  {"best practice", "recommend", "should i", "how to", "guide"},
+		"security":        {"security", "encrypt", "secure", "protect", "vulnerable"},
 	}
 
 	bestIntent := "general"
@@ -184,8 +189,8 @@ func (aa *AIAdvisor) detectIntent(question string) string {
 	return bestIntent
 }
 
-// handleOptimizationQuery handles optimization-related questions
-func (aa *AIAdvisor) handleOptimizationQuery(ctx context.Context, sessionID, question string) (*AdvisorResponse, error) {
+// handleOptimizationQuery handles optimization-related questions.
+func (aa *AIAdvisor) handleOptimizationQuery(_ context.Context, _ string) (*AdvisorResponse, error) { //nolint:unparam // uniform dispatch signature shared by all query handlers
 	recommendations := []*Recommendation{
 		{
 			ID:          generateID(),
@@ -264,8 +269,8 @@ func (aa *AIAdvisor) handleOptimizationQuery(ctx context.Context, sessionID, que
 	return response, nil
 }
 
-// handleCostAnalysisQuery handles cost-related questions
-func (aa *AIAdvisor) handleCostAnalysisQuery(ctx context.Context, sessionID, question string) (*AdvisorResponse, error) {
+// handleCostAnalysisQuery handles cost-related questions.
+func (aa *AIAdvisor) handleCostAnalysisQuery(_ context.Context, _ string) (*AdvisorResponse, error) { //nolint:unparam // uniform dispatch signature shared by all query handlers
 	response := &AdvisorResponse{
 		Message: "Based on your current usage patterns, I've identified several cost-saving opportunities. " +
 			"By implementing smart retention policies and using Cool storage tiers for older backups, " +
@@ -302,8 +307,8 @@ func (aa *AIAdvisor) handleCostAnalysisQuery(ctx context.Context, sessionID, que
 	return response, nil
 }
 
-// handleTroubleshootingQuery handles troubleshooting questions
-func (aa *AIAdvisor) handleTroubleshootingQuery(ctx context.Context, sessionID, question string) (*AdvisorResponse, error) {
+// handleTroubleshootingQuery handles troubleshooting questions.
+func (aa *AIAdvisor) handleTroubleshootingQuery(_ context.Context, _ string) (*AdvisorResponse, error) { //nolint:unparam // uniform dispatch signature shared by all query handlers
 	response := &AdvisorResponse{
 		Message: "I can help you troubleshoot backup issues. To provide the best assistance, " +
 			"I need to know more about the specific problem. Common issues include:\n\n" +
@@ -330,8 +335,8 @@ func (aa *AIAdvisor) handleTroubleshootingQuery(ctx context.Context, sessionID, 
 	return response, nil
 }
 
-// handleBestPracticesQuery handles best practices questions
-func (aa *AIAdvisor) handleBestPracticesQuery(ctx context.Context, sessionID, question string) (*AdvisorResponse, error) {
+// handleBestPracticesQuery handles best practices questions.
+func (aa *AIAdvisor) handleBestPracticesQuery(_ context.Context, _ string) (*AdvisorResponse, error) { //nolint:unparam // uniform dispatch signature shared by all query handlers
 	response := &AdvisorResponse{
 		Message: "Here are the top backup best practices I recommend:\n\n" +
 			"1. **3-2-1 Rule**: 3 copies of data, 2 different media types, 1 offsite\n" +
@@ -345,7 +350,7 @@ func (aa *AIAdvisor) handleBestPracticesQuery(ctx context.Context, sessionID, qu
 				Type:        "best_practice",
 				Title:       "Implement 3-2-1 Backup Strategy",
 				Description: "Ensure redundancy across multiple locations and media types",
-				Priority:    "critical",
+				Priority:    severityCritical,
 				Impact:      "Dramatically reduces risk of data loss",
 				Effort:      "medium",
 				Confidence:  98.0,
@@ -365,8 +370,8 @@ func (aa *AIAdvisor) handleBestPracticesQuery(ctx context.Context, sessionID, qu
 	return response, nil
 }
 
-// handleSecurityQuery handles security-related questions
-func (aa *AIAdvisor) handleSecurityQuery(ctx context.Context, sessionID, question string) (*AdvisorResponse, error) {
+// handleSecurityQuery handles security-related questions.
+func (aa *AIAdvisor) handleSecurityQuery(_ context.Context, _ string) (*AdvisorResponse, error) { //nolint:unparam // uniform dispatch signature shared by all query handlers
 	response := &AdvisorResponse{
 		Message: "Security is critical for backups. I've analyzed your configuration and identified " +
 			"some important security improvements you should consider.",
@@ -376,7 +381,7 @@ func (aa *AIAdvisor) handleSecurityQuery(ctx context.Context, sessionID, questio
 				Type:        "security",
 				Title:       "Enable Encryption at Rest",
 				Description: "Encrypt all backups using AES-256 encryption",
-				Priority:    "critical",
+				Priority:    severityCritical,
 				Impact:      "Protects data from unauthorized access",
 				Effort:      "low",
 				Confidence:  99.0,
@@ -403,8 +408,8 @@ func (aa *AIAdvisor) handleSecurityQuery(ctx context.Context, sessionID, questio
 	return response, nil
 }
 
-// handleGeneralQuery handles general questions
-func (aa *AIAdvisor) handleGeneralQuery(ctx context.Context, sessionID, question string) (*AdvisorResponse, error) {
+// handleGeneralQuery handles general questions.
+func (aa *AIAdvisor) handleGeneralQuery(_ context.Context, _ string) (*AdvisorResponse, error) { //nolint:unparam // uniform dispatch signature shared by all query handlers
 	response := &AdvisorResponse{
 		Message: "I can help you with various backup-related topics including:\n\n" +
 			"• Optimization and performance tuning\n" +
@@ -426,14 +431,14 @@ func (aa *AIAdvisor) handleGeneralQuery(ctx context.Context, sessionID, question
 
 // ==================== 9. Automated Troubleshooting Engine ====================
 
-// AutomatedTroubleshootingEngine diagnoses and resolves backup issues automatically
+// AutomatedTroubleshootingEngine diagnoses and resolves backup issues automatically.
 type AutomatedTroubleshootingEngine struct {
 	diagnosticRules map[string]*DiagnosticRule
 	issueHistory    map[string][]*DiagnosticResult
 	mu              sync.RWMutex
 }
 
-// DiagnosticRule represents a troubleshooting rule
+// DiagnosticRule represents a troubleshooting rule.
 type DiagnosticRule struct {
 	ID          string
 	Name        string
@@ -446,7 +451,7 @@ type DiagnosticRule struct {
 	AutoFixFunc func(context.Context, *DiagnosticResult) error
 }
 
-// DiagnosticResult represents the result of diagnostics
+// DiagnosticResult represents the result of diagnostics.
 type DiagnosticResult struct {
 	IssueID        string
 	DatabaseName   string
@@ -462,21 +467,21 @@ type DiagnosticResult struct {
 	Metadata       map[string]interface{}
 }
 
-// TroubleshootingReport represents a comprehensive troubleshooting report
+// TroubleshootingReport represents a comprehensive troubleshooting report.
 type TroubleshootingReport struct {
-	DatabaseName   string
-	Issues         []*DiagnosticResult
-	TotalIssues    int
-	CriticalCount  int
-	HighCount      int
-	MediumCount    int
-	LowCount       int
-	AutoFixedCount int
+	DatabaseName    string
+	Issues          []*DiagnosticResult
+	TotalIssues     int
+	CriticalCount   int
+	HighCount       int
+	MediumCount     int
+	LowCount        int
+	AutoFixedCount  int
 	Recommendations []string
-	GeneratedAt    time.Time
+	GeneratedAt     time.Time
 }
 
-// NewAutomatedTroubleshootingEngine creates a new troubleshooting engine
+// NewAutomatedTroubleshootingEngine creates a new troubleshooting engine.
 func NewAutomatedTroubleshootingEngine() *AutomatedTroubleshootingEngine {
 	ate := &AutomatedTroubleshootingEngine{
 		diagnosticRules: make(map[string]*DiagnosticRule),
@@ -488,16 +493,16 @@ func NewAutomatedTroubleshootingEngine() *AutomatedTroubleshootingEngine {
 	return ate
 }
 
-// initializeDiagnosticRules sets up diagnostic rules
+// initializeDiagnosticRules sets up diagnostic rules.
 func (ate *AutomatedTroubleshootingEngine) initializeDiagnosticRules() {
 	rules := []*DiagnosticRule{
 		{
-			ID:         "disk_space_low",
-			Name:       "Low Disk Space",
-			Category:   "disk_space",
-			Pattern:    regexp.MustCompile(`(?i)(no space left|disk full|insufficient space)`),
-			Severity:   "critical",
-			Diagnosis:  "Backup failed due to insufficient disk space",
+			ID:        "disk_space_low",
+			Name:      "Low Disk Space",
+			Category:  "disk_space",
+			Pattern:   regexp.MustCompile(`(?i)(no space left|disk full|insufficient space)`),
+			Severity:  severityCritical,
+			Diagnosis: "Backup failed due to insufficient disk space",
 			Resolution: []string{
 				"Free up disk space by removing old backups",
 				"Increase storage capacity",
@@ -508,12 +513,12 @@ func (ate *AutomatedTroubleshootingEngine) initializeDiagnosticRules() {
 			AutoFixFunc: ate.autoFixDiskSpace,
 		},
 		{
-			ID:         "connection_timeout",
-			Name:       "Database Connection Timeout",
-			Category:   "network",
-			Pattern:    regexp.MustCompile(`(?i)(connection timeout|cannot connect|connection refused)`),
-			Severity:   "high",
-			Diagnosis:  "Unable to connect to database within timeout period",
+			ID:        "connection_timeout",
+			Name:      "Database Connection Timeout",
+			Category:  "network",
+			Pattern:   regexp.MustCompile(`(?i)(connection timeout|cannot connect|connection refused)`),
+			Severity:  "high",
+			Diagnosis: "Unable to connect to database within timeout period",
 			Resolution: []string{
 				"Verify database is running and accessible",
 				"Check network connectivity",
@@ -525,12 +530,12 @@ func (ate *AutomatedTroubleshootingEngine) initializeDiagnosticRules() {
 			AutoFixFunc: ate.autoFixConnection,
 		},
 		{
-			ID:         "checksum_mismatch",
-			Name:       "Checksum Validation Failed",
-			Category:   "data_integrity",
-			Pattern:    regexp.MustCompile(`(?i)(checksum mismatch|checksum failed|corrupted|invalid checksum)`),
-			Severity:   "critical",
-			Diagnosis:  "Backup file integrity check failed - possible data corruption",
+			ID:        "checksum_mismatch",
+			Name:      "Checksum Validation Failed",
+			Category:  "data_integrity",
+			Pattern:   regexp.MustCompile(`(?i)(checksum mismatch|checksum failed|corrupted|invalid checksum)`),
+			Severity:  severityCritical,
+			Diagnosis: "Backup file integrity check failed - possible data corruption",
 			Resolution: []string{
 				"Re-run backup immediately",
 				"Verify source data integrity",
@@ -542,12 +547,12 @@ func (ate *AutomatedTroubleshootingEngine) initializeDiagnosticRules() {
 			AutoFixFunc: ate.autoFixChecksum,
 		},
 		{
-			ID:         "performance_degradation",
-			Name:       "Backup Performance Degradation",
-			Category:   "performance",
-			Pattern:    regexp.MustCompile(`(?i)(slow|performance|taking too long|timeout)`),
-			Severity:   "medium",
-			Diagnosis:  "Backup taking significantly longer than expected",
+			ID:        "performance_degradation",
+			Name:      "Backup Performance Degradation",
+			Category:  "performance",
+			Pattern:   regexp.MustCompile(`(?i)(slow|performance|taking too long|timeout)`),
+			Severity:  "medium",
+			Diagnosis: "Backup taking significantly longer than expected",
 			Resolution: []string{
 				"Increase parallelism to use more workers",
 				"Schedule during off-peak hours",
@@ -555,22 +560,22 @@ func (ate *AutomatedTroubleshootingEngine) initializeDiagnosticRules() {
 				"Optimize database indexes before backup",
 				"Check for high system load during backup",
 			},
-			AutoFix:     false,
+			AutoFix: false,
 		},
 		{
-			ID:         "authentication_failed",
-			Name:       "Authentication Failed",
-			Category:   "authentication",
-			Pattern:    regexp.MustCompile(`(?i)(authentication failed|access denied|invalid credentials|permission denied)`),
-			Severity:   "critical",
-			Diagnosis:  "Unable to authenticate to database",
+			ID:        "authentication_failed",
+			Name:      "Authentication Failed",
+			Category:  "authentication",
+			Pattern:   regexp.MustCompile(`(?i)(authentication failed|access denied|invalid credentials|permission denied)`),
+			Severity:  severityCritical,
+			Diagnosis: "Unable to authenticate to database",
 			Resolution: []string{
 				"Verify database credentials are correct",
 				"Check if database user has backup privileges",
 				"Ensure password hasn't expired",
 				"Verify SSL/TLS certificates if required",
 			},
-			AutoFix:     false,
+			AutoFix: false,
 		},
 	}
 
@@ -579,46 +584,48 @@ func (ate *AutomatedTroubleshootingEngine) initializeDiagnosticRules() {
 	}
 }
 
-// Diagnose analyzes an error and provides diagnostic results
+// Diagnose analyzes an error and provides diagnostic results.
 func (ate *AutomatedTroubleshootingEngine) Diagnose(ctx context.Context, database, errorMsg string, metadata map[string]interface{}) (*DiagnosticResult, error) {
 	ate.mu.RLock()
 	defer ate.mu.RUnlock()
 
 	// Match against diagnostic rules
 	for _, rule := range ate.diagnosticRules {
-		if rule.Pattern.MatchString(errorMsg) {
-			result := &DiagnosticResult{
-				IssueID:      generateID(),
-				DatabaseName: database,
-				Category:     rule.Category,
-				Severity:     rule.Severity,
-				Diagnosis:    rule.Diagnosis,
-				RootCause:    ate.determineRootCause(rule, errorMsg, metadata),
-				Resolution:   rule.Resolution,
-				Confidence:   ate.calculateDiagnosticConfidence(rule, errorMsg),
-				DetectedAt:   time.Now(),
-				Metadata:     metadata,
-			}
-
-			// Attempt auto-fix if enabled
-			if rule.AutoFix && rule.AutoFixFunc != nil {
-				result.AutoFixApplied = true
-				err := rule.AutoFixFunc(ctx, result)
-				result.AutoFixSuccess = err == nil
-			}
-
-			// Store in history
-			ate.mu.RUnlock()
-			ate.mu.Lock()
-			if _, exists := ate.issueHistory[database]; !exists {
-				ate.issueHistory[database] = make([]*DiagnosticResult, 0)
-			}
-			ate.issueHistory[database] = append(ate.issueHistory[database], result)
-			ate.mu.Unlock()
-			ate.mu.RLock()
-
-			return result, nil
+		if !rule.Pattern.MatchString(errorMsg) {
+			continue
 		}
+
+		result := &DiagnosticResult{
+			IssueID:      generateID(),
+			DatabaseName: database,
+			Category:     rule.Category,
+			Severity:     rule.Severity,
+			Diagnosis:    rule.Diagnosis,
+			RootCause:    ate.determineRootCause(rule, errorMsg, metadata),
+			Resolution:   rule.Resolution,
+			Confidence:   ate.calculateDiagnosticConfidence(rule, errorMsg),
+			DetectedAt:   time.Now(),
+			Metadata:     metadata,
+		}
+
+		// Attempt auto-fix if enabled
+		if rule.AutoFix && rule.AutoFixFunc != nil {
+			result.AutoFixApplied = true
+			err := rule.AutoFixFunc(ctx, result)
+			result.AutoFixSuccess = err == nil
+		}
+
+		// Store in history
+		ate.mu.RUnlock()
+		ate.mu.Lock()
+		if _, exists := ate.issueHistory[database]; !exists {
+			ate.issueHistory[database] = make([]*DiagnosticResult, 0)
+		}
+		ate.issueHistory[database] = append(ate.issueHistory[database], result)
+		ate.mu.Unlock()
+		ate.mu.RLock()
+
+		return result, nil
 	}
 
 	// No specific rule matched - generic diagnosis
@@ -643,7 +650,7 @@ func (ate *AutomatedTroubleshootingEngine) Diagnose(ctx context.Context, databas
 	return result, nil
 }
 
-// determineRootCause analyzes the error to find root cause
+// determineRootCause analyzes the error to find root cause.
 func (ate *AutomatedTroubleshootingEngine) determineRootCause(rule *DiagnosticRule, errorMsg string, metadata map[string]interface{}) string {
 	// Extract specific details from error message
 	switch rule.Category {
@@ -680,7 +687,7 @@ func (ate *AutomatedTroubleshootingEngine) determineRootCause(rule *DiagnosticRu
 	}
 }
 
-// calculateDiagnosticConfidence calculates confidence in the diagnosis
+// calculateDiagnosticConfidence calculates confidence in the diagnosis.
 func (ate *AutomatedTroubleshootingEngine) calculateDiagnosticConfidence(rule *DiagnosticRule, errorMsg string) float64 {
 	// Base confidence from pattern match
 	baseConfidence := 70.0
@@ -691,14 +698,14 @@ func (ate *AutomatedTroubleshootingEngine) calculateDiagnosticConfidence(rule *D
 	}
 
 	// Boost for critical patterns
-	if rule.Severity == "critical" {
+	if rule.Severity == severityCritical {
 		baseConfidence += 10.0
 	}
 
 	return math.Min(100.0, baseConfidence)
 }
 
-// autoFixDiskSpace attempts to automatically fix disk space issues
+// autoFixDiskSpace attempts to automatically fix disk space issues.
 func (ate *AutomatedTroubleshootingEngine) autoFixDiskSpace(ctx context.Context, result *DiagnosticResult) error {
 	// Implement automatic cleanup of old backups
 	// This would integrate with the backup manager to remove old backups
@@ -710,7 +717,7 @@ func (ate *AutomatedTroubleshootingEngine) autoFixDiskSpace(ctx context.Context,
 	return nil
 }
 
-// autoFixConnection attempts to automatically fix connection issues
+// autoFixConnection attempts to automatically fix connection issues.
 func (ate *AutomatedTroubleshootingEngine) autoFixConnection(ctx context.Context, result *DiagnosticResult) error {
 	// Implement automatic connection retry with exponential backoff
 	if result.Metadata == nil {
@@ -720,7 +727,7 @@ func (ate *AutomatedTroubleshootingEngine) autoFixConnection(ctx context.Context
 	return nil
 }
 
-// autoFixChecksum attempts to automatically fix checksum issues
+// autoFixChecksum attempts to automatically fix checksum issues.
 func (ate *AutomatedTroubleshootingEngine) autoFixChecksum(ctx context.Context, result *DiagnosticResult) error {
 	// Implement automatic backup retry
 	if result.Metadata == nil {
@@ -730,7 +737,7 @@ func (ate *AutomatedTroubleshootingEngine) autoFixChecksum(ctx context.Context, 
 	return nil
 }
 
-// GenerateReport generates a comprehensive troubleshooting report
+// GenerateReport generates a comprehensive troubleshooting report.
 func (ate *AutomatedTroubleshootingEngine) GenerateReport(ctx context.Context, database string) (*TroubleshootingReport, error) {
 	ate.mu.RLock()
 	defer ate.mu.RUnlock()
@@ -750,7 +757,7 @@ func (ate *AutomatedTroubleshootingEngine) GenerateReport(ctx context.Context, d
 	// Count issues by severity
 	for _, issue := range issues {
 		switch issue.Severity {
-		case "critical":
+		case severityCritical:
 			report.CriticalCount++
 		case "high":
 			report.HighCount++
@@ -778,13 +785,12 @@ func (ate *AutomatedTroubleshootingEngine) GenerateReport(ctx context.Context, d
 
 // ==================== 10. Failure Prediction API ====================
 
-// FailurePredictionAPI provides API access to failure prediction
+// FailurePredictionAPI provides API access to failure prediction.
 type FailurePredictionAPI struct {
 	predictor interface{} // Placeholder for existing failure predictor
-	mu        sync.RWMutex
 }
 
-// NewFailurePredictionAPI creates a new failure prediction API
+// NewFailurePredictionAPI creates a new failure prediction API.
 func NewFailurePredictionAPI() *FailurePredictionAPI {
 	return &FailurePredictionAPI{
 		// predictor would be initialized with actual failure predictor instance
@@ -793,7 +799,7 @@ func NewFailurePredictionAPI() *FailurePredictionAPI {
 	}
 }
 
-// GetPrediction gets failure prediction for a database
+// GetPrediction gets failure prediction for a database.
 func (fpa *FailurePredictionAPI) GetPrediction(ctx context.Context, database string) ([]*FailurePrediction, error) {
 	// This would delegate to the existing FailurePredictor
 	// For now, return mock predictions
@@ -822,12 +828,12 @@ func (fpa *FailurePredictionAPI) GetPrediction(ctx context.Context, database str
 
 // ==================== Helper Functions ====================
 
-// generateID generates a unique ID
+// generateID generates a unique ID.
 func generateID() string {
 	return uid.New("feat")
 }
 
-// FailurePrediction represents a failure prediction
+// FailurePrediction represents a failure prediction.
 type FailurePrediction struct {
 	DatabaseName      string
 	PredictedAt       time.Time

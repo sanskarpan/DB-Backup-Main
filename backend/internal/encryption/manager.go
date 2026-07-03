@@ -16,7 +16,7 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// Manager manages encryption with key rotation support
+// Manager manages encryption with key rotation support.
 type Manager struct {
 	keyStore      KeyStore
 	currentKeyID  string
@@ -27,7 +27,7 @@ type Manager struct {
 	cancel        context.CancelFunc
 }
 
-// ManagerConfig holds configuration for the encryption manager
+// ManagerConfig holds configuration for the encryption manager.
 type ManagerConfig struct {
 	KeyStore          KeyStore
 	CurrentKeyID      string
@@ -36,7 +36,7 @@ type ManagerConfig struct {
 	ReencryptOnRotate bool
 }
 
-// NewManager creates a new encryption manager
+// NewManager creates a new encryption manager.
 func NewManager(ctx context.Context, config *ManagerConfig) (*Manager, error) {
 	if config.KeyStore == nil {
 		return nil, pkgErrors.New(pkgErrors.ErrorTypeConfiguration, "key store is required")
@@ -67,7 +67,7 @@ func NewManager(ctx context.Context, config *ManagerConfig) (*Manager, error) {
 	return manager, nil
 }
 
-// Encrypt encrypts data with the current key
+// Encrypt encrypts data with the current key.
 func (m *Manager) Encrypt(plaintext []byte) ([]byte, error) {
 	m.mu.RLock()
 	encryptor, exists := m.encryptors[m.currentKeyID]
@@ -100,7 +100,7 @@ func (m *Manager) Encrypt(plaintext []byte) ([]byte, error) {
 	return envelopeData, nil
 }
 
-// Decrypt decrypts data, automatically using the correct key version
+// Decrypt decrypts data, automatically using the correct key version.
 func (m *Manager) Decrypt(envelopeData []byte) ([]byte, error) {
 	// Parse envelope
 	var envelope EncryptionEnvelope
@@ -129,7 +129,7 @@ func (m *Manager) Decrypt(envelopeData []byte) ([]byte, error) {
 	return plaintext, nil
 }
 
-// EncryptFile encrypts a file
+// EncryptFile encrypts a file.
 func (m *Manager) EncryptFile(inputPath, outputPath string) error {
 	// Read input file
 	inputFile, err := os.Open(inputPath)
@@ -150,14 +150,14 @@ func (m *Manager) EncryptFile(inputPath, outputPath string) error {
 	}
 
 	// Write encrypted data
-	if err := os.WriteFile(outputPath, envelopeData, 0600); err != nil {
+	if err := os.WriteFile(outputPath, envelopeData, 0o600); err != nil {
 		return pkgErrors.ErrEncryptionFailed(err)
 	}
 
 	return nil
 }
 
-// DecryptFile decrypts a file
+// DecryptFile decrypts a file.
 func (m *Manager) DecryptFile(inputPath, outputPath string) error {
 	// Read encrypted file
 	envelopeData, err := os.ReadFile(inputPath)
@@ -172,14 +172,14 @@ func (m *Manager) DecryptFile(inputPath, outputPath string) error {
 	}
 
 	// Write decrypted data
-	if err := os.WriteFile(outputPath, plaintext, 0600); err != nil {
+	if err := os.WriteFile(outputPath, plaintext, 0o600); err != nil {
 		return pkgErrors.ErrDecryptionFailed(err)
 	}
 
 	return nil
 }
 
-// RotateKey rotates the encryption key
+// RotateKey rotates the encryption key.
 func (m *Manager) RotateKey(ctx context.Context) error {
 	// Perform key rotation
 	newKeyID, newKey, err := m.keyStore.RotateKey(ctx, m.currentKeyID)
@@ -202,7 +202,7 @@ func (m *Manager) RotateKey(ctx context.Context) error {
 	return nil
 }
 
-// ReencryptWithNewKey re-encrypts data with the current key
+// ReencryptWithNewKey re-encrypts data with the current key.
 func (m *Manager) ReencryptWithNewKey(oldEnvelopeData []byte) ([]byte, error) {
 	// Decrypt with old key
 	plaintext, err := m.Decrypt(oldEnvelopeData)
@@ -214,7 +214,7 @@ func (m *Manager) ReencryptWithNewKey(oldEnvelopeData []byte) ([]byte, error) {
 	return m.Encrypt(plaintext)
 }
 
-// ReencryptDirectory re-encrypts all encrypted files in a directory
+// ReencryptDirectory re-encrypts all encrypted files in a directory.
 func (m *Manager) ReencryptDirectory(ctx context.Context, dirPath string) error {
 	return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -239,9 +239,9 @@ func (m *Manager) ReencryptDirectory(ctx context.Context, dirPath string) error 
 
 		// Try to parse as envelope
 		var envelope EncryptionEnvelope
-		if err := json.Unmarshal(oldData, &envelope); err != nil {
-			// Not an encrypted envelope, skip
-			return nil
+		if unmarshalErr := json.Unmarshal(oldData, &envelope); unmarshalErr != nil {
+			// Not an encrypted envelope, skip it rather than failing the walk.
+			return nil //nolint:nilerr // skipping non-envelope files is intentional
 		}
 
 		// Check if already using current key
@@ -264,14 +264,14 @@ func (m *Manager) ReencryptDirectory(ctx context.Context, dirPath string) error 
 	})
 }
 
-// GetCurrentKeyID returns the current active key ID
+// GetCurrentKeyID returns the current active key ID.
 func (m *Manager) GetCurrentKeyID() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.currentKeyID
 }
 
-// Close stops the manager and closes resources
+// Close stops the manager and closes resources.
 func (m *Manager) Close() error {
 	if m.cancel != nil {
 		m.cancel()
@@ -354,15 +354,15 @@ func (m *Manager) autoRotate() {
 	}
 }
 
-// EncryptionEnvelope wraps encrypted data with metadata
-type EncryptionEnvelope struct {
+// EncryptionEnvelope wraps encrypted data with metadata.
+type EncryptionEnvelope struct { //nolint:revive // keeps public name stable
 	KeyID      string    `json:"key_id"`
 	Algorithm  string    `json:"algorithm"`
 	Ciphertext string    `json:"ciphertext"`
 	Timestamp  time.Time `json:"timestamp"`
 }
 
-// EncryptStream encrypts a stream using the current key
+// EncryptStream encrypts a stream using the current key.
 func (m *Manager) EncryptStream(input io.Reader, output io.Writer) error {
 	m.mu.RLock()
 	encryptor, exists := m.encryptors[m.currentKeyID]
@@ -403,7 +403,7 @@ func (m *Manager) EncryptStream(input io.Reader, output io.Writer) error {
 	return encryptor.EncryptStream(input, output)
 }
 
-// DecryptStream decrypts a stream
+// DecryptStream decrypts a stream.
 func (m *Manager) DecryptStream(input io.Reader, output io.Writer) error {
 	// Read metadata header
 	header := make([]byte, 4)
@@ -435,7 +435,7 @@ func (m *Manager) DecryptStream(input io.Reader, output io.Writer) error {
 	return encryptor.DecryptStream(input, output)
 }
 
-// GenerateKey generates a new random encryption key
+// GenerateKey generates a new random encryption key.
 func GenerateKey() ([]byte, error) {
 	key := make([]byte, 32) // 256 bits for AES-256
 	if _, err := io.ReadFull(rand.Reader, key); err != nil {
@@ -444,7 +444,7 @@ func GenerateKey() ([]byte, error) {
 	return key, nil
 }
 
-// InitializeKeyStore initializes a key store with an initial key
+// InitializeKeyStore initializes a key store with an initial key.
 func InitializeKeyStore(ctx context.Context, keyStore KeyStore, keyID string) error {
 	// Generate initial key
 	key, err := GenerateKey()

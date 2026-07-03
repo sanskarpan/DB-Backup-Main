@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/sanskarpan/db-backup/internal/database"
 )
 
 func skipIfAWSUnavailable(t *testing.T) {
@@ -425,7 +426,7 @@ func TestPITRManager_IsPITREnabled(t *testing.T) {
 	testTable := getEnv("DYNAMODB_TEST_TABLE", "test-table")
 
 	// Check initial state
-	enabled, err := driver.pitrManager.IsPITREnabled(ctx, testTable)
+	_, err := driver.pitrManager.IsPITREnabled(ctx, testTable)
 	assert.NoError(t, err)
 
 	// Enable PITR
@@ -433,7 +434,7 @@ func TestPITRManager_IsPITREnabled(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check it's enabled
-	enabled, err = driver.pitrManager.IsPITREnabled(ctx, testTable)
+	enabled, err := driver.pitrManager.IsPITREnabled(ctx, testTable)
 	assert.NoError(t, err)
 	assert.True(t, enabled)
 
@@ -495,6 +496,7 @@ func TestDynamoDB_BackupWithNoTables(t *testing.T) {
 // Helper functions
 
 func setupTestDriver(t *testing.T) *DynamoDBDriver {
+	t.Helper()
 	skipIfAWSUnavailable(t)
 	driver := NewDynamoDBDriver()
 	config := &database.ConnectionConfig{

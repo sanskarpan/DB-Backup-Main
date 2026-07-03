@@ -334,7 +334,7 @@ func TestCustomKeyDerivationParams(t *testing.T) {
 	assert.Len(t, key, 32)
 }
 
-// Benchmark tests
+// Benchmark tests.
 func BenchmarkEncryptAES256GCM(b *testing.B) {
 	encryptor, _ := NewZeroKnowledgeEncryptor(AlgorithmAES256GCM)
 	plaintext := make([]byte, 1024*1024) // 1MB

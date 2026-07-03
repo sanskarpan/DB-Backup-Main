@@ -18,22 +18,22 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// PITRManager handles Point-in-Time Recovery for MySQL
+// PITRManager handles Point-in-Time Recovery for MySQL.
 type PITRManager struct {
 	driver *MySQLDriver
 }
 
-// NewPITRManager creates a new PITR manager
+// NewPITRManager creates a new PITR manager.
 func NewPITRManager(driver *MySQLDriver) *PITRManager {
 	return &PITRManager{
 		driver: driver,
 	}
 }
 
-// BackupBinaryLogs backs up MySQL binary logs for PITR
+// BackupBinaryLogs backs up MySQL binary logs for PITR.
 func (p *PITRManager) BackupBinaryLogs(ctx context.Context, outputDir string, since *time.Time) error {
 	// Ensure output directory exists
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return pkgErrors.ErrDatabaseBackup(err).WithMetadata("output_dir", outputDir)
 	}
 
@@ -45,10 +45,7 @@ func (p *PITRManager) BackupBinaryLogs(ctx context.Context, outputDir string, si
 
 	// Filter logs if 'since' is provided
 	if since != nil {
-		binlogs, err = p.filterBinaryLogsSince(ctx, binlogs, *since)
-		if err != nil {
-			return err
-		}
+		binlogs = p.filterBinaryLogsSince(ctx, binlogs, *since)
 	}
 
 	// Flush logs to ensure current log is complete
@@ -71,7 +68,7 @@ func (p *PITRManager) BackupBinaryLogs(ctx context.Context, outputDir string, si
 	return nil
 }
 
-// RestoreToPointInTime restores database to a specific point in time
+// RestoreToPointInTime restores database to a specific point in time.
 func (p *PITRManager) RestoreToPointInTime(ctx context.Context, opts *PITRRestoreOptions) error {
 	// Validate options
 	if err := p.validatePITROptions(opts); err != nil {
@@ -100,7 +97,7 @@ func (p *PITRManager) RestoreToPointInTime(ctx context.Context, opts *PITRRestor
 	return nil
 }
 
-// GetBinaryLogPosition gets the current binary log position
+// GetBinaryLogPosition gets the current binary log position.
 func (p *PITRManager) GetBinaryLogPosition(ctx context.Context) (*BinaryLogPosition, error) {
 	query := "SHOW MASTER STATUS"
 	rows, err := p.driver.db.QueryContext(ctx, query)
@@ -146,7 +143,7 @@ func (p *PITRManager) getBinaryLogs(ctx context.Context) ([]string, error) {
 	return logs, nil
 }
 
-func (p *PITRManager) filterBinaryLogsSince(ctx context.Context, logs []string, since time.Time) ([]string, error) {
+func (p *PITRManager) filterBinaryLogsSince(ctx context.Context, logs []string, since time.Time) []string {
 	var filtered []string
 
 	for _, logName := range logs {
@@ -164,13 +161,14 @@ func (p *PITRManager) filterBinaryLogsSince(ctx context.Context, logs []string, 
 		}
 	}
 
-	return filtered, nil
+	return filtered
 }
 
 func (p *PITRManager) getFirstEventTime(ctx context.Context, logName string) (time.Time, error) {
 	// Use mysqlbinlog to read the first timestamp
-	cmd := exec.CommandContext(ctx, "mysqlbinlog",
-		"--start-position=4", // Skip magic number
+	cmd := exec.CommandContext(
+		ctx, "mysqlbinlog",
+		"--start-position=4",   // Skip magic number
 		"--stop-position=1000", // Read only first event
 		"--short-form",
 		logName,
@@ -191,15 +189,33 @@ func (p *PITRManager) getFirstEventTime(ctx context.Context, logName string) (ti
 
 	// Parse the timestamp
 	dateStr := matches[1]
-	hour, _ := strconv.Atoi(matches[2])
-	min, _ := strconv.Atoi(matches[3])
-	sec, _ := strconv.Atoi(matches[4])
+	hour, err := strconv.Atoi(matches[2])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid hour in binary log timestamp: %w", err)
+	}
+	minute, err := strconv.Atoi(matches[3])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid minute in binary log timestamp: %w", err)
+	}
+	sec, err := strconv.Atoi(matches[4])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid second in binary log timestamp: %w", err)
+	}
 
-	year, _ := strconv.Atoi("20" + dateStr[0:2])
-	month, _ := strconv.Atoi(dateStr[2:4])
-	day, _ := strconv.Atoi(dateStr[4:6])
+	year, err := strconv.Atoi("20" + dateStr[0:2])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid year in binary log timestamp: %w", err)
+	}
+	month, err := strconv.Atoi(dateStr[2:4])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid month in binary log timestamp: %w", err)
+	}
+	day, err := strconv.Atoi(dateStr[4:6])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid day in binary log timestamp: %w", err)
+	}
 
-	return time.Date(year, time.Month(month), day, hour, min, sec, 0, time.UTC), nil
+	return time.Date(year, time.Month(month), day, hour, minute, sec, 0, time.UTC), nil
 }
 
 func (p *PITRManager) flushBinaryLogs(ctx context.Context) error {
@@ -211,7 +227,9 @@ func (p *PITRManager) copyBinaryLog(ctx context.Context, logName, outputDir stri
 	destPath := filepath.Join(outputDir, logName)
 
 	// Use mysqlbinlog to read the log (safer than direct file copy)
-	cmd := exec.CommandContext(ctx, "mysqlbinlog",
+	//nolint:gosec // G204: log names come from the server's SHOW BINARY LOGS; connection args are validated config
+	cmd := exec.CommandContext(
+		ctx, "mysqlbinlog",
 		"--read-from-remote-server",
 		fmt.Sprintf("--host=%s", p.driver.config.Host),
 		fmt.Sprintf("--port=%d", p.driver.config.Port),
@@ -265,10 +283,10 @@ func (p *PITRManager) validatePITROptions(opts *PITRRestoreOptions) error {
 func (p *PITRManager) restoreBaseBackup(ctx context.Context, opts *PITRRestoreOptions) error {
 	// Create restore options for base backup
 	restoreOpts := &database.RestoreOptions{
-		Database:      opts.Database,
-		SourceBackup:  opts.BaseBackupPath,
-		DropExisting:  true,
-		Parallel:      4,
+		Database:     opts.Database,
+		SourceBackup: opts.BaseBackupPath,
+		DropExisting: true,
+		Parallel:     4,
 	}
 
 	// Restore base backup
@@ -304,7 +322,9 @@ func (p *PITRManager) applyBinaryLogs(ctx context.Context, opts *PITRRestoreOpti
 
 func (p *PITRManager) applyBinaryLogToTime(ctx context.Context, logPath string, opts *PITRRestoreOptions) error {
 	// Build mysqlbinlog command
-	cmd := exec.CommandContext(ctx, "mysqlbinlog",
+	//nolint:gosec // G204: logPath is derived from a controlled binlog index; datetime is formatted constant
+	cmd := exec.CommandContext(
+		ctx, "mysqlbinlog",
 		"--stop-datetime="+opts.TargetTime.Format("2006-01-02 15:04:05"),
 		logPath,
 	)
@@ -316,7 +336,9 @@ func (p *PITRManager) applyBinaryLogToTime(ctx context.Context, logPath string, 
 	}
 
 	// Apply to database using mysql client
-	mysqlCmd := exec.CommandContext(ctx, "mysql",
+	//nolint:gosec // G204: connection args are validated config; database name validated upstream
+	mysqlCmd := exec.CommandContext(
+		ctx, "mysql",
 		fmt.Sprintf("--host=%s", p.driver.config.Host),
 		fmt.Sprintf("--port=%d", p.driver.config.Port),
 		fmt.Sprintf("--user=%s", p.driver.config.Username),
@@ -336,8 +358,11 @@ func (p *PITRManager) applyBinaryLogToTime(ctx context.Context, logPath string, 
 		return err
 	}
 
-	// Read stderr
-	stderrOutput, _ := io.ReadAll(stderr)
+	// Read stderr (best-effort; a read failure should not mask the command result)
+	stderrOutput, readErr := io.ReadAll(stderr)
+	if readErr != nil {
+		stderrOutput = nil
+	}
 
 	if err := mysqlCmd.Wait(); err != nil {
 		return fmt.Errorf("mysql command failed: %w, stderr: %s", err, string(stderrOutput))
@@ -402,7 +427,7 @@ func (p *PITRManager) verifyPITRRestore(ctx context.Context, opts *PITRRestoreOp
 	return nil
 }
 
-// PITRRestoreOptions holds options for PITR restore
+// PITRRestoreOptions holds options for PITR restore.
 type PITRRestoreOptions struct {
 	Database         string
 	BaseBackupPath   string
@@ -411,13 +436,13 @@ type PITRRestoreOptions struct {
 	SkipVerification bool
 }
 
-// BinaryLogPosition represents a position in MySQL binary log
+// BinaryLogPosition represents a position in MySQL binary log.
 type BinaryLogPosition struct {
 	File     string
 	Position int64
 }
 
-// String returns string representation of binary log position
+// String returns string representation of binary log position.
 func (b *BinaryLogPosition) String() string {
 	return fmt.Sprintf("%s:%d", b.File, b.Position)
 }

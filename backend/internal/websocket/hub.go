@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Hub manages WebSocket connections and message broadcasting
+// Hub manages WebSocket connections and message broadcasting.
 type Hub struct {
 	// Registered clients
 	clients map[*Client]bool
@@ -29,7 +29,7 @@ type Hub struct {
 	mu sync.RWMutex
 }
 
-// Message represents a WebSocket message
+// Message represents a WebSocket message.
 type Message struct {
 	Type      MessageType            `json:"type"`
 	Topic     string                 `json:"topic,omitempty"`
@@ -38,40 +38,40 @@ type Message struct {
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// MessageType represents the type of WebSocket message
+// MessageType represents the type of WebSocket message.
 type MessageType string
 
 const (
-	// Message types
-	MessageTypeBackupProgress    MessageType = "backup_progress"
-	MessageTypeBackupComplete    MessageType = "backup_complete"
-	MessageTypeBackupFailed      MessageType = "backup_failed"
-	MessageTypeRestoreProgress   MessageType = "restore_progress"
-	MessageTypeRestoreComplete   MessageType = "restore_complete"
-	MessageTypeRestoreFailed     MessageType = "restore_failed"
-	MessageTypeLog               MessageType = "log"
-	MessageTypeNotification      MessageType = "notification"
-	MessageTypeSubscribe         MessageType = "subscribe"
-	MessageTypeUnsubscribe       MessageType = "unsubscribe"
-	MessageTypePing              MessageType = "ping"
-	MessageTypePong              MessageType = "pong"
-	MessageTypeError             MessageType = "error"
+	// Message types.
+	MessageTypeBackupProgress  MessageType = "backup_progress"
+	MessageTypeBackupComplete  MessageType = "backup_complete"
+	MessageTypeBackupFailed    MessageType = "backup_failed"
+	MessageTypeRestoreProgress MessageType = "restore_progress"
+	MessageTypeRestoreComplete MessageType = "restore_complete"
+	MessageTypeRestoreFailed   MessageType = "restore_failed"
+	MessageTypeLog             MessageType = "log"
+	MessageTypeNotification    MessageType = "notification"
+	MessageTypeSubscribe       MessageType = "subscribe"
+	MessageTypeUnsubscribe     MessageType = "unsubscribe"
+	MessageTypePing            MessageType = "ping"
+	MessageTypePong            MessageType = "pong"
+	MessageTypeError           MessageType = "error"
 )
 
-// BackupProgress represents backup progress data
+// BackupProgress represents backup progress data.
 type BackupProgress struct {
-	BackupID         string  `json:"backup_id"`
-	DatabaseID       string  `json:"database_id"`
-	Status           string  `json:"status"`
-	Progress         float64 `json:"progress"` // 0-100
-	BytesProcessed   int64   `json:"bytes_processed"`
-	BytesTotal       int64   `json:"bytes_total"`
-	ElapsedTime      int64   `json:"elapsed_time"` // milliseconds
-	EstimatedTimeLeft int64  `json:"estimated_time_left"` // milliseconds
-	CurrentStep      string  `json:"current_step"`
+	BackupID          string  `json:"backup_id"`
+	DatabaseID        string  `json:"database_id"`
+	Status            string  `json:"status"`
+	Progress          float64 `json:"progress"` // 0-100
+	BytesProcessed    int64   `json:"bytes_processed"`
+	BytesTotal        int64   `json:"bytes_total"`
+	ElapsedTime       int64   `json:"elapsed_time"`        // milliseconds
+	EstimatedTimeLeft int64   `json:"estimated_time_left"` // milliseconds
+	CurrentStep       string  `json:"current_step"`
 }
 
-// LogMessage represents a log message
+// LogMessage represents a log message.
 type LogMessage struct {
 	Level     string                 `json:"level"`
 	Message   string                 `json:"message"`
@@ -80,7 +80,7 @@ type LogMessage struct {
 	Fields    map[string]interface{} `json:"fields,omitempty"`
 }
 
-// Notification represents a user notification
+// Notification represents a user notification.
 type Notification struct {
 	ID       string    `json:"id"`
 	Type     string    `json:"type"` // info, warning, error, success
@@ -91,7 +91,7 @@ type Notification struct {
 	Time     time.Time `json:"time"`
 }
 
-// NewHub creates a new WebSocket hub
+// NewHub creates a new WebSocket hub.
 func NewHub() *Hub {
 	return &Hub{
 		broadcast:     make(chan *Message, 256),
@@ -102,7 +102,7 @@ func NewHub() *Hub {
 	}
 }
 
-// Run starts the hub's main loop
+// Run starts the hub's main loop.
 func (h *Hub) Run() {
 	for {
 		select {
@@ -118,7 +118,7 @@ func (h *Hub) Run() {
 	}
 }
 
-// registerClient registers a new client
+// registerClient registers a new client.
 func (h *Hub) registerClient(client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -127,7 +127,7 @@ func (h *Hub) registerClient(client *Client) {
 	log.Printf("WebSocket client connected. Total clients: %d", len(h.clients))
 }
 
-// unregisterClient unregisters a client
+// unregisterClient unregisters a client.
 func (h *Hub) unregisterClient(client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -147,7 +147,7 @@ func (h *Hub) unregisterClient(client *Client) {
 	}
 }
 
-// broadcastMessage broadcasts a message to subscribed clients
+// broadcastMessage broadcasts a message to subscribed clients.
 func (h *Hub) broadcastMessage(message *Message) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -178,7 +178,7 @@ func (h *Hub) broadcastMessage(message *Message) {
 	}
 }
 
-// Subscribe subscribes a client to a topic
+// Subscribe subscribes a client to a topic.
 func (h *Hub) Subscribe(client *Client, topic string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -191,7 +191,7 @@ func (h *Hub) Subscribe(client *Client, topic string) {
 	log.Printf("Client subscribed to topic: %s. Subscribers: %d", topic, len(h.subscriptions[topic]))
 }
 
-// Unsubscribe unsubscribes a client from a topic
+// Unsubscribe unsubscribes a client from a topic.
 func (h *Hub) Unsubscribe(client *Client, topic string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -205,13 +205,13 @@ func (h *Hub) Unsubscribe(client *Client, topic string) {
 	}
 }
 
-// Broadcast sends a message to all clients or topic subscribers
+// Broadcast sends a message to all clients or topic subscribers.
 func (h *Hub) Broadcast(message *Message) {
 	message.Timestamp = time.Now()
 	h.broadcast <- message
 }
 
-// BroadcastBackupProgress broadcasts backup progress update
+// BroadcastBackupProgress broadcasts backup progress update.
 func (h *Hub) BroadcastBackupProgress(progress *BackupProgress) {
 	h.Broadcast(&Message{
 		Type:  MessageTypeBackupProgress,
@@ -220,7 +220,7 @@ func (h *Hub) BroadcastBackupProgress(progress *BackupProgress) {
 	})
 }
 
-// BroadcastLog broadcasts a log message
+// BroadcastLog broadcasts a log message.
 func (h *Hub) BroadcastLog(logMsg *LogMessage) {
 	h.Broadcast(&Message{
 		Type:  MessageTypeLog,
@@ -229,7 +229,7 @@ func (h *Hub) BroadcastLog(logMsg *LogMessage) {
 	})
 }
 
-// BroadcastNotification broadcasts a notification
+// BroadcastNotification broadcasts a notification.
 func (h *Hub) BroadcastNotification(notification *Notification) {
 	h.Broadcast(&Message{
 		Type:  MessageTypeNotification,
@@ -238,7 +238,7 @@ func (h *Hub) BroadcastNotification(notification *Notification) {
 	})
 }
 
-// GetStats returns hub statistics
+// GetStats returns hub statistics.
 func (h *Hub) GetStats() map[string]interface{} {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -249,18 +249,18 @@ func (h *Hub) GetStats() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"total_clients":      len(h.clients),
+		"total_clients":       len(h.clients),
 		"total_subscriptions": len(h.subscriptions),
-		"topic_stats":        topicStats,
+		"topic_stats":         topicStats,
 	}
 }
 
-// Marshal converts a message to JSON
+// Marshal converts a message to JSON.
 func (m *Message) Marshal() ([]byte, error) {
 	return json.Marshal(m)
 }
 
-// Unmarshal converts JSON to a message
+// Unmarshal converts JSON to a message.
 func UnmarshalMessage(data []byte) (*Message, error) {
 	var msg Message
 	err := json.Unmarshal(data, &msg)
@@ -270,10 +270,10 @@ func UnmarshalMessage(data []byte) (*Message, error) {
 	return &msg, nil
 }
 
-// Shutdown gracefully stops the hub
+// Shutdown gracefully stops the hub.
 func (h *Hub) Shutdown(ctx context.Context) error {
 	log.Println("WebSocket hub shutting down...")
-	
+
 	// Close all client connections
 	h.mu.Lock()
 	for client := range h.clients {
@@ -283,7 +283,7 @@ func (h *Hub) Shutdown(ctx context.Context) error {
 		}
 	}
 	h.mu.Unlock()
-	
+
 	log.Println("WebSocket hub shutdown complete")
 	return nil
 }

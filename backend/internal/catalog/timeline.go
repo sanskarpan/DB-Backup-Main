@@ -6,19 +6,19 @@ import (
 	"time"
 )
 
-// TimelineEngine provides timeline visualization and relationship mapping
+// TimelineEngine provides timeline visualization and relationship mapping.
 type TimelineEngine struct {
 	indexer *CatalogIndexer
 }
 
-// NewTimelineEngine creates a new timeline engine
+// NewTimelineEngine creates a new timeline engine.
 func NewTimelineEngine(indexer *CatalogIndexer) *TimelineEngine {
 	return &TimelineEngine{
 		indexer: indexer,
 	}
 }
 
-// TimelineEntry represents a single entry in the timeline
+// TimelineEntry represents a single entry in the timeline.
 type TimelineEntry struct {
 	ID           string                 `json:"id"`
 	DatabaseName string                 `json:"database_name"`
@@ -30,7 +30,7 @@ type TimelineEntry struct {
 	Metadata     map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// Timeline represents a collection of timeline entries
+// Timeline represents a collection of timeline entries.
 type Timeline struct {
 	Entries    []*TimelineEntry `json:"entries"`
 	StartDate  time.Time        `json:"start_date"`
@@ -38,7 +38,7 @@ type Timeline struct {
 	TotalCount int64            `json:"total_count"`
 }
 
-// TimelineOptions configures timeline generation
+// TimelineOptions configures timeline generation.
 type TimelineOptions struct {
 	// DatabaseName filters timeline by database
 	DatabaseName string
@@ -56,7 +56,7 @@ type TimelineOptions struct {
 	Limit int
 }
 
-// GetTimeline generates a visual timeline of backups
+// GetTimeline generates a visual timeline of backups.
 func (te *TimelineEngine) GetTimeline(ctx context.Context, options *TimelineOptions) (*Timeline, error) {
 	if options == nil {
 		options = &TimelineOptions{}
@@ -101,8 +101,18 @@ func (te *TimelineEngine) GetTimeline(ctx context.Context, options *TimelineOpti
 
 	// Add database filter if specified
 	if options.DatabaseName != "" {
-		boolQuery := query["query"].(map[string]interface{})["bool"].(map[string]interface{})
-		filters := boolQuery["filter"].([]map[string]interface{})
+		queryMap, ok := query["query"].(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("unexpected timeline query structure")
+		}
+		boolQuery, ok := queryMap["bool"].(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("unexpected timeline query structure")
+		}
+		filters, ok := boolQuery["filter"].([]map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("unexpected timeline query structure")
+		}
 		filters = append(filters, map[string]interface{}{
 			"term": map[string]interface{}{
 				"database_name.keyword": options.DatabaseName,
@@ -145,7 +155,7 @@ func (te *TimelineEngine) GetTimeline(ctx context.Context, options *TimelineOpti
 	}, nil
 }
 
-// BackupRelationship represents a relationship between backups
+// BackupRelationship represents a relationship between backups.
 type BackupRelationship struct {
 	ParentBackup *BackupDocument   `json:"parent_backup"`
 	ChildBackups []*BackupDocument `json:"child_backups"`
@@ -153,7 +163,7 @@ type BackupRelationship struct {
 	ChainLength  int               `json:"chain_length"`
 }
 
-// GetBackupChain retrieves the full backup chain for a given backup
+// GetBackupChain retrieves the full backup chain for a given backup.
 func (te *TimelineEngine) GetBackupChain(ctx context.Context, backupID string) (*BackupRelationship, error) {
 	// Get the backup
 	backup, err := te.indexer.GetBackup(ctx, backupID)
@@ -190,7 +200,7 @@ func (te *TimelineEngine) GetBackupChain(ctx context.Context, backupID string) (
 	}, nil
 }
 
-// findRootBackup finds the root (full) backup in a chain
+// findRootBackup finds the root (full) backup in a chain.
 func (te *TimelineEngine) findRootBackup(ctx context.Context, backup *BackupDocument) (*BackupDocument, error) {
 	current := backup
 	visited := make(map[string]bool) // Prevent infinite loops
@@ -213,7 +223,7 @@ func (te *TimelineEngine) findRootBackup(ctx context.Context, backup *BackupDocu
 	return current, nil
 }
 
-// getChildBackups retrieves all child backups recursively
+// getChildBackups retrieves all child backups recursively.
 func (te *TimelineEngine) getChildBackups(ctx context.Context, parentID string) ([]*BackupDocument, error) {
 	query := map[string]interface{}{
 		"query": map[string]interface{}{
@@ -248,16 +258,16 @@ func (te *TimelineEngine) getChildBackups(ctx context.Context, parentID string) 
 	return children, nil
 }
 
-// BackupDependency represents a dependency between backups
+// BackupDependency represents a dependency between backups.
 type BackupDependency struct {
-	BackupID        string   `json:"backup_id"`
-	DependsOn       []string `json:"depends_on"`
-	RequiredBy      []string `json:"required_by"`
-	IsRestoreable   bool     `json:"is_restoreable"`
-	MissingBackups  []string `json:"missing_backups,omitempty"`
+	BackupID       string   `json:"backup_id"`
+	DependsOn      []string `json:"depends_on"`
+	RequiredBy     []string `json:"required_by"`
+	IsRestoreable  bool     `json:"is_restoreable"`
+	MissingBackups []string `json:"missing_backups,omitempty"`
 }
 
-// GetBackupDependencies analyzes dependencies for a backup
+// GetBackupDependencies analyzes dependencies for a backup.
 func (te *TimelineEngine) GetBackupDependencies(ctx context.Context, backupID string) (*BackupDependency, error) {
 	backup, err := te.indexer.GetBackup(ctx, backupID)
 	if err != nil {
@@ -285,8 +295,8 @@ func (te *TimelineEngine) GetBackupDependencies(ctx context.Context, backupID st
 			dependency.DependsOn = append(dependency.DependsOn, current.ParentBackupID)
 
 			// Check if parent exists
-			parent, err := te.indexer.GetBackup(ctx, current.ParentBackupID)
-			if err != nil {
+			parent, perr := te.indexer.GetBackup(ctx, current.ParentBackupID)
+			if perr != nil {
 				dependency.MissingBackups = append(dependency.MissingBackups, current.ParentBackupID)
 				dependency.IsRestoreable = false
 				break
@@ -310,22 +320,22 @@ func (te *TimelineEngine) GetBackupDependencies(ctx context.Context, backupID st
 	return dependency, nil
 }
 
-// DatabaseTimeline represents backup timeline for a specific database
+// DatabaseTimeline represents backup timeline for a specific database.
 type DatabaseTimeline struct {
-	DatabaseName  string                  `json:"database_name"`
-	FirstBackup   time.Time               `json:"first_backup"`
-	LastBackup    time.Time               `json:"last_backup"`
-	TotalBackups  int64                   `json:"total_backups"`
-	FullBackups   int64                   `json:"full_backups"`
-	IncrBackups   int64                   `json:"incremental_backups"`
-	SuccessRate   float64                 `json:"success_rate"`
-	AverageSize   int64                   `json:"average_size"`
-	TotalSize     int64                   `json:"total_size"`
-	BackupChains  int                     `json:"backup_chains"`
-	Timeline      []*TimelineEntry        `json:"timeline"`
+	DatabaseName string           `json:"database_name"`
+	FirstBackup  time.Time        `json:"first_backup"`
+	LastBackup   time.Time        `json:"last_backup"`
+	TotalBackups int64            `json:"total_backups"`
+	FullBackups  int64            `json:"full_backups"`
+	IncrBackups  int64            `json:"incremental_backups"`
+	SuccessRate  float64          `json:"success_rate"`
+	AverageSize  int64            `json:"average_size"`
+	TotalSize    int64            `json:"total_size"`
+	BackupChains int              `json:"backup_chains"`
+	Timeline     []*TimelineEntry `json:"timeline"`
 }
 
-// GetDatabaseTimeline generates a timeline for a specific database
+// GetDatabaseTimeline generates a timeline for a specific database.
 func (te *TimelineEngine) GetDatabaseTimeline(ctx context.Context, databaseName string, days int) (*DatabaseTimeline, error) {
 	if days <= 0 {
 		days = 30 // Default to last 30 days
@@ -413,56 +423,72 @@ func (te *TimelineEngine) GetDatabaseTimeline(ctx context.Context, databaseName 
 	}
 
 	// Parse aggregations
-	if aggs := response.Aggregations; aggs != nil {
-		// Backup counts by type
-		if byType := parseTermsAggregation(aggs, "by_type"); byType != nil {
-			dbTimeline.FullBackups = byType["full"]
-			dbTimeline.IncrBackups = byType["incremental"]
-			dbTimeline.BackupChains = int(byType["full"]) // Approximate
-		}
-
-		// Success rate
-		if byStatus := parseTermsAggregation(aggs, "by_status"); byStatus != nil {
-			success := byStatus["success"]
-			total := timeline.TotalCount
-			if total > 0 {
-				dbTimeline.SuccessRate = float64(success) / float64(total) * 100
-			}
-		}
-
-		// Size statistics
-		if totalSize, ok := aggs["total_size"].(map[string]interface{}); ok {
-			if value, ok := totalSize["value"].(float64); ok {
-				dbTimeline.TotalSize = int64(value)
-			}
-		}
-		if avgSize, ok := aggs["avg_size"].(map[string]interface{}); ok {
-			if value, ok := avgSize["value"].(float64); ok {
-				dbTimeline.AverageSize = int64(value)
-			}
-		}
-
-		// First and last backup timestamps
-		if firstBackup, ok := aggs["first_backup"].(map[string]interface{}); ok {
-			if value, ok := firstBackup["value_as_string"].(string); ok {
-				if t, err := time.Parse(time.RFC3339, value); err == nil {
-					dbTimeline.FirstBackup = t
-				}
-			}
-		}
-		if lastBackup, ok := aggs["last_backup"].(map[string]interface{}); ok {
-			if value, ok := lastBackup["value_as_string"].(string); ok {
-				if t, err := time.Parse(time.RFC3339, value); err == nil {
-					dbTimeline.LastBackup = t
-				}
-			}
-		}
-	}
+	applyDatabaseAggregations(dbTimeline, response.Aggregations, timeline.TotalCount)
 
 	return dbTimeline, nil
 }
 
-// CompareDatabases compares backup timelines across multiple databases
+// applyDatabaseAggregations parses the Elasticsearch aggregation response and
+// populates the derived statistics on dbTimeline.
+func applyDatabaseAggregations(dbTimeline *DatabaseTimeline, aggs map[string]interface{}, totalCount int64) {
+	if aggs == nil {
+		return
+	}
+
+	// Backup counts by type
+	if byType := parseTermsAggregation(aggs, "by_type"); byType != nil {
+		dbTimeline.FullBackups = byType["full"]
+		dbTimeline.IncrBackups = byType["incremental"]
+		dbTimeline.BackupChains = int(byType["full"]) // Approximate
+	}
+
+	// Success rate
+	if byStatus := parseTermsAggregation(aggs, "by_status"); byStatus != nil && totalCount > 0 {
+		dbTimeline.SuccessRate = float64(byStatus["success"]) / float64(totalCount) * 100
+	}
+
+	// Size statistics
+	dbTimeline.TotalSize = aggMetricInt64(aggs, "total_size")
+	dbTimeline.AverageSize = aggMetricInt64(aggs, "avg_size")
+
+	// First and last backup timestamps
+	dbTimeline.FirstBackup = aggMetricTime(aggs, "first_backup")
+	dbTimeline.LastBackup = aggMetricTime(aggs, "last_backup")
+}
+
+// aggMetricInt64 extracts a numeric single-value metric aggregation, returning
+// 0 when the aggregation is absent.
+func aggMetricInt64(aggs map[string]interface{}, name string) int64 {
+	m, ok := aggs[name].(map[string]interface{})
+	if !ok {
+		return 0
+	}
+	value, ok := m["value"].(float64)
+	if !ok {
+		return 0
+	}
+	return int64(value)
+}
+
+// aggMetricTime extracts an RFC3339 timestamp from a single-value metric
+// aggregation, returning the zero time when absent or unparseable.
+func aggMetricTime(aggs map[string]interface{}, name string) time.Time {
+	m, ok := aggs[name].(map[string]interface{})
+	if !ok {
+		return time.Time{}
+	}
+	value, ok := m["value_as_string"].(string)
+	if !ok {
+		return time.Time{}
+	}
+	t, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
+
+// CompareDatabases compares backup timelines across multiple databases.
 func (te *TimelineEngine) CompareDatabases(ctx context.Context, databaseNames []string, days int) (map[string]*DatabaseTimeline, error) {
 	results := make(map[string]*DatabaseTimeline)
 

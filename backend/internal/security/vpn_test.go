@@ -40,15 +40,15 @@ func TestNewVPNManager(t *testing.T) {
 		{
 			name: "valid OpenVPN config",
 			config: &VPNConfig{
-				Enabled:        true,
-				Type:           VPNTypeOpenVPN,
-				ServerAddress:  "203.0.113.1",
-				ServerPort:     1194,
-				Network:        "10.0.0.0/24",
+				Enabled:         true,
+				Type:            VPNTypeOpenVPN,
+				ServerAddress:   "203.0.113.1",
+				ServerPort:      1194,
+				Network:         "10.0.0.0/24",
 				OpenVPNProtocol: "udp",
-				CAPath:         "/etc/openvpn/ca.crt",
-				CertPath:       "/etc/openvpn/server.crt",
-				KeyPath:        "/etc/openvpn/server.key",
+				CAPath:          "/etc/openvpn/ca.crt",
+				CertPath:        "/etc/openvpn/server.crt",
+				KeyPath:         "/etc/openvpn/server.key",
 			},
 			wantErr: false,
 		},
@@ -164,7 +164,7 @@ func TestMaxClients(t *testing.T) {
 
 	// Add max clients
 	for i := 0; i < 2; i++ {
-		_, err := manager.AddClient("client-" + string(rune('1'+i)))
+		_, err = manager.AddClient("client-" + string(rune('1'+i)))
 		if err != nil {
 			t.Fatalf("Failed to add client %d: %v", i+1, err)
 		}
@@ -345,8 +345,9 @@ func TestIPPool(t *testing.T) {
 
 	// Allocate all available IPs
 	allocated := make([]string, 0)
+	var ip string
 	for i := 0; i < 10; i++ { // Try to allocate more than available
-		ip, err := pool.Allocate()
+		ip, err = pool.Allocate()
 		if err != nil {
 			break
 		}
@@ -362,7 +363,7 @@ func TestIPPool(t *testing.T) {
 	pool.Release(allocated[0])
 
 	// Should be able to allocate again
-	ip, err := pool.Allocate()
+	ip, err = pool.Allocate()
 	if err != nil {
 		t.Fatalf("Failed to allocate after release: %v", err)
 	}
@@ -471,12 +472,12 @@ func TestStartStop(t *testing.T) {
 
 func TestGenerateWireGuardServerConfig(t *testing.T) {
 	config := &VPNConfig{
-		Enabled:             true,
-		Type:                VPNTypeWireGuard,
-		ServerAddress:       "203.0.113.1",
-		ServerPort:          51820,
-		Network:             "10.0.0.0/24",
-		WireGuardInterface:  "wg0",
+		Enabled:            true,
+		Type:               VPNTypeWireGuard,
+		ServerAddress:      "203.0.113.1",
+		ServerPort:         51820,
+		Network:            "10.0.0.0/24",
+		WireGuardInterface: "wg0",
 	}
 
 	manager, err := NewVPNManager(config)
@@ -549,7 +550,7 @@ func TestClientTimeout(t *testing.T) {
 // Helper functions
 
 func contains(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && (s == substr || len(s) >= len(substr) && findSubstring(s, substr))
+	return s != "" && substr != "" && (s == substr || len(s) >= len(substr) && findSubstring(s, substr))
 }
 
 func findSubstring(s, substr string) bool {

@@ -5,16 +5,16 @@ import (
 	"time"
 )
 
-// StatsCollector collects and maintains query statistics
+// StatsCollector collects and maintains query statistics.
 type StatsCollector struct {
-	statistics       map[string]*QueryStatistics
-	retentionPeriod  time.Duration
-	mu               sync.RWMutex
-	cleanupTicker    *time.Ticker
-	stopCleanup      chan struct{}
+	statistics      map[string]*QueryStatistics
+	retentionPeriod time.Duration
+	mu              sync.RWMutex
+	cleanupTicker   *time.Ticker
+	stopCleanup     chan struct{}
 }
 
-// NewStatsCollector creates a new statistics collector
+// NewStatsCollector creates a new statistics collector.
 func NewStatsCollector(retentionPeriod time.Duration) *StatsCollector {
 	collector := &StatsCollector{
 		statistics:      make(map[string]*QueryStatistics),
@@ -31,7 +31,7 @@ func NewStatsCollector(retentionPeriod time.Duration) *StatsCollector {
 	return collector
 }
 
-// RecordQuery records a query execution
+// RecordQuery records a query execution.
 func (sc *StatsCollector) RecordQuery(query string, executionTime time.Duration) {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
@@ -73,7 +73,7 @@ func (sc *StatsCollector) RecordQuery(query string, executionTime time.Duration)
 	}
 }
 
-// RecordQueryWithDetails records a query execution with additional details
+// RecordQueryWithDetails records a query execution with additional details.
 func (sc *StatsCollector) RecordQueryWithDetails(query string, executionTime time.Duration, rowsReturned, rowsAffected int64) {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
@@ -111,7 +111,7 @@ func (sc *StatsCollector) RecordQueryWithDetails(query string, executionTime tim
 	stats.MeanTime = stats.TotalTime / time.Duration(stats.ExecutionCount)
 }
 
-// GetStatistics returns all collected statistics
+// GetStatistics returns all collected statistics.
 func (sc *StatsCollector) GetStatistics() map[string]*QueryStatistics {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
@@ -126,7 +126,7 @@ func (sc *StatsCollector) GetStatistics() map[string]*QueryStatistics {
 	return result
 }
 
-// GetQueryStatistics returns statistics for a specific query
+// GetQueryStatistics returns statistics for a specific query.
 func (sc *StatsCollector) GetQueryStatistics(queryHash string) *QueryStatistics {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
@@ -140,7 +140,7 @@ func (sc *StatsCollector) GetQueryStatistics(queryHash string) *QueryStatistics 
 	return &statsCopy
 }
 
-// GetTopQueries returns the top N queries by total execution time
+// GetTopQueries returns the top N queries by total execution time.
 func (sc *StatsCollector) GetTopQueries(limit int) []*QueryStatistics {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
@@ -161,7 +161,7 @@ func (sc *StatsCollector) GetTopQueries(limit int) []*QueryStatistics {
 	return stats
 }
 
-// GetSlowestQueries returns the top N queries by average execution time
+// GetSlowestQueries returns the top N queries by average execution time.
 func (sc *StatsCollector) GetSlowestQueries(limit int) []*QueryStatistics {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
@@ -182,7 +182,7 @@ func (sc *StatsCollector) GetSlowestQueries(limit int) []*QueryStatistics {
 	return stats
 }
 
-// GetMostFrequentQueries returns the top N most frequently executed queries
+// GetMostFrequentQueries returns the top N most frequently executed queries.
 func (sc *StatsCollector) GetMostFrequentQueries(limit int) []*QueryStatistics {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
@@ -203,21 +203,21 @@ func (sc *StatsCollector) GetMostFrequentQueries(limit int) []*QueryStatistics {
 	return stats
 }
 
-// Clear clears all statistics
+// Clear clears all statistics.
 func (sc *StatsCollector) Clear() {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 	sc.statistics = make(map[string]*QueryStatistics)
 }
 
-// GetTotalQueries returns the total number of unique queries tracked
+// GetTotalQueries returns the total number of unique queries tracked.
 func (sc *StatsCollector) GetTotalQueries() int {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
 	return len(sc.statistics)
 }
 
-// GetTotalExecutions returns the total number of query executions
+// GetTotalExecutions returns the total number of query executions.
 func (sc *StatsCollector) GetTotalExecutions() int64 {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
@@ -229,7 +229,7 @@ func (sc *StatsCollector) GetTotalExecutions() int64 {
 	return total
 }
 
-// Stop stops the statistics collector
+// Stop stops the statistics collector.
 func (sc *StatsCollector) Stop() {
 	if sc.cleanupTicker != nil {
 		sc.cleanupTicker.Stop()
@@ -237,7 +237,7 @@ func (sc *StatsCollector) Stop() {
 	}
 }
 
-// cleanupLoop periodically removes old statistics
+// cleanupLoop periodically removes old statistics.
 func (sc *StatsCollector) cleanupLoop() {
 	for {
 		select {
@@ -249,7 +249,7 @@ func (sc *StatsCollector) cleanupLoop() {
 	}
 }
 
-// cleanup removes statistics older than retention period
+// cleanup removes statistics older than retention period.
 func (sc *StatsCollector) cleanup() {
 	if sc.retentionPeriod <= 0 {
 		return

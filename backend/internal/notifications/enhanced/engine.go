@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Engine is the enhanced notification engine
+// Engine is the enhanced notification engine.
 type Engine struct {
 	mu                  sync.RWMutex
 	config              *Config
@@ -31,39 +31,39 @@ type Engine struct {
 	stopChan            chan struct{}
 }
 
-// Config represents engine configuration
+// Config represents engine configuration.
 type Config struct {
-	DataDir              string
-	QueueSize            int
-	WorkerCount          int
-	MaxRetries           int
-	RetryDelay           time.Duration
-	BatchInterval        time.Duration
-	GroupingEnabled      bool
-	AIEnabled            bool
-	AnalyticsEnabled     bool
-	AuditEnabled         bool
-	RetentionDays        int
+	DataDir          string
+	QueueSize        int
+	WorkerCount      int
+	MaxRetries       int
+	RetryDelay       time.Duration
+	BatchInterval    time.Duration
+	GroupingEnabled  bool
+	AIEnabled        bool
+	AnalyticsEnabled bool
+	AuditEnabled     bool
+	RetentionDays    int
 }
 
-// DefaultConfig returns default configuration
+// DefaultConfig returns default configuration.
 func DefaultConfig() *Config {
 	return &Config{
-		DataDir:              "~/.db-backup/notifications",
-		QueueSize:            1000,
-		WorkerCount:          5,
-		MaxRetries:           3,
-		RetryDelay:           time.Minute,
-		BatchInterval:        5 * time.Minute,
-		GroupingEnabled:      true,
-		AIEnabled:            true,
-		AnalyticsEnabled:     true,
-		AuditEnabled:         true,
-		RetentionDays:        90,
+		DataDir:          "~/.db-backup/notifications",
+		QueueSize:        1000,
+		WorkerCount:      5,
+		MaxRetries:       3,
+		RetryDelay:       time.Minute,
+		BatchInterval:    5 * time.Minute,
+		GroupingEnabled:  true,
+		AIEnabled:        true,
+		AnalyticsEnabled: true,
+		AuditEnabled:     true,
+		RetentionDays:    90,
 	}
 }
 
-// NewEngine creates a new notification engine
+// NewEngine creates a new notification engine.
 func NewEngine(config *Config) (*Engine, error) {
 	if config == nil {
 		config = DefaultConfig()
@@ -71,12 +71,15 @@ func NewEngine(config *Config) (*Engine, error) {
 
 	// Expand home directory
 	if len(config.DataDir) >= 2 && config.DataDir[:2] == "~/" {
-		home, _ := os.UserHomeDir()
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve home directory: %w", err)
+		}
 		config.DataDir = filepath.Join(home, config.DataDir[2:])
 	}
 
 	// Create data directory
-	if err := os.MkdirAll(config.DataDir, 0755); err != nil {
+	if err := os.MkdirAll(config.DataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
@@ -95,12 +98,16 @@ func NewEngine(config *Config) (*Engine, error) {
 	// Initialize components
 	if config.AnalyticsEnabled {
 		engine.analytics = NewAnalyticsTracker(filepath.Join(config.DataDir, "analytics.json"), 10000)
-		engine.analytics.Load()
+		if err := engine.analytics.Load(); err != nil {
+			return nil, fmt.Errorf("failed to load analytics: %w", err)
+		}
 	}
 
 	if config.AIEnabled {
 		engine.aiEngine = NewAIEngine(filepath.Join(config.DataDir, "ai_model.json"))
-		engine.aiEngine.Load()
+		if err := engine.aiEngine.Load(); err != nil {
+			return nil, fmt.Errorf("failed to load AI model: %w", err)
+		}
 	}
 
 	batchConfig := BatchConfig{
@@ -121,14 +128,14 @@ func NewEngine(config *Config) (*Engine, error) {
 	return engine, nil
 }
 
-// RegisterChannel registers a delivery channel
+// RegisterChannel registers a delivery channel.
 func (e *Engine) RegisterChannel(channelType DeliveryChannel, channel Channel) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.channels[channelType] = channel
 }
 
-// RegisterTemplate registers a notification template
+// RegisterTemplate registers a notification template.
 func (e *Engine) RegisterTemplate(template *NotificationTemplate) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -144,7 +151,7 @@ func (e *Engine) RegisterTemplate(template *NotificationTemplate) error {
 	return e.saveTemplates()
 }
 
-// Send sends a notification
+// Send sends a notification.
 func (e *Engine) Send(ctx context.Context, notification *Notification) error {
 	// Generate ID if not provided
 	if notification.ID == "" {
@@ -161,13 +168,13 @@ func (e *Engine) Send(ctx context.Context, notification *Notification) error {
 	// Check Do Not Disturb
 	if e.isInDNDPeriod(prefs) && notification.Priority < PriorityUrgent {
 		notification.Status = StatusQueued
-		notification.ScheduledFor = e.getNextAvailableTime(prefs)
+		notification.ScheduledFor = e.getNextAvailableTime()
 	}
 
 	// Check quiet hours
 	if e.isInQuietHours(prefs) && notification.Priority < PriorityHigh {
 		notification.Status = StatusQueued
-		notification.ScheduledFor = e.getNextAvailableTime(prefs)
+		notification.ScheduledFor = e.getNextAvailableTime()
 	}
 
 	// AI relevance scoring
@@ -218,12 +225,16 @@ func (e *Engine) Send(ctx context.Context, notification *Notification) error {
 	}
 
 	// Save
-	go e.saveNotifications()
+	go func() {
+		if err := e.saveNotifications(); err != nil {
+			fmt.Printf("Error saving notifications: %v\n", err)
+		}
+	}()
 
 	return nil
 }
 
-// SendFromTemplate sends a notification from a template
+// SendFromTemplate sends a notification from a template.
 func (e *Engine) SendFromTemplate(ctx context.Context, templateID string, variables map[string]interface{}, userID string) error {
 	e.mu.RLock()
 	template, exists := e.templates[templateID]
@@ -248,7 +259,7 @@ func (e *Engine) SendFromTemplate(ctx context.Context, templateID string, variab
 	return e.Send(ctx, notification)
 }
 
-// Start starts the notification engine
+// Start starts the notification engine.
 func (e *Engine) Start() error {
 	e.mu.Lock()
 	if e.running {
@@ -260,7 +271,7 @@ func (e *Engine) Start() error {
 
 	// Start workers
 	for i := 0; i < e.config.WorkerCount; i++ {
-		go e.worker(i)
+		go e.worker()
 	}
 
 	// Start batch processor
@@ -279,7 +290,7 @@ func (e *Engine) Start() error {
 	return nil
 }
 
-// Stop stops the notification engine
+// Stop stops the notification engine.
 func (e *Engine) Stop() error {
 	e.mu.Lock()
 	if !e.running {
@@ -293,13 +304,15 @@ func (e *Engine) Stop() error {
 	close(e.stopChan)
 
 	// Save all data
-	e.save()
+	if err := e.save(); err != nil {
+		return fmt.Errorf("failed to save on stop: %w", err)
+	}
 
 	return nil
 }
 
-// worker processes notifications from the queue
-func (e *Engine) worker(id int) {
+// worker processes notifications from the queue.
+func (e *Engine) worker() {
 	for {
 		select {
 		case notification := <-e.queue:
@@ -310,7 +323,7 @@ func (e *Engine) worker(id int) {
 	}
 }
 
-// processNotification processes and delivers a notification
+// processNotification processes and delivers a notification.
 func (e *Engine) processNotification(notification *Notification) {
 	ctx := context.Background()
 
@@ -379,7 +392,7 @@ func (e *Engine) processNotification(notification *Notification) {
 	}
 }
 
-// deliverToChannel delivers notification to a specific channel
+// deliverToChannel delivers notification to a specific channel.
 func (e *Engine) deliverToChannel(ctx context.Context, notification *Notification, channelType DeliveryChannel) DeliveryResult {
 	e.mu.RLock()
 	channel, exists := e.channels[channelType]
@@ -398,15 +411,20 @@ func (e *Engine) deliverToChannel(ctx context.Context, notification *Notificatio
 	responseTime := time.Since(startTime).Milliseconds()
 
 	return DeliveryResult{
-		Channel:      channelType,
-		Success:      err == nil,
-		Error:        func() string { if err != nil { return err.Error() }; return "" }(),
+		Channel: channelType,
+		Success: err == nil,
+		Error: func() string {
+			if err != nil {
+				return err.Error()
+			}
+			return ""
+		}(),
 		DeliveredAt:  time.Now(),
 		ResponseTime: float64(responseTime),
 	}
 }
 
-// scheduler handles scheduled/queued notifications
+// scheduler handles scheduled/queued notifications.
 func (e *Engine) scheduler() {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
@@ -421,7 +439,7 @@ func (e *Engine) scheduler() {
 	}
 }
 
-// processScheduled processes scheduled notifications
+// processScheduled processes scheduled notifications.
 func (e *Engine) processScheduled() {
 	e.mu.RLock()
 	notifications := make([]*Notification, 0)
@@ -505,7 +523,7 @@ func (e *Engine) isInQuietHours(prefs *NotificationPreferences) bool {
 	return false
 }
 
-func (e *Engine) getNextAvailableTime(prefs *NotificationPreferences) *time.Time {
+func (e *Engine) getNextAvailableTime() *time.Time {
 	// Simplified implementation
 	next := time.Now().Add(time.Hour)
 	return &next
@@ -554,16 +572,17 @@ func (e *Engine) findOrCreateGroup(notification *Notification) string {
 
 	// Look for existing group
 	for _, group := range e.groups {
-		if group.Type == notification.Type && group.Category == notification.Category {
-			// Add to existing group
-			group.Notifications = append(group.Notifications, notification)
-			group.Count = len(group.Notifications)
-			group.UpdatedAt = time.Now()
-			if notification.Priority > group.Priority {
-				group.Priority = notification.Priority
-			}
-			return group.ID
+		if group.Type != notification.Type || group.Category != notification.Category {
+			continue
 		}
+		// Add to existing group
+		group.Notifications = append(group.Notifications, notification)
+		group.Count = len(group.Notifications)
+		group.UpdatedAt = time.Now()
+		if notification.Priority > group.Priority {
+			group.Priority = notification.Priority
+		}
+		return group.ID
 	}
 
 	// Create new group
@@ -595,8 +614,8 @@ func (e *Engine) renderTemplate(template string, variables map[string]interface{
 	return result
 }
 
-// replaceString replaces all occurrences of old with new in s
-func replaceString(s, old, new string) string {
+// replaceString replaces all occurrences of old with replacement in s.
+func replaceString(s, old, replacement string) string {
 	result := ""
 	for {
 		idx := findString(s, old)
@@ -604,15 +623,15 @@ func replaceString(s, old, new string) string {
 			result += s
 			break
 		}
-		result += s[:idx] + new
+		result += s[:idx] + replacement
 		s = s[idx+len(old):]
 	}
 	return result
 }
 
-// findString returns the index of the first occurrence of substr in s, or -1 if not found
+// findString returns the index of the first occurrence of substr in s, or -1 if not found.
 func findString(s, substr string) int {
-	if len(substr) == 0 {
+	if substr == "" {
 		return 0
 	}
 	for i := 0; i <= len(s)-len(substr); i++ {
@@ -694,7 +713,7 @@ func (e *Engine) saveTemplates() error {
 	}
 
 	path := filepath.Join(e.dataDir, "templates.json")
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0o600)
 }
 
 func (e *Engine) loadPreferences() error {
@@ -731,7 +750,7 @@ func (e *Engine) savePreferences() error {
 	}
 
 	path := filepath.Join(e.dataDir, "preferences.json")
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0o600)
 }
 
 func (e *Engine) loadNotifications() error {
@@ -775,5 +794,5 @@ func (e *Engine) saveNotifications() error {
 	}
 
 	path := filepath.Join(e.dataDir, "notifications.json")
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0o600)
 }

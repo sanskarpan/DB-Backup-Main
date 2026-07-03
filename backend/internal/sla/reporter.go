@@ -10,7 +10,7 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// ReportFormat represents the format of a compliance report
+// ReportFormat represents the format of a compliance report.
 type ReportFormat string
 
 const (
@@ -20,7 +20,7 @@ const (
 	ReportFormatText     ReportFormat = "text"
 )
 
-// ReportType represents the type of compliance report
+// ReportType represents the type of compliance report.
 type ReportType string
 
 const (
@@ -31,7 +31,7 @@ const (
 	ReportTypeCompliance ReportType = "compliance" // Compliance standard report
 )
 
-// ComplianceReport represents a generated compliance report
+// ComplianceReport represents a generated compliance report.
 type ComplianceReport struct {
 	ID                string
 	Type              ReportType
@@ -45,7 +45,7 @@ type ComplianceReport struct {
 	Metadata          map[string]interface{}
 }
 
-// ExecutiveSummary represents high-level metrics for executives
+// ExecutiveSummary represents high-level metrics for executives.
 type ExecutiveSummary struct {
 	OverallComplianceRate float64
 	TotalDatabases        int
@@ -64,7 +64,7 @@ type ExecutiveSummary struct {
 	ComplianceByStandard  map[string]bool
 }
 
-// DatabaseComplianceDetail represents detailed compliance info for a database
+// DatabaseComplianceDetail represents detailed compliance info for a database.
 type DatabaseComplianceDetail struct {
 	DatabaseID          string
 	DatabaseName        string
@@ -88,7 +88,7 @@ type DatabaseComplianceDetail struct {
 	Recommendations     []string
 }
 
-// TrendData represents historical trend information
+// TrendData represents historical trend information.
 type TrendData struct {
 	Date              time.Time
 	SuccessRate       float64
@@ -97,13 +97,13 @@ type TrendData struct {
 	ComplianceRate    float64
 }
 
-// ComplianceReporter generates compliance reports
+// ComplianceReporter generates compliance reports.
 type ComplianceReporter struct {
 	monitor       *SLAMonitor
 	reportHistory []*ComplianceReport
 }
 
-// NewComplianceReporter creates a new compliance reporter
+// NewComplianceReporter creates a new compliance reporter.
 func NewComplianceReporter(monitor *SLAMonitor) *ComplianceReporter {
 	return &ComplianceReporter{
 		monitor:       monitor,
@@ -111,7 +111,7 @@ func NewComplianceReporter(monitor *SLAMonitor) *ComplianceReporter {
 	}
 }
 
-// GenerateReport generates a compliance report
+// GenerateReport generates a compliance report.
 func (cr *ComplianceReporter) GenerateReport(reportType ReportType, format ReportFormat, periodStart, periodEnd time.Time) (*ComplianceReport, error) {
 	if cr.monitor == nil {
 		return nil, fmt.Errorf("SLA monitor not initialized")
@@ -165,7 +165,9 @@ func (cr *ComplianceReporter) GenerateReport(reportType ReportType, format Repor
 	return report, nil
 }
 
-// generateExecutiveReport generates an executive summary report
+// generateExecutiveReport generates an executive summary report.
+//
+//nolint:unparam // period bounds kept for a uniform report-generator signature; used once historical querying is implemented
 func (cr *ComplianceReporter) generateExecutiveReport(format ReportFormat, periodStart, periodEnd time.Time) (string, error) {
 	summary := cr.getExecutiveSummary()
 
@@ -191,7 +193,9 @@ func (cr *ComplianceReporter) generateExecutiveReport(format ReportFormat, perio
 	}
 }
 
-// generateDetailedReport generates a detailed compliance report
+// generateDetailedReport generates a detailed compliance report.
+//
+//nolint:unparam // period bounds kept for a uniform report-generator signature; used once historical querying is implemented
 func (cr *ComplianceReporter) generateDetailedReport(format ReportFormat, periodStart, periodEnd time.Time) (string, error) {
 	details := cr.getDatabaseComplianceDetails()
 
@@ -217,7 +221,7 @@ func (cr *ComplianceReporter) generateDetailedReport(format ReportFormat, period
 	}
 }
 
-// generateTrendReport generates a trend analysis report
+// generateTrendReport generates a trend analysis report.
 func (cr *ComplianceReporter) generateTrendReport(format ReportFormat, periodStart, periodEnd time.Time) (string, error) {
 	trends := cr.getTrendData(periodStart, periodEnd)
 
@@ -243,7 +247,7 @@ func (cr *ComplianceReporter) generateTrendReport(format ReportFormat, periodSta
 	}
 }
 
-// generateViolationReport generates a violation-focused report
+// generateViolationReport generates a violation-focused report.
 func (cr *ComplianceReporter) generateViolationReport(format ReportFormat, periodStart, periodEnd time.Time) (string, error) {
 	violations := cr.monitor.GetViolations("", false)
 
@@ -277,7 +281,9 @@ func (cr *ComplianceReporter) generateViolationReport(format ReportFormat, perio
 	}
 }
 
-// generateComplianceStandardReport generates a compliance standard report
+// generateComplianceStandardReport generates a compliance standard report.
+//
+//nolint:unparam // period bounds kept for a uniform report-generator signature; used once historical querying is implemented
 func (cr *ComplianceReporter) generateComplianceStandardReport(format ReportFormat, periodStart, periodEnd time.Time) (string, error) {
 	complianceData := cr.getComplianceStandardData()
 
@@ -297,16 +303,22 @@ func (cr *ComplianceReporter) generateComplianceStandardReport(format ReportForm
 	}
 }
 
-// getExecutiveSummary generates executive summary data
+// getExecutiveSummary generates executive summary data.
 func (cr *ComplianceReporter) getExecutiveSummary() *ExecutiveSummary {
 	summary := cr.monitor.GetComplianceSummary()
 
+	totalDatabases, _ := summary["total_databases"].(int)              //nolint:errcheck // type assertion ok ignored; zero value is an acceptable default
+	compliantDatabases, _ := summary["compliant_databases"].(int)      //nolint:errcheck // type assertion ok ignored; zero value is an acceptable default
+	averageSuccessRate, _ := summary["average_success_rate"].(float64) //nolint:errcheck // type assertion ok ignored; zero value is an acceptable default
+	totalViolations, _ := summary["violations_count"].(int)            //nolint:errcheck // type assertion ok ignored; zero value is an acceptable default
+	unresolvedViolations, _ := summary["unresolved_violations"].(int)  //nolint:errcheck // type assertion ok ignored; zero value is an acceptable default
+
 	exec := &ExecutiveSummary{
-		TotalDatabases:       summary["total_databases"].(int),
-		CompliantDatabases:   summary["compliant_databases"].(int),
-		AverageSuccessRate:   summary["average_success_rate"].(float64),
-		TotalViolations:      summary["violations_count"].(int),
-		UnresolvedViolations: summary["unresolved_violations"].(int),
+		TotalDatabases:       totalDatabases,
+		CompliantDatabases:   compliantDatabases,
+		AverageSuccessRate:   averageSuccessRate,
+		TotalViolations:      totalViolations,
+		UnresolvedViolations: unresolvedViolations,
 		ComplianceByLevel:    make(map[SLALevel]int),
 		ComplianceByStandard: make(map[string]bool),
 		TopIssues:            make([]string, 0),
@@ -345,7 +357,7 @@ func (cr *ComplianceReporter) getExecutiveSummary() *ExecutiveSummary {
 	return exec
 }
 
-// getDatabaseComplianceDetails gets detailed compliance info for all databases
+// getDatabaseComplianceDetails gets detailed compliance info for all databases.
 func (cr *ComplianceReporter) getDatabaseComplianceDetails() []*DatabaseComplianceDetail {
 	details := make([]*DatabaseComplianceDetail, 0)
 
@@ -413,7 +425,9 @@ func (cr *ComplianceReporter) getDatabaseComplianceDetails() []*DatabaseComplian
 	return details
 }
 
-// getTrendData generates historical trend data
+// getTrendData generates historical trend data.
+//
+//nolint:unparam // period bounds kept for the intended historical query implementation (see snapshot note below)
 func (cr *ComplianceReporter) getTrendData(periodStart, periodEnd time.Time) []*TrendData {
 	trends := make([]*TrendData, 0)
 
@@ -461,7 +475,7 @@ func (cr *ComplianceReporter) getTrendData(periodStart, periodEnd time.Time) []*
 	return trends
 }
 
-// getComplianceStandardData gets compliance data for industry standards
+// getComplianceStandardData gets compliance data for industry standards.
 func (cr *ComplianceReporter) getComplianceStandardData() map[string]interface{} {
 	standards := make(map[string][]string)
 	complianceStatus := make(map[string]bool)
@@ -490,10 +504,10 @@ func (cr *ComplianceReporter) getComplianceStandardData() map[string]interface{}
 	}
 }
 
-// analyzeIssuesAndRecommendations analyzes violations and generates recommendations
-func (cr *ComplianceReporter) analyzeIssuesAndRecommendations() ([]string, []string) {
-	issues := make([]string, 0)
-	recommendations := make([]string, 0)
+// analyzeIssuesAndRecommendations analyzes violations and generates recommendations.
+func (cr *ComplianceReporter) analyzeIssuesAndRecommendations() (issues, recommendations []string) {
+	issues = make([]string, 0)
+	recommendations = make([]string, 0)
 
 	cr.monitor.mu.RLock()
 	defer cr.monitor.mu.RUnlock()
@@ -538,7 +552,7 @@ func (cr *ComplianceReporter) analyzeIssuesAndRecommendations() ([]string, []str
 	return issues, recommendations
 }
 
-// generateRecommendations generates recommendations for a specific database
+// generateRecommendations generates recommendations for a specific database.
 func (cr *ComplianceReporter) generateRecommendations(detail *DatabaseComplianceDetail) []string {
 	recommendations := make([]string, 0)
 
@@ -565,7 +579,7 @@ func (cr *ComplianceReporter) generateRecommendations(detail *DatabaseCompliance
 	return recommendations
 }
 
-// formatExecutiveMarkdown formats executive summary as markdown
+// formatExecutiveMarkdown formats executive summary as markdown.
 func (cr *ComplianceReporter) formatExecutiveMarkdown(summary *ExecutiveSummary) string {
 	var sb strings.Builder
 
@@ -608,7 +622,7 @@ func (cr *ComplianceReporter) formatExecutiveMarkdown(summary *ExecutiveSummary)
 	return sb.String()
 }
 
-// formatExecutiveText formats executive summary as plain text
+// formatExecutiveText formats executive summary as plain text.
 func (cr *ComplianceReporter) formatExecutiveText(summary *ExecutiveSummary) string {
 	var sb strings.Builder
 
@@ -625,7 +639,7 @@ func (cr *ComplianceReporter) formatExecutiveText(summary *ExecutiveSummary) str
 	return sb.String()
 }
 
-// formatExecutiveHTML formats executive summary as HTML
+// formatExecutiveHTML formats executive summary as HTML.
 func (cr *ComplianceReporter) formatExecutiveHTML(summary *ExecutiveSummary) string {
 	var sb strings.Builder
 
@@ -643,7 +657,7 @@ func (cr *ComplianceReporter) formatExecutiveHTML(summary *ExecutiveSummary) str
 	return sb.String()
 }
 
-// formatDetailedMarkdown formats detailed report as markdown
+// formatDetailedMarkdown formats detailed report as markdown.
 func (cr *ComplianceReporter) formatDetailedMarkdown(details []*DatabaseComplianceDetail) string {
 	var sb strings.Builder
 
@@ -684,7 +698,7 @@ func (cr *ComplianceReporter) formatDetailedMarkdown(details []*DatabaseComplian
 	return sb.String()
 }
 
-// formatDetailedText formats detailed report as plain text
+// formatDetailedText formats detailed report as plain text.
 func (cr *ComplianceReporter) formatDetailedText(details []*DatabaseComplianceDetail) string {
 	var sb strings.Builder
 
@@ -705,7 +719,7 @@ func (cr *ComplianceReporter) formatDetailedText(details []*DatabaseComplianceDe
 	return sb.String()
 }
 
-// formatDetailedHTML formats detailed report as HTML
+// formatDetailedHTML formats detailed report as HTML.
 func (cr *ComplianceReporter) formatDetailedHTML(details []*DatabaseComplianceDetail) string {
 	var sb strings.Builder
 
@@ -730,7 +744,7 @@ func (cr *ComplianceReporter) formatDetailedHTML(details []*DatabaseComplianceDe
 	return sb.String()
 }
 
-// formatViolationMarkdown formats violation report as markdown
+// formatViolationMarkdown formats violation report as markdown.
 func (cr *ComplianceReporter) formatViolationMarkdown(violations []*SLAViolation) string {
 	var sb strings.Builder
 
@@ -772,7 +786,7 @@ func (cr *ComplianceReporter) formatViolationMarkdown(violations []*SLAViolation
 	return sb.String()
 }
 
-// formatViolationText formats violation report as plain text
+// formatViolationText formats violation report as plain text.
 func (cr *ComplianceReporter) formatViolationText(violations []*SLAViolation) string {
 	var sb strings.Builder
 
@@ -794,7 +808,7 @@ func (cr *ComplianceReporter) formatViolationText(violations []*SLAViolation) st
 	return sb.String()
 }
 
-// formatViolationHTML formats violation report as HTML
+// formatViolationHTML formats violation report as HTML.
 func (cr *ComplianceReporter) formatViolationHTML(violations []*SLAViolation) string {
 	var sb strings.Builder
 
@@ -820,7 +834,7 @@ func (cr *ComplianceReporter) formatViolationHTML(violations []*SLAViolation) st
 	return sb.String()
 }
 
-// formatTrendMarkdown formats trend report as markdown
+// formatTrendMarkdown formats trend report as markdown.
 func (cr *ComplianceReporter) formatTrendMarkdown(trends []*TrendData) string {
 	var sb strings.Builder
 
@@ -831,7 +845,8 @@ func (cr *ComplianceReporter) formatTrendMarkdown(trends []*TrendData) string {
 	sb.WriteString("|------|--------------|-----------------|-----------------|------------|\n")
 
 	for _, trend := range trends {
-		sb.WriteString(fmt.Sprintf("| %s | %.2f%% | %v | %.2f%% | %d |\n",
+		sb.WriteString(fmt.Sprintf(
+			"| %s | %.2f%% | %v | %.2f%% | %d |\n",
 			trend.Date.Format("2006-01-02"),
 			trend.SuccessRate,
 			trend.AverageBackupTime,
@@ -845,7 +860,7 @@ func (cr *ComplianceReporter) formatTrendMarkdown(trends []*TrendData) string {
 	return sb.String()
 }
 
-// formatTrendText formats trend report as plain text
+// formatTrendText formats trend report as plain text.
 func (cr *ComplianceReporter) formatTrendText(trends []*TrendData) string {
 	var sb strings.Builder
 
@@ -861,7 +876,7 @@ func (cr *ComplianceReporter) formatTrendText(trends []*TrendData) string {
 	return sb.String()
 }
 
-// formatTrendHTML formats trend report as HTML
+// formatTrendHTML formats trend report as HTML.
 func (cr *ComplianceReporter) formatTrendHTML(trends []*TrendData) string {
 	var sb strings.Builder
 
@@ -871,7 +886,8 @@ func (cr *ComplianceReporter) formatTrendHTML(trends []*TrendData) string {
 	sb.WriteString("<tr><th>Date</th><th>Success Rate</th><th>Compliance Rate</th></tr>\n")
 
 	for _, trend := range trends {
-		sb.WriteString(fmt.Sprintf("<tr><td>%s</td><td>%.2f%%</td><td>%.2f%%</td></tr>\n",
+		sb.WriteString(fmt.Sprintf(
+			"<tr><td>%s</td><td>%.2f%%</td><td>%.2f%%</td></tr>\n",
 			trend.Date.Format("2006-01-02"),
 			trend.SuccessRate,
 			trend.ComplianceRate,
@@ -884,15 +900,15 @@ func (cr *ComplianceReporter) formatTrendHTML(trends []*TrendData) string {
 	return sb.String()
 }
 
-// formatComplianceStandardMarkdown formats compliance standard report as markdown
+// formatComplianceStandardMarkdown formats compliance standard report as markdown.
 func (cr *ComplianceReporter) formatComplianceStandardMarkdown(data map[string]interface{}) string {
 	var sb strings.Builder
 
 	sb.WriteString("# Compliance Standard Report\n\n")
 	sb.WriteString(fmt.Sprintf("**Generated:** %s\n\n", time.Now().Format(time.RFC3339)))
 
-	standards := data["standards"].(map[string][]string)
-	complianceStatus := data["compliance_status"].(map[string]bool)
+	standards, _ := data["standards"].(map[string][]string)            //nolint:errcheck // type assertion ok ignored; nil map is an acceptable default
+	complianceStatus, _ := data["compliance_status"].(map[string]bool) //nolint:errcheck // type assertion ok ignored; nil map is an acceptable default
 
 	sb.WriteString("## Compliance Standards Coverage\n\n")
 
@@ -914,12 +930,12 @@ func (cr *ComplianceReporter) formatComplianceStandardMarkdown(data map[string]i
 	return sb.String()
 }
 
-// GetReportHistory returns the history of generated reports
+// GetReportHistory returns the history of generated reports.
 func (cr *ComplianceReporter) GetReportHistory() []*ComplianceReport {
 	return cr.reportHistory
 }
 
-// GetReport returns a specific report by ID
+// GetReport returns a specific report by ID.
 func (cr *ComplianceReporter) GetReport(reportID string) (*ComplianceReport, bool) {
 	for _, report := range cr.reportHistory {
 		if report.ID == reportID {

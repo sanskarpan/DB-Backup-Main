@@ -1,10 +1,10 @@
 // Package types provides common types used across the application
 package types
 
-// CompressionType represents the type of compression
+// CompressionType represents the type of compression.
 type CompressionType string
 
-// Compression type constants
+// Compression type constants.
 const (
 	CompressionNone CompressionType = "none"
 	CompressionGzip CompressionType = "gzip"

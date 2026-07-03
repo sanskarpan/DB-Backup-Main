@@ -9,7 +9,7 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// MigrationJob represents a cloud migration job
+// MigrationJob represents a cloud migration job.
 type MigrationJob struct {
 	// ID is the unique migration job identifier
 	ID string
@@ -54,7 +54,7 @@ type MigrationJob struct {
 	Error error
 }
 
-// MigrationStatus represents the status of a migration
+// MigrationStatus represents the status of a migration.
 type MigrationStatus string
 
 const (
@@ -62,10 +62,10 @@ const (
 	MigrationInProgress MigrationStatus = "in_progress"
 	MigrationCompleted  MigrationStatus = "completed"
 	MigrationFailed     MigrationStatus = "failed"
-	MigrationCancelled  MigrationStatus = "cancelled"
+	MigrationCancelled  MigrationStatus = "canceled"
 )
 
-// MigrationManager manages cloud migrations
+// MigrationManager manages cloud migrations.
 type MigrationManager struct {
 	mu            sync.RWMutex
 	orchestrator  *MultiCloudOrchestrator
@@ -75,12 +75,12 @@ type MigrationManager struct {
 	downloader    Downloader
 }
 
-// Downloader is an interface for downloading backups from a provider
+// Downloader is an interface for downloading backups from a provider.
 type Downloader interface {
 	Download(ctx context.Context, provider StorageProvider, location string) ([]byte, map[string]interface{}, error)
 }
 
-// NewMigrationManager creates a new migration manager
+// NewMigrationManager creates a new migration manager.
 func NewMigrationManager(orchestrator *MultiCloudOrchestrator, downloader Downloader, maxConcurrent int) *MigrationManager {
 	if maxConcurrent <= 0 {
 		maxConcurrent = 3
@@ -94,7 +94,7 @@ func NewMigrationManager(orchestrator *MultiCloudOrchestrator, downloader Downlo
 	}
 }
 
-// CreateMigration creates a new migration job
+// CreateMigration creates a new migration job.
 func (mm *MigrationManager) CreateMigration(job *MigrationJob) error {
 	if job == nil {
 		return fmt.Errorf("migration job cannot be nil")
@@ -120,7 +120,7 @@ func (mm *MigrationManager) CreateMigration(job *MigrationJob) error {
 	return nil
 }
 
-// ExecuteMigration executes a migration job
+// ExecuteMigration executes a migration job.
 func (mm *MigrationManager) ExecuteMigration(ctx context.Context, jobID string) error {
 	mm.mu.Lock()
 	if mm.activeJobs >= mm.maxConcurrent {
@@ -171,14 +171,14 @@ func (mm *MigrationManager) ExecuteMigration(ctx context.Context, jobID string) 
 
 	// Upload to target destinations
 	backupJob := &BackupJob{
-		ID:           job.ID,
-		DatabaseName: fmt.Sprintf("migration-%s", job.BackupID),
-		BackupData:   backupData,
-		Metadata:     metadata,
-		Destinations: job.TargetDestinations,
-		RequireAll:   false,
+		ID:            job.ID,
+		DatabaseName:  fmt.Sprintf("migration-%s", job.BackupID),
+		BackupData:    backupData,
+		Metadata:      metadata,
+		Destinations:  job.TargetDestinations,
+		RequireAll:    false,
 		MinSuccessful: 1,
-		CreatedAt:    time.Now(),
+		CreatedAt:     time.Now(),
 	}
 
 	_, err = mm.orchestrator.ExecuteBackup(ctx, backupJob)
@@ -234,7 +234,7 @@ func (mm *MigrationManager) ExecuteMigration(ctx context.Context, jobID string) 
 	return nil
 }
 
-// GetMigration retrieves a migration job by ID
+// GetMigration retrieves a migration job by ID.
 func (mm *MigrationManager) GetMigration(jobID string) (*MigrationJob, error) {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
@@ -247,7 +247,7 @@ func (mm *MigrationManager) GetMigration(jobID string) (*MigrationJob, error) {
 	return job, nil
 }
 
-// ListMigrations returns all migration jobs
+// ListMigrations returns all migration jobs.
 func (mm *MigrationManager) ListMigrations(status MigrationStatus) []*MigrationJob {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
@@ -262,7 +262,7 @@ func (mm *MigrationManager) ListMigrations(status MigrationStatus) []*MigrationJ
 	return jobs
 }
 
-// CancelMigration cancels a pending migration
+// CancelMigration cancels a pending migration.
 func (mm *MigrationManager) CancelMigration(jobID string) error {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
@@ -280,7 +280,7 @@ func (mm *MigrationManager) CancelMigration(jobID string) error {
 	return nil
 }
 
-// updateJob updates a job atomically
+// updateJob updates a job atomically.
 func (mm *MigrationManager) updateJob(jobID string, updateFn func(*MigrationJob)) {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
@@ -290,39 +290,39 @@ func (mm *MigrationManager) updateJob(jobID string, updateFn func(*MigrationJob)
 	}
 }
 
-// updateProgress updates migration progress
+// updateProgress updates migration progress.
 func (mm *MigrationManager) updateProgress(jobID string, progress float64) {
 	mm.updateJob(jobID, func(j *MigrationJob) {
 		j.Progress = progress
 	})
 }
 
-// FailoverManager manages automatic failover between cloud providers
+// FailoverManager manages automatic failover between cloud providers.
 type FailoverManager struct {
-	mu                sync.RWMutex
-	orchestrator      *MultiCloudOrchestrator
-	selector          *CloudSelector
-	healthChecks      map[StorageProvider]*HealthCheckConfig
-	failoverRules     []*FailoverRule
-	activeFailovers   map[string]*FailoverEvent
-	monitoring        bool
-	stopChan          chan struct{}
+	mu              sync.RWMutex
+	orchestrator    *MultiCloudOrchestrator
+	selector        *CloudSelector
+	healthChecks    map[StorageProvider]*HealthCheckConfig
+	failoverRules   []*FailoverRule
+	activeFailovers map[string]*FailoverEvent
+	monitoring      bool
+	stopChan        chan struct{}
 }
 
-// HealthCheckConfig configures health checks for a provider
+// HealthCheckConfig configures health checks for a provider.
 type HealthCheckConfig struct {
-	Provider        StorageProvider
-	Interval        time.Duration
-	Timeout         time.Duration
+	Provider         StorageProvider
+	Interval         time.Duration
+	Timeout          time.Duration
 	FailureThreshold int
 	SuccessThreshold int
-	CurrentFailures int
-	Healthy         bool
-	LastCheck       time.Time
-	LastError       error
+	CurrentFailures  int
+	Healthy          bool
+	LastCheck        time.Time
+	LastError        error
 }
 
-// FailoverRule defines when and how to failover
+// FailoverRule defines when and how to failover.
 type FailoverRule struct {
 	ID              string
 	Name            string
@@ -332,7 +332,7 @@ type FailoverRule struct {
 	Enabled         bool
 }
 
-// FailoverEvent represents a failover event
+// FailoverEvent represents a failover event.
 type FailoverEvent struct {
 	ID              string
 	RuleID          string
@@ -344,7 +344,7 @@ type FailoverEvent struct {
 	Error           error
 }
 
-// NewFailoverManager creates a new failover manager
+// NewFailoverManager creates a new failover manager.
 func NewFailoverManager(orchestrator *MultiCloudOrchestrator, selector *CloudSelector) *FailoverManager {
 	return &FailoverManager{
 		orchestrator:    orchestrator,
@@ -356,7 +356,7 @@ func NewFailoverManager(orchestrator *MultiCloudOrchestrator, selector *CloudSel
 	}
 }
 
-// RegisterHealthCheck registers a health check configuration
+// RegisterHealthCheck registers a health check configuration.
 func (fm *FailoverManager) RegisterHealthCheck(config *HealthCheckConfig) error {
 	if config == nil {
 		return fmt.Errorf("health check config cannot be nil")
@@ -384,7 +384,7 @@ func (fm *FailoverManager) RegisterHealthCheck(config *HealthCheckConfig) error 
 	return nil
 }
 
-// AddFailoverRule adds a failover rule
+// AddFailoverRule adds a failover rule.
 func (fm *FailoverManager) AddFailoverRule(rule *FailoverRule) error {
 	if rule == nil {
 		return fmt.Errorf("failover rule cannot be nil")
@@ -397,7 +397,7 @@ func (fm *FailoverManager) AddFailoverRule(rule *FailoverRule) error {
 	return nil
 }
 
-// StartMonitoring starts health check monitoring
+// StartMonitoring starts health check monitoring.
 func (fm *FailoverManager) StartMonitoring(ctx context.Context) error {
 	fm.mu.Lock()
 	if fm.monitoring {
@@ -412,7 +412,7 @@ func (fm *FailoverManager) StartMonitoring(ctx context.Context) error {
 	return nil
 }
 
-// StopMonitoring stops health check monitoring
+// StopMonitoring stops health check monitoring.
 func (fm *FailoverManager) StopMonitoring() {
 	fm.mu.Lock()
 	defer fm.mu.Unlock()
@@ -423,7 +423,7 @@ func (fm *FailoverManager) StopMonitoring() {
 	}
 }
 
-// monitorLoop runs the health check monitoring loop
+// monitorLoop runs the health check monitoring loop.
 func (fm *FailoverManager) monitorLoop(ctx context.Context) {
 	for {
 		select {
@@ -437,7 +437,7 @@ func (fm *FailoverManager) monitorLoop(ctx context.Context) {
 	}
 }
 
-// performHealthChecks performs health checks on all registered providers
+// performHealthChecks performs health checks on all registered providers.
 func (fm *FailoverManager) performHealthChecks(ctx context.Context) {
 	fm.mu.Lock()
 	configs := make([]*HealthCheckConfig, 0, len(fm.healthChecks))
@@ -454,7 +454,7 @@ func (fm *FailoverManager) performHealthChecks(ctx context.Context) {
 	}
 }
 
-// performHealthCheck performs a health check on a single provider
+// performHealthCheck performs a health check on a single provider.
 func (fm *FailoverManager) performHealthCheck(ctx context.Context, config *HealthCheckConfig) {
 	checkCtx, cancel := context.WithTimeout(ctx, config.Timeout)
 	defer cancel()
@@ -491,14 +491,14 @@ func (fm *FailoverManager) performHealthCheck(ctx context.Context, config *Healt
 	}
 }
 
-// checkProviderHealth checks if a provider is healthy
+// checkProviderHealth checks if a provider is healthy.
 func (fm *FailoverManager) checkProviderHealth(ctx context.Context, provider StorageProvider) error {
 	// This would implement actual health checks
 	// For now, return nil (healthy)
 	return nil
 }
 
-// triggerFailover triggers a failover event
+// triggerFailover triggers a failover event.
 func (fm *FailoverManager) triggerFailover(provider StorageProvider, reason string) {
 	// Find applicable failover rules
 	for _, rule := range fm.failoverRules {
@@ -533,7 +533,7 @@ func (fm *FailoverManager) triggerFailover(provider StorageProvider, reason stri
 	}
 }
 
-// GetHealthStatus returns the health status of all providers
+// GetHealthStatus returns the health status of all providers.
 func (fm *FailoverManager) GetHealthStatus() map[StorageProvider]*HealthCheckConfig {
 	fm.mu.RLock()
 	defer fm.mu.RUnlock()
@@ -546,7 +546,7 @@ func (fm *FailoverManager) GetHealthStatus() map[StorageProvider]*HealthCheckCon
 	return status
 }
 
-// GetFailoverEvents returns recent failover events
+// GetFailoverEvents returns recent failover events.
 func (fm *FailoverManager) GetFailoverEvents() []*FailoverEvent {
 	fm.mu.RLock()
 	defer fm.mu.RUnlock()

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Provider defines the interface for storage providers
+// Provider defines the interface for storage providers.
 type Provider interface {
 	// Upload uploads a file to storage
 	Upload(ctx context.Context, localPath, remotePath string, opts *UploadOptions) error
@@ -40,7 +40,7 @@ type Provider interface {
 	ValidateConfig() error
 }
 
-// ProviderType represents the type of storage provider
+// ProviderType represents the type of storage provider.
 type ProviderType string
 
 const (
@@ -55,7 +55,7 @@ const (
 	ProviderTypeGlusterFS   ProviderType = "glusterfs"
 )
 
-// UploadOptions holds options for upload operations
+// UploadOptions holds options for upload operations.
 type UploadOptions struct {
 	ContentType          string
 	Metadata             map[string]string
@@ -68,7 +68,7 @@ type UploadOptions struct {
 	ProgressCallback     func(uploaded, total int64)
 }
 
-// FileMetadata contains metadata about a file
+// FileMetadata contains metadata about a file.
 type FileMetadata struct {
 	Path         string
 	Size         int64
@@ -80,7 +80,7 @@ type FileMetadata struct {
 }
 
 // NewProvider creates a new storage provider based on type
-// This is a placeholder - use specific provider constructors from sub-packages
+// This is a placeholder - use specific provider constructors from sub-packages.
 func NewProvider(providerType ProviderType, config interface{}) (Provider, error) {
 	return nil, &ProviderError{
 		Type:    providerType,
@@ -88,7 +88,7 @@ func NewProvider(providerType ProviderType, config interface{}) (Provider, error
 	}
 }
 
-// ProviderError represents a provider-specific error
+// ProviderError represents a provider-specific error.
 type ProviderError struct {
 	Type    ProviderType
 	Message string
@@ -106,12 +106,12 @@ func (e *ProviderError) Unwrap() error {
 	return e.Err
 }
 
-// LocalConfig holds local storage configuration
+// LocalConfig holds local storage configuration.
 type LocalConfig struct {
 	Path string
 }
 
-// S3Config holds AWS S3 configuration
+// S3Config holds AWS S3 configuration.
 type S3Config struct {
 	Region       string
 	Bucket       string
@@ -121,21 +121,21 @@ type S3Config struct {
 	UsePathStyle bool
 }
 
-// GCSConfig holds Google Cloud Storage configuration
+// GCSConfig holds Google Cloud Storage configuration.
 type GCSConfig struct {
 	Project         string
 	Bucket          string
 	CredentialsFile string
 }
 
-// AzureConfig holds Azure Blob Storage configuration
+// AzureConfig holds Azure Blob Storage configuration.
 type AzureConfig struct {
 	AccountName string
 	AccountKey  string
 	Container   string
 }
 
-// MinIOConfig holds MinIO storage configuration
+// MinIOConfig holds MinIO storage configuration.
 type MinIOConfig struct {
 	Endpoint     string
 	AccessKey    string
@@ -146,19 +146,19 @@ type MinIOConfig struct {
 	UsePathStyle bool
 }
 
-// WasabiConfig holds Wasabi storage configuration
+// WasabiConfig holds Wasabi storage configuration.
 type WasabiConfig struct {
-	Endpoint    string // Wasabi endpoint (e.g., s3.wasabisys.com)
-	Region      string
-	AccessKey   string
-	SecretKey   string
-	Bucket      string
-	UseSSL      bool
-	Immutable   bool // Enable object lock for immutability
+	Endpoint      string // Wasabi endpoint (e.g., s3.wasabisys.com)
+	Region        string
+	AccessKey     string
+	SecretKey     string
+	Bucket        string
+	UseSSL        bool
+	Immutable     bool // Enable object lock for immutability
 	RetentionDays int  // Days to retain immutable objects
 }
 
-// BackblazeB2Config holds Backblaze B2 storage configuration
+// BackblazeB2Config holds Backblaze B2 storage configuration.
 type BackblazeB2Config struct {
 	AccountID      string
 	ApplicationKey string
@@ -169,7 +169,7 @@ type BackblazeB2Config struct {
 	RetentionDays  int    // Days to retain immutable files
 }
 
-// CephConfig holds Ceph storage configuration via RADOS Gateway
+// CephConfig holds Ceph storage configuration via RADOS Gateway.
 type CephConfig struct {
 	Endpoint  string // Ceph RADOS Gateway endpoint
 	Region    string
@@ -179,7 +179,7 @@ type CephConfig struct {
 	Pool      string // Optional: Ceph pool name
 }
 
-// GlusterFSConfig holds GlusterFS storage configuration
+// GlusterFSConfig holds GlusterFS storage configuration.
 type GlusterFSConfig struct {
 	VolumeHost  string // GlusterFS volume host
 	VolumeName  string // GlusterFS volume name

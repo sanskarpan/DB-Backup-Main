@@ -10,7 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestDetector(t *testing.T) (*Detector, *BaselineTrainer) {
+func setupTestDetector(t *testing.T) *Detector {
+	t.Helper()
 	trainer := NewBaselineTrainer(30)
 
 	// Create baseline with some variance
@@ -23,7 +24,7 @@ func setupTestDetector(t *testing.T) (*Detector, *BaselineTrainer) {
 			DatabaseName: "test-db",
 			Timestamp:    now.Add(-time.Duration(i) * time.Hour),
 			Size:         1000000 + int64(variance*10000), // ±50k variance
-			Duration:     60.0 + variance,                   // ±5 seconds variance
+			Duration:     60.0 + variance,                 // ±5 seconds variance
 			Success:      true,
 		})
 	}
@@ -35,7 +36,7 @@ func setupTestDetector(t *testing.T) (*Detector, *BaselineTrainer) {
 	config := DefaultDetectorConfig()
 	detector := NewDetector(config, trainer)
 
-	return detector, trainer
+	return detector
 }
 
 func TestNewDetector(t *testing.T) {
@@ -51,7 +52,7 @@ func TestNewDetector(t *testing.T) {
 }
 
 func TestDetector_DetectSizeAnomaly(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	// Create metric with significantly larger size (5x normal)
 	metric := BackupMetric{
@@ -84,7 +85,7 @@ func TestDetector_DetectSizeAnomaly(t *testing.T) {
 }
 
 func TestDetector_DetectDurationAnomaly(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	// Create metric with significantly longer duration (10x normal)
 	metric := BackupMetric{
@@ -115,7 +116,7 @@ func TestDetector_DetectDurationAnomaly(t *testing.T) {
 }
 
 func TestDetector_DetectFailureCluster(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	ctx := context.Background()
 
@@ -150,7 +151,7 @@ func TestDetector_DetectFailureCluster(t *testing.T) {
 }
 
 func TestDetector_NoAnomalyForNormalMetric(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	// Create normal metric matching baseline
 	metric := BackupMetric{
@@ -192,7 +193,7 @@ func TestDetector_NoBaselineNoDetection(t *testing.T) {
 }
 
 func TestDetector_RegisterAlertCallback(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	var mu sync.Mutex
 	callbackCalled := false
@@ -233,7 +234,7 @@ func TestDetector_RegisterAlertCallback(t *testing.T) {
 }
 
 func TestDetector_GetAnomalyHistory(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	ctx := context.Background()
 
@@ -258,7 +259,7 @@ func TestDetector_GetAnomalyHistory(t *testing.T) {
 }
 
 func TestDetector_CalculateSeverity(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	tests := []struct {
 		deviation float64
@@ -277,7 +278,7 @@ func TestDetector_CalculateSeverity(t *testing.T) {
 }
 
 func TestDetector_CalculateScore(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	tests := []struct {
 		deviation float64
@@ -349,7 +350,7 @@ func TestDetector_DetectUnusualTiming(t *testing.T) {
 }
 
 func TestDetector_MultipleSimultaneousAnomalies(t *testing.T) {
-	detector, _ := setupTestDetector(t)
+	detector := setupTestDetector(t)
 
 	// Create metric with multiple anomalies
 	metric := BackupMetric{
@@ -407,9 +408,13 @@ func TestAnomalyReport_Fields(t *testing.T) {
 
 	assert.Equal(t, "anomaly-123", report.ID)
 	assert.Equal(t, "test-db", report.DatabaseName)
+	assert.Equal(t, "backup-123", report.BackupID)
 	assert.Equal(t, AnomalyTypeSizeIncrease, report.Type)
 	assert.Equal(t, AnomalySeverityHigh, report.Severity)
 	assert.Equal(t, 85.5, report.Score)
+	assert.False(t, report.DetectedAt.IsZero())
+	assert.Equal(t, "Size increased significantly", report.Description)
+	assert.Equal(t, "Investigate data growth", report.Recommendation)
 	assert.Contains(t, report.Deviations, "size")
 	assert.Equal(t, 4.2, report.Deviations["size"])
 }

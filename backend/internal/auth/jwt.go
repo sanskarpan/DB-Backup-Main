@@ -8,7 +8,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// Claims represents JWT claims
+// Claims represents JWT claims.
 type Claims struct {
 	UserID string   `json:"user_id"`
 	Email  string   `json:"email"`
@@ -16,14 +16,14 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// TokenService handles JWT token operations
+// TokenService handles JWT token operations.
 type TokenService struct {
 	secret     []byte
 	expiration time.Duration
 	issuer     string
 }
 
-// NewTokenService creates a new token service
+// NewTokenService creates a new token service.
 func NewTokenService(secret string, expiration time.Duration) *TokenService {
 	return &TokenService{
 		secret:     []byte(secret),
@@ -32,7 +32,7 @@ func NewTokenService(secret string, expiration time.Duration) *TokenService {
 	}
 }
 
-// GenerateToken generates a new JWT token for a user
+// GenerateToken generates a new JWT token for a user.
 func (s *TokenService) GenerateToken(userID, email string, roles []string) (string, error) {
 	now := time.Now()
 	claims := &Claims{
@@ -52,7 +52,7 @@ func (s *TokenService) GenerateToken(userID, email string, roles []string) (stri
 	return token.SignedString(s.secret)
 }
 
-// ValidateToken validates a JWT token and returns the claims
+// ValidateToken validates a JWT token and returns the claims.
 func (s *TokenService) ValidateToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		// Verify signing method
@@ -61,7 +61,6 @@ func (s *TokenService) ValidateToken(tokenString string) (*Claims, error) {
 		}
 		return s.secret, nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
@@ -74,7 +73,7 @@ func (s *TokenService) ValidateToken(tokenString string) (*Claims, error) {
 	return claims, nil
 }
 
-// RefreshToken generates a new token with extended expiration
+// RefreshToken generates a new token with extended expiration.
 func (s *TokenService) RefreshToken(tokenString string) (string, error) {
 	claims, err := s.ValidateToken(tokenString)
 	if err != nil {
@@ -85,7 +84,7 @@ func (s *TokenService) RefreshToken(tokenString string) (string, error) {
 	return s.GenerateToken(claims.UserID, claims.Email, claims.Roles)
 }
 
-// HasRole checks if the claims contain a specific role
+// HasRole checks if the claims contain a specific role.
 func (c *Claims) HasRole(role string) bool {
 	for _, r := range c.Roles {
 		if r == role {
@@ -95,7 +94,7 @@ func (c *Claims) HasRole(role string) bool {
 	return false
 }
 
-// HasAnyRole checks if the claims contain any of the specified roles
+// HasAnyRole checks if the claims contain any of the specified roles.
 func (c *Claims) HasAnyRole(roles ...string) bool {
 	for _, role := range roles {
 		if c.HasRole(role) {
@@ -105,7 +104,7 @@ func (c *Claims) HasAnyRole(roles ...string) bool {
 	return false
 }
 
-// HasAllRoles checks if the claims contain all of the specified roles
+// HasAllRoles checks if the claims contain all of the specified roles.
 func (c *Claims) HasAllRoles(roles ...string) bool {
 	for _, role := range roles {
 		if !c.HasRole(role) {

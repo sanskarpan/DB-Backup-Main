@@ -9,11 +9,17 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/integrations"
 	"github.com/rs/zerolog/log"
+
+	"github.com/sanskarpan/db-backup/internal/integrations"
 )
 
-// PagerDutyIntegration implements the Integration interface for PagerDuty
+// eventsAPIURL is the PagerDuty Events API v2 enqueue endpoint.
+const eventsAPIURL = "https://events.pagerduty.com/v2/enqueue"
+
+// PagerDutyIntegration implements the Integration interface for PagerDuty.
+//
+//nolint:revive // keeps public name stable across packages
 type PagerDutyIntegration struct {
 	*integrations.BaseIntegration
 	client         *http.Client
@@ -21,7 +27,7 @@ type PagerDutyIntegration struct {
 	serviceID      string
 }
 
-// NewPagerDutyIntegration creates a new PagerDuty integration
+// NewPagerDutyIntegration creates a new PagerDuty integration.
 func NewPagerDutyIntegration(name string) *PagerDutyIntegration {
 	return &PagerDutyIntegration{
 		BaseIntegration: integrations.NewBaseIntegration(),
@@ -29,12 +35,12 @@ func NewPagerDutyIntegration(name string) *PagerDutyIntegration {
 	}
 }
 
-// GetType returns the integration type
+// GetType returns the integration type.
 func (p *PagerDutyIntegration) GetType() integrations.IntegrationType {
 	return integrations.IntegrationTypePagerDuty
 }
 
-// GetName returns the integration name
+// GetName returns the integration name.
 func (p *PagerDutyIntegration) GetName() string {
 	config := p.GetConfig()
 	if config != nil {
@@ -43,7 +49,7 @@ func (p *PagerDutyIntegration) GetName() string {
 	return "pagerduty"
 }
 
-// Configure configures the PagerDuty integration
+// Configure configures the PagerDuty integration.
 func (p *PagerDutyIntegration) Configure(config *integrations.Config) error {
 	if err := p.BaseIntegration.Configure(config); err != nil {
 		return err
@@ -74,7 +80,7 @@ func (p *PagerDutyIntegration) Configure(config *integrations.Config) error {
 	return nil
 }
 
-// Validate validates the PagerDuty configuration
+// Validate validates the PagerDuty configuration.
 func (p *PagerDutyIntegration) Validate() error {
 	config := p.GetConfig()
 	if config == nil {
@@ -88,7 +94,7 @@ func (p *PagerDutyIntegration) Validate() error {
 	return nil
 }
 
-// HealthCheck performs a health check on the PagerDuty integration
+// HealthCheck performs a health check on the PagerDuty integration.
 func (p *PagerDutyIntegration) HealthCheck(ctx context.Context) error {
 	if err := p.Validate(); err != nil {
 		return err
@@ -97,7 +103,7 @@ func (p *PagerDutyIntegration) HealthCheck(ctx context.Context) error {
 	config := p.GetConfig()
 
 	// Use Events API v2 for health check
-	url := "https://events.pagerduty.com/v2/enqueue"
+	url := eventsAPIURL
 
 	// Send a test event
 	payload := map[string]interface{}{
@@ -116,7 +122,7 @@ func (p *PagerDutyIntegration) HealthCheck(ctx context.Context) error {
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -137,7 +143,12 @@ func (p *PagerDutyIntegration) HealthCheck(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		p.GetMetrics().RecordError(err)
+		p.SetStatus(integrations.StatusError)
+		return fmt.Errorf("failed to read response: %w", err)
+	}
 
 	if resp.StatusCode != http.StatusAccepted {
 		err := fmt.Errorf("health check failed with status: %d, body: %s", resp.StatusCode, string(body))
@@ -154,13 +165,13 @@ func (p *PagerDutyIntegration) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
-// CreateIncident creates a PagerDuty incident
+// CreateIncident creates a PagerDuty incident.
 func (p *PagerDutyIntegration) CreateIncident(ctx context.Context, incident *integrations.Incident) (*integrations.IncidentResponse, error) {
 	if err := p.Validate(); err != nil {
 		return nil, err
 	}
 
-	url := "https://events.pagerduty.com/v2/enqueue"
+	url := eventsAPIURL
 
 	// Map severity
 	severity := p.mapSeverity(incident.Severity)
@@ -197,7 +208,9 @@ func (p *PagerDutyIntegration) CreateIncident(ctx context.Context, incident *int
 			customDetails[k] = v
 		}
 
-		payload["payload"].(map[string]interface{})["custom_details"] = customDetails
+		if inner, ok := payload["payload"].(map[string]interface{}); ok {
+			inner["custom_details"] = customDetails
+		}
 	}
 
 	bodyBytes, err := json.Marshal(payload)
@@ -205,7 +218,7 @@ func (p *PagerDutyIntegration) CreateIncident(ctx context.Context, incident *int
 		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -265,7 +278,7 @@ func (p *PagerDutyIntegration) CreateIncident(ctx context.Context, incident *int
 	return response, nil
 }
 
-// UpdateIncident updates a PagerDuty incident
+// UpdateIncident updates a PagerDuty incident.
 func (p *PagerDutyIntegration) UpdateIncident(ctx context.Context, dedupKey string, update *integrations.IncidentUpdate) error {
 	// PagerDuty doesn't support direct updates via Events API
 	// We can trigger a new event with the same dedup_key
@@ -273,7 +286,7 @@ func (p *PagerDutyIntegration) UpdateIncident(ctx context.Context, dedupKey stri
 		return err
 	}
 
-	url := "https://events.pagerduty.com/v2/enqueue"
+	url := eventsAPIURL
 
 	payload := map[string]interface{}{
 		"routing_key":  p.integrationKey,
@@ -287,8 +300,10 @@ func (p *PagerDutyIntegration) UpdateIncident(ctx context.Context, dedupKey stri
 	}
 
 	if update.Comment != "" {
-		payload["payload"].(map[string]interface{})["custom_details"] = map[string]string{
-			"update": update.Comment,
+		if inner, ok := payload["payload"].(map[string]interface{}); ok {
+			inner["custom_details"] = map[string]string{
+				"update": update.Comment,
+			}
 		}
 	}
 
@@ -297,7 +312,7 @@ func (p *PagerDutyIntegration) UpdateIncident(ctx context.Context, dedupKey stri
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -315,7 +330,10 @@ func (p *PagerDutyIntegration) UpdateIncident(ctx context.Context, dedupKey stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusAccepted {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			body = nil
+		}
 		err := fmt.Errorf("failed to update incident, status: %d, body: %s", resp.StatusCode, string(body))
 		p.GetMetrics().RecordError(err)
 		return err
@@ -331,7 +349,7 @@ func (p *PagerDutyIntegration) UpdateIncident(ctx context.Context, dedupKey stri
 	return nil
 }
 
-// GetIncident retrieves a PagerDuty incident
+// GetIncident retrieves a PagerDuty incident.
 func (p *PagerDutyIntegration) GetIncident(ctx context.Context, incidentID string) (*integrations.IncidentResponse, error) {
 	if err := p.Validate(); err != nil {
 		return nil, err
@@ -344,7 +362,7 @@ func (p *PagerDutyIntegration) GetIncident(ctx context.Context, incidentID strin
 
 	url := fmt.Sprintf("https://api.pagerduty.com/incidents/%s", incidentID)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -404,13 +422,13 @@ func (p *PagerDutyIntegration) GetIncident(ctx context.Context, incidentID strin
 	return response, nil
 }
 
-// CloseIncident closes/resolves a PagerDuty incident
-func (p *PagerDutyIntegration) CloseIncident(ctx context.Context, dedupKey string, resolution string) error {
+// CloseIncident closes/resolves a PagerDuty incident.
+func (p *PagerDutyIntegration) CloseIncident(ctx context.Context, dedupKey, resolution string) error {
 	if err := p.Validate(); err != nil {
 		return err
 	}
 
-	url := "https://events.pagerduty.com/v2/enqueue"
+	url := eventsAPIURL
 
 	payload := map[string]interface{}{
 		"routing_key":  p.integrationKey,
@@ -430,7 +448,7 @@ func (p *PagerDutyIntegration) CloseIncident(ctx context.Context, dedupKey strin
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -448,7 +466,10 @@ func (p *PagerDutyIntegration) CloseIncident(ctx context.Context, dedupKey strin
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusAccepted {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			body = nil
+		}
 		err := fmt.Errorf("failed to resolve incident, status: %d, body: %s", resp.StatusCode, string(body))
 		p.GetMetrics().RecordError(err)
 		return err
@@ -464,16 +485,16 @@ func (p *PagerDutyIntegration) CloseIncident(ctx context.Context, dedupKey strin
 	return nil
 }
 
-// SendNotification sends a notification via PagerDuty (creates a low-priority incident)
+// SendNotification sends a notification via PagerDuty (creates a low-priority incident).
 func (p *PagerDutyIntegration) SendNotification(ctx context.Context, notification *integrations.Notification) error {
 	incident := &integrations.Incident{
-		Title:       notification.Title,
-		Description: notification.Message,
-		Priority:    notification.Priority,
-		Severity:    integrations.SeverityLow,
-		Tags:        notification.Tags,
-		Source:      "db-backup-notification",
-		Timestamp:   notification.Timestamp,
+		Title:        notification.Title,
+		Description:  notification.Message,
+		Priority:     notification.Priority,
+		Severity:     integrations.SeverityLow,
+		Tags:         notification.Tags,
+		Source:       "db-backup-notification",
+		Timestamp:    notification.Timestamp,
 		CustomFields: notification.CustomData,
 	}
 

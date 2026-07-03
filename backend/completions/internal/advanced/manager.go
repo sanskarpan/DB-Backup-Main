@@ -14,7 +14,7 @@ import (
 	"github.com/sanskarpan/db-backup/completions/internal/templates"
 )
 
-// CompletionRequest represents a completion request
+// CompletionRequest represents a completion request.
 type CompletionRequest struct {
 	Command      string
 	Args         []string
@@ -24,7 +24,7 @@ type CompletionRequest struct {
 	ShellHistory []string
 }
 
-// CompletionResponse represents a completion response
+// CompletionResponse represents a completion response.
 type CompletionResponse struct {
 	Suggestions  []string
 	Preview      string
@@ -33,7 +33,12 @@ type CompletionResponse struct {
 	Metadata     map[string]interface{}
 }
 
-// AdvancedManager integrates all advanced completion features
+// sourceLive is the completion source label used before a specific strategy wins.
+const sourceLive = "live"
+
+// AdvancedManager integrates all advanced completion features.
+//
+//nolint:revive // keeps public name stable; renaming would break other packages
 type AdvancedManager struct {
 	cache     *cache.MultiLevelCache
 	fuzzy     *fuzzy.Matcher
@@ -45,7 +50,7 @@ type AdvancedManager struct {
 	baseDir   string
 }
 
-// NewAdvancedManager creates a new advanced completion manager
+// NewAdvancedManager creates a new advanced completion manager.
 func NewAdvancedManager(baseDir string) *AdvancedManager {
 	return &AdvancedManager{
 		cache:     cache.NewMultiLevelCache(filepath.Join(baseDir, "cache"), 5*time.Minute),
@@ -59,7 +64,7 @@ func NewAdvancedManager(baseDir string) *AdvancedManager {
 	}
 }
 
-// Initialize initializes all components
+// Initialize initializes all components.
 func (am *AdvancedManager) Initialize() error {
 	if err := am.history.Load(); err != nil {
 		return fmt.Errorf("failed to load history: %w", err)
@@ -84,7 +89,7 @@ func (am *AdvancedManager) Initialize() error {
 	return nil
 }
 
-// GetCompletions returns intelligent completions
+// GetCompletions returns intelligent completions.
 func (am *AdvancedManager) GetCompletions(req *CompletionRequest) *CompletionResponse {
 	startTime := time.Now()
 
@@ -106,7 +111,7 @@ func (am *AdvancedManager) GetCompletions(req *CompletionRequest) *CompletionRes
 	}
 
 	var suggestions []string
-	source := "live"
+	source := sourceLive
 
 	// Try different strategies in order of preference
 
@@ -131,7 +136,7 @@ func (am *AdvancedManager) GetCompletions(req *CompletionRequest) *CompletionRes
 	// 3. Plugin suggestions
 	pluginSuggestions := am.plugins.GetCompletions(req.Command, req.Args, req.Context)
 	suggestions = append(suggestions, pluginSuggestions...)
-	if len(pluginSuggestions) > 0 && source == "live" {
+	if len(pluginSuggestions) > 0 && source == sourceLive {
 		source = "plugin"
 	}
 
@@ -150,14 +155,16 @@ func (am *AdvancedManager) GetCompletions(req *CompletionRequest) *CompletionRes
 		for _, match := range matches {
 			suggestions = append(suggestions, match.Text)
 		}
-		if source == "live" {
+		if source == sourceLive {
 			source = "fuzzy"
 		}
 	}
 
-	// Cache the results
+	// Cache the results. Caching is best-effort: a write failure must not break
+	// completions, so the error is recorded in metadata rather than returned.
+	var cacheErr error
 	if len(suggestions) > 0 {
-		am.cache.Set(cacheKey, suggestions)
+		cacheErr = am.cache.Set(cacheKey, suggestions)
 	}
 
 	responseTime := time.Since(startTime).Milliseconds()
@@ -173,6 +180,9 @@ func (am *AdvancedManager) GetCompletions(req *CompletionRequest) *CompletionRes
 			"count": len(suggestions),
 		},
 	}
+	if cacheErr != nil {
+		response.Metadata["cache_error"] = cacheErr.Error()
+	}
 
 	// Add preview if template
 	if source == "template" && len(suggestions) > 0 {
@@ -184,13 +194,13 @@ func (am *AdvancedManager) GetCompletions(req *CompletionRequest) *CompletionRes
 	return response
 }
 
-// GetPreview returns a preview of what a command will do
+// GetPreview returns a preview of what a command will do.
 func (am *AdvancedManager) GetPreview(command string, args []string) string {
 	// Check if it's a template
 	for _, arg := range args {
 		if template, exists := am.templates.GetTemplate(arg); exists {
-			preview, _ := am.templates.Preview(arg, nil)
-			if preview != nil {
+			preview, err := am.templates.Preview(arg, nil)
+			if err == nil && preview != nil {
 				if expanded, ok := preview["expanded"].(string); ok {
 					return fmt.Sprintf("Template: %s\nWill execute: %s", template.Description, expanded)
 				}
@@ -209,7 +219,7 @@ func (am *AdvancedManager) GetPreview(command string, args []string) string {
 	return ""
 }
 
-// RecordExecution records a command execution for learning
+// RecordExecution records a command execution for learning.
 func (am *AdvancedManager) RecordExecution(command string, args []string, context map[string]string, execTime float64) {
 	// Record in history
 	am.history.Record(command, args)
@@ -217,14 +227,19 @@ func (am *AdvancedManager) RecordExecution(command string, args []string, contex
 	// Record in learning system
 	am.learning.Learn(command, args, context, execTime)
 
-	// Save asynchronously
+	// Save asynchronously. Persistence is best-effort here; failures are captured
+	// and re-recorded in analytics so they are not silently swallowed.
 	go func() {
-		am.history.Save()
-		am.learning.Save()
+		if err := am.history.Save(); err != nil {
+			am.analytics.TrackError("history_save", err.Error())
+		}
+		if err := am.learning.Save(); err != nil {
+			am.analytics.TrackError("learning_save", err.Error())
+		}
 	}()
 }
 
-// GetStats returns comprehensive statistics
+// GetStats returns comprehensive statistics.
 func (am *AdvancedManager) GetStats() map[string]interface{} {
 	return map[string]interface{}{
 		"cache":     am.cache.Stats(),
@@ -236,26 +251,26 @@ func (am *AdvancedManager) GetStats() map[string]interface{} {
 	}
 }
 
-// ExportProfile exports completion profile
+// ExportProfile exports completion profile.
 func (am *AdvancedManager) ExportProfile(outputPath string) error {
 	// Export all data structures
 	// Implementation would export history, learning, templates, plugins config
 	return fmt.Errorf("not implemented")
 }
 
-// ImportProfile imports completion profile
+// ImportProfile imports completion profile.
 func (am *AdvancedManager) ImportProfile(inputPath string) error {
 	// Import data structures
 	// Implementation would import and merge history, learning, templates, plugins
 	return fmt.Errorf("not implemented")
 }
 
-// buildCacheKey builds a cache key from request
+// buildCacheKey builds a cache key from request.
 func (am *AdvancedManager) buildCacheKey(req *CompletionRequest) string {
 	return fmt.Sprintf("%s:%s:%s", req.Command, req.CurrentWord, req.PrevWord)
 }
 
-// trackCompletion tracks a completion event
+// trackCompletion tracks a completion event.
 func (am *AdvancedManager) trackCompletion(req *CompletionRequest, suggestions []string, source string, responseTime float64, accepted bool) {
 	event := &analytics.CompletionEvent{
 		Command:      req.Command,

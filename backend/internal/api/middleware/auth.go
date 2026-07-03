@@ -5,10 +5,11 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/sanskarpan/db-backup/internal/auth"
 )
 
-// Auth returns a gin middleware for JWT authentication
+// Auth returns a gin middleware for JWT authentication.
 func Auth(tokenService *auth.TokenService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -45,7 +46,7 @@ func Auth(tokenService *auth.TokenService) gin.HandlerFunc {
 	}
 }
 
-// OptionalAuth allows requests with or without authentication
+// OptionalAuth allows requests with or without authentication.
 func OptionalAuth(tokenService *auth.TokenService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -70,7 +71,7 @@ func OptionalAuth(tokenService *auth.TokenService) gin.HandlerFunc {
 	}
 }
 
-// RequireRole returns a middleware that requires specific roles
+// RequireRole returns a middleware that requires specific roles.
 func RequireRole(roles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userRoles, exists := c.Get("roles")

@@ -1,18 +1,25 @@
 package commands
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 
 	"github.com/spf13/cobra"
-	"github.com/sanskarpan/db-backup/internal/config"
-	"github.com/sanskarpan/db-backup/internal/repository"
 )
 
-// completionCmd represents the completion command
+// Supported shells for completion generation.
+const (
+	shellBash       = "bash"
+	shellZsh        = "zsh"
+	shellFish       = "fish"
+	shellPowerShell = "powershell"
+
+	osDarwin = "darwin"
+)
+
+// completionCmd represents the completion command.
 var completionCmd = &cobra.Command{
 	Use:   "completion [bash|zsh|fish|powershell]",
 	Short: "Generate shell completion scripts",
@@ -57,8 +64,8 @@ PowerShell:
   # and source this file from your PowerShell profile.
 `,
 	DisableFlagsInUseLine: true,
-	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
-	Args:                  cobra.ExactValidArgs(1),
+	ValidArgs:             []string{shellBash, shellZsh, shellFish, shellPowerShell},
+	Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 	RunE:                  runCompletion,
 }
 
@@ -72,8 +79,8 @@ func init() {
 func runCompletion(cmd *cobra.Command, args []string) error {
 	shell := args[0]
 
-	install, _ := cmd.Flags().GetBool("install")
-	output, _ := cmd.Flags().GetString("output")
+	install := flagBool(cmd, "install")
+	output := flagString(cmd, "output")
 
 	if install {
 		return installCompletion(shell)
@@ -88,13 +95,13 @@ func runCompletion(cmd *cobra.Command, args []string) error {
 
 func generateCompletion(cmd *cobra.Command, shell string) error {
 	switch shell {
-	case "bash":
+	case shellBash:
 		return cmd.Root().GenBashCompletion(os.Stdout)
-	case "zsh":
+	case shellZsh:
 		return cmd.Root().GenZshCompletion(os.Stdout)
-	case "fish":
+	case shellFish:
 		return cmd.Root().GenFishCompletion(os.Stdout, true)
-	case "powershell":
+	case shellPowerShell:
 		return cmd.Root().GenPowerShellCompletion(os.Stdout)
 	default:
 		return fmt.Errorf("unsupported shell: %s", shell)
@@ -109,13 +116,13 @@ func generateCompletionToFile(cmd *cobra.Command, shell, output string) error {
 	defer file.Close()
 
 	switch shell {
-	case "bash":
+	case shellBash:
 		return cmd.Root().GenBashCompletion(file)
-	case "zsh":
+	case shellZsh:
 		return cmd.Root().GenZshCompletion(file)
-	case "fish":
+	case shellFish:
 		return cmd.Root().GenFishCompletion(file, true)
-	case "powershell":
+	case shellPowerShell:
 		return cmd.Root().GenPowerShellCompletion(file)
 	default:
 		return fmt.Errorf("unsupported shell: %s", shell)
@@ -126,13 +133,13 @@ func installCompletion(shell string) error {
 	var installPath string
 
 	switch shell {
-	case "bash":
+	case shellBash:
 		installPath = getBashCompletionPath()
-	case "zsh":
+	case shellZsh:
 		installPath = getZshCompletionPath()
-	case "fish":
+	case shellFish:
 		installPath = getFishCompletionPath()
-	case "powershell":
+	case shellPowerShell:
 		installPath = getPowerShellCompletionPath()
 	default:
 		return fmt.Errorf("unsupported shell: %s", shell)
@@ -145,7 +152,7 @@ func installCompletion(shell string) error {
 
 	// Ensure directory exists
 	dir := filepath.Dir(installPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
@@ -158,13 +165,13 @@ func installCompletion(shell string) error {
 
 	var genErr error
 	switch shell {
-	case "bash":
+	case shellBash:
 		genErr = rootCmd.GenBashCompletion(file)
-	case "zsh":
+	case shellZsh:
 		genErr = rootCmd.GenZshCompletion(file)
-	case "fish":
+	case shellFish:
 		genErr = rootCmd.GenFishCompletion(file, true)
-	case "powershell":
+	case shellPowerShell:
 		genErr = rootCmd.GenPowerShellCompletion(file)
 	}
 
@@ -175,13 +182,14 @@ func installCompletion(shell string) error {
 	fmt.Printf("Completion script installed to: %s\n", installPath)
 	fmt.Println("\nPlease restart your shell or source the completion file.")
 
-	if shell == "bash" {
+	switch shell {
+	case shellBash:
 		fmt.Printf("\nRun: source %s\n", installPath)
-	} else if shell == "zsh" {
+	case shellZsh:
 		fmt.Println("\nRun: exec zsh")
-	} else if shell == "fish" {
+	case shellFish:
 		fmt.Println("\nRun: exec fish")
-	} else if shell == "powershell" {
+	case shellPowerShell:
 		fmt.Printf("\nRun: . %s\n", installPath)
 	}
 
@@ -189,7 +197,7 @@ func installCompletion(shell string) error {
 }
 
 func getBashCompletionPath() string {
-	if runtime.GOOS == "darwin" {
+	if runtime.GOOS == osDarwin {
 		// macOS with Homebrew
 		if _, err := os.Stat("/usr/local/etc/bash_completion.d"); err == nil {
 			return "/usr/local/etc/bash_completion.d/db-backup"
@@ -205,25 +213,31 @@ func getBashCompletionPath() string {
 	}
 
 	// User-local fallback
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
 	return filepath.Join(home, ".bash_completion.d", "db-backup")
 }
 
 func getZshCompletionPath() string {
 	// oh-my-zsh
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
 	ohmyzsh := filepath.Join(home, ".oh-my-zsh", "completions", "_db-backup")
-	if _, err := os.Stat(filepath.Dir(ohmyzsh)); err == nil {
+	if _, statErr := os.Stat(filepath.Dir(ohmyzsh)); statErr == nil {
 		return ohmyzsh
 	}
 
 	// Standard zsh
-	if runtime.GOOS == "darwin" {
+	if runtime.GOOS == osDarwin {
 		// macOS with Homebrew
-		if _, err := os.Stat("/usr/local/share/zsh/site-functions"); err == nil {
+		if _, statErr := os.Stat("/usr/local/share/zsh/site-functions"); statErr == nil {
 			return "/usr/local/share/zsh/site-functions/_db-backup"
 		}
-		if _, err := os.Stat("/opt/homebrew/share/zsh/site-functions"); err == nil {
+		if _, statErr := os.Stat("/opt/homebrew/share/zsh/site-functions"); statErr == nil {
 			return "/opt/homebrew/share/zsh/site-functions/_db-backup"
 		}
 	}
@@ -233,26 +247,31 @@ func getZshCompletionPath() string {
 }
 
 func getFishCompletionPath() string {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
 
 	// User config
 	userConfig := filepath.Join(home, ".config", "fish", "completions", "db-backup.fish")
-	if _, err := os.Stat(filepath.Dir(userConfig)); err == nil {
+	if _, statErr := os.Stat(filepath.Dir(userConfig)); statErr == nil {
 		return userConfig
 	}
 
 	// System-wide (macOS with Homebrew)
-	if runtime.GOOS == "darwin" {
-		if _, err := os.Stat("/usr/local/share/fish/vendor_completions.d"); err == nil {
+	if runtime.GOOS == osDarwin {
+		if _, statErr := os.Stat("/usr/local/share/fish/vendor_completions.d"); statErr == nil {
 			return "/usr/local/share/fish/vendor_completions.d/db-backup.fish"
 		}
-		if _, err := os.Stat("/opt/homebrew/share/fish/vendor_completions.d"); err == nil {
+		if _, statErr := os.Stat("/opt/homebrew/share/fish/vendor_completions.d"); statErr == nil {
 			return "/opt/homebrew/share/fish/vendor_completions.d/db-backup.fish"
 		}
 	}
 
 	// Create user config dir and return path
-	os.MkdirAll(filepath.Dir(userConfig), 0755)
+	if mkErr := os.MkdirAll(filepath.Dir(userConfig), 0o755); mkErr != nil {
+		return ""
+	}
 	return userConfig
 }
 
@@ -276,256 +295,4 @@ func getPowerShellCompletionPath() string {
 	// Documents\WindowsPowerShell\Modules (Windows PowerShell 5.1)
 	wsModules := filepath.Join(userProfile, "Documents", "WindowsPowerShell", "Modules", "DbBackupCompletion")
 	return filepath.Join(wsModules, "db-backup.ps1")
-}
-
-// ============================================================================
-// Custom Completion Functions
-// ============================================================================
-
-// These functions are called by Cobra's completion system
-
-func init() {
-	// Custom completion functions are registered per-command in each command's init function.
-}
-
-// Helper functions to get dynamic data
-func getDatabases(ctx context.Context) ([]string, error) {
-	// Get repository instance
-	repo, err := getRepository()
-	if err != nil {
-		return []string{}, err
-	}
-
-	// List all backups
-	backups, err := repo.List(ctx, nil)
-	if err != nil {
-		return []string{}, err
-	}
-
-	// Extract unique database names
-	databaseMap := make(map[string]bool)
-	for _, backup := range backups {
-		if backup.Database != "" {
-			databaseMap[backup.Database] = true
-		}
-	}
-
-	// Convert to slice
-	databases := make([]string, 0, len(databaseMap))
-	for db := range databaseMap {
-		databases = append(databases, db)
-	}
-
-	return databases, nil
-}
-
-func getBackups(ctx context.Context, database string) ([]string, error) {
-	// Get repository instance
-	repo, err := getRepository()
-	if err != nil {
-		return []string{}, err
-	}
-
-	// Build filter
-	filter := &repository.ListFilter{}
-	if database != "" {
-		filter.Database = database
-	}
-
-	// List backups
-	backups, err := repo.List(ctx, filter)
-	if err != nil {
-		return []string{}, err
-	}
-
-	// Extract backup IDs
-	backupIDs := make([]string, 0, len(backups))
-	for _, backup := range backups {
-		backupIDs = append(backupIDs, backup.ID)
-	}
-
-	return backupIDs, nil
-}
-
-func getSchedules(ctx context.Context) ([]string, error) {
-	// Get repository instance
-	repo, err := getRepository()
-	if err != nil {
-		return []string{}, err
-	}
-
-	// List all backups with schedule information
-	backups, err := repo.List(ctx, nil)
-	if err != nil {
-		return []string{}, err
-	}
-
-	// Extract unique schedule names from tags/metadata
-	scheduleMap := make(map[string]bool)
-	for _, backup := range backups {
-		// Check if backup has schedule tag
-		if backup.Tags != nil {
-			if schedule, ok := backup.Tags["schedule"]; ok && schedule != "" {
-				scheduleMap[schedule] = true
-			}
-		}
-		// Also check metadata field if it exists
-		if backup.Metadata != nil {
-			if schedule, ok := backup.Metadata["schedule"]; ok {
-				if schedStr, ok := schedule.(string); ok && schedStr != "" {
-					scheduleMap[schedStr] = true
-				}
-			}
-		}
-	}
-
-	// Convert to slice
-	schedules := make([]string, 0, len(scheduleMap))
-	for schedule := range scheduleMap {
-		schedules = append(schedules, schedule)
-	}
-
-	return schedules, nil
-}
-
-func getRetentionPolicies(ctx context.Context) ([]string, error) {
-	// Get repository instance
-	repo, err := getRepository()
-	if err != nil {
-		return []string{}, err
-	}
-
-	// List all backups with retention policy information
-	backups, err := repo.List(ctx, nil)
-	if err != nil {
-		return []string{}, err
-	}
-
-	// Extract unique retention policy names from tags/metadata
-	policyMap := make(map[string]bool)
-	for _, backup := range backups {
-		// Check if backup has retention policy tag
-		if backup.Tags != nil {
-			if policy, ok := backup.Tags["retention_policy"]; ok && policy != "" {
-				policyMap[policy] = true
-			}
-		}
-		// Also check metadata field if it exists
-		if backup.Metadata != nil {
-			if policy, ok := backup.Metadata["retention_policy"]; ok {
-				if policyStr, ok := policy.(string); ok && policyStr != "" {
-					policyMap[policyStr] = true
-				}
-			}
-		}
-	}
-
-	// Convert to slice
-	policies := make([]string, 0, len(policyMap))
-	for policy := range policyMap {
-		policies = append(policies, policy)
-	}
-
-	// Add common retention policies as fallback
-	if len(policies) == 0 {
-		policies = []string{"daily", "weekly", "monthly", "yearly"}
-	}
-
-	return policies, nil
-}
-
-func getAlerts(ctx context.Context) ([]string, error) {
-	// Get repository instance
-	repo, err := getRepository()
-	if err != nil {
-		return []string{}, err
-	}
-
-	// List all backups with alert information
-	backups, err := repo.List(ctx, nil)
-	if err != nil {
-		return []string{}, err
-	}
-
-	// Extract unique alert names from tags/metadata
-	alertMap := make(map[string]bool)
-	for _, backup := range backups {
-		// Check if backup has alert tag
-		if backup.Tags != nil {
-			if alert, ok := backup.Tags["alert"]; ok && alert != "" {
-				alertMap[alert] = true
-			}
-		}
-		// Also check metadata field if it exists
-		if backup.Metadata != nil {
-			if alert, ok := backup.Metadata["alert"]; ok {
-				if alertStr, ok := alert.(string); ok && alertStr != "" {
-					alertMap[alertStr] = true
-				}
-			}
-		}
-	}
-
-	// Convert to slice
-	alerts := make([]string, 0, len(alertMap))
-	for alert := range alertMap {
-		alerts = append(alerts, alert)
-	}
-
-	// Add common alert types as fallback
-	if len(alerts) == 0 {
-		alerts = []string{"backup_failed", "backup_succeeded", "backup_slow", "storage_full"}
-	}
-
-	return alerts, nil
-}
-
-func getTags(ctx context.Context) ([]string, error) {
-	// Get repository instance
-	repo, err := getRepository()
-	if err != nil {
-		return []string{}, err
-	}
-
-	// List all backups
-	backups, err := repo.List(ctx, nil)
-	if err != nil {
-		return []string{}, err
-	}
-
-	// Extract all unique tag keys
-	tagMap := make(map[string]bool)
-	for _, backup := range backups {
-		if backup.Tags != nil {
-			for tag := range backup.Tags {
-				tagMap[tag] = true
-			}
-		}
-	}
-
-	// Convert to slice
-	tags := make([]string, 0, len(tagMap))
-	for tag := range tagMap {
-		tags = append(tags, tag)
-	}
-
-	return tags, nil
-}
-
-// getRepository creates a repository instance using configuration
-func getRepository() (*repository.FileRepository, error) {
-	// Try to load configuration
-	loadedCfg, err := config.Load("")
-	if err != nil {
-		// Fall back to default metadata directory
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get user home directory: %w", err)
-		}
-		metadataDir := filepath.Join(homeDir, ".db-backup", "metadata")
-		return repository.NewFileRepository(metadataDir)
-	}
-
-	// Use configured metadata directory
-	return repository.NewFileRepository(loadedCfg.Backup.MetadataDirectory)
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
 	"github.com/sanskarpan/db-backup/internal/backup"
 	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/sanskarpan/db-backup/internal/scheduler"
@@ -71,23 +72,22 @@ var scheduleRunCmd = &cobra.Command{
 }
 
 type ScheduleAddOptions struct {
-	ID              string
-	Name            string
-	Cron            string
-	Type            string
-	Host            string
-	Port            int
-	User            string
-	Database        string
-	Databases       []string
-	AllDatabases    bool
-	Compression     string
-	Encrypt         bool
-	Storage         string
-	Retries         int
-	RetryDelay      time.Duration
-	Timeout         time.Duration
-	Tags            map[string]string
+	ID           string
+	Name         string
+	Cron         string
+	Type         string
+	Host         string
+	Port         int
+	User         string
+	Database     string
+	Databases    []string
+	AllDatabases bool
+	Compression  string
+	Encrypt      bool
+	Retries      int
+	RetryDelay   time.Duration
+	Timeout      time.Duration
+	Tags         map[string]string
 }
 
 type ScheduleListOptions struct {
@@ -121,47 +121,74 @@ func init() {
 	scheduleAddCmd.Flags().Duration("retry-delay", 5*time.Minute, "Delay between retries")
 	scheduleAddCmd.Flags().Duration("timeout", 24*time.Hour, "Job timeout")
 
-	scheduleAddCmd.MarkFlagRequired("id")
-	scheduleAddCmd.MarkFlagRequired("cron")
-	scheduleAddCmd.MarkFlagRequired("type")
+	cobra.CheckErr(scheduleAddCmd.MarkFlagRequired("id"))
+	cobra.CheckErr(scheduleAddCmd.MarkFlagRequired("cron"))
+	cobra.CheckErr(scheduleAddCmd.MarkFlagRequired("type"))
 
 	scheduleListCmd.Flags().String("format", "table", "Output format (table, json)")
+}
+
+// newSchedulerEngine constructs a scheduler backed by a backup engine built
+// from the active configuration. It centralizes the boilerplate shared by all
+// schedule subcommands.
+func newSchedulerEngine() (*scheduler.Scheduler, error) {
+	cfg := GetConfig()
+	log := GetLogger()
+	engine := backup.NewEngine(&backup.Config{
+		TempDirectory:      cfg.Backup.TempDirectory,
+		ParallelOperations: cfg.Backup.ParallelOperations,
+		DefaultCompression: cfg.Backup.DefaultCompression,
+		EnableEncryption:   cfg.Backup.Encryption.Enabled,
+		EncryptionKey:      "",
+	})
+
+	sched, err := scheduler.NewScheduler(engine, log, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create scheduler: %w", err)
+	}
+	return sched, nil
+}
+
+// runScheduleJobAction performs a simple lifecycle action (remove/enable/disable)
+// against the schedule identified by args[0]. verb is used both for the error
+// wrapping ("failed to <verb> schedule") and the success message ("<verb>d
+// successfully").
+func runScheduleJobAction(args []string, verb string, action func(*scheduler.Scheduler, string) error) error {
+	scheduleID := args[0]
+
+	sched, err := newSchedulerEngine()
+	if err != nil {
+		return err
+	}
+
+	if err := action(sched, scheduleID); err != nil {
+		return fmt.Errorf("failed to %s schedule: %w", verb, err)
+	}
+
+	fmt.Printf("✓ Schedule '%s' %sd successfully\n", scheduleID, verb)
+	return nil
 }
 
 func runScheduleAdd(cmd *cobra.Command, args []string) error {
 	// Parse options
 	opts := &ScheduleAddOptions{
-		ID:           cmd.Flag("id").Value.String(),
-		Name:         cmd.Flag("name").Value.String(),
-		Cron:         cmd.Flag("cron").Value.String(),
-		Type:         cmd.Flag("type").Value.String(),
-		Host:         cmd.Flag("host").Value.String(),
-		User:         cmd.Flag("user").Value.String(),
-		Database:     cmd.Flag("database").Value.String(),
-		Compression:  cmd.Flag("compression").Value.String(),
-		Storage:      cmd.Flag("storage").Value.String(),
+		ID:          cmd.Flag("id").Value.String(),
+		Name:        cmd.Flag("name").Value.String(),
+		Cron:        cmd.Flag("cron").Value.String(),
+		Type:        cmd.Flag("type").Value.String(),
+		Host:        cmd.Flag("host").Value.String(),
+		User:        cmd.Flag("user").Value.String(),
+		Database:    cmd.Flag("database").Value.String(),
+		Compression: cmd.Flag("compression").Value.String(),
 	}
 
-	port, _ := cmd.Flags().GetInt("port")
-	opts.Port = port
-
-	databases, _ := cmd.Flags().GetStringSlice("databases")
-	opts.Databases = databases
-
-	allDbs, _ := cmd.Flags().GetBool("all-databases")
-	opts.AllDatabases = allDbs
-
-	encrypt, _ := cmd.Flags().GetBool("encrypt")
-	opts.Encrypt = encrypt
-
-	retries, _ := cmd.Flags().GetInt("retries")
-	opts.Retries = retries
-
-	retryDelay, _ := cmd.Flags().GetDuration("retry-delay")
-	opts.RetryDelay = retryDelay
-
-	timeout, _ := cmd.Flags().GetDuration("timeout")
-	opts.Timeout = timeout
+	opts.Port = flagInt(cmd, "port")
+	opts.Databases = flagStringSlice(cmd, "databases")
+	opts.AllDatabases = flagBool(cmd, "all-databases")
+	opts.Encrypt = flagBool(cmd, "encrypt")
+	opts.Retries = flagInt(cmd, "retries")
+	opts.RetryDelay = flagDuration(cmd, "retry-delay")
+	opts.Timeout = flagDuration(cmd, "timeout")
 
 	// Set default name if not provided
 	if opts.Name == "" {
@@ -191,31 +218,21 @@ func runScheduleAdd(cmd *cobra.Command, args []string) error {
 
 	// Create scheduled job
 	job := &scheduler.ScheduledJob{
-		ID:          opts.ID,
-		Name:        opts.Name,
-		Schedule:    opts.Cron,
-		BackupOpts:  backupOpts,
-		Enabled:     true,
-		Retries:     opts.Retries,
-		RetryDelay:  opts.RetryDelay,
-		Timeout:     opts.Timeout,
-		Tags:        opts.Tags,
+		ID:         opts.ID,
+		Name:       opts.Name,
+		Schedule:   opts.Cron,
+		BackupOpts: backupOpts,
+		Enabled:    true,
+		Retries:    opts.Retries,
+		RetryDelay: opts.RetryDelay,
+		Timeout:    opts.Timeout,
+		Tags:       opts.Tags,
 	}
 
 	// Initialize scheduler
-	cfg := GetConfig()
-	log := GetLogger()
-	engine := backup.NewEngine(&backup.Config{
-		TempDirectory:      cfg.Backup.TempDirectory,
-		ParallelOperations: cfg.Backup.ParallelOperations,
-		DefaultCompression: cfg.Backup.DefaultCompression,
-		EnableEncryption:   cfg.Backup.Encryption.Enabled,
-		EncryptionKey:      "",
-	})
-
-	sched, err := scheduler.NewScheduler(engine, log, nil)
+	sched, err := newSchedulerEngine()
 	if err != nil {
-		return fmt.Errorf("failed to create scheduler: %w", err)
+		return err
 	}
 
 	// Add job
@@ -230,22 +247,12 @@ func runScheduleAdd(cmd *cobra.Command, args []string) error {
 }
 
 func runScheduleList(cmd *cobra.Command, args []string) error {
-	format, _ := cmd.Flags().GetString("format")
+	format := flagString(cmd, "format")
 
 	// Initialize scheduler
-	cfg := GetConfig()
-	log := GetLogger()
-	engine := backup.NewEngine(&backup.Config{
-		TempDirectory:      cfg.Backup.TempDirectory,
-		ParallelOperations: cfg.Backup.ParallelOperations,
-		DefaultCompression: cfg.Backup.DefaultCompression,
-		EnableEncryption:   cfg.Backup.Encryption.Enabled,
-		EncryptionKey:      "",
-	})
-
-	sched, err := scheduler.NewScheduler(engine, log, nil)
+	sched, err := newSchedulerEngine()
 	if err != nil {
-		return fmt.Errorf("failed to create scheduler: %w", err)
+		return err
 	}
 
 	jobs := sched.ListJobs()
@@ -289,103 +296,23 @@ func runScheduleList(cmd *cobra.Command, args []string) error {
 }
 
 func runScheduleRemove(cmd *cobra.Command, args []string) error {
-	scheduleID := args[0]
-
-	// Initialize scheduler
-	cfg := GetConfig()
-	log := GetLogger()
-	engine := backup.NewEngine(&backup.Config{
-		TempDirectory:      cfg.Backup.TempDirectory,
-		ParallelOperations: cfg.Backup.ParallelOperations,
-		DefaultCompression: cfg.Backup.DefaultCompression,
-		EnableEncryption:   cfg.Backup.Encryption.Enabled,
-		EncryptionKey:      "",
-	})
-
-	sched, err := scheduler.NewScheduler(engine, log, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create scheduler: %w", err)
-	}
-
-	if err := sched.RemoveJob(scheduleID); err != nil {
-		return fmt.Errorf("failed to remove schedule: %w", err)
-	}
-
-	fmt.Printf("✓ Schedule '%s' removed successfully\n", scheduleID)
-	return nil
+	return runScheduleJobAction(args, "remove", (*scheduler.Scheduler).RemoveJob)
 }
 
 func runScheduleEnable(cmd *cobra.Command, args []string) error {
-	scheduleID := args[0]
-
-	// Initialize scheduler
-	cfg := GetConfig()
-	log := GetLogger()
-	engine := backup.NewEngine(&backup.Config{
-		TempDirectory:      cfg.Backup.TempDirectory,
-		ParallelOperations: cfg.Backup.ParallelOperations,
-		DefaultCompression: cfg.Backup.DefaultCompression,
-		EnableEncryption:   cfg.Backup.Encryption.Enabled,
-		EncryptionKey:      "",
-	})
-
-	sched, err := scheduler.NewScheduler(engine, log, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create scheduler: %w", err)
-	}
-
-	if err := sched.EnableJob(scheduleID); err != nil {
-		return fmt.Errorf("failed to enable schedule: %w", err)
-	}
-
-	fmt.Printf("✓ Schedule '%s' enabled successfully\n", scheduleID)
-	return nil
+	return runScheduleJobAction(args, "enable", (*scheduler.Scheduler).EnableJob)
 }
 
 func runScheduleDisable(cmd *cobra.Command, args []string) error {
-	scheduleID := args[0]
-
-	// Initialize scheduler
-	cfg := GetConfig()
-	log := GetLogger()
-	engine := backup.NewEngine(&backup.Config{
-		TempDirectory:      cfg.Backup.TempDirectory,
-		ParallelOperations: cfg.Backup.ParallelOperations,
-		DefaultCompression: cfg.Backup.DefaultCompression,
-		EnableEncryption:   cfg.Backup.Encryption.Enabled,
-		EncryptionKey:      "",
-	})
-
-	sched, err := scheduler.NewScheduler(engine, log, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create scheduler: %w", err)
-	}
-
-	if err := sched.DisableJob(scheduleID); err != nil {
-		return fmt.Errorf("failed to disable schedule: %w", err)
-	}
-
-	fmt.Printf("✓ Schedule '%s' disabled successfully\n", scheduleID)
-	return nil
+	return runScheduleJobAction(args, "disable", (*scheduler.Scheduler).DisableJob)
 }
 
 func runScheduleRun(cmd *cobra.Command, args []string) error {
 	scheduleID := args[0]
 
-	// Initialize scheduler
-	cfg := GetConfig()
-	log := GetLogger()
-	engine := backup.NewEngine(&backup.Config{
-		TempDirectory:      cfg.Backup.TempDirectory,
-		ParallelOperations: cfg.Backup.ParallelOperations,
-		DefaultCompression: cfg.Backup.DefaultCompression,
-		EnableEncryption:   cfg.Backup.Encryption.Enabled,
-		EncryptionKey:      "",
-	})
-
-	sched, err := scheduler.NewScheduler(engine, log, nil)
+	sched, err := newSchedulerEngine()
 	if err != nil {
-		return fmt.Errorf("failed to create scheduler: %w", err)
+		return err
 	}
 
 	fmt.Printf("Running schedule '%s'...\n", scheduleID)
@@ -407,4 +334,3 @@ func runScheduleRun(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
-

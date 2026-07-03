@@ -15,34 +15,34 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// SMBProvider implements SMB/CIFS storage
-type SMBProvider struct {
+// SMBProvider implements SMB/CIFS storage.
+type SMBProvider struct { //nolint:revive // exported name kept stable for external packages
 	config      *SMBConfig
 	mountPoint  string
 	isMounted   bool
 	autoCleanup bool
 }
 
-// SMBConfig holds SMB/CIFS configuration
-type SMBConfig struct {
-	Server       string            // SMB server address (e.g., "//192.168.1.100/share")
-	Share        string            // Share name (e.g., "backups")
-	Username     string            // SMB username
-	Password     string            // SMB password
-	Domain       string            // Windows domain (optional)
-	MountPoint   string            // Local mount point (e.g., "/mnt/smb-backups")
-	Version      string            // SMB version ("1.0", "2.0", "2.1", "3.0", "3.1.1")
-	Options      map[string]string // Mount options
-	Timeout      time.Duration     // Mount timeout
-	AutoMount    bool              // Automatically mount on initialization
-	AutoUnmount  bool              // Automatically unmount on close
-	UseKerberos  bool              // Use Kerberos authentication
-	DirectIO     bool              // Use direct I/O (no caching)
-	FileMode     string            // File permissions (e.g., "0644")
-	DirMode      string            // Directory permissions (e.g., "0755")
+// SMBConfig holds SMB/CIFS configuration.
+type SMBConfig struct { //nolint:revive // exported name kept stable for external packages
+	Server      string            // SMB server address (e.g., "//192.168.1.100/share")
+	Share       string            // Share name (e.g., "backups")
+	Username    string            // SMB username
+	Password    string            // SMB password
+	Domain      string            // Windows domain (optional)
+	MountPoint  string            // Local mount point (e.g., "/mnt/smb-backups")
+	Version     string            // SMB version ("1.0", "2.0", "2.1", "3.0", "3.1.1")
+	Options     map[string]string // Mount options
+	Timeout     time.Duration     // Mount timeout
+	AutoMount   bool              // Automatically mount on initialization
+	AutoUnmount bool              // Automatically unmount on close
+	UseKerberos bool              // Use Kerberos authentication
+	DirectIO    bool              // Use direct I/O (no caching)
+	FileMode    string            // File permissions (e.g., "0644")
+	DirMode     string            // Directory permissions (e.g., "0755")
 }
 
-// NewSMBProvider creates a new SMB/CIFS storage provider
+// NewSMBProvider creates a new SMB/CIFS storage provider.
 func NewSMBProvider(config *SMBConfig) (*SMBProvider, error) {
 	if config == nil {
 		return nil, pkgErrors.New(pkgErrors.ErrorTypeConfiguration, "SMB config is required")
@@ -55,7 +55,7 @@ func NewSMBProvider(config *SMBConfig) (*SMBProvider, error) {
 
 	if config.MountPoint == "" {
 		// Create temporary mount point
-		config.MountPoint = filepath.Join("/tmp", fmt.Sprintf("smb-mount-%d", time.Now().Unix()))
+		config.MountPoint = filepath.Join(os.TempDir(), fmt.Sprintf("smb-mount-%d", time.Now().Unix()))
 		config.AutoUnmount = true
 	}
 
@@ -87,21 +87,19 @@ func NewSMBProvider(config *SMBConfig) (*SMBProvider, error) {
 	return provider, nil
 }
 
-// Mount mounts the SMB share
+// Mount mounts the SMB share.
 func (p *SMBProvider) Mount(ctx context.Context) error {
 	if p.isMounted {
 		return nil // Already mounted
 	}
 
 	// Create mount point if it doesn't exist
-	if err := os.MkdirAll(p.mountPoint, 0755); err != nil {
+	if err := os.MkdirAll(p.mountPoint, 0o755); err != nil {
 		return pkgErrors.New(pkgErrors.ErrorTypeStorage, fmt.Sprintf("failed to create mount point: %v", err))
 	}
 
 	// Check if already mounted
-	if mounted, err := p.checkMounted(); err != nil {
-		return err
-	} else if mounted {
+	if p.checkMounted() {
 		p.isMounted = true
 		return nil
 	}
@@ -135,12 +133,13 @@ func (p *SMBProvider) Mount(ctx context.Context) error {
 	return nil
 }
 
-// Unmount unmounts the SMB share
+// Unmount unmounts the SMB share.
 func (p *SMBProvider) Unmount(ctx context.Context) error {
 	if !p.isMounted {
 		return nil // Not mounted
 	}
 
+	//nolint:gosec // G204: mount point is an internally-derived path, not user command input
 	cmd := exec.CommandContext(ctx, "umount", p.mountPoint)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -151,14 +150,14 @@ func (p *SMBProvider) Unmount(ctx context.Context) error {
 	p.isMounted = false
 
 	// Remove temporary mount point if auto-cleanup is enabled
-	if p.autoCleanup && strings.HasPrefix(p.mountPoint, "/tmp/smb-mount-") {
+	if p.autoCleanup && strings.HasPrefix(p.mountPoint, filepath.Join(os.TempDir(), "smb-mount-")) {
 		os.Remove(p.mountPoint)
 	}
 
 	return nil
 }
 
-// Upload uploads a file to SMB storage
+// Upload uploads a file to SMB storage.
 func (p *SMBProvider) Upload(ctx context.Context, localPath, remotePath string, opts *storage.UploadOptions) error {
 	if !p.isMounted {
 		if err := p.Mount(ctx); err != nil {
@@ -184,7 +183,7 @@ func (p *SMBProvider) Upload(ctx context.Context, localPath, remotePath string, 
 
 	// Ensure destination directory exists
 	destDir := filepath.Dir(destPath)
-	if err := os.MkdirAll(destDir, 0755); err != nil {
+	if err = os.MkdirAll(destDir, 0o755); err != nil {
 		return pkgErrors.ErrStorageUpload(err)
 	}
 
@@ -219,7 +218,7 @@ func (p *SMBProvider) Upload(ctx context.Context, localPath, remotePath string, 
 	return nil
 }
 
-// UploadStream uploads data from a reader to SMB storage
+// UploadStream uploads data from a reader to SMB storage.
 func (p *SMBProvider) UploadStream(ctx context.Context, reader io.Reader, remotePath string, opts *storage.UploadOptions) error {
 	if !p.isMounted {
 		if err := p.Mount(ctx); err != nil {
@@ -231,7 +230,7 @@ func (p *SMBProvider) UploadStream(ctx context.Context, reader io.Reader, remote
 
 	// Ensure destination directory exists
 	destDir := filepath.Dir(destPath)
-	if err := os.MkdirAll(destDir, 0755); err != nil {
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return pkgErrors.ErrStorageUpload(err)
 	}
 
@@ -256,7 +255,7 @@ func (p *SMBProvider) UploadStream(ctx context.Context, reader io.Reader, remote
 	return nil
 }
 
-// Download downloads a file from SMB storage
+// Download downloads a file from SMB storage.
 func (p *SMBProvider) Download(ctx context.Context, remotePath, localPath string) error {
 	if !p.isMounted {
 		if err := p.Mount(ctx); err != nil {
@@ -275,7 +274,7 @@ func (p *SMBProvider) Download(ctx context.Context, remotePath, localPath string
 
 	// Ensure local directory exists
 	localDir := filepath.Dir(localPath)
-	if err := os.MkdirAll(localDir, 0755); err != nil {
+	if err = os.MkdirAll(localDir, 0o755); err != nil {
 		return pkgErrors.ErrStorageDownload(err)
 	}
 
@@ -295,7 +294,7 @@ func (p *SMBProvider) Download(ctx context.Context, remotePath, localPath string
 	return nil
 }
 
-// DownloadStream downloads data to a reader
+// DownloadStream downloads data to a reader.
 func (p *SMBProvider) DownloadStream(ctx context.Context, remotePath string) (io.ReadCloser, error) {
 	if !p.isMounted {
 		if err := p.Mount(ctx); err != nil {
@@ -313,7 +312,7 @@ func (p *SMBProvider) DownloadStream(ctx context.Context, remotePath string) (io
 	return file, nil
 }
 
-// Delete deletes a file from SMB storage
+// Delete deletes a file from SMB storage.
 func (p *SMBProvider) Delete(ctx context.Context, remotePath string) error {
 	if !p.isMounted {
 		if err := p.Mount(ctx); err != nil {
@@ -330,7 +329,7 @@ func (p *SMBProvider) Delete(ctx context.Context, remotePath string) error {
 	return nil
 }
 
-// Exists checks if a file exists in SMB storage
+// Exists checks if a file exists in SMB storage.
 func (p *SMBProvider) Exists(ctx context.Context, remotePath string) (bool, error) {
 	if !p.isMounted {
 		if err := p.Mount(ctx); err != nil {
@@ -352,7 +351,7 @@ func (p *SMBProvider) Exists(ctx context.Context, remotePath string) (bool, erro
 	return false, err
 }
 
-// GetMetadata retrieves file metadata
+// GetMetadata retrieves file metadata.
 func (p *SMBProvider) GetMetadata(ctx context.Context, remotePath string) (*storage.FileMetadata, error) {
 	if !p.isMounted {
 		if err := p.Mount(ctx); err != nil {
@@ -378,7 +377,7 @@ func (p *SMBProvider) GetMetadata(ctx context.Context, remotePath string) (*stor
 	return metadata, nil
 }
 
-// List lists files with a given prefix
+// List lists files with a given prefix.
 func (p *SMBProvider) List(ctx context.Context, prefix string) ([]*storage.FileMetadata, error) {
 	if !p.isMounted {
 		if err := p.Mount(ctx); err != nil {
@@ -423,12 +422,12 @@ func (p *SMBProvider) List(ctx context.Context, prefix string) ([]*storage.FileM
 	return files, nil
 }
 
-// GetType returns the provider type
+// GetType returns the provider type.
 func (p *SMBProvider) GetType() storage.ProviderType {
 	return "smb"
 }
 
-// ValidateConfig validates the provider configuration
+// ValidateConfig validates the provider configuration.
 func (p *SMBProvider) ValidateConfig() error {
 	if p.config.Server == "" {
 		return fmt.Errorf("SMB server is required")
@@ -446,7 +445,7 @@ func (p *SMBProvider) ValidateConfig() error {
 	return nil
 }
 
-// Close closes the provider and unmounts if configured
+// Close closes the provider and unmounts if configured.
 func (p *SMBProvider) Close() error {
 	if p.autoCleanup && p.isMounted {
 		return p.Unmount(context.Background())
@@ -545,7 +544,7 @@ func (p *SMBProvider) createCredentialsFile() (string, error) {
 	}
 
 	// Set restrictive permissions
-	if err := tmpFile.Chmod(0600); err != nil {
+	if err := tmpFile.Chmod(0o600); err != nil {
 		os.Remove(tmpFile.Name())
 		return "", err
 	}
@@ -553,16 +552,15 @@ func (p *SMBProvider) createCredentialsFile() (string, error) {
 	return tmpFile.Name(), nil
 }
 
-func (p *SMBProvider) checkMounted() (bool, error) {
+func (p *SMBProvider) checkMounted() bool {
 	// Read /proc/mounts to check if already mounted
 	data, err := os.ReadFile("/proc/mounts")
 	if err != nil {
 		// /proc/mounts might not exist on non-Linux systems
 		// Try using mount command
-		cmd := exec.Command("mount")
-		output, err := cmd.Output()
-		if err != nil {
-			return false, nil
+		output, cmdErr := exec.Command("mount").Output()
+		if cmdErr != nil {
+			return false
 		}
 		data = output
 	}
@@ -571,14 +569,14 @@ func (p *SMBProvider) checkMounted() (bool, error) {
 	for _, line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) >= 2 && fields[1] == p.mountPoint {
-			return true, nil
+			return true
 		}
 	}
 
-	return false, nil
+	return false
 }
 
-// progressReader wraps a reader to track progress
+// progressReader wraps a reader to track progress.
 type progressReader struct {
 	reader   io.Reader
 	total    int64

@@ -18,13 +18,13 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// Engine orchestrates restore operations
+// Engine orchestrates restore operations.
 type Engine struct {
 	config   *Config
 	provider storage.Provider
 }
 
-// Config holds restore engine configuration
+// Config holds restore engine configuration.
 type Config struct {
 	TempDirectory string
 	ValidateFirst bool
@@ -34,7 +34,9 @@ type Config struct {
 	StorageProvider storage.Provider
 }
 
-// RestoreOptions holds options for restoring a backup
+// RestoreOptions holds options for restoring a backup.
+//
+//nolint:revive // keeps public name stable; renaming would break other packages
 type RestoreOptions struct {
 	// Backup to restore
 	BackupID string
@@ -64,7 +66,7 @@ type RestoreOptions struct {
 	ProgressCallback func(progress Progress)
 }
 
-// Progress represents restore progress
+// Progress represents restore progress.
 type Progress struct {
 	Stage       string
 	Percentage  float64
@@ -73,7 +75,9 @@ type Progress struct {
 	BytesCopied int64
 }
 
-// RestoreResult contains the result of a restore operation
+// RestoreResult contains the result of a restore operation.
+//
+//nolint:revive // keeps public name stable; renaming would break other packages
 type RestoreResult struct {
 	BackupID       string
 	StartTime      time.Time
@@ -85,7 +89,7 @@ type RestoreResult struct {
 	Error          error
 }
 
-// NewEngine creates a new restore engine
+// NewEngine creates a new restore engine.
 func NewEngine(config *Config) *Engine {
 	return &Engine{
 		config:   config,
@@ -99,7 +103,7 @@ func (e *Engine) SetStorageProvider(provider storage.Provider) {
 	e.provider = provider
 }
 
-// RestoreBackup restores a database from backup
+// RestoreBackup restores a database from backup.
 func (e *Engine) RestoreBackup(ctx context.Context, backupMetadata *models.BackupMetadata, opts *RestoreOptions) (*RestoreResult, error) {
 	result := &RestoreResult{
 		BackupID:  backupMetadata.ID,
@@ -178,12 +182,17 @@ func (e *Engine) RestoreBackup(ctx context.Context, backupMetadata *models.Backu
 		})
 	}
 
-	if err := driver.Connect(ctx, connConfig); err != nil {
+	if err = driver.Connect(ctx, connConfig); err != nil {
 		result.Status = database.RestoreStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseConnection(err)
 	}
-	defer driver.Disconnect()
+	defer func() {
+		// Best-effort disconnect; the restore result already reflects the outcome.
+		if derr := driver.Disconnect(); derr != nil {
+			_ = derr
+		}
+	}()
 
 	// Prepare restore options
 	restoreOpts := &database.RestoreOptions{
@@ -199,7 +208,7 @@ func (e *Engine) RestoreBackup(ctx context.Context, backupMetadata *models.Backu
 
 	// Validate restore if required
 	if !opts.SkipValidation {
-		if err := driver.ValidateRestore(ctx, restoreOpts); err != nil {
+		if err = driver.ValidateRestore(ctx, restoreOpts); err != nil {
 			result.Status = database.RestoreStatusFailed
 			result.Error = err
 			return result, err
@@ -257,7 +266,7 @@ func (e *Engine) RestoreBackup(ctx context.Context, backupMetadata *models.Backu
 	return result, nil
 }
 
-// RestorePointInTime performs point-in-time recovery
+// RestorePointInTime performs point-in-time recovery.
 func (e *Engine) RestorePointInTime(ctx context.Context, backupMetadata *models.BackupMetadata, targetTime time.Time, opts *RestoreOptions) (*RestoreResult, error) {
 	// Set point-in-time
 	opts.PointInTime = &targetTime
@@ -337,7 +346,7 @@ func (e *Engine) validateRemoteBackup(ctx context.Context, metadata *models.Back
 	return nil
 }
 
-// verifyRestore verifies the restore was successful
+// verifyRestore verifies the restore was successful.
 func (e *Engine) verifyRestore(ctx context.Context, driver database.Driver, opts *RestoreOptions) error {
 	// Basic connectivity check
 	if err := driver.Ping(ctx); err != nil {

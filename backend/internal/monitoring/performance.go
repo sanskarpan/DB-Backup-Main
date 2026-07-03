@@ -6,14 +6,14 @@ import (
 	"time"
 )
 
-// ResponseEntry represents a recorded response
+// ResponseEntry represents a recorded response.
 type ResponseEntry struct {
 	Duration  time.Duration `json:"duration"`
 	Endpoint  string        `json:"endpoint"`
 	Timestamp time.Time     `json:"timestamp"`
 }
 
-// PerformanceMonitor monitors performance metrics
+// PerformanceMonitor monitors performance metrics.
 type PerformanceMonitor struct {
 	mu         sync.RWMutex
 	responses  []ResponseEntry
@@ -21,7 +21,7 @@ type PerformanceMonitor struct {
 	windowSize time.Duration
 }
 
-// NewPerformanceMonitor creates a new performance monitor
+// NewPerformanceMonitor creates a new performance monitor.
 func NewPerformanceMonitor() *PerformanceMonitor {
 	return &PerformanceMonitor{
 		responses:  make([]ResponseEntry, 0),
@@ -30,7 +30,7 @@ func NewPerformanceMonitor() *PerformanceMonitor {
 	}
 }
 
-// RecordResponse records a response time
+// RecordResponse records a response time.
 func (pm *PerformanceMonitor) RecordResponse(duration time.Duration, endpoint string) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
@@ -47,7 +47,7 @@ func (pm *PerformanceMonitor) RecordResponse(duration time.Duration, endpoint st
 	}
 }
 
-// GetAverageResponseTime calculates average response time
+// GetAverageResponseTime calculates average response time.
 func (pm *PerformanceMonitor) GetAverageResponseTime() time.Duration {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
@@ -74,7 +74,7 @@ func (pm *PerformanceMonitor) GetAverageResponseTime() time.Duration {
 	return total / time.Duration(count)
 }
 
-// GetP95ResponseTime calculates 95th percentile response time
+// GetP95ResponseTime calculates 95th percentile response time.
 func (pm *PerformanceMonitor) GetP95ResponseTime() time.Duration {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
@@ -105,7 +105,7 @@ func (pm *PerformanceMonitor) GetP95ResponseTime() time.Duration {
 	return durations[p95Index]
 }
 
-// Start starts the performance monitor
+// Start starts the performance monitor.
 func (pm *PerformanceMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 
@@ -122,7 +122,7 @@ func (pm *PerformanceMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-// cleanup removes old entries
+// cleanup removes old entries.
 func (pm *PerformanceMonitor) cleanup() {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()

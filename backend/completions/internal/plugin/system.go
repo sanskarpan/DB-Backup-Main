@@ -10,7 +10,7 @@ import (
 	"sync"
 )
 
-// Plugin represents a completion plugin
+// Plugin represents a completion plugin.
 type Plugin struct {
 	Name        string            `json:"name"`
 	Version     string            `json:"version"`
@@ -21,14 +21,18 @@ type Plugin struct {
 	Enabled     bool              `json:"enabled"`
 }
 
-// PluginResponse represents a plugin's completion response
+// PluginResponse represents a plugin's completion response.
+//
+//nolint:revive // keeps public name stable across packages
 type PluginResponse struct {
 	Suggestions []string          `json:"suggestions"`
 	Metadata    map[string]string `json:"metadata"`
 	Error       string            `json:"error,omitempty"`
 }
 
-// PluginSystem manages completion plugins
+// PluginSystem manages completion plugins.
+//
+//nolint:revive // keeps public name stable across packages
 type PluginSystem struct {
 	mu         sync.RWMutex
 	pluginDir  string
@@ -36,7 +40,7 @@ type PluginSystem struct {
 	configFile string
 }
 
-// NewPluginSystem creates a new plugin system
+// NewPluginSystem creates a new plugin system.
 func NewPluginSystem(pluginDir, configFile string) *PluginSystem {
 	return &PluginSystem{
 		pluginDir:  pluginDir,
@@ -45,13 +49,13 @@ func NewPluginSystem(pluginDir, configFile string) *PluginSystem {
 	}
 }
 
-// Load loads plugins from directory
+// Load loads plugins from directory.
 func (ps *PluginSystem) Load() error {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
 	// Create plugin directory if it doesn't exist
-	if err := os.MkdirAll(ps.pluginDir, 0755); err != nil {
+	if err := os.MkdirAll(ps.pluginDir, 0o755); err != nil {
 		return err
 	}
 
@@ -76,7 +80,7 @@ func (ps *PluginSystem) Load() error {
 	return nil
 }
 
-// Save saves plugin configurations
+// Save saves plugin configurations.
 func (ps *PluginSystem) Save() error {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
@@ -92,14 +96,14 @@ func (ps *PluginSystem) Save() error {
 	}
 
 	dir := filepath.Dir(ps.configFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 
-	return os.WriteFile(ps.configFile, data, 0644)
+	return os.WriteFile(ps.configFile, data, 0o600)
 }
 
-// Register registers a new plugin
+// Register registers a new plugin.
 func (ps *PluginSystem) Register(plugin *Plugin) error {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
@@ -128,7 +132,7 @@ func (ps *PluginSystem) Register(plugin *Plugin) error {
 	return ps.Save()
 }
 
-// Unregister unregisters a plugin
+// Unregister unregisters a plugin.
 func (ps *PluginSystem) Unregister(name string) error {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
@@ -138,7 +142,7 @@ func (ps *PluginSystem) Unregister(name string) error {
 	return ps.Save()
 }
 
-// Enable enables a plugin
+// Enable enables a plugin.
 func (ps *PluginSystem) Enable(name string) error {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
@@ -153,7 +157,7 @@ func (ps *PluginSystem) Enable(name string) error {
 	return ps.Save()
 }
 
-// Disable disables a plugin
+// Disable disables a plugin.
 func (ps *PluginSystem) Disable(name string) error {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
@@ -168,7 +172,7 @@ func (ps *PluginSystem) Disable(name string) error {
 	return ps.Save()
 }
 
-// GetCompletions gets completions from plugins
+// GetCompletions gets completions from plugins.
 func (ps *PluginSystem) GetCompletions(command string, args []string, context map[string]string) []string {
 	ps.mu.RLock()
 	plugins := make([]*Plugin, 0, len(ps.plugins))
@@ -194,7 +198,7 @@ func (ps *PluginSystem) GetCompletions(command string, args []string, context ma
 	return allSuggestions
 }
 
-// ListPlugins returns all registered plugins
+// ListPlugins returns all registered plugins.
 func (ps *PluginSystem) ListPlugins() []*Plugin {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
@@ -207,7 +211,7 @@ func (ps *PluginSystem) ListPlugins() []*Plugin {
 	return plugins
 }
 
-// GetPlugin returns a specific plugin
+// GetPlugin returns a specific plugin.
 func (ps *PluginSystem) GetPlugin(name string) (*Plugin, bool) {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
@@ -216,7 +220,7 @@ func (ps *PluginSystem) GetPlugin(name string) (*Plugin, bool) {
 	return plugin, exists
 }
 
-// executePlugin executes a plugin and returns suggestions
+// executePlugin executes a plugin and returns suggestions.
 func (ps *PluginSystem) executePlugin(plugin *Plugin, command string, args []string, context map[string]string) ([]string, error) {
 	execPath := plugin.Executable
 	if !filepath.IsAbs(execPath) {
@@ -242,13 +246,13 @@ func (ps *PluginSystem) executePlugin(plugin *Plugin, command string, args []str
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("plugin execution failed: %v, output: %s", err, output)
+		return nil, fmt.Errorf("plugin execution failed: %w, output: %s", err, output)
 	}
 
 	// Parse response
 	var response PluginResponse
 	if err := json.Unmarshal(output, &response); err != nil {
-		return nil, fmt.Errorf("failed to parse plugin response: %v", err)
+		return nil, fmt.Errorf("failed to parse plugin response: %w", err)
 	}
 
 	if response.Error != "" {
@@ -258,9 +262,9 @@ func (ps *PluginSystem) executePlugin(plugin *Plugin, command string, args []str
 	return response.Suggestions, nil
 }
 
-// CreateExamplePlugin creates an example plugin script
+// CreateExamplePlugin creates an example plugin script.
 func CreateExamplePlugin(pluginDir string) error {
-	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
 		return err
 	}
 
@@ -307,7 +311,8 @@ if __name__ == '__main__':
 `
 
 	pluginPath := filepath.Join(pluginDir, "example-plugin.py")
-	if err := os.WriteFile(pluginPath, []byte(exampleScript), 0755); err != nil {
+	//nolint:gosec // G306: plugin script must be executable to run as a subprocess
+	if err := os.WriteFile(pluginPath, []byte(exampleScript), 0o755); err != nil {
 		return err
 	}
 

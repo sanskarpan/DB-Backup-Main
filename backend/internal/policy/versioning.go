@@ -11,25 +11,29 @@ import (
 	"time"
 )
 
-// PolicyVersion represents a versioned policy
+// PolicyVersion represents a versioned policy.
+//
+//nolint:revive // keeps public name stable across packages
 type PolicyVersion struct {
-	ID          string                 `json:"id"`
-	PolicyID    string                 `json:"policy_id"`
-	Version     int                    `json:"version"`
-	Content     string                 `json:"content"`      // Rego policy content
-	Checksum    string                 `json:"checksum"`     // SHA256 of content
-	Description string                 `json:"description"`
-	Author      string                 `json:"author"`
-	CreatedAt   time.Time              `json:"created_at"`
-	Tags        map[string]string      `json:"tags,omitempty"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
-	Status      PolicyVersionStatus    `json:"status"`
-	Deprecated  bool                   `json:"deprecated"`
-	DeprecatedAt *time.Time            `json:"deprecated_at,omitempty"`
-	DeprecatedBy string                `json:"deprecated_by,omitempty"`
+	ID           string                 `json:"id"`
+	PolicyID     string                 `json:"policy_id"`
+	Version      int                    `json:"version"`
+	Content      string                 `json:"content"`  // Rego policy content
+	Checksum     string                 `json:"checksum"` // SHA256 of content
+	Description  string                 `json:"description"`
+	Author       string                 `json:"author"`
+	CreatedAt    time.Time              `json:"created_at"`
+	Tags         map[string]string      `json:"tags,omitempty"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+	Status       PolicyVersionStatus    `json:"status"`
+	Deprecated   bool                   `json:"deprecated"`
+	DeprecatedAt *time.Time             `json:"deprecated_at,omitempty"`
+	DeprecatedBy string                 `json:"deprecated_by,omitempty"`
 }
 
-// PolicyVersionStatus represents the status of a policy version
+// PolicyVersionStatus represents the status of a policy version.
+//
+//nolint:revive // keeps public name stable across packages
 type PolicyVersionStatus string
 
 const (
@@ -38,7 +42,9 @@ const (
 	PolicyVersionStatusArchived PolicyVersionStatus = "archived"
 )
 
-// PolicyVersionManager manages policy versions
+// PolicyVersionManager manages policy versions.
+//
+//nolint:revive // keeps public name stable across packages
 type PolicyVersionManager struct {
 	mu       sync.RWMutex
 	store    PolicyVersionStore
@@ -46,7 +52,9 @@ type PolicyVersionManager struct {
 	active   map[string]*PolicyVersion   // policyID -> active version
 }
 
-// PolicyVersionStore defines the interface for storing policy versions
+// PolicyVersionStore defines the interface for storing policy versions.
+//
+//nolint:revive // keeps public name stable across packages
 type PolicyVersionStore interface {
 	Save(ctx context.Context, version *PolicyVersion) error
 	Get(ctx context.Context, versionID string) (*PolicyVersion, error)
@@ -58,7 +66,7 @@ type PolicyVersionStore interface {
 	List(ctx context.Context) ([]*PolicyVersion, error)
 }
 
-// NewPolicyVersionManager creates a new policy version manager
+// NewPolicyVersionManager creates a new policy version manager.
 func NewPolicyVersionManager(store PolicyVersionStore) *PolicyVersionManager {
 	return &PolicyVersionManager{
 		store:    store,
@@ -67,7 +75,7 @@ func NewPolicyVersionManager(store PolicyVersionStore) *PolicyVersionManager {
 	}
 }
 
-// CreateVersion creates a new policy version
+// CreateVersion creates a new policy version.
 func (m *PolicyVersionManager) CreateVersion(ctx context.Context, policyID, content, description, author string) (*PolicyVersion, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -115,7 +123,7 @@ func (m *PolicyVersionManager) CreateVersion(ctx context.Context, policyID, cont
 	return version, nil
 }
 
-// ActivateVersion activates a specific policy version
+// ActivateVersion activates a specific policy version.
 func (m *PolicyVersionManager) ActivateVersion(ctx context.Context, policyID string, version int) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -146,7 +154,7 @@ func (m *PolicyVersionManager) ActivateVersion(ctx context.Context, policyID str
 	return nil
 }
 
-// GetActiveVersion returns the active version of a policy
+// GetActiveVersion returns the active version of a policy.
 func (m *PolicyVersionManager) GetActiveVersion(ctx context.Context, policyID string) (*PolicyVersion, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -171,17 +179,17 @@ func (m *PolicyVersionManager) GetActiveVersion(ctx context.Context, policyID st
 	return version, nil
 }
 
-// GetVersion retrieves a specific policy version
+// GetVersion retrieves a specific policy version.
 func (m *PolicyVersionManager) GetVersion(ctx context.Context, policyID string, version int) (*PolicyVersion, error) {
 	return m.store.GetVersion(ctx, policyID, version)
 }
 
-// GetVersionHistory returns all versions of a policy
+// GetVersionHistory returns all versions of a policy.
 func (m *PolicyVersionManager) GetVersionHistory(ctx context.Context, policyID string) ([]*PolicyVersion, error) {
 	return m.store.GetByPolicy(ctx, policyID)
 }
 
-// CompareVersions compares two policy versions
+// CompareVersions compares two policy versions.
 func (m *PolicyVersionManager) CompareVersions(ctx context.Context, policyID string, version1, version2 int) (*VersionComparison, error) {
 	v1, err := m.store.GetVersion(ctx, policyID, version1)
 	if err != nil {
@@ -194,18 +202,18 @@ func (m *PolicyVersionManager) CompareVersions(ctx context.Context, policyID str
 	}
 
 	comparison := &VersionComparison{
-		PolicyID:      policyID,
-		Version1:      v1,
-		Version2:      v2,
-		ContentChanged: v1.Content != v2.Content,
+		PolicyID:        policyID,
+		Version1:        v1,
+		Version2:        v2,
+		ContentChanged:  v1.Content != v2.Content,
 		ChecksumChanged: v1.Checksum != v2.Checksum,
-		SizeChange:    len(v2.Content) - len(v1.Content),
+		SizeChange:      len(v2.Content) - len(v1.Content),
 	}
 
 	return comparison, nil
 }
 
-// RollbackToVersion rolls back to a previous version
+// RollbackToVersion rolls back to a previous version.
 func (m *PolicyVersionManager) RollbackToVersion(ctx context.Context, policyID string, targetVersion int, author, reason string) error {
 	// Get the target version
 	target, err := m.store.GetVersion(ctx, policyID, targetVersion)
@@ -227,7 +235,7 @@ func (m *PolicyVersionManager) RollbackToVersion(ctx context.Context, policyID s
 	return nil
 }
 
-// DeprecateVersion marks a version as deprecated
+// DeprecateVersion marks a version as deprecated.
 func (m *PolicyVersionManager) DeprecateVersion(ctx context.Context, policyID string, version int, deprecatedBy, reason string) error {
 	policyVersion, err := m.store.GetVersion(ctx, policyID, version)
 	if err != nil {
@@ -247,7 +255,7 @@ func (m *PolicyVersionManager) DeprecateVersion(ctx context.Context, policyID st
 	return m.store.Update(ctx, policyVersion)
 }
 
-// TagVersion adds a tag to a policy version
+// TagVersion adds a tag to a policy version.
 func (m *PolicyVersionManager) TagVersion(ctx context.Context, policyID string, version int, key, value string) error {
 	policyVersion, err := m.store.GetVersion(ctx, policyID, version)
 	if err != nil {
@@ -262,7 +270,7 @@ func (m *PolicyVersionManager) TagVersion(ctx context.Context, policyID string, 
 	return m.store.Update(ctx, policyVersion)
 }
 
-// ExportVersion exports a policy version
+// ExportVersion exports a policy version.
 func (m *PolicyVersionManager) ExportVersion(ctx context.Context, policyID string, version int) ([]byte, error) {
 	policyVersion, err := m.store.GetVersion(ctx, policyID, version)
 	if err != nil {
@@ -278,7 +286,7 @@ func (m *PolicyVersionManager) ExportVersion(ctx context.Context, policyID strin
 	return json.MarshalIndent(export, "", "  ")
 }
 
-// ImportVersion imports a policy version
+// ImportVersion imports a policy version.
 func (m *PolicyVersionManager) ImportVersion(ctx context.Context, data []byte) (*PolicyVersion, error) {
 	var importData map[string]interface{}
 	if err := json.Unmarshal(data, &importData); err != nil {
@@ -308,7 +316,7 @@ func (m *PolicyVersionManager) ImportVersion(ctx context.Context, data []byte) (
 	return &version, nil
 }
 
-// GetVersionStatistics returns statistics about policy versions
+// GetVersionStatistics returns statistics about policy versions.
 func (m *PolicyVersionManager) GetVersionStatistics(ctx context.Context, policyID string) (*VersionStatistics, error) {
 	versions, err := m.store.GetByPolicy(ctx, policyID)
 	if err != nil {
@@ -316,11 +324,11 @@ func (m *PolicyVersionManager) GetVersionStatistics(ctx context.Context, policyI
 	}
 
 	stats := &VersionStatistics{
-		PolicyID:      policyID,
-		TotalVersions: len(versions),
-		ActiveVersions: 0,
-		DraftVersions: 0,
-		ArchivedVersions: 0,
+		PolicyID:           policyID,
+		TotalVersions:      len(versions),
+		ActiveVersions:     0,
+		DraftVersions:      0,
+		ArchivedVersions:   0,
 		DeprecatedVersions: 0,
 	}
 
@@ -348,33 +356,33 @@ func (m *PolicyVersionManager) GetVersionStatistics(ctx context.Context, policyI
 	return stats, nil
 }
 
-// VersionComparison represents a comparison between two versions
+// VersionComparison represents a comparison between two versions.
 type VersionComparison struct {
-	PolicyID        string          `json:"policy_id"`
-	Version1        *PolicyVersion  `json:"version_1"`
-	Version2        *PolicyVersion  `json:"version_2"`
-	ContentChanged  bool            `json:"content_changed"`
-	ChecksumChanged bool            `json:"checksum_changed"`
-	SizeChange      int             `json:"size_change"` // bytes
+	PolicyID        string         `json:"policy_id"`
+	Version1        *PolicyVersion `json:"version_1"`
+	Version2        *PolicyVersion `json:"version_2"`
+	ContentChanged  bool           `json:"content_changed"`
+	ChecksumChanged bool           `json:"checksum_changed"`
+	SizeChange      int            `json:"size_change"` // bytes
 }
 
-// VersionStatistics represents statistics about policy versions
+// VersionStatistics represents statistics about policy versions.
 type VersionStatistics struct {
-	PolicyID          string    `json:"policy_id"`
-	TotalVersions     int       `json:"total_versions"`
-	CurrentVersion    int       `json:"current_version"`
-	ActiveVersions    int       `json:"active_versions"`
-	DraftVersions     int       `json:"draft_versions"`
-	ArchivedVersions  int       `json:"archived_versions"`
-	DeprecatedVersions int      `json:"deprecated_versions"`
-	OldestVersion     time.Time `json:"oldest_version"`
-	LatestVersion     time.Time `json:"latest_version"`
+	PolicyID           string    `json:"policy_id"`
+	TotalVersions      int       `json:"total_versions"`
+	CurrentVersion     int       `json:"current_version"`
+	ActiveVersions     int       `json:"active_versions"`
+	DraftVersions      int       `json:"draft_versions"`
+	ArchivedVersions   int       `json:"archived_versions"`
+	DeprecatedVersions int       `json:"deprecated_versions"`
+	OldestVersion      time.Time `json:"oldest_version"`
+	LatestVersion      time.Time `json:"latest_version"`
 }
 
-// Common errors
+// Common errors.
 var (
-	ErrPolicyNotFound        = errors.New("policy not found")
-	ErrVersionNotFound       = errors.New("version not found")
-	ErrVersionAlreadyExists  = errors.New("version already exists")
-	ErrInvalidVersion        = errors.New("invalid version number")
+	ErrPolicyNotFound       = errors.New("policy not found")
+	ErrVersionNotFound      = errors.New("version not found")
+	ErrVersionAlreadyExists = errors.New("version already exists")
+	ErrInvalidVersion       = errors.New("invalid version number")
 )

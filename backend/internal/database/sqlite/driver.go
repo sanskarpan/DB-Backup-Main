@@ -11,13 +11,16 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+
 	"github.com/sanskarpan/db-backup/internal/database"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 	"github.com/sanskarpan/db-backup/pkg/utils"
 	"github.com/sanskarpan/db-backup/pkg/validation"
 )
 
-// SQLiteDriver implements the database.Driver interface for SQLite
+// SQLiteDriver implements the database.Driver interface for SQLite.
+//
+//nolint:revive // SQLiteDriver keeps a stable public name used by other packages
 type SQLiteDriver struct {
 	db     *sql.DB
 	config *database.ConnectionConfig
@@ -29,12 +32,12 @@ func init() {
 	})
 }
 
-// NewSQLiteDriver creates a new SQLite driver instance
+// NewSQLiteDriver creates a new SQLite driver instance.
 func NewSQLiteDriver() *SQLiteDriver {
 	return &SQLiteDriver{}
 }
 
-// Connect establishes a connection to the SQLite database
+// Connect establishes a connection to the SQLite database.
 func (d *SQLiteDriver) Connect(ctx context.Context, config *database.ConnectionConfig) error {
 	// For SQLite, the database field contains the file path
 	dbPath := config.Database
@@ -62,7 +65,7 @@ func (d *SQLiteDriver) Connect(ctx context.Context, config *database.ConnectionC
 	return nil
 }
 
-// Disconnect closes the database connection
+// Disconnect closes the database connection.
 func (d *SQLiteDriver) Disconnect() error {
 	if d.db != nil {
 		return d.db.Close()
@@ -70,7 +73,7 @@ func (d *SQLiteDriver) Disconnect() error {
 	return nil
 }
 
-// Ping tests the database connection
+// Ping tests the database connection.
 func (d *SQLiteDriver) Ping(ctx context.Context) error {
 	if d.db == nil {
 		return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "not connected to database")
@@ -78,7 +81,7 @@ func (d *SQLiteDriver) Ping(ctx context.Context) error {
 	return d.db.PingContext(ctx)
 }
 
-// Backup creates a backup of the SQLite database
+// Backup creates a backup of the SQLite database.
 func (d *SQLiteDriver) Backup(ctx context.Context, opts *database.BackupOptions) (*database.BackupResult, error) {
 	result := &database.BackupResult{
 		ID:        utils.GenerateBackupID(),
@@ -102,15 +105,15 @@ func (d *SQLiteDriver) Backup(ctx context.Context, opts *database.BackupOptions)
 
 	// Try VACUUM INTO first (preferred method)
 	// Note: VACUUM INTO doesn't support parameterized queries, but we've validated the path
+	//nolint:gosec // G201: sanitizedPath is validated via validation.SanitizePath; VACUUM INTO does not support parameters
 	query := fmt.Sprintf("VACUUM INTO '%s'", sanitizedPath)
 	_, err = d.db.ExecContext(ctx, query)
-
 	if err != nil {
 		// Fallback to file copy method
-		if err := d.fileCopyBackup(ctx, sanitizedPath); err != nil {
+		if copyErr := d.fileCopyBackup(ctx, sanitizedPath); copyErr != nil {
 			result.Status = database.BackupStatusFailed
-			result.Error = err
-			return result, pkgErrors.ErrDatabaseBackup(err)
+			result.Error = copyErr
+			return result, pkgErrors.ErrDatabaseBackup(copyErr)
 		}
 	}
 
@@ -122,11 +125,17 @@ func (d *SQLiteDriver) Backup(ctx context.Context, opts *database.BackupOptions)
 		return result, err
 	}
 
-	// Get database version
-	version, _ := d.GetVersion(ctx)
+	// Get database version (best-effort; failure should not fail the backup)
+	version, verErr := d.GetVersion(ctx)
+	if verErr != nil {
+		version = ""
+	}
 
-	// Get table information
-	tables, _ := d.getTableInfo(ctx)
+	// Get table information (best-effort; failure should not fail the backup)
+	tables, tblErr := d.getTableInfo(ctx)
+	if tblErr != nil {
+		tables = nil
+	}
 
 	// Complete result
 	result.EndTime = time.Now()
@@ -139,14 +148,14 @@ func (d *SQLiteDriver) Backup(ctx context.Context, opts *database.BackupOptions)
 	return result, nil
 }
 
-// StreamBackup streams a backup to the provided writer
+// StreamBackup streams a backup to the provided writer.
 func (d *SQLiteDriver) StreamBackup(ctx context.Context, opts *database.BackupOptions, writer io.Writer) error {
 	// SQLite doesn't natively support streaming
 	// We would need to backup to a temp file first, then stream it
 	return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "SQLite streaming backup not implemented - use file-based backup")
 }
 
-// GetBackupSize estimates the size of a backup
+// GetBackupSize estimates the size of a backup.
 func (d *SQLiteDriver) GetBackupSize(ctx context.Context, opts *database.BackupOptions) (int64, error) {
 	// Get database file size
 	fileInfo, err := os.Stat(d.config.Database)
@@ -157,7 +166,7 @@ func (d *SQLiteDriver) GetBackupSize(ctx context.Context, opts *database.BackupO
 	return fileInfo.Size(), nil
 }
 
-// Restore restores a SQLite database from backup
+// Restore restores a SQLite database from backup.
 func (d *SQLiteDriver) Restore(ctx context.Context, opts *database.RestoreOptions) (*database.RestoreResult, error) {
 	result := &database.RestoreResult{
 		StartTime: time.Now(),
@@ -218,14 +227,14 @@ func (d *SQLiteDriver) Restore(ctx context.Context, opts *database.RestoreOption
 	return result, nil
 }
 
-// StreamRestore restores from a reader
+// StreamRestore restores from a reader.
 func (d *SQLiteDriver) StreamRestore(ctx context.Context, opts *database.RestoreOptions, reader io.Reader) error {
 	// SQLite doesn't support streaming restore
 	// We would need to write to a temp file first
 	return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "SQLite streaming restore not implemented - use file-based restore")
 }
 
-// ValidateRestore validates that a restore can be performed
+// ValidateRestore validates that a restore can be performed.
 func (d *SQLiteDriver) ValidateRestore(ctx context.Context, opts *database.RestoreOptions) error {
 	// Check if backup file exists
 	if _, err := os.Stat(opts.SourceBackup); os.IsNotExist(err) {
@@ -235,13 +244,13 @@ func (d *SQLiteDriver) ValidateRestore(ctx context.Context, opts *database.Resto
 	return nil
 }
 
-// GetDatabases returns list of databases (for SQLite, just the current database)
+// GetDatabases returns list of databases (for SQLite, just the current database).
 func (d *SQLiteDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	// SQLite has only one database per file
 	return []string{d.config.Database}, nil
 }
 
-// GetTables returns list of tables in the database
+// GetTables returns list of tables in the database.
 func (d *SQLiteDriver) GetTables(ctx context.Context, database string) ([]string, error) {
 	query := "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
 	rows, err := d.db.QueryContext(ctx, query)
@@ -262,7 +271,7 @@ func (d *SQLiteDriver) GetTables(ctx context.Context, database string) ([]string
 	return tables, nil
 }
 
-// GetTableSize returns the size of a table (approximate)
+// GetTableSize returns the size of a table (approximate).
 func (d *SQLiteDriver) GetTableSize(ctx context.Context, database, table string) (int64, error) {
 	// Validate table name to prevent SQL injection
 	if err := validation.ValidateTableName(table); err != nil {
@@ -272,6 +281,7 @@ func (d *SQLiteDriver) GetTableSize(ctx context.Context, database, table string)
 	// SQLite doesn't have a direct way to get table size
 	// We can estimate by counting rows and page size
 	var rowCount int64
+	//nolint:gosec // G201: table is validated via validation.ValidateTableName; identifiers cannot be parameterized
 	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", table)
 	if err := d.db.QueryRowContext(ctx, query).Scan(&rowCount); err != nil {
 		return 0, err
@@ -287,29 +297,29 @@ func (d *SQLiteDriver) GetTableSize(ctx context.Context, database, table string)
 	return rowCount * pageSize, nil
 }
 
-// GetVersion returns the SQLite version
+// GetVersion returns the SQLite version.
 func (d *SQLiteDriver) GetVersion(ctx context.Context) (string, error) {
 	var version string
 	err := d.db.QueryRowContext(ctx, "SELECT sqlite_version()").Scan(&version)
 	return version, err
 }
 
-// GetType returns the database type
+// GetType returns the database type.
 func (d *SQLiteDriver) GetType() database.DatabaseType {
 	return database.DatabaseTypeSQLite
 }
 
-// SupportsIncremental returns whether incremental backups are supported
+// SupportsIncremental returns whether incremental backups are supported.
 func (d *SQLiteDriver) SupportsIncremental() bool {
 	return false // SQLite doesn't have built-in incremental backup
 }
 
-// SupportsPITR returns whether point-in-time recovery is supported
+// SupportsPITR returns whether point-in-time recovery is supported.
 func (d *SQLiteDriver) SupportsPITR() bool {
 	return false // SQLite doesn't have built-in PITR
 }
 
-// fileCopyBackup performs a file-based backup
+// fileCopyBackup performs a file-based backup.
 func (d *SQLiteDriver) fileCopyBackup(ctx context.Context, destPath string) error {
 	// Checkpoint WAL first
 	if _, err := d.db.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
@@ -321,7 +331,12 @@ func (d *SQLiteDriver) fileCopyBackup(ctx context.Context, destPath string) erro
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		// Rollback of a read-only transaction; its error is non-fatal.
+		if rbErr := tx.Rollback(); rbErr != nil {
+			_ = rbErr
+		}
+	}()
 
 	// Copy file
 	if err := copyFile(d.config.Database, destPath); err != nil {
@@ -331,7 +346,7 @@ func (d *SQLiteDriver) fileCopyBackup(ctx context.Context, destPath string) erro
 	return nil
 }
 
-// copyFile copies a file from src to dst
+// copyFile copies a file from src to dst.
 func copyFile(src, dst string) error {
 	srcFile, err := os.Open(src)
 	if err != nil {
@@ -341,8 +356,8 @@ func copyFile(src, dst string) error {
 
 	// Ensure destination directory exists
 	dstDir := filepath.Dir(dst)
-	if err := os.MkdirAll(dstDir, 0755); err != nil {
-		return err
+	if mkErr := os.MkdirAll(dstDir, 0o755); mkErr != nil {
+		return mkErr
 	}
 
 	dstFile, err := os.Create(dst)
@@ -355,14 +370,14 @@ func copyFile(src, dst string) error {
 	return err
 }
 
-// getTableInfo retrieves information about tables
+// getTableInfo retrieves information about tables.
 func (d *SQLiteDriver) getTableInfo(ctx context.Context) ([]database.TableInfo, error) {
 	tables, err := d.GetTables(ctx, d.config.Database)
 	if err != nil {
 		return nil, err
 	}
 
-	var tableInfos []database.TableInfo
+	tableInfos := make([]database.TableInfo, 0, len(tables))
 	for _, table := range tables {
 		// Validate table name to prevent SQL injection
 		if err := validation.ValidateTableName(table); err != nil {
@@ -370,6 +385,7 @@ func (d *SQLiteDriver) getTableInfo(ctx context.Context) ([]database.TableInfo, 
 		}
 
 		var rowCount int64
+		//nolint:gosec // G201: table is validated via validation.ValidateTableName; identifiers cannot be parameterized
 		query := fmt.Sprintf("SELECT COUNT(*) FROM %s", table)
 		if err := d.db.QueryRowContext(ctx, query).Scan(&rowCount); err != nil {
 			continue // Skip tables with errors
@@ -385,7 +401,7 @@ func (d *SQLiteDriver) getTableInfo(ctx context.Context) ([]database.TableInfo, 
 	return tableInfos, nil
 }
 
-// GetDatabaseSize returns the total size of the SQLite database file
+// GetDatabaseSize returns the total size of the SQLite database file.
 func (d *SQLiteDriver) GetDatabaseSize(ctx context.Context) (int64, error) {
 	// Get the database file size from disk
 	info, err := os.Stat(d.config.Database)

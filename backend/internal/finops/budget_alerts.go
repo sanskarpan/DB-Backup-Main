@@ -9,7 +9,7 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// BudgetManager manages budgets and alerts
+// BudgetManager manages budgets and alerts.
 type BudgetManager struct {
 	mu            sync.RWMutex
 	budgets       map[string]*Budget
@@ -20,28 +20,28 @@ type BudgetManager struct {
 	running       bool
 }
 
-// Budget represents a cost budget
+// Budget represents a cost budget.
 type Budget struct {
-	ID               string
-	Name             string
-	Scope            BudgetScope
-	ScopeValue       string // Database name, tag value, or "all"
-	Period           BudgetPeriod
-	Amount           float64
-	Currency         string
-	Thresholds       []BudgetThreshold
-	CurrentSpend     float64
-	Forecasted       float64
-	PercentUsed      float64
-	Status           BudgetStatus
-	StartDate        time.Time
-	EndDate          time.Time
-	LastEvaluated    time.Time
-	AlertsTriggered  int
-	Enabled          bool
+	ID              string
+	Name            string
+	Scope           BudgetScope
+	ScopeValue      string // Database name, tag value, or "all"
+	Period          BudgetPeriod
+	Amount          float64
+	Currency        string
+	Thresholds      []BudgetThreshold
+	CurrentSpend    float64
+	Forecasted      float64
+	PercentUsed     float64
+	Status          BudgetStatus
+	StartDate       time.Time
+	EndDate         time.Time
+	LastEvaluated   time.Time
+	AlertsTriggered int
+	Enabled         bool
 }
 
-// BudgetScope defines budget scope
+// BudgetScope defines budget scope.
 type BudgetScope string
 
 const (
@@ -51,7 +51,7 @@ const (
 	ScopeTag      BudgetScope = "tag"
 )
 
-// BudgetPeriod defines budget period
+// BudgetPeriod defines budget period.
 type BudgetPeriod string
 
 const (
@@ -61,14 +61,14 @@ const (
 	PeriodAnnual  BudgetPeriod = "annual"
 )
 
-// BudgetThreshold defines alert threshold
+// BudgetThreshold defines alert threshold.
 type BudgetThreshold struct {
 	Percentage float64 // 50, 75, 90, 100
 	Triggered  bool
 	LastAlert  time.Time
 }
 
-// BudgetStatus represents budget status
+// BudgetStatus represents budget status.
 type BudgetStatus string
 
 const (
@@ -78,7 +78,7 @@ const (
 	StatusExceeded BudgetStatus = "EXCEEDED"
 )
 
-// BudgetAlert represents a budget alert
+// BudgetAlert represents a budget alert.
 type BudgetAlert struct {
 	ID             string
 	BudgetID       string
@@ -95,7 +95,7 @@ type BudgetAlert struct {
 	AcknowledgedBy string
 }
 
-// AlertSeverity represents alert severity
+// AlertSeverity represents alert severity.
 type AlertSeverity string
 
 const (
@@ -104,10 +104,10 @@ const (
 	SeverityCritical AlertSeverity = "CRITICAL"
 )
 
-// AlertHandler is a callback for budget alerts
+// AlertHandler is a callback for budget alerts.
 type AlertHandler func(ctx context.Context, alert *BudgetAlert) error
 
-// NewBudgetManager creates a new budget manager
+// NewBudgetManager creates a new budget manager.
 func NewBudgetManager(costTracker *CostTracker) *BudgetManager {
 	return &BudgetManager{
 		budgets:       make(map[string]*Budget),
@@ -118,7 +118,7 @@ func NewBudgetManager(costTracker *CostTracker) *BudgetManager {
 	}
 }
 
-// AddBudget adds a new budget
+// AddBudget adds a new budget.
 func (bm *BudgetManager) AddBudget(budget *Budget) error {
 	bm.mu.Lock()
 	defer bm.mu.Unlock()
@@ -148,7 +148,7 @@ func (bm *BudgetManager) AddBudget(budget *Budget) error {
 	return nil
 }
 
-// setPeriodDates sets start and end dates based on period
+// setPeriodDates sets start and end dates based on period.
 func (bm *BudgetManager) setPeriodDates(budget *Budget) {
 	now := time.Now()
 
@@ -175,7 +175,7 @@ func (bm *BudgetManager) setPeriodDates(budget *Budget) {
 	}
 }
 
-// RemoveBudget removes a budget
+// RemoveBudget removes a budget.
 func (bm *BudgetManager) RemoveBudget(budgetID string) error {
 	bm.mu.Lock()
 	defer bm.mu.Unlock()
@@ -188,7 +188,7 @@ func (bm *BudgetManager) RemoveBudget(budgetID string) error {
 	return nil
 }
 
-// GetBudget returns a budget by ID
+// GetBudget returns a budget by ID.
 func (bm *BudgetManager) GetBudget(budgetID string) (*Budget, error) {
 	bm.mu.RLock()
 	defer bm.mu.RUnlock()
@@ -201,7 +201,7 @@ func (bm *BudgetManager) GetBudget(budgetID string) (*Budget, error) {
 	return budget, nil
 }
 
-// ListBudgets returns all budgets
+// ListBudgets returns all budgets.
 func (bm *BudgetManager) ListBudgets() []*Budget {
 	bm.mu.RLock()
 	defer bm.mu.RUnlock()
@@ -214,7 +214,7 @@ func (bm *BudgetManager) ListBudgets() []*Budget {
 	return budgets
 }
 
-// RegisterAlertHandler registers a callback for budget alerts
+// RegisterAlertHandler registers a callback for budget alerts.
 func (bm *BudgetManager) RegisterAlertHandler(handler AlertHandler) {
 	bm.mu.Lock()
 	defer bm.mu.Unlock()
@@ -222,7 +222,7 @@ func (bm *BudgetManager) RegisterAlertHandler(handler AlertHandler) {
 	bm.alertHandlers = append(bm.alertHandlers, handler)
 }
 
-// Start starts the budget monitoring loop
+// Start starts the budget monitoring loop.
 func (bm *BudgetManager) Start(ctx context.Context, interval time.Duration) error {
 	bm.mu.Lock()
 	if bm.running {
@@ -243,7 +243,7 @@ func (bm *BudgetManager) Start(ctx context.Context, interval time.Duration) erro
 	return nil
 }
 
-// Stop stops the budget monitoring
+// Stop stops the budget monitoring.
 func (bm *BudgetManager) Stop() {
 	bm.mu.Lock()
 	defer bm.mu.Unlock()
@@ -254,7 +254,7 @@ func (bm *BudgetManager) Stop() {
 	}
 }
 
-// monitoringLoop monitors budgets periodically
+// monitoringLoop monitors budgets periodically.
 func (bm *BudgetManager) monitoringLoop(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -274,7 +274,7 @@ func (bm *BudgetManager) monitoringLoop(ctx context.Context, interval time.Durat
 	}
 }
 
-// EvaluateAllBudgets evaluates all budgets
+// EvaluateAllBudgets evaluates all budgets.
 func (bm *BudgetManager) EvaluateAllBudgets(ctx context.Context) error {
 	bm.mu.Lock()
 	budgets := make([]*Budget, 0, len(bm.budgets))
@@ -295,7 +295,7 @@ func (bm *BudgetManager) EvaluateAllBudgets(ctx context.Context) error {
 	return nil
 }
 
-// EvaluateBudget evaluates a single budget
+// EvaluateBudget evaluates a single budget.
 func (bm *BudgetManager) EvaluateBudget(ctx context.Context, budgetID string) error {
 	bm.mu.Lock()
 	budget, exists := bm.budgets[budgetID]
@@ -331,13 +331,14 @@ func (bm *BudgetManager) EvaluateBudget(ctx context.Context, budgetID string) er
 	budget.LastEvaluated = now
 
 	// Determine status
-	if percentUsed >= 100 {
+	switch {
+	case percentUsed >= 100:
 		budget.Status = StatusExceeded
-	} else if percentUsed >= 90 {
+	case percentUsed >= 90:
 		budget.Status = StatusCritical
-	} else if percentUsed >= 75 {
+	case percentUsed >= 75:
 		budget.Status = StatusWarning
-	} else {
+	default:
 		budget.Status = StatusOK
 	}
 	bm.mu.Unlock()
@@ -348,7 +349,7 @@ func (bm *BudgetManager) EvaluateBudget(ctx context.Context, budgetID string) er
 	return nil
 }
 
-// resetBudgetPeriod resets budget for new period
+// resetBudgetPeriod resets budget for new period.
 func (bm *BudgetManager) resetBudgetPeriod(budget *Budget) {
 	bm.mu.Lock()
 	defer bm.mu.Unlock()
@@ -369,7 +370,7 @@ func (bm *BudgetManager) resetBudgetPeriod(budget *Budget) {
 	bm.setPeriodDates(budget)
 }
 
-// getCurrentSpend calculates current spend based on budget scope
+// getCurrentSpend calculates current spend based on budget scope.
 func (bm *BudgetManager) getCurrentSpend(budget *Budget) float64 {
 	switch budget.Scope {
 	case ScopeGlobal:
@@ -401,7 +402,7 @@ func (bm *BudgetManager) getCurrentSpend(budget *Budget) float64 {
 	return 0
 }
 
-// forecastSpend forecasts spending for the period
+// forecastSpend forecasts spending for the period.
 func (bm *BudgetManager) forecastSpend(budget *Budget, currentSpend float64) float64 {
 	now := time.Now()
 	periodDuration := budget.EndDate.Sub(budget.StartDate)
@@ -419,7 +420,7 @@ func (bm *BudgetManager) forecastSpend(budget *Budget, currentSpend float64) flo
 	return forecasted
 }
 
-// checkThresholds checks budget thresholds and triggers alerts
+// checkThresholds checks budget thresholds and triggers alerts.
 func (bm *BudgetManager) checkThresholds(ctx context.Context, budget *Budget) {
 	for i := range budget.Thresholds {
 		threshold := &budget.Thresholds[i]
@@ -445,14 +446,13 @@ func (bm *BudgetManager) checkThresholds(ctx context.Context, budget *Budget) {
 	}
 }
 
-// createAlert creates a budget alert
+// createAlert creates a budget alert.
 func (bm *BudgetManager) createAlert(budget *Budget, threshold float64) *BudgetAlert {
 	severity := SeverityInfo
-	if threshold >= 100 {
+	switch {
+	case threshold >= 90:
 		severity = SeverityCritical
-	} else if threshold >= 90 {
-		severity = SeverityCritical
-	} else if threshold >= 75 {
+	case threshold >= 75:
 		severity = SeverityWarning
 	}
 
@@ -480,7 +480,7 @@ func (bm *BudgetManager) createAlert(budget *Budget, threshold float64) *BudgetA
 	}
 }
 
-// triggerAlertHandlers triggers all registered alert handlers
+// triggerAlertHandlers triggers all registered alert handlers.
 func (bm *BudgetManager) triggerAlertHandlers(ctx context.Context, alert *BudgetAlert) {
 	bm.mu.RLock()
 	handlers := make([]AlertHandler, len(bm.alertHandlers))
@@ -496,7 +496,7 @@ func (bm *BudgetManager) triggerAlertHandlers(ctx context.Context, alert *Budget
 	}
 }
 
-// GetAlerts returns all alerts
+// GetAlerts returns all alerts.
 func (bm *BudgetManager) GetAlerts(unacknowledgedOnly bool) []*BudgetAlert {
 	bm.mu.RLock()
 	defer bm.mu.RUnlock()
@@ -511,7 +511,7 @@ func (bm *BudgetManager) GetAlerts(unacknowledgedOnly bool) []*BudgetAlert {
 	return alerts
 }
 
-// AcknowledgeAlert acknowledges an alert
+// AcknowledgeAlert acknowledges an alert.
 func (bm *BudgetManager) AcknowledgeAlert(alertID, user string) error {
 	bm.mu.Lock()
 	defer bm.mu.Unlock()
@@ -528,16 +528,16 @@ func (bm *BudgetManager) AcknowledgeAlert(alertID, user string) error {
 	return fmt.Errorf("alert not found: %s", alertID)
 }
 
-// GetBudgetSummary returns summary of all budgets
+// GetBudgetSummary returns summary of all budgets.
 func (bm *BudgetManager) GetBudgetSummary() *BudgetSummary {
 	bm.mu.RLock()
 	defer bm.mu.RUnlock()
 
 	summary := &BudgetSummary{
-		TotalBudgets:  len(bm.budgets),
-		ActiveAlerts:  0,
-		BudgetsOK:     0,
-		BudgetsWarning: 0,
+		TotalBudgets:    len(bm.budgets),
+		ActiveAlerts:    0,
+		BudgetsOK:       0,
+		BudgetsWarning:  0,
 		BudgetsCritical: 0,
 		BudgetsExceeded: 0,
 	}
@@ -568,14 +568,14 @@ func (bm *BudgetManager) GetBudgetSummary() *BudgetSummary {
 	return summary
 }
 
-// BudgetSummary represents budget summary
+// BudgetSummary represents budget summary.
 type BudgetSummary struct {
-	TotalBudgets     int
-	ActiveAlerts     int
-	BudgetsOK        int
-	BudgetsWarning   int
-	BudgetsCritical  int
-	BudgetsExceeded  int
+	TotalBudgets    int
+	ActiveAlerts    int
+	BudgetsOK       int
+	BudgetsWarning  int
+	BudgetsCritical int
+	BudgetsExceeded int
 }
 
 // Helper functions

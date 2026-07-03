@@ -8,11 +8,15 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
+
 	"github.com/sanskarpan/db-backup/internal/notification"
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// TestSchedule represents a DR test schedule
+// statusFailed is the textual status used across DR notifications for a failed test.
+const statusFailed = "FAILED"
+
+// TestSchedule represents a DR test schedule.
 type TestSchedule struct {
 	ID                       string
 	Name                     string
@@ -68,7 +72,7 @@ type TargetConfig struct {
 	Port int
 }
 
-// TestConfig represents configuration for a DR test
+// TestConfig represents configuration for a DR test.
 type TestConfig struct {
 	// Target is the real database to restore into and validate. Required.
 	Target *TargetConfig
@@ -94,7 +98,7 @@ type TestConfig struct {
 	CustomQueries []string
 }
 
-// DefaultTestConfig returns default DR test configuration
+// DefaultTestConfig returns default DR test configuration.
 func DefaultTestConfig() *TestConfig {
 	return &TestConfig{
 		IsolatedNetwork:    true,
@@ -112,7 +116,7 @@ func DefaultTestConfig() *TestConfig {
 	}
 }
 
-// Scheduler manages DR test schedules
+// Scheduler manages DR test schedules.
 type Scheduler struct {
 	mu                 sync.RWMutex
 	schedules          map[string]*TestSchedule
@@ -122,7 +126,7 @@ type Scheduler struct {
 	notificationRouter *notification.Router
 }
 
-// NewScheduler creates a new DR test scheduler
+// NewScheduler creates a new DR test scheduler.
 func NewScheduler(executor *TestExecutor, notificationRouter *notification.Router) *Scheduler {
 	if notificationRouter == nil {
 		notificationRouter = notification.NewRouter()
@@ -136,7 +140,7 @@ func NewScheduler(executor *TestExecutor, notificationRouter *notification.Route
 	}
 }
 
-// AddSchedule adds a new test schedule
+// AddSchedule adds a new test schedule.
 func (s *Scheduler) AddSchedule(schedule *TestSchedule) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -156,7 +160,7 @@ func (s *Scheduler) AddSchedule(schedule *TestSchedule) error {
 	return nil
 }
 
-// RemoveSchedule removes a test schedule
+// RemoveSchedule removes a test schedule.
 func (s *Scheduler) RemoveSchedule(scheduleID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -169,7 +173,7 @@ func (s *Scheduler) RemoveSchedule(scheduleID string) error {
 	return nil
 }
 
-// GetSchedule retrieves a schedule by ID
+// GetSchedule retrieves a schedule by ID.
 func (s *Scheduler) GetSchedule(scheduleID string) (*TestSchedule, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -182,7 +186,7 @@ func (s *Scheduler) GetSchedule(scheduleID string) (*TestSchedule, error) {
 	return schedule, nil
 }
 
-// ListSchedules returns all schedules
+// ListSchedules returns all schedules.
 func (s *Scheduler) ListSchedules() []*TestSchedule {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -195,7 +199,7 @@ func (s *Scheduler) ListSchedules() []*TestSchedule {
 	return schedules
 }
 
-// Start starts the scheduler
+// Start starts the scheduler.
 func (s *Scheduler) Start(ctx context.Context) error {
 	s.mu.Lock()
 	if s.running {
@@ -209,7 +213,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop stops the scheduler
+// Stop stops the scheduler.
 func (s *Scheduler) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -220,7 +224,7 @@ func (s *Scheduler) Stop() {
 	}
 }
 
-// run is the main scheduler loop
+// run is the main scheduler loop.
 func (s *Scheduler) run(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Minute) // Check every minute
 	defer ticker.Stop()
@@ -237,7 +241,7 @@ func (s *Scheduler) run(ctx context.Context) {
 	}
 }
 
-// checkAndExecuteTests checks for due tests and executes them
+// checkAndExecuteTests checks for due tests and executes them.
 func (s *Scheduler) checkAndExecuteTests(ctx context.Context, now time.Time) {
 	s.mu.RLock()
 	dueSchedules := make([]*TestSchedule, 0)
@@ -255,7 +259,7 @@ func (s *Scheduler) checkAndExecuteTests(ctx context.Context, now time.Time) {
 	}
 }
 
-// executeScheduledTest executes a scheduled DR test
+// executeScheduledTest executes a scheduled DR test.
 func (s *Scheduler) executeScheduledTest(ctx context.Context, schedule *TestSchedule) {
 	// Update last run time
 	now := time.Now()
@@ -268,8 +272,8 @@ func (s *Scheduler) executeScheduledTest(ctx context.Context, schedule *TestSche
 
 	// Calculate next run
 	if schedule.Enabled {
-		nextRun, err := calculateNextRun(schedule.CronExpression, now)
-		if err == nil {
+		nextRun, nextErr := calculateNextRun(schedule.CronExpression, now)
+		if nextErr == nil {
 			s.mu.Lock()
 			schedule.NextRun = &nextRun
 			s.mu.Unlock()
@@ -297,14 +301,14 @@ func (s *Scheduler) executeScheduledTest(ctx context.Context, schedule *TestSche
 	}
 }
 
-// sendNotification sends test result notifications via email and Slack
+// sendNotification sends test result notifications via email and Slack.
 func (s *Scheduler) sendNotification(schedule *TestSchedule, result *TestResult, err error) {
 	// Determine notification level and status
 	var level notification.NotificationLevel
 	status := "SUCCESS"
 
 	if err != nil || (result != nil && !result.Success) {
-		status = "FAILED"
+		status = statusFailed
 		level = notification.LevelError
 	} else {
 		level = notification.LevelSuccess
@@ -385,11 +389,11 @@ func (s *Scheduler) sendNotification(schedule *TestSchedule, result *TestResult,
 		if len(result.Validations) > 0 {
 			validationSummary := ""
 			for _, v := range result.Validations {
-				status := "✓"
+				vStatus := "✓"
 				if !v.Success {
-					status = "✗"
+					vStatus = "✗"
 				}
-				validationSummary += fmt.Sprintf("%s %s\n", status, v.Name)
+				validationSummary += fmt.Sprintf("%s %s\n", vStatus, v.Name)
 			}
 			fields = append(fields, &notification.Field{
 				Title: "Validations",
@@ -401,7 +405,7 @@ func (s *Scheduler) sendNotification(schedule *TestSchedule, result *TestResult,
 
 	// Set color based on status
 	color := "#36a64f" // Green for success
-	if status == "FAILED" {
+	if status == statusFailed {
 		color = "#ff0000" // Red for failure
 	}
 
@@ -442,12 +446,12 @@ func calculateNextRun(cronExpr string, from time.Time) (time.Time, error) {
 	return schedule.Next(from), nil
 }
 
-// generateScheduleID generates a unique schedule ID
+// generateScheduleID generates a unique schedule ID.
 func generateScheduleID() string {
 	return uid.New("schedule")
 }
 
-// RunTest manually triggers a DR test for a schedule
+// RunTest manually triggers a DR test for a schedule.
 func (s *Scheduler) RunTest(ctx context.Context, scheduleID string) (*TestResult, error) {
 	schedule, err := s.GetSchedule(scheduleID)
 	if err != nil {

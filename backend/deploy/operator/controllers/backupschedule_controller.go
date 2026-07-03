@@ -23,7 +23,10 @@ import (
 
 const backupScheduleFinalizer = "backup.db.sanskarpan.com/finalizer"
 
-// BackupScheduleReconciler reconciles a BackupSchedule object
+// phaseFailed is the status phase used when a resource enters a failed state.
+const phaseFailed = "Failed"
+
+// BackupScheduleReconciler reconciles a BackupSchedule object.
 type BackupScheduleReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
@@ -35,7 +38,7 @@ type BackupScheduleReconciler struct {
 // +kubebuilder:rbac:groups=backup.db.sanskarpan.com,resources=backuppolicies,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 
-// Reconcile is the main reconciliation loop
+// Reconcile is the main reconciliation loop.
 func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
@@ -54,8 +57,8 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// Add finalizer if it doesn't exist
 	if !controllerutil.ContainsFinalizer(schedule, backupScheduleFinalizer) {
 		controllerutil.AddFinalizer(schedule, backupScheduleFinalizer)
-		if err := r.Update(ctx, schedule); err != nil {
-			return ctrl.Result{}, err
+		if updErr := r.Update(ctx, schedule); updErr != nil {
+			return ctrl.Result{}, updErr
 		}
 	}
 
@@ -71,16 +74,16 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if schedule.Spec.Suspended {
 		schedule.Status.Phase = "Suspended"
 		r.updateCondition(schedule, "Active", metav1.ConditionFalse, "Suspended", "Schedule is suspended")
-		if err := r.Status().Update(ctx, schedule); err != nil {
-			return ctrl.Result{}, err
+		if statusErr := r.Status().Update(ctx, schedule); statusErr != nil {
+			return ctrl.Result{}, statusErr
 		}
 		return ctrl.Result{}, nil
 	}
 
 	// Validate schedule configuration
-	if err := r.validateSchedule(schedule); err != nil {
+	if err = r.validateSchedule(schedule); err != nil {
 		log.Error(err, "Invalid schedule configuration")
-		schedule.Status.Phase = "Failed"
+		schedule.Status.Phase = phaseFailed
 		r.updateCondition(schedule, "Valid", metav1.ConditionFalse, "ValidationFailed", err.Error())
 		if updateErr := r.Status().Update(ctx, schedule); updateErr != nil {
 			log.Error(updateErr, "Failed to update status")
@@ -95,7 +98,7 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	policy, err := r.getBackupPolicy(ctx, schedule)
 	if err != nil {
 		log.Error(err, "Failed to get BackupPolicy")
-		schedule.Status.Phase = "Failed"
+		schedule.Status.Phase = phaseFailed
 		r.updateCondition(schedule, "PolicyFound", metav1.ConditionFalse, "PolicyNotFound", err.Error())
 		if updateErr := r.Status().Update(ctx, schedule); updateErr != nil {
 			return ctrl.Result{}, updateErr
@@ -117,44 +120,16 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	} else {
 		schedule.Status.NextScheduleTime = &metav1.Time{Time: nextTime}
 		r.updateCondition(schedule, "Scheduled", metav1.ConditionTrue, "ScheduleActive", "Backup scheduled successfully")
-
-		// Check if it's time to run a backup
-		now := time.Now()
-		if schedule.Status.LastScheduleTime == nil || now.After(nextTime) {
-			// Check maintenance window
-			if r.isInMaintenanceWindow(schedule, now) {
-				// Check concurrency policy
-				if r.canRunBackup(schedule) {
-					if err := r.triggerBackup(ctx, schedule, policy); err != nil {
-						log.Error(err, "Failed to trigger backup")
-						schedule.Status.FailedRuns++
-						schedule.Status.MissedRuns++
-					} else {
-						schedule.Status.LastScheduleTime = &metav1.Time{Time: now}
-						schedule.Status.TotalRuns++
-						schedule.Status.SuccessfulRuns++
-						schedule.Status.LastSuccessfulTime = &metav1.Time{Time: now}
-					}
-				} else {
-					log.Info("Backup not triggered due to concurrency policy")
-					schedule.Status.MissedRuns++
-					r.updateCondition(schedule, "ConcurrencyBlocked", metav1.ConditionTrue, "ConcurrentBackupRunning", "Another backup is already running")
-				}
-			} else {
-				log.Info("Backup not triggered - outside maintenance window")
-				schedule.Status.MissedRuns++
-				r.updateCondition(schedule, "MaintenanceWindow", metav1.ConditionFalse, "OutsideWindow", "Current time is outside maintenance window")
-			}
-		}
+		r.maybeRunScheduledBackup(ctx, schedule, policy, nextTime)
 	}
 
 	// Clean up old jobs based on history limits
-	if err := r.cleanupOldJobs(ctx, schedule); err != nil {
+	if err = r.cleanupOldJobs(ctx, schedule); err != nil {
 		log.Error(err, "Failed to cleanup old jobs")
 	}
 
 	// Update status
-	if err := r.Status().Update(ctx, schedule); err != nil {
+	if err = r.Status().Update(ctx, schedule); err != nil {
 		log.Error(err, "Failed to update status")
 		return ctrl.Result{}, err
 	}
@@ -173,7 +148,44 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
-// reconcileDelete handles schedule deletion
+// maybeRunScheduledBackup triggers a backup if it is due, within the
+// maintenance window, and permitted by the concurrency policy.
+func (r *BackupScheduleReconciler) maybeRunScheduledBackup(ctx context.Context, schedule *backupv1.BackupSchedule, policy *backupv1.BackupPolicy, nextTime time.Time) {
+	log := log.FromContext(ctx)
+
+	now := time.Now()
+	if schedule.Status.LastScheduleTime != nil && !now.After(nextTime) {
+		return
+	}
+
+	if !r.isInMaintenanceWindow(schedule, now) {
+		log.Info("Backup not triggered - outside maintenance window")
+		schedule.Status.MissedRuns++
+		r.updateCondition(schedule, "MaintenanceWindow", metav1.ConditionFalse, "OutsideWindow", "Current time is outside maintenance window")
+		return
+	}
+
+	if !r.canRunBackup(schedule) {
+		log.Info("Backup not triggered due to concurrency policy")
+		schedule.Status.MissedRuns++
+		r.updateCondition(schedule, "ConcurrencyBlocked", metav1.ConditionTrue, "ConcurrentBackupRunning", "Another backup is already running")
+		return
+	}
+
+	if err := r.triggerBackup(ctx, schedule, policy); err != nil {
+		log.Error(err, "Failed to trigger backup")
+		schedule.Status.FailedRuns++
+		schedule.Status.MissedRuns++
+		return
+	}
+
+	schedule.Status.LastScheduleTime = &metav1.Time{Time: now}
+	schedule.Status.TotalRuns++
+	schedule.Status.SuccessfulRuns++
+	schedule.Status.LastSuccessfulTime = &metav1.Time{Time: now}
+}
+
+// reconcileDelete handles schedule deletion.
 func (r *BackupScheduleReconciler) reconcileDelete(ctx context.Context, schedule *backupv1.BackupSchedule) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
@@ -183,24 +195,8 @@ func (r *BackupScheduleReconciler) reconcileDelete(ctx context.Context, schedule
 
 		// Cancel any active backup jobs
 		log.Info("Canceling active backup jobs", "schedule", schedule.Name, "activeJobs", len(schedule.Status.ActiveJobs))
-		for _, activeJob := range schedule.Status.ActiveJobs {
-			job := &batchv1.Job{}
-			err := r.Get(ctx, client.ObjectKey{
-				Name:      activeJob.Name,
-				Namespace: activeJob.Namespace,
-			}, job)
-			if err == nil {
-				log.Info("Canceling active backup job", "job", activeJob.Name)
-				propagationPolicy := metav1.DeletePropagationBackground
-				if err := r.Delete(ctx, job, &client.DeleteOptions{
-					PropagationPolicy: &propagationPolicy,
-				}); err != nil && !errors.IsNotFound(err) {
-					log.Error(err, "Failed to delete active job", "job", activeJob.Name)
-				}
-			} else if !errors.IsNotFound(err) {
-				log.Error(err, "Failed to get active job", "job", activeJob.Name)
-			}
-		}
+		r.cancelActiveJobs(ctx, schedule.Status.ActiveJobs,
+			"Canceling active backup job", "Failed to delete active job", "Failed to get active job")
 
 		// Optionally clean up job history
 		if schedule.Spec.CleanupOnDelete {
@@ -211,10 +207,11 @@ func (r *BackupScheduleReconciler) reconcileDelete(ctx context.Context, schedule
 				client.MatchingLabels{"backup-schedule": schedule.Name}); err != nil {
 				log.Error(err, "Failed to list jobs for cleanup")
 			} else {
-				for _, job := range jobList.Items {
+				for i := range jobList.Items {
+					job := &jobList.Items[i]
 					log.Info("Deleting backup job", "job", job.Name)
 					propagationPolicy := metav1.DeletePropagationBackground
-					if err := r.Delete(ctx, &job, &client.DeleteOptions{
+					if err := r.Delete(ctx, job, &client.DeleteOptions{
 						PropagationPolicy: &propagationPolicy,
 					}); err != nil && !errors.IsNotFound(err) {
 						log.Error(err, "Failed to delete job", "job", job.Name)
@@ -227,15 +224,15 @@ func (r *BackupScheduleReconciler) reconcileDelete(ctx context.Context, schedule
 
 		// Remove finalizer
 		controllerutil.RemoveFinalizer(schedule, backupScheduleFinalizer)
-		if err := r.Update(ctx, schedule); err != nil {
-			return ctrl.Result{}, err
+		if updErr := r.Update(ctx, schedule); updErr != nil {
+			return ctrl.Result{}, updErr
 		}
 	}
 
 	return ctrl.Result{}, nil
 }
 
-// validateSchedule validates the schedule configuration
+// validateSchedule validates the schedule configuration.
 func (r *BackupScheduleReconciler) validateSchedule(schedule *backupv1.BackupSchedule) error {
 	// Validate cron schedule
 	if _, err := cron.ParseStandard(schedule.Spec.Schedule); err != nil {
@@ -260,7 +257,7 @@ func (r *BackupScheduleReconciler) validateSchedule(schedule *backupv1.BackupSch
 	return nil
 }
 
-// getBackupPolicy retrieves the referenced BackupPolicy
+// getBackupPolicy retrieves the referenced BackupPolicy.
 func (r *BackupScheduleReconciler) getBackupPolicy(ctx context.Context, schedule *backupv1.BackupSchedule) (*backupv1.BackupPolicy, error) {
 	policy := &backupv1.BackupPolicy{}
 	namespace := schedule.Spec.BackupPolicyRef.Namespace
@@ -272,7 +269,6 @@ func (r *BackupScheduleReconciler) getBackupPolicy(ctx context.Context, schedule
 		Name:      schedule.Spec.BackupPolicyRef.Name,
 		Namespace: namespace,
 	}, policy)
-
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +276,7 @@ func (r *BackupScheduleReconciler) getBackupPolicy(ctx context.Context, schedule
 	return policy, nil
 }
 
-// calculateNextScheduleTime calculates the next scheduled time
+// calculateNextScheduleTime calculates the next scheduled time.
 func (r *BackupScheduleReconciler) calculateNextScheduleTime(schedule *backupv1.BackupSchedule) (time.Time, error) {
 	cronSchedule, err := cron.ParseStandard(schedule.Spec.Schedule)
 	if err != nil {
@@ -299,7 +295,7 @@ func (r *BackupScheduleReconciler) calculateNextScheduleTime(schedule *backupv1.
 	return nextTime, nil
 }
 
-// isInMaintenanceWindow checks if current time is within maintenance window
+// isInMaintenanceWindow checks if current time is within maintenance window.
 func (r *BackupScheduleReconciler) isInMaintenanceWindow(schedule *backupv1.BackupSchedule, now time.Time) bool {
 	if schedule.Spec.MaintenanceWindow == nil {
 		return true // No maintenance window defined, always allowed
@@ -338,7 +334,7 @@ func (r *BackupScheduleReconciler) isInMaintenanceWindow(schedule *backupv1.Back
 	return true
 }
 
-// canRunBackup checks if a backup can run based on concurrency policy
+// canRunBackup checks if a backup can run based on concurrency policy.
 func (r *BackupScheduleReconciler) canRunBackup(schedule *backupv1.BackupSchedule) bool {
 	concurrencyPolicy := schedule.Spec.ConcurrencyPolicy
 	if concurrencyPolicy == "" {
@@ -362,24 +358,8 @@ func (r *BackupScheduleReconciler) canRunBackup(schedule *backupv1.BackupSchedul
 			// Create a background context for job deletion
 			ctx := context.Background()
 
-			for _, activeJob := range schedule.Status.ActiveJobs {
-				job := &batchv1.Job{}
-				err := r.Get(ctx, client.ObjectKey{
-					Name:      activeJob.Name,
-					Namespace: activeJob.Namespace,
-				}, job)
-				if err == nil {
-					log.Info("Canceling existing job due to Replace policy", "job", activeJob.Name)
-					propagationPolicy := metav1.DeletePropagationBackground
-					if err := r.Delete(ctx, job, &client.DeleteOptions{
-						PropagationPolicy: &propagationPolicy,
-					}); err != nil && !errors.IsNotFound(err) {
-						log.Error(err, "Failed to delete existing job", "job", activeJob.Name)
-					}
-				} else if !errors.IsNotFound(err) {
-					log.Error(err, "Failed to get existing job", "job", activeJob.Name)
-				}
-			}
+			r.cancelActiveJobs(ctx, schedule.Status.ActiveJobs,
+				"Canceling existing job due to Replace policy", "Failed to delete existing job", "Failed to get existing job")
 
 			// Clear active jobs list
 			schedule.Status.ActiveJobs = []backupv1.ActiveJob{}
@@ -390,7 +370,7 @@ func (r *BackupScheduleReconciler) canRunBackup(schedule *backupv1.BackupSchedul
 	return false
 }
 
-// triggerBackup triggers a new backup job
+// triggerBackup triggers a new backup job.
 func (r *BackupScheduleReconciler) triggerBackup(ctx context.Context, schedule *backupv1.BackupSchedule, policy *backupv1.BackupPolicy) error {
 	log := log.FromContext(ctx)
 	log.Info("Triggering backup", "schedule", schedule.Name, "policy", policy.Name)
@@ -411,7 +391,8 @@ func (r *BackupScheduleReconciler) triggerBackup(ctx context.Context, schedule *
 
 	// Add storage configuration if specified
 	if policy.Spec.Storage != nil {
-		args = append(args,
+		args = append(
+			args,
 			"--storage-provider", policy.Spec.Storage.Provider,
 			"--storage-path", policy.Spec.Storage.Path,
 		)
@@ -464,10 +445,10 @@ func (r *BackupScheduleReconciler) triggerBackup(ctx context.Context, schedule *
 
 	// Build pod labels
 	labels := map[string]string{
-		"app":                                  "db-backup",
-		"component":                            "backup",
-		"backup-schedule":                      schedule.Name,
-		"backup-policy":                        policy.Name,
+		"app":                                 "db-backup",
+		"component":                           "backup",
+		"backup-schedule":                     schedule.Name,
+		"backup-policy":                       policy.Name,
 		"backup.db.sanskarpan.com/managed-by": "backup-operator",
 	}
 
@@ -516,7 +497,7 @@ func (r *BackupScheduleReconciler) triggerBackup(ctx context.Context, schedule *
 	}
 
 	// Create backup job
-	backoffLimit := int32(3) // Default retry limit
+	backoffLimit := int32(3)   // Default retry limit
 	ttlSeconds := int32(86400) // 24 hours TTL
 
 	job := &batchv1.Job{
@@ -570,7 +551,7 @@ func (r *BackupScheduleReconciler) triggerBackup(ctx context.Context, schedule *
 	return nil
 }
 
-// cleanupOldJobs removes old job history based on limits
+// cleanupOldJobs removes old job history based on limits.
 func (r *BackupScheduleReconciler) cleanupOldJobs(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 	logger := log.FromContext(ctx)
 
@@ -588,7 +569,8 @@ func (r *BackupScheduleReconciler) cleanupOldJobs(ctx context.Context, schedule 
 
 	// Separate successful and failed jobs
 	var successfulJobs, failedJobs []batchv1.Job
-	for _, job := range jobList.Items {
+	for i := range jobList.Items {
+		job := jobList.Items[i]
 		if isJobSuccessful(&job) {
 			successfulJobs = append(successfulJobs, job)
 		} else if isJobFailed(&job) {
@@ -603,7 +585,7 @@ func (r *BackupScheduleReconciler) cleanupOldJobs(ctx context.Context, schedule 
 	// Clean up old successful jobs
 	successLimit := 3 // Default
 	if schedule.Spec.SuccessfulJobsHistoryLimit != nil {
-		successLimit = int(*schedule.Spec.SuccessfulJobsHistoryLimit)
+		successLimit = *schedule.Spec.SuccessfulJobsHistoryLimit
 	}
 	if err := r.cleanupJobsOverLimit(ctx, successfulJobs, successLimit); err != nil {
 		logger.Error(err, "Failed to cleanup old successful jobs")
@@ -612,7 +594,7 @@ func (r *BackupScheduleReconciler) cleanupOldJobs(ctx context.Context, schedule 
 	// Clean up old failed jobs
 	failedLimit := 1 // Default
 	if schedule.Spec.FailedJobsHistoryLimit != nil {
-		failedLimit = int(*schedule.Spec.FailedJobsHistoryLimit)
+		failedLimit = *schedule.Spec.FailedJobsHistoryLimit
 	}
 	if err := r.cleanupJobsOverLimit(ctx, failedJobs, failedLimit); err != nil {
 		logger.Error(err, "Failed to cleanup old failed jobs")
@@ -628,8 +610,9 @@ func (r *BackupScheduleReconciler) cleanupJobsOverLimit(ctx context.Context, job
 
 	// Delete oldest jobs beyond the limit
 	toDelete := jobs[:len(jobs)-limit]
-	for _, job := range toDelete {
-		if err := r.Delete(ctx, &job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+	for i := range toDelete {
+		job := &toDelete[i]
+		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
 			if !errors.IsNotFound(err) {
 				return fmt.Errorf("failed to delete job %s: %w", job.Name, err)
 			}
@@ -679,35 +662,37 @@ func getJobCompletionTime(job *batchv1.Job) *metav1.Time {
 	return job.Status.StartTime
 }
 
-// updateCondition updates a condition in the schedule status
-func (r *BackupScheduleReconciler) updateCondition(schedule *backupv1.BackupSchedule, conditionType string, status metav1.ConditionStatus, reason, message string) {
-	condition := metav1.Condition{
-		Type:               conditionType,
-		Status:             status,
-		ObservedGeneration: schedule.Generation,
-		LastTransitionTime: metav1.Now(),
-		Reason:             reason,
-		Message:            message,
-	}
-
-	// Find and update existing condition or append new one
-	found := false
-	for i, cond := range schedule.Status.Conditions {
-		if cond.Type == conditionType {
-			if cond.Status != status {
-				schedule.Status.Conditions[i] = condition
+// cancelActiveJobs deletes the given active jobs using background propagation.
+// cancelMsg, deleteErrMsg and getErrMsg parameterize the log messages emitted
+// for the cancel action, delete failures and get failures respectively.
+func (r *BackupScheduleReconciler) cancelActiveJobs(ctx context.Context, activeJobs []backupv1.ActiveJob, cancelMsg, deleteErrMsg, getErrMsg string) {
+	log := log.FromContext(ctx)
+	for _, activeJob := range activeJobs {
+		job := &batchv1.Job{}
+		err := r.Get(ctx, client.ObjectKey{
+			Name:      activeJob.Name,
+			Namespace: activeJob.Namespace,
+		}, job)
+		if err == nil {
+			log.Info(cancelMsg, "job", activeJob.Name)
+			propagationPolicy := metav1.DeletePropagationBackground
+			if err = r.Delete(ctx, job, &client.DeleteOptions{
+				PropagationPolicy: &propagationPolicy,
+			}); err != nil && !errors.IsNotFound(err) {
+				log.Error(err, deleteErrMsg, "job", activeJob.Name)
 			}
-			found = true
-			break
+		} else if !errors.IsNotFound(err) {
+			log.Error(err, getErrMsg, "job", activeJob.Name)
 		}
-	}
-
-	if !found {
-		schedule.Status.Conditions = append(schedule.Status.Conditions, condition)
 	}
 }
 
-// SetupWithManager sets up the controller with the Manager
+// updateCondition updates a condition in the schedule status.
+func (r *BackupScheduleReconciler) updateCondition(schedule *backupv1.BackupSchedule, conditionType string, status metav1.ConditionStatus, reason, message string) {
+	schedule.Status.Conditions = upsertCondition(schedule.Status.Conditions, schedule.Generation, conditionType, status, reason, message)
+}
+
+// SetupWithManager sets up the controller with the Manager.
 func (r *BackupScheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&backupv1.BackupSchedule{}).

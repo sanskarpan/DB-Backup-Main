@@ -5,13 +5,13 @@ import (
 	"time"
 )
 
-// Analytics tracks webhook delivery metrics
+// Analytics tracks webhook delivery metrics.
 type Analytics struct {
 	mu      sync.RWMutex
 	metrics map[string]*SubscriptionMetrics
 }
 
-// SubscriptionMetrics holds metrics for a single subscription
+// SubscriptionMetrics holds metrics for a single subscription.
 type SubscriptionMetrics struct {
 	SubscriptionID   string
 	TotalDeliveries  int64
@@ -26,7 +26,7 @@ type SubscriptionMetrics struct {
 	hourlyStats      []HourlyStat
 }
 
-// EventMetrics holds metrics for a single event
+// EventMetrics holds metrics for a single event.
 type EventMetrics struct {
 	EventID      string
 	DeliveryTime time.Time
@@ -36,35 +36,35 @@ type EventMetrics struct {
 	Attempts     int
 }
 
-// HourlyStat represents stats for an hour window
+// HourlyStat represents stats for an hour window.
 type HourlyStat struct {
-	Hour         time.Time
-	Deliveries   int64
-	Successes    int64
-	Failures     int64
-	AvgDuration  time.Duration
+	Hour        time.Time
+	Deliveries  int64
+	Successes   int64
+	Failures    int64
+	AvgDuration time.Duration
 }
 
-// AggregateMetrics holds overall metrics across all subscriptions
+// AggregateMetrics holds overall metrics across all subscriptions.
 type AggregateMetrics struct {
-	TotalSubscriptions int
+	TotalSubscriptions  int
 	ActiveSubscriptions int
-	TotalDeliveries    int64
-	TotalSuccesses     int64
-	TotalFailures      int64
-	SuccessRate        float64
-	AverageLatency     time.Duration
+	TotalDeliveries     int64
+	TotalSuccesses      int64
+	TotalFailures       int64
+	SuccessRate         float64
+	AverageLatency      time.Duration
 	SubscriptionMetrics []*SubscriptionMetrics
 }
 
-// NewAnalytics creates a new analytics tracker
+// NewAnalytics creates a new analytics tracker.
 func NewAnalytics() *Analytics {
 	return &Analytics{
 		metrics: make(map[string]*SubscriptionMetrics),
 	}
 }
 
-// RecordDelivery records a delivery attempt
+// RecordDelivery records a delivery attempt.
 func (a *Analytics) RecordDelivery(subscriptionID, eventID string, success bool, duration time.Duration, err error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -129,7 +129,7 @@ func (a *Analytics) RecordDelivery(subscriptionID, eventID string, success bool,
 	a.updateHourlyStats(metrics, success, duration)
 }
 
-// updateHourlyStats updates hourly statistics
+// updateHourlyStats updates hourly statistics.
 func (a *Analytics) updateHourlyStats(metrics *SubscriptionMetrics, success bool, duration time.Duration) {
 	now := time.Now()
 	currentHour := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, time.UTC)
@@ -172,7 +172,7 @@ func (a *Analytics) updateHourlyStats(metrics *SubscriptionMetrics, success bool
 	}
 }
 
-// GetSubscriptionMetrics returns metrics for a specific subscription
+// GetSubscriptionMetrics returns metrics for a specific subscription.
 func (a *Analytics) GetSubscriptionMetrics(subscriptionID string) *SubscriptionMetrics {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -198,13 +198,13 @@ func (a *Analytics) GetSubscriptionMetrics(subscriptionID string) *SubscriptionM
 	}
 }
 
-// GetAggregateMetrics returns aggregate metrics across all subscriptions
+// GetAggregateMetrics returns aggregate metrics across all subscriptions.
 func (a *Analytics) GetAggregateMetrics() *AggregateMetrics {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
 	agg := &AggregateMetrics{
-		TotalSubscriptions: len(a.metrics),
+		TotalSubscriptions:  len(a.metrics),
 		SubscriptionMetrics: make([]*SubscriptionMetrics, 0, len(a.metrics)),
 	}
 
@@ -249,7 +249,7 @@ func (a *Analytics) GetAggregateMetrics() *AggregateMetrics {
 	return agg
 }
 
-// GetHourlyStats returns hourly statistics for a subscription
+// GetHourlyStats returns hourly statistics for a subscription.
 func (a *Analytics) GetHourlyStats(subscriptionID string, hours int) []HourlyStat {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -275,7 +275,7 @@ func (a *Analytics) GetHourlyStats(subscriptionID string, hours int) []HourlySta
 	return stats
 }
 
-// Reset resets all analytics data
+// Reset resets all analytics data.
 func (a *Analytics) Reset() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -283,7 +283,7 @@ func (a *Analytics) Reset() {
 	a.metrics = make(map[string]*SubscriptionMetrics)
 }
 
-// ResetSubscription resets analytics for a specific subscription
+// ResetSubscription resets analytics for a specific subscription.
 func (a *Analytics) ResetSubscription(subscriptionID string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -291,7 +291,7 @@ func (a *Analytics) ResetSubscription(subscriptionID string) {
 	delete(a.metrics, subscriptionID)
 }
 
-// GetSuccessRate returns the success rate for a subscription
+// GetSuccessRate returns the success rate for a subscription.
 func (a *Analytics) GetSuccessRate(subscriptionID string) float64 {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -304,7 +304,7 @@ func (a *Analytics) GetSuccessRate(subscriptionID string) float64 {
 	return float64(metrics.SuccessCount) / float64(metrics.TotalDeliveries) * 100
 }
 
-// GetEventMetrics returns metrics for a specific event
+// GetEventMetrics returns metrics for a specific event.
 func (a *Analytics) GetEventMetrics(subscriptionID, eventID string) *EventMetrics {
 	a.mu.RLock()
 	defer a.mu.RUnlock()

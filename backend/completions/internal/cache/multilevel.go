@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-// CacheEntry represents a cache entry
-type CacheEntry struct {
+// Entry represents a cache entry.
+type Entry struct {
 	Key       string      `json:"key"`
 	Value     interface{} `json:"value"`
 	ExpiresAt time.Time   `json:"expires_at"`
@@ -20,10 +20,10 @@ type CacheEntry struct {
 	Size      int         `json:"size"`
 }
 
-// MultiLevelCache implements memory + disk caching with compression
+// MultiLevelCache implements memory + disk caching with compression.
 type MultiLevelCache struct {
 	mu            sync.RWMutex
-	memCache      map[string]*CacheEntry
+	memCache      map[string]*Entry
 	diskCacheDir  string
 	maxMemorySize int // in bytes
 	currentSize   int
@@ -31,10 +31,10 @@ type MultiLevelCache struct {
 	compress      bool
 }
 
-// NewMultiLevelCache creates a new multi-level cache
+// NewMultiLevelCache creates a new multi-level cache.
 func NewMultiLevelCache(diskCacheDir string, ttl time.Duration) *MultiLevelCache {
 	return &MultiLevelCache{
-		memCache:      make(map[string]*CacheEntry),
+		memCache:      make(map[string]*Entry),
 		diskCacheDir:  diskCacheDir,
 		maxMemorySize: 10 * 1024 * 1024, // 10MB default
 		ttl:           ttl,
@@ -42,7 +42,7 @@ func NewMultiLevelCache(diskCacheDir string, ttl time.Duration) *MultiLevelCache
 	}
 }
 
-// Get retrieves value from cache (memory first, then disk)
+// Get retrieves value from cache (memory first, then disk).
 func (c *MultiLevelCache) Get(key string) (interface{}, bool) {
 	c.mu.RLock()
 
@@ -70,13 +70,16 @@ func (c *MultiLevelCache) Get(key string) (interface{}, bool) {
 		return nil, false
 	}
 
-	// Promote to memory cache
-	c.Set(key, value)
+	// Promote to memory cache; a promotion failure is non-fatal since we
+	// already have the value from disk.
+	if err := c.Set(key, value); err != nil {
+		return value, true
+	}
 
 	return value, true
 }
 
-// Set stores value in cache (memory and disk)
+// Set stores value in cache (memory and disk).
 func (c *MultiLevelCache) Set(key string, value interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -87,7 +90,7 @@ func (c *MultiLevelCache) Set(key string, value interface{}) error {
 		return err
 	}
 
-	entry := &CacheEntry{
+	entry := &Entry{
 		Key:       key,
 		Value:     value,
 		ExpiresAt: time.Now().Add(c.ttl),
@@ -107,13 +110,18 @@ func (c *MultiLevelCache) Set(key string, value interface{}) error {
 	c.memCache[key] = entry
 	c.currentSize += entry.Size
 
-	// Store on disk asynchronously
-	go c.saveToDisk(key, entry)
+	// Store on disk asynchronously; disk persistence is best-effort so a
+	// failure here is non-fatal.
+	go func() {
+		if err := c.saveToDisk(key, entry); err != nil {
+			return
+		}
+	}()
 
 	return nil
 }
 
-// Delete removes value from cache
+// Delete removes value from cache.
 func (c *MultiLevelCache) Delete(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -128,18 +136,18 @@ func (c *MultiLevelCache) Delete(key string) {
 	os.Remove(diskPath)
 }
 
-// Clear clears all cache
+// Clear clears all cache.
 func (c *MultiLevelCache) Clear() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.memCache = make(map[string]*CacheEntry)
+	c.memCache = make(map[string]*Entry)
 	c.currentSize = 0
 
 	return os.RemoveAll(c.diskCacheDir)
 }
 
-// Stats returns cache statistics
+// Stats returns cache statistics.
 func (c *MultiLevelCache) Stats() map[string]interface{} {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -171,7 +179,7 @@ func (c *MultiLevelCache) Stats() map[string]interface{} {
 	}
 }
 
-// Prefetch loads multiple keys into cache
+// Prefetch loads multiple keys into cache.
 func (c *MultiLevelCache) Prefetch(keys []string, loader func(key string) (interface{}, error)) error {
 	for _, key := range keys {
 		// Check if already in cache
@@ -185,14 +193,16 @@ func (c *MultiLevelCache) Prefetch(keys []string, loader func(key string) (inter
 			continue // Skip errors, continue prefetching
 		}
 
-		// Store in cache
-		c.Set(key, value)
+		// Store in cache; skip on error and continue prefetching.
+		if err := c.Set(key, value); err != nil {
+			continue
+		}
 	}
 
 	return nil
 }
 
-// evictLRU evicts least recently used (lowest hits) entry
+// evictLRU evicts least recently used (lowest hits) entry.
 func (c *MultiLevelCache) evictLRU() {
 	if len(c.memCache) == 0 {
 		return
@@ -221,7 +231,7 @@ func (c *MultiLevelCache) evictLRU() {
 	}
 }
 
-// getFromDisk retrieves value from disk cache
+// getFromDisk retrieves value from disk cache.
 func (c *MultiLevelCache) getFromDisk(key string) (interface{}, error) {
 	diskPath := filepath.Join(c.diskCacheDir, key+".cache")
 
@@ -243,7 +253,7 @@ func (c *MultiLevelCache) getFromDisk(key string) (interface{}, error) {
 		reader = gzReader
 	}
 
-	var entry CacheEntry
+	var entry Entry
 	if err := json.NewDecoder(reader).Decode(&entry); err != nil {
 		return nil, err
 	}
@@ -257,9 +267,9 @@ func (c *MultiLevelCache) getFromDisk(key string) (interface{}, error) {
 	return entry.Value, nil
 }
 
-// saveToDisk saves value to disk cache
-func (c *MultiLevelCache) saveToDisk(key string, entry *CacheEntry) error {
-	if err := os.MkdirAll(c.diskCacheDir, 0755); err != nil {
+// saveToDisk saves value to disk cache.
+func (c *MultiLevelCache) saveToDisk(key string, entry *Entry) error {
+	if err := os.MkdirAll(c.diskCacheDir, 0o755); err != nil {
 		return err
 	}
 
@@ -283,7 +293,7 @@ func (c *MultiLevelCache) saveToDisk(key string, entry *CacheEntry) error {
 	return json.NewEncoder(writer).Encode(entry)
 }
 
-// Compress compresses data using gzip
+// Compress compresses data using gzip.
 func Compress(data []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	gzWriter := gzip.NewWriter(&buf)
@@ -299,7 +309,7 @@ func Compress(data []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// Decompress decompresses gzip data
+// Decompress decompresses gzip data.
 func Decompress(data []byte) ([]byte, error) {
 	buf := bytes.NewReader(data)
 	gzReader, err := gzip.NewReader(buf)

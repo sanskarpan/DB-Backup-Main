@@ -12,21 +12,21 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// IsolationAction represents an action taken during backup isolation
+// IsolationAction represents an action taken during backup isolation.
 type IsolationAction string
 
 const (
-	// IsolationActionQuarantine moves backup to quarantine
+	// IsolationActionQuarantine moves backup to quarantine.
 	IsolationActionQuarantine IsolationAction = "QUARANTINE"
-	// IsolationActionBlock prevents access to backup
+	// IsolationActionBlock prevents access to backup.
 	IsolationActionBlock IsolationAction = "BLOCK"
-	// IsolationActionAlert sends notification only
+	// IsolationActionAlert sends notification only.
 	IsolationActionAlert IsolationAction = "ALERT"
-	// IsolationActionDelete removes threatened backup
+	// IsolationActionDelete removes threatened backup.
 	IsolationActionDelete IsolationAction = "DELETE"
 )
 
-// IsolationPolicy defines how to handle threatened backups
+// IsolationPolicy defines how to handle threatened backups.
 type IsolationPolicy struct {
 	// Enabled determines if isolation is active
 	Enabled bool
@@ -50,7 +50,7 @@ type IsolationPolicy struct {
 	NotifyOnIsolation bool
 }
 
-// DefaultIsolationPolicy returns a default isolation policy
+// DefaultIsolationPolicy returns a default isolation policy.
 func DefaultIsolationPolicy(quarantinePath string) *IsolationPolicy {
 	return &IsolationPolicy{
 		Enabled:        true,
@@ -69,7 +69,7 @@ func DefaultIsolationPolicy(quarantinePath string) *IsolationPolicy {
 	}
 }
 
-// IsolationManager manages backup isolation
+// IsolationManager manages backup isolation.
 type IsolationManager struct {
 	policy   *IsolationPolicy
 	detector *Detector
@@ -82,7 +82,7 @@ type IsolationManager struct {
 	onIsolation func(*IsolatedBackup)
 }
 
-// IsolatedBackup represents a backup that has been isolated
+// IsolatedBackup represents a backup that has been isolated.
 type IsolatedBackup struct {
 	OriginalPath   string
 	QuarantinePath string
@@ -93,7 +93,7 @@ type IsolatedBackup struct {
 	RestoredAt     *time.Time
 }
 
-// NewIsolationManager creates a new isolation manager
+// NewIsolationManager creates a new isolation manager.
 func NewIsolationManager(policy *IsolationPolicy, detector *Detector) *IsolationManager {
 	if policy == nil {
 		policy = DefaultIsolationPolicy("/var/quarantine")
@@ -106,17 +106,18 @@ func NewIsolationManager(policy *IsolationPolicy, detector *Detector) *Isolation
 	}
 }
 
-// SetNotificationCallback sets a callback for isolation events
+// SetNotificationCallback sets a callback for isolation events.
 func (im *IsolationManager) SetNotificationCallback(callback func(*IsolatedBackup)) {
 	im.mu.Lock()
 	defer im.mu.Unlock()
 	im.onIsolation = callback
 }
 
-// ScanAndIsolate scans a backup and isolates if threats are detected
+// ScanAndIsolate scans a backup and isolates if threats are detected.
 func (im *IsolationManager) ScanAndIsolate(ctx context.Context, backupPath string) (*ThreatReport, error) {
 	if !im.policy.Enabled {
-		return nil, nil
+		// Isolation disabled: no report and no error is the intended no-op result.
+		return nil, nil //nolint:nilnil // disabled policy is a valid no-op, not an error
 	}
 
 	// Scan for threats
@@ -151,7 +152,7 @@ func (im *IsolationManager) ScanAndIsolate(ctx context.Context, backupPath strin
 	return report, nil
 }
 
-// executeIsolation executes the isolation action
+// executeIsolation executes the isolation action.
 func (im *IsolationManager) executeIsolation(backupPath string, report *ThreatReport, action IsolationAction) (*IsolatedBackup, error) {
 	im.mu.Lock()
 	defer im.mu.Unlock()
@@ -192,10 +193,10 @@ func (im *IsolationManager) executeIsolation(backupPath string, report *ThreatRe
 	return isolated, nil
 }
 
-// moveToQuarantine moves a backup to quarantine directory
+// moveToQuarantine moves a backup to quarantine directory.
 func (im *IsolationManager) moveToQuarantine(backupPath string) (string, error) {
 	// Ensure quarantine directory exists
-	if err := os.MkdirAll(im.policy.QuarantinePath, 0700); err != nil {
+	if err := os.MkdirAll(im.policy.QuarantinePath, 0o700); err != nil {
 		return "", pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
 			"failed to create quarantine directory")
 	}
@@ -216,7 +217,7 @@ func (im *IsolationManager) moveToQuarantine(backupPath string) (string, error) 
 	}
 
 	// Set restrictive permissions on quarantined file
-	if err := os.Chmod(quarantinePath, 0400); err != nil {
+	if err := os.Chmod(quarantinePath, 0o400); err != nil {
 		return quarantinePath, pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
 			"failed to set quarantine file permissions")
 	}
@@ -224,7 +225,7 @@ func (im *IsolationManager) moveToQuarantine(backupPath string) (string, error) 
 	return quarantinePath, nil
 }
 
-// copyAndDelete copies a file and deletes the original
+// copyAndDelete copies a file and deletes the original.
 func (im *IsolationManager) copyAndDelete(src, dst string) error {
 	// Read source file
 	data, err := os.ReadFile(src)
@@ -233,7 +234,7 @@ func (im *IsolationManager) copyAndDelete(src, dst string) error {
 	}
 
 	// Write to destination
-	if err := os.WriteFile(dst, data, 0400); err != nil {
+	if err := os.WriteFile(dst, data, 0o400); err != nil {
 		return err
 	}
 
@@ -241,18 +242,18 @@ func (im *IsolationManager) copyAndDelete(src, dst string) error {
 	return os.Remove(src)
 }
 
-// blockAccess blocks access to a backup by setting restrictive permissions
+// blockAccess blocks access to a backup by setting restrictive permissions.
 func (im *IsolationManager) blockAccess(backupPath string) error {
 	// Set file to no permissions (000)
-	if err := os.Chmod(backupPath, 0000); err != nil {
+	if err := os.Chmod(backupPath, 0o000); err != nil {
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
 			"failed to block access to backup")
 	}
 	return nil
 }
 
-// RestoreFromQuarantine restores a backup from quarantine
-func (im *IsolationManager) RestoreFromQuarantine(originalPath string, destinationPath string) error {
+// RestoreFromQuarantine restores a backup from quarantine.
+func (im *IsolationManager) RestoreFromQuarantine(originalPath, destinationPath string) error {
 	im.mu.Lock()
 	defer im.mu.Unlock()
 
@@ -274,7 +275,7 @@ func (im *IsolationManager) RestoreFromQuarantine(originalPath string, destinati
 	}
 
 	// Restore normal permissions
-	if err := os.Chmod(destinationPath, 0644); err != nil {
+	if err := os.Chmod(destinationPath, 0o644); err != nil {
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
 			"failed to restore backup permissions")
 	}
@@ -287,7 +288,7 @@ func (im *IsolationManager) RestoreFromQuarantine(originalPath string, destinati
 	return nil
 }
 
-// ListIsolatedBackups returns all isolated backups
+// ListIsolatedBackups returns all isolated backups.
 func (im *IsolationManager) ListIsolatedBackups() []*IsolatedBackup {
 	im.mu.RLock()
 	defer im.mu.RUnlock()
@@ -300,7 +301,7 @@ func (im *IsolationManager) ListIsolatedBackups() []*IsolatedBackup {
 	return backups
 }
 
-// GetIsolatedBackup retrieves an isolated backup by original path
+// GetIsolatedBackup retrieves an isolated backup by original path.
 func (im *IsolationManager) GetIsolatedBackup(originalPath string) (*IsolatedBackup, error) {
 	im.mu.RLock()
 	defer im.mu.RUnlock()
@@ -314,7 +315,7 @@ func (im *IsolationManager) GetIsolatedBackup(originalPath string) (*IsolatedBac
 	return isolated, nil
 }
 
-// CleanupOldQuarantine removes quarantined backups older than retention period
+// CleanupOldQuarantine removes quarantined backups older than retention period.
 func (im *IsolationManager) CleanupOldQuarantine(ctx context.Context) error {
 	im.mu.Lock()
 	defer im.mu.Unlock()
@@ -350,7 +351,7 @@ func (im *IsolationManager) CleanupOldQuarantine(ctx context.Context) error {
 	return nil
 }
 
-// IsBackupIsolated checks if a backup is currently isolated
+// IsBackupIsolated checks if a backup is currently isolated.
 func (im *IsolationManager) IsBackupIsolated(backupPath string) bool {
 	im.mu.RLock()
 	defer im.mu.RUnlock()
@@ -359,7 +360,7 @@ func (im *IsolationManager) IsBackupIsolated(backupPath string) bool {
 	return exists && !isolated.Restored
 }
 
-// GetIsolationStats returns statistics about isolated backups
+// GetIsolationStats returns statistics about isolated backups.
 func (im *IsolationManager) GetIsolationStats() *IsolationStats {
 	im.mu.RLock()
 	defer im.mu.RUnlock()
@@ -383,7 +384,7 @@ func (im *IsolationManager) GetIsolationStats() *IsolationStats {
 	return stats
 }
 
-// IsolationStats represents statistics about isolated backups
+// IsolationStats represents statistics about isolated backups.
 type IsolationStats struct {
 	TotalIsolated int
 	ByAction      map[IsolationAction]int

@@ -48,46 +48,46 @@ func TestNewDetector(t *testing.T) {
 
 func TestCalculateEntropy(t *testing.T) {
 	tests := []struct {
-		name         string
-		data         []byte
-		expectedMin  float64
-		expectedMax  float64
-		description  string
+		name        string
+		data        []byte
+		expectedMin float64
+		expectedMax float64
+		description string
 	}{
 		{
-			name:         "all zeros - low entropy",
-			data:         bytes.Repeat([]byte{0}, 1000),
-			expectedMin:  0.0,
-			expectedMax:  0.1,
-			description:  "uniform data should have very low entropy",
+			name:        "all zeros - low entropy",
+			data:        bytes.Repeat([]byte{0}, 1000),
+			expectedMin: 0.0,
+			expectedMax: 0.1,
+			description: "uniform data should have very low entropy",
 		},
 		{
-			name:         "repeating pattern - low entropy",
-			data:         bytes.Repeat([]byte("ABC"), 333),
-			expectedMin:  0.0,
-			expectedMax:  2.0,
-			description:  "repeating pattern has low entropy",
+			name:        "repeating pattern - low entropy",
+			data:        bytes.Repeat([]byte("ABC"), 333),
+			expectedMin: 0.0,
+			expectedMax: 2.0,
+			description: "repeating pattern has low entropy",
 		},
 		{
-			name:         "english text - medium entropy",
-			data:         []byte(strings.Repeat("The quick brown fox jumps over the lazy dog. ", 20)),
-			expectedMin:  3.0,
-			expectedMax:  5.0,
-			description:  "natural language has medium entropy",
+			name:        "english text - medium entropy",
+			data:        []byte(strings.Repeat("The quick brown fox jumps over the lazy dog. ", 20)),
+			expectedMin: 3.0,
+			expectedMax: 5.0,
+			description: "natural language has medium entropy",
 		},
 		{
-			name:         "random-like data - high entropy",
-			data:         generatePseudoRandom(1000),
-			expectedMin:  6.0,
-			expectedMax:  8.0,
-			description:  "random/encrypted data has high entropy",
+			name:        "random-like data - high entropy",
+			data:        generatePseudoRandom(1000),
+			expectedMin: 6.0,
+			expectedMax: 8.0,
+			description: "random/encrypted data has high entropy",
 		},
 		{
-			name:         "empty data",
-			data:         []byte{},
-			expectedMin:  0.0,
-			expectedMax:  0.0,
-			description:  "empty data has zero entropy",
+			name:        "empty data",
+			data:        []byte{},
+			expectedMin: 0.0,
+			expectedMax: 0.0,
+			description: "empty data has zero entropy",
 		},
 	}
 
@@ -140,7 +140,7 @@ func TestScanFile_SuspiciousExtension(t *testing.T) {
 	defer os.Remove(tmpFile.Name())
 
 	// Write low entropy data (so it doesn't trigger entropy check)
-	_, err = tmpFile.Write([]byte(strings.Repeat("normal text ", 100)))
+	_, err = tmpFile.WriteString(strings.Repeat("normal text ", 100))
 	require.NoError(t, err)
 	tmpFile.Close()
 
@@ -164,7 +164,7 @@ func TestScanFile_CleanFile(t *testing.T) {
 	defer os.Remove(tmpFile.Name())
 
 	// Write normal text data
-	_, err = tmpFile.Write([]byte("This is normal text content for testing purposes.\n"))
+	_, err = tmpFile.WriteString("This is normal text content for testing purposes.\n")
 	require.NoError(t, err)
 	tmpFile.Close()
 
@@ -188,17 +188,17 @@ func TestScanDirectory(t *testing.T) {
 
 	// Create normal file
 	normalFile := filepath.Join(tmpDir, "normal.txt")
-	err = os.WriteFile(normalFile, []byte("normal content"), 0644)
+	err = os.WriteFile(normalFile, []byte("normal content"), 0o644)
 	require.NoError(t, err)
 
 	// Create encrypted-looking file
 	encryptedFile := filepath.Join(tmpDir, "encrypted.bin")
-	err = os.WriteFile(encryptedFile, generatePseudoRandom(5000), 0644)
+	err = os.WriteFile(encryptedFile, generatePseudoRandom(5000), 0o644)
 	require.NoError(t, err)
 
 	// Create suspicious extension file
 	suspiciousFile := filepath.Join(tmpDir, "file.encrypted")
-	err = os.WriteFile(suspiciousFile, []byte("content"), 0644)
+	err = os.WriteFile(suspiciousFile, []byte("content"), 0o644)
 	require.NoError(t, err)
 
 	// Scan directory
@@ -499,6 +499,8 @@ func TestThreatReport(t *testing.T) {
 		assert.NotEmpty(t, report.FileHash)
 		assert.Equal(t, 7.5, report.Entropy)
 		assert.NotEmpty(t, report.Indicators)
+		assert.Equal(t, "High entropy detected", report.Description)
+		assert.Equal(t, "Investigate file", report.Recommended)
 	})
 }
 
@@ -513,7 +515,7 @@ func TestConcurrentAccess(t *testing.T) {
 	// Create multiple test files
 	for i := 0; i < 10; i++ {
 		filename := filepath.Join(tmpDir, fmt.Sprintf("file%d.txt", i))
-		err := os.WriteFile(filename, []byte("test content"), 0644)
+		err := os.WriteFile(filename, []byte("test content"), 0o644)
 		require.NoError(t, err)
 	}
 
@@ -536,7 +538,7 @@ func TestConcurrentAccess(t *testing.T) {
 	<-done
 }
 
-// Helper function to generate pseudo-random data for testing
+// Helper function to generate pseudo-random data for testing.
 func generatePseudoRandom(size int) []byte {
 	data := make([]byte, size)
 	// Use a mix of all possible byte values to create high entropy
@@ -546,7 +548,7 @@ func generatePseudoRandom(size int) []byte {
 	return data
 }
 
-// Benchmark tests
+// Benchmark tests.
 func BenchmarkCalculateEntropy(b *testing.B) {
 	data := generatePseudoRandom(10000)
 	reader := bytes.NewReader(data)

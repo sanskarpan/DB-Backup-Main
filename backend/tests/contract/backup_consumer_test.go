@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// BackupConsumer tests the backup API from consumer perspective
+// BackupConsumer tests the backup API from consumer perspective.
 func TestBackupConsumer(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping contract test - requires Pact CLI tools")
@@ -163,7 +163,7 @@ func TestBackupConsumer(t *testing.T) {
 	})
 }
 
-// TestRestoreConsumer tests the restore API from consumer perspective
+// TestRestoreConsumer tests the restore API from consumer perspective.
 func TestRestoreConsumer(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping contract test - requires Pact CLI tools")

@@ -21,7 +21,7 @@ import (
 
 const backupPolicyFinalizer = "backup.db.sanskarpan.com/finalizer"
 
-// BackupPolicyReconciler reconciles a BackupPolicy object
+// BackupPolicyReconciler reconciles a BackupPolicy object.
 type BackupPolicyReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
@@ -35,7 +35,7 @@ type BackupPolicyReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 
-// Reconcile is the main reconciliation loop
+// Reconcile is the main reconciliation loop.
 func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
@@ -116,87 +116,109 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 }
 
-// reconcileDelete handles policy deletion
+// reconcileDelete handles policy deletion.
 func (r *BackupPolicyReconciler) reconcileDelete(ctx context.Context, policy *backupv1.BackupPolicy) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	if controllerutil.ContainsFinalizer(policy, backupPolicyFinalizer) {
-		// Perform cleanup
-		log.Info("Performing cleanup for BackupPolicy", "name", policy.Name)
+	if !controllerutil.ContainsFinalizer(policy, backupPolicyFinalizer) {
+		return ctrl.Result{}, nil
+	}
 
-		// Cancel any in-progress backups
-		log.Info("Canceling in-progress backups for policy", "policy", policy.Name)
+	// Perform cleanup
+	log.Info("Performing cleanup for BackupPolicy", "name", policy.Name)
+	r.cancelInProgressBackups(ctx, policy)
 
-		// Find all BackupSchedules that reference this policy
-		scheduleList := &backupv1.BackupScheduleList{}
-		if err := r.List(ctx, scheduleList, client.InNamespace(policy.Namespace)); err != nil {
-			log.Error(err, "Failed to list backup schedules")
-		} else {
-			for _, schedule := range scheduleList.Items {
-				// Check if this schedule references the policy being deleted
-				if schedule.Spec.BackupPolicyRef.Name == policy.Name {
-					// Cancel active jobs for this schedule
-					for _, activeJob := range schedule.Status.ActiveJobs {
-						log.Info("Canceling active backup job", "job", activeJob.Name)
-						job := &batchv1.Job{}
-						err := r.Get(ctx, client.ObjectKey{
-							Name:      activeJob.Name,
-							Namespace: activeJob.Namespace,
-						}, job)
-						if err == nil {
-							propagationPolicy := metav1.DeletePropagationBackground
-							if err := r.Delete(ctx, job, &client.DeleteOptions{
-								PropagationPolicy: &propagationPolicy,
-							}); err != nil && !errors.IsNotFound(err) {
-								log.Error(err, "Failed to delete active job", "job", activeJob.Name)
-							}
-						}
-					}
-				}
-			}
-		}
+	// Optionally delete associated backups based on policy.
+	if policy.Spec.DeletionPolicy == "Delete" {
+		r.deleteAssociatedBackups(ctx, policy)
+	} else {
+		log.Info("Retaining associated backups (DeletionPolicy=Retain)", "policy", policy.Name)
+	}
 
-		// Optionally delete associated backups based on policy
-		// Check if policy has cascade delete enabled
-		if policy.Spec.DeletionPolicy == "Delete" {
-			log.Info("Deleting associated backups for policy", "policy", policy.Name)
-
-			// List all backup jobs created by this policy
-			jobList := &batchv1.JobList{}
-			if err := r.List(ctx, jobList,
-				client.InNamespace(policy.Namespace),
-				client.MatchingLabels{"backup-policy": policy.Name}); err != nil {
-				log.Error(err, "Failed to list backup jobs")
-			} else {
-				for _, job := range jobList.Items {
-					log.Info("Deleting backup job", "job", job.Name)
-					propagationPolicy := metav1.DeletePropagationBackground
-					if err := r.Delete(ctx, &job, &client.DeleteOptions{
-						PropagationPolicy: &propagationPolicy,
-					}); err != nil && !errors.IsNotFound(err) {
-						log.Error(err, "Failed to delete backup job", "job", job.Name)
-					}
-				}
-			}
-
-			// Delete backup artifacts from storage (if implemented)
-			// This would require integration with storage providers
-			log.Info("Backup artifacts cleanup would be performed here", "policy", policy.Name)
-		} else {
-			log.Info("Retaining associated backups (DeletionPolicy=Retain)", "policy", policy.Name)
-		}
-
-		// Remove finalizer
-		controllerutil.RemoveFinalizer(policy, backupPolicyFinalizer)
-		if err := r.Update(ctx, policy); err != nil {
-			return ctrl.Result{}, err
-		}
+	// Remove finalizer
+	controllerutil.RemoveFinalizer(policy, backupPolicyFinalizer)
+	if err := r.Update(ctx, policy); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
 }
 
-// validatePolicy validates the policy configuration
+// cancelInProgressBackups cancels active backup jobs for schedules that
+// reference the policy being deleted.
+func (r *BackupPolicyReconciler) cancelInProgressBackups(ctx context.Context, policy *backupv1.BackupPolicy) {
+	log := log.FromContext(ctx)
+	log.Info("Canceling in-progress backups for policy", "policy", policy.Name)
+
+	scheduleList := &backupv1.BackupScheduleList{}
+	if err := r.List(ctx, scheduleList, client.InNamespace(policy.Namespace)); err != nil {
+		log.Error(err, "Failed to list backup schedules")
+		return
+	}
+
+	for i := range scheduleList.Items {
+		schedule := &scheduleList.Items[i]
+		if schedule.Spec.BackupPolicyRef.Name != policy.Name {
+			continue
+		}
+		for _, activeJob := range schedule.Status.ActiveJobs {
+			r.cancelActiveJob(ctx, activeJob)
+		}
+	}
+}
+
+// cancelActiveJob deletes a single active backup job if it still exists.
+func (r *BackupPolicyReconciler) cancelActiveJob(ctx context.Context, activeJob backupv1.ActiveJob) {
+	log := log.FromContext(ctx)
+	log.Info("Canceling active backup job", "job", activeJob.Name)
+
+	job := &batchv1.Job{}
+	if err := r.Get(ctx, client.ObjectKey{
+		Name:      activeJob.Name,
+		Namespace: activeJob.Namespace,
+	}, job); err != nil {
+		return
+	}
+
+	propagationPolicy := metav1.DeletePropagationBackground
+	if err := r.Delete(ctx, job, &client.DeleteOptions{
+		PropagationPolicy: &propagationPolicy,
+	}); err != nil && !errors.IsNotFound(err) {
+		log.Error(err, "Failed to delete active job", "job", activeJob.Name)
+	}
+}
+
+// deleteAssociatedBackups deletes backup jobs created by the policy when the
+// deletion policy requests cascade deletion.
+func (r *BackupPolicyReconciler) deleteAssociatedBackups(ctx context.Context, policy *backupv1.BackupPolicy) {
+	log := log.FromContext(ctx)
+	log.Info("Deleting associated backups for policy", "policy", policy.Name)
+
+	jobList := &batchv1.JobList{}
+	if err := r.List(ctx, jobList,
+		client.InNamespace(policy.Namespace),
+		client.MatchingLabels{"backup-policy": policy.Name}); err != nil {
+		log.Error(err, "Failed to list backup jobs")
+		return
+	}
+
+	for i := range jobList.Items {
+		job := &jobList.Items[i]
+		log.Info("Deleting backup job", "job", job.Name)
+		propagationPolicy := metav1.DeletePropagationBackground
+		if err := r.Delete(ctx, job, &client.DeleteOptions{
+			PropagationPolicy: &propagationPolicy,
+		}); err != nil && !errors.IsNotFound(err) {
+			log.Error(err, "Failed to delete backup job", "job", job.Name)
+		}
+	}
+
+	// Delete backup artifacts from storage (if implemented).
+	// This would require integration with storage providers.
+	log.Info("Backup artifacts cleanup would be performed here", "policy", policy.Name)
+}
+
+// validatePolicy validates the policy configuration.
 func (r *BackupPolicyReconciler) validatePolicy(policy *backupv1.BackupPolicy) error {
 	// Validate database type
 	validDatabaseTypes := map[string]bool{
@@ -249,7 +271,7 @@ func (r *BackupPolicyReconciler) validatePolicy(policy *backupv1.BackupPolicy) e
 	return nil
 }
 
-// calculateNextBackupTime calculates the next backup time based on schedule
+// calculateNextBackupTime calculates the next backup time based on schedule.
 func (r *BackupPolicyReconciler) calculateNextBackupTime(schedule string) (time.Time, error) {
 	cronSchedule, err := cron.ParseStandard(schedule)
 	if err != nil {
@@ -262,36 +284,39 @@ func (r *BackupPolicyReconciler) calculateNextBackupTime(schedule string) (time.
 	return nextTime, nil
 }
 
-// updateCondition updates a condition in the policy status
+// updateCondition updates a condition in the policy status.
 func (r *BackupPolicyReconciler) updateCondition(policy *backupv1.BackupPolicy, conditionType string, status metav1.ConditionStatus, reason, message string) {
+	policy.Status.Conditions = upsertCondition(policy.Status.Conditions, policy.Generation, conditionType, status, reason, message)
+}
+
+// upsertCondition updates the matching condition in conditions (only when its
+// status changed) or appends a new one, returning the resulting slice. The
+// condition's ObservedGeneration is set to generation.
+func upsertCondition(conditions []metav1.Condition, generation int64, conditionType string, status metav1.ConditionStatus, reason, message string) []metav1.Condition {
 	condition := metav1.Condition{
 		Type:               conditionType,
 		Status:             status,
-		ObservedGeneration: policy.Generation,
+		ObservedGeneration: generation,
 		LastTransitionTime: metav1.Now(),
 		Reason:             reason,
 		Message:            message,
 	}
 
 	// Find and update existing condition or append new one
-	found := false
-	for i, cond := range policy.Status.Conditions {
+	for i, cond := range conditions {
 		if cond.Type == conditionType {
 			// Only update if status changed
 			if cond.Status != status {
-				policy.Status.Conditions[i] = condition
+				conditions[i] = condition
 			}
-			found = true
-			break
+			return conditions
 		}
 	}
 
-	if !found {
-		policy.Status.Conditions = append(policy.Status.Conditions, condition)
-	}
+	return append(conditions, condition)
 }
 
-// SetupWithManager sets up the controller with the Manager
+// SetupWithManager sets up the controller with the Manager.
 func (r *BackupPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&backupv1.BackupPolicy{}).

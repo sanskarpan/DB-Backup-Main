@@ -89,6 +89,7 @@ func TestContainerImmutabilityPolicy(t *testing.T) {
 		assert.Equal(t, 90, policy.ImmutabilityPeriodDays)
 		assert.Equal(t, "Locked", policy.State)
 		assert.True(t, policy.AllowProtectedAppendWrites)
+		assert.False(t, policy.AllowProtectedAppendWritesAll)
 	})
 }
 
@@ -243,10 +244,10 @@ func TestAzureImmutableBlobInfo_ProtectionScenarios(t *testing.T) {
 		// Day 0: Create blob with 30-day retention
 		expiryDate := time.Now().AddDate(0, 0, 30)
 		info := AzureImmutableBlobInfo{
-			BlobName:              "backup-2025-01-01.sql",
-			ImmutabilityExpiresOn: &expiryDate,
+			BlobName:               "backup-2025-01-01.sql",
+			ImmutabilityExpiresOn:  &expiryDate,
 			ImmutabilityPolicyMode: "Unlocked",
-			LegalHold:             false,
+			LegalHold:              false,
 		}
 
 		// Should be protected
@@ -301,6 +302,8 @@ func TestAzureImmutableBlobInfo_ProtectionScenarios(t *testing.T) {
 
 		assert.True(t, config.AllowProtectedAppendWrites)
 		assert.Equal(t, 60, config.ImmutabilityPeriodDays)
+		assert.False(t, config.LegalHold)
+		assert.Equal(t, ImmutabilityPolicyModeUnlocked, config.Mode)
 	})
 }
 
@@ -330,6 +333,7 @@ func TestImmutableBlobConfig_Validation(t *testing.T) {
 		assert.Equal(t, ImmutabilityPolicyModeUnlocked, config.Mode)
 		assert.True(t, config.AllowProtectedAppendWrites)
 		assert.Equal(t, 30, config.ImmutabilityPeriodDays)
+		assert.False(t, config.LegalHold)
 	})
 
 	t.Run("locked policy cannot be modified", func(t *testing.T) {
@@ -343,6 +347,7 @@ func TestImmutableBlobConfig_Validation(t *testing.T) {
 		assert.Equal(t, ImmutabilityPolicyModeLocked, config.Mode)
 		assert.False(t, config.AllowProtectedAppendWrites)
 		assert.Equal(t, 90, config.ImmutabilityPeriodDays)
+		assert.False(t, config.LegalHold)
 	})
 }
 
@@ -388,6 +393,8 @@ func TestContainerImmutabilityPolicy_Scenarios(t *testing.T) {
 
 		assert.Equal(t, 7, policy.ImmutabilityPeriodDays)
 		assert.Equal(t, "Unlocked", policy.State)
+		assert.False(t, policy.AllowProtectedAppendWrites)
+		assert.False(t, policy.AllowProtectedAppendWritesAll)
 	})
 
 	t.Run("container with locked retention", func(t *testing.T) {
@@ -445,12 +452,12 @@ func TestAzureImmutableBlobInfo_EdgeCases(t *testing.T) {
 	})
 }
 
-// Helper function to create time pointers
+// Helper function to create time pointers.
 func timePtr(t time.Time) *time.Time {
 	return &t
 }
 
-// Benchmark tests
+// Benchmark tests.
 func BenchmarkAzureIsProtected(b *testing.B) {
 	info := AzureImmutableBlobInfo{
 		ImmutabilityExpiresOn: timePtr(time.Now().AddDate(0, 0, 30)),

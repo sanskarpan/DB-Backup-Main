@@ -16,7 +16,7 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/validation"
 )
 
-// Repository manages backup metadata storage
+// Repository manages backup metadata storage.
 type Repository interface {
 	// Save saves backup metadata
 	Save(ctx context.Context, metadata *models.BackupMetadata) error
@@ -34,28 +34,28 @@ type Repository interface {
 	Update(ctx context.Context, metadata *models.BackupMetadata) error
 }
 
-// ListFilter defines filtering options for listing backups
+// ListFilter defines filtering options for listing backups.
 type ListFilter struct {
-	Database      string
-	DatabaseType  string
-	StorageType   string
-	Tags          map[string]string
-	From          *time.Time
-	To            *time.Time
-	Limit         int
-	SortBy        string // date, size, name
-	SortOrder     string // asc, desc
+	Database     string
+	DatabaseType string
+	StorageType  string
+	Tags         map[string]string
+	From         *time.Time
+	To           *time.Time
+	Limit        int
+	SortBy       string // date, size, name
+	SortOrder    string // asc, desc
 }
 
-// FileRepository implements Repository using filesystem storage
+// FileRepository implements Repository using filesystem storage.
 type FileRepository struct {
 	baseDir string
 }
 
-// NewFileRepository creates a new file-based repository
+// NewFileRepository creates a new file-based repository.
 func NewFileRepository(baseDir string) (*FileRepository, error) {
 	// Ensure directory exists
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
+	if err := os.MkdirAll(baseDir, 0o755); err != nil {
 		return nil, pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage, "failed to create repository directory")
 	}
 
@@ -64,7 +64,7 @@ func NewFileRepository(baseDir string) (*FileRepository, error) {
 	}, nil
 }
 
-// Save saves backup metadata to file
+// Save saves backup metadata to file.
 func (r *FileRepository) Save(ctx context.Context, metadata *models.BackupMetadata) error {
 	if metadata.ID == "" {
 		return pkgErrors.New(pkgErrors.ErrorTypeValidation, "backup ID is required")
@@ -77,7 +77,7 @@ func (r *FileRepository) Save(ctx context.Context, metadata *models.BackupMetada
 	}
 
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(metadataPath), 0755); err != nil {
+	if err = os.MkdirAll(filepath.Dir(metadataPath), 0o755); err != nil {
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage, "failed to create metadata directory")
 	}
 
@@ -88,14 +88,14 @@ func (r *FileRepository) Save(ctx context.Context, metadata *models.BackupMetada
 	}
 
 	// Write to file with secure permissions (owner read/write only)
-	if err := os.WriteFile(metadataPath, data, 0600); err != nil {
+	if err := os.WriteFile(metadataPath, data, 0o600); err != nil {
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage, "failed to write metadata file")
 	}
 
 	return nil
 }
 
-// Get retrieves backup metadata by ID
+// Get retrieves backup metadata by ID.
 func (r *FileRepository) Get(ctx context.Context, id string) (*models.BackupMetadata, error) {
 	metadataPath, err := r.getMetadataPath(id)
 	if err != nil {
@@ -103,7 +103,7 @@ func (r *FileRepository) Get(ctx context.Context, id string) (*models.BackupMeta
 	}
 
 	// Check if file exists
-	if _, err := os.Stat(metadataPath); os.IsNotExist(err) {
+	if _, err = os.Stat(metadataPath); os.IsNotExist(err) {
 		return nil, pkgErrors.New(pkgErrors.ErrorTypeNotFound, fmt.Sprintf("backup not found: %s", id))
 	}
 
@@ -122,7 +122,7 @@ func (r *FileRepository) Get(ctx context.Context, id string) (*models.BackupMeta
 	return &metadata, nil
 }
 
-// List lists all backups with optional filtering
+// List lists all backups with optional filtering.
 func (r *FileRepository) List(ctx context.Context, filter *ListFilter) ([]*models.BackupMetadata, error) {
 	var backups []*models.BackupMetadata
 
@@ -140,40 +140,21 @@ func (r *FileRepository) List(ctx context.Context, filter *ListFilter) ([]*model
 		// Read metadata file
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return nil // Skip files that can't be read
+			return nil //nolint:nilerr // skip files that can't be read
 		}
 
 		// Unmarshal metadata
 		var metadata models.BackupMetadata
 		if err := json.Unmarshal(data, &metadata); err != nil {
-			return nil // Skip invalid metadata files
+			return nil //nolint:nilerr // skip invalid metadata files
 		}
 
 		// Apply filters
-		if filter != nil {
-			if filter.Database != "" && metadata.Database != filter.Database {
-				return nil
-			}
-			if filter.DatabaseType != "" && string(metadata.DatabaseType) != filter.DatabaseType {
-				return nil
-			}
-			if filter.From != nil && metadata.StartTime.Before(*filter.From) {
-				return nil
-			}
-			if filter.To != nil && metadata.StartTime.After(*filter.To) {
-				return nil
-			}
-			if filter.Tags != nil && len(filter.Tags) > 0 {
-				if !matchTags(metadata.Tags, filter.Tags) {
-					return nil
-				}
-			}
+		if matchesFilter(&metadata, filter) {
+			backups = append(backups, &metadata)
 		}
-
-		backups = append(backups, &metadata)
 		return nil
 	})
-
 	if err != nil {
 		return nil, pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage, "failed to list backups")
 	}
@@ -194,7 +175,7 @@ func (r *FileRepository) List(ctx context.Context, filter *ListFilter) ([]*model
 	return backups, nil
 }
 
-// Delete removes backup metadata
+// Delete removes backup metadata.
 func (r *FileRepository) Delete(ctx context.Context, id string) error {
 	metadataPath, err := r.getMetadataPath(id)
 	if err != nil {
@@ -214,7 +195,7 @@ func (r *FileRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-// Update updates backup metadata
+// Update updates backup metadata.
 func (r *FileRepository) Update(ctx context.Context, metadata *models.BackupMetadata) error {
 	// Verify backup exists
 	if _, err := r.Get(ctx, metadata.ID); err != nil {
@@ -225,7 +206,7 @@ func (r *FileRepository) Update(ctx context.Context, metadata *models.BackupMeta
 	return r.Save(ctx, metadata)
 }
 
-// getMetadataPath returns the file path for backup metadata
+// getMetadataPath returns the file path for backup metadata.
 func (r *FileRepository) getMetadataPath(id string) (string, error) {
 	// Validate backup ID to prevent path traversal
 	if err := validation.ValidateBackupID(id); err != nil {
@@ -243,7 +224,7 @@ func (r *FileRepository) getMetadataPath(id string) (string, error) {
 	return sanitized, nil
 }
 
-// sortBackups sorts backups based on criteria
+// sortBackups sorts backups based on criteria.
 func (r *FileRepository) sortBackups(backups []*models.BackupMetadata, sortBy, order string) {
 	sort.Slice(backups, func(i, j int) bool {
 		var less bool
@@ -264,7 +245,30 @@ func (r *FileRepository) sortBackups(backups []*models.BackupMetadata, sortBy, o
 	})
 }
 
-// matchTags checks if metadata tags match filter tags
+// matchesFilter reports whether the metadata satisfies the given filter.
+func matchesFilter(metadata *models.BackupMetadata, filter *ListFilter) bool {
+	if filter == nil {
+		return true
+	}
+	if filter.Database != "" && metadata.Database != filter.Database {
+		return false
+	}
+	if filter.DatabaseType != "" && string(metadata.DatabaseType) != filter.DatabaseType {
+		return false
+	}
+	if filter.From != nil && metadata.StartTime.Before(*filter.From) {
+		return false
+	}
+	if filter.To != nil && metadata.StartTime.After(*filter.To) {
+		return false
+	}
+	if len(filter.Tags) > 0 && !matchTags(metadata.Tags, filter.Tags) {
+		return false
+	}
+	return true
+}
+
+// matchTags checks if metadata tags match filter tags.
 func matchTags(metadataTags, filterTags map[string]string) bool {
 	for key, value := range filterTags {
 		if metadataTags[key] != value {

@@ -49,17 +49,24 @@ func TestHubRegisterClient(t *testing.T) {
 
 	// Connect as a client
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
-	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	ws, resp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
+	}
+	if resp != nil {
+		defer resp.Body.Close()
 	}
 	defer ws.Close()
 
 	time.Sleep(200 * time.Millisecond)
 
 	stats := hub.GetStats()
-	if stats["total_clients"].(int) != 1 {
-		t.Errorf("Expected 1 client, got %d", stats["total_clients"])
+	totalClients, ok := stats["total_clients"].(int)
+	if !ok {
+		t.Fatalf("total_clients is not an int: %T", stats["total_clients"])
+	}
+	if totalClients != 1 {
+		t.Errorf("Expected 1 client, got %d", totalClients)
 	}
 }
 
@@ -262,9 +269,12 @@ func TestClientSubscriptions(t *testing.T) {
 
 	// Connect as a client
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
-	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	ws, resp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
+	}
+	if resp != nil {
+		defer resp.Body.Close()
 	}
 	defer ws.Close()
 
@@ -285,7 +295,11 @@ func TestClientSubscriptions(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	stats := hub.GetStats()
-	if stats["total_subscriptions"].(int) == 0 {
+	totalSubs, ok := stats["total_subscriptions"].(int)
+	if !ok {
+		t.Fatalf("total_subscriptions is not an int: %T", stats["total_subscriptions"])
+	}
+	if totalSubs == 0 {
 		t.Error("Expected at least one subscription")
 	}
 }
@@ -315,9 +329,12 @@ func TestHubBroadcast(t *testing.T) {
 
 	// Connect as a client
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
-	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	ws, resp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
+	}
+	if resp != nil {
+		defer resp.Body.Close()
 	}
 	defer ws.Close()
 
@@ -334,8 +351,8 @@ func TestHubBroadcast(t *testing.T) {
 
 	// Broadcast a message
 	hub.Broadcast(&Message{
-		Type:  MessageTypeNotification,
-		Data:  map[string]interface{}{"message": "Test broadcast"},
+		Type: MessageTypeNotification,
+		Data: map[string]interface{}{"message": "Test broadcast"},
 	})
 
 	// Wait for message
@@ -397,7 +414,10 @@ func TestClientInfo(t *testing.T) {
 		t.Errorf("Expected user ID 'user-123', got '%s'", info["user_id"])
 	}
 
-	subscriptions := info["subscriptions"].([]interface{})
+	subscriptions, ok := info["subscriptions"].([]interface{})
+	if !ok {
+		t.Fatalf("subscriptions is not a slice: %T", info["subscriptions"])
+	}
 	if len(subscriptions) != 2 {
 		t.Errorf("Expected 2 subscriptions, got %d", len(subscriptions))
 	}

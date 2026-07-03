@@ -8,17 +8,17 @@ import (
 )
 
 var (
-	// DatabaseNameRegex allows alphanumeric, underscore, hyphen (MySQL, PostgreSQL, MongoDB compatible)
+	// DatabaseNameRegex allows alphanumeric, underscore, hyphen (MySQL, PostgreSQL, MongoDB compatible).
 	DatabaseNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
-	// TableNameRegex allows alphanumeric, underscore, hyphen, dot (for schema.table)
+	// TableNameRegex allows alphanumeric, underscore, hyphen, dot (for schema.table).
 	TableNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
 
-	// BackupIDRegex matches the expected backup ID format
+	// BackupIDRegex matches the expected backup ID format.
 	BackupIDRegex = regexp.MustCompile(`^backup-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}-[a-f0-9]{8}$`)
 )
 
-// ValidateDatabaseName validates a database name for security
+// ValidateDatabaseName validates a database name for security.
 func ValidateDatabaseName(name string) error {
 	if name == "" {
 		return fmt.Errorf("database name cannot be empty")
@@ -45,7 +45,7 @@ func ValidateDatabaseName(name string) error {
 	return nil
 }
 
-// ValidateTableName validates a table name for security
+// ValidateTableName validates a table name for security.
 func ValidateTableName(name string) error {
 	if name == "" {
 		return fmt.Errorf("table name cannot be empty")
@@ -72,7 +72,7 @@ func ValidateTableName(name string) error {
 	return nil
 }
 
-// ValidateBackupID validates a backup ID to prevent path traversal
+// ValidateBackupID validates a backup ID to prevent path traversal.
 func ValidateBackupID(id string) error {
 	if id == "" {
 		return fmt.Errorf("backup ID cannot be empty")
@@ -95,8 +95,8 @@ func ValidateBackupID(id string) error {
 	return nil
 }
 
-// SanitizePath cleans and validates a file path
-func SanitizePath(path string, baseDir string) (string, error) {
+// SanitizePath cleans and validates a file path.
+func SanitizePath(path, baseDir string) (string, error) {
 	// Clean the path to resolve .. and .
 	cleaned := filepath.Clean(path)
 
@@ -122,7 +122,7 @@ func SanitizePath(path string, baseDir string) (string, error) {
 	return cleaned, nil
 }
 
-// ValidatePort validates a port number
+// ValidatePort validates a port number.
 func ValidatePort(port int) error {
 	if port < 1 || port > 65535 {
 		return fmt.Errorf("port must be between 1 and 65535, got %d", port)
@@ -130,7 +130,7 @@ func ValidatePort(port int) error {
 	return nil
 }
 
-// ValidateCompressionLevel validates compression level
+// ValidateCompressionLevel validates compression level.
 func ValidateCompressionLevel(level int) error {
 	if level < -1 || level > 9 {
 		return fmt.Errorf("compression level must be between -1 and 9, got %d", level)
@@ -138,7 +138,7 @@ func ValidateCompressionLevel(level int) error {
 	return nil
 }
 
-// ValidateEncryptionKeyLength validates encryption key minimum length
+// ValidateEncryptionKeyLength validates encryption key minimum length.
 func ValidateEncryptionKeyLength(key []byte, minLength int) error {
 	if len(key) < minLength {
 		return fmt.Errorf("encryption key too short: minimum %d bytes required, got %d", minLength, len(key))

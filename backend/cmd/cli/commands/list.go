@@ -7,13 +7,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/models"
-	"github.com/sanskarpan/db-backup/internal/repository"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
+
+	"github.com/sanskarpan/db-backup/internal/models"
+	"github.com/sanskarpan/db-backup/internal/repository"
 )
 
-// ListOptions holds options for the list command
+// ListOptions holds options for the list command.
 type ListOptions struct {
 	Database string
 	Type     string
@@ -27,7 +28,7 @@ type ListOptions struct {
 	Order    string
 }
 
-// listCmd represents the list command
+// listCmd represents the list command.
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List available backups",
@@ -78,16 +79,16 @@ func runList(cmd *cobra.Command, args []string) error {
 	opts := &ListOptions{}
 
 	// Parse flags
-	opts.Database, _ = cmd.Flags().GetString("database")
-	opts.Type, _ = cmd.Flags().GetString("type")
-	opts.Storage, _ = cmd.Flags().GetString("storage")
-	opts.From, _ = cmd.Flags().GetString("from")
-	opts.To, _ = cmd.Flags().GetString("to")
-	opts.Tags, _ = cmd.Flags().GetStringSlice("tags")
-	opts.Format, _ = cmd.Flags().GetString("format")
-	opts.Limit, _ = cmd.Flags().GetInt("limit")
-	opts.Sort, _ = cmd.Flags().GetString("sort")
-	opts.Order, _ = cmd.Flags().GetString("order")
+	opts.Database = flagString(cmd, "database")
+	opts.Type = flagString(cmd, "type")
+	opts.Storage = flagString(cmd, "storage")
+	opts.From = flagString(cmd, "from")
+	opts.To = flagString(cmd, "to")
+	opts.Tags = flagStringSlice(cmd, "tags")
+	opts.Format = flagString(cmd, "format")
+	opts.Limit = flagInt(cmd, "limit")
+	opts.Sort = flagString(cmd, "sort")
+	opts.Order = flagString(cmd, "order")
 
 	// Get logger and config
 	log := GetLogger()
@@ -120,7 +121,8 @@ func runList(cmd *cobra.Command, args []string) error {
 
 	// Parse time filters
 	if opts.From != "" {
-		fromTime, err := time.Parse(time.RFC3339, opts.From)
+		var fromTime time.Time
+		fromTime, err = time.Parse(time.RFC3339, opts.From)
 		if err != nil {
 			return fmt.Errorf("invalid from date format (use RFC3339): %w", err)
 		}
@@ -128,7 +130,8 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	if opts.To != "" {
-		toTime, err := time.Parse(time.RFC3339, opts.To)
+		var toTime time.Time
+		toTime, err = time.Parse(time.RFC3339, opts.To)
 		if err != nil {
 			return fmt.Errorf("invalid to date format (use RFC3339): %w", err)
 		}
@@ -169,7 +172,8 @@ func printTable(backups []*models.BackupMetadata) error {
 	fmt.Println("────────────────────────────────────────────────────────────────────────────────────────────────────────────────")
 
 	for _, b := range backups {
-		fmt.Printf("%-38s %-14s %-10s %-11s %-21s %s\n",
+		fmt.Printf(
+			"%-38s %-14s %-10s %-11s %-21s %s\n",
 			truncate(b.ID, 38),
 			truncate(b.Database, 14),
 			string(b.DatabaseType),
