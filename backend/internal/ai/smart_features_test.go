@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/sanskarpan/db-backup/internal/ai/prediction"
 )
 
 // ==================== Test Suite for Smart Features ====================
@@ -561,8 +563,16 @@ func TestAutomatedTroubleshootingEngine(t *testing.T) {
 			t.Errorf("Expected critical severity, got %s", result.Severity)
 		}
 
-		if !result.AutoFixApplied {
-			t.Error("Expected auto-fix to be applied")
+		// With no remediation backend wired, the engine must NOT claim to have
+		// fixed anything; it should honestly report manual action is required.
+		if result.AutoFixApplied {
+			t.Error("Expected auto-fix NOT to be applied without a remediator")
+		}
+		if result.AutoFixSuccess {
+			t.Error("Expected auto-fix NOT to report success without a remediator")
+		}
+		if got := result.Metadata["auto_fix_action"]; got != manualActionRequired {
+			t.Errorf("Expected honest manual-action note, got %v", got)
 		}
 
 		if len(result.Resolution) == 0 {
@@ -611,6 +621,150 @@ func TestAutomatedTroubleshootingEngine(t *testing.T) {
 
 		if len(report.Recommendations) == 0 {
 			t.Error("Expected recommendations")
+		}
+	})
+}
+
+// fakeRemediator is a test double implementing the Remediator interface so we
+// can verify the auto-fix path performs a real action instead of faking one.
+type fakeRemediator struct {
+	cleanupCalled bool
+	retryCalled   bool
+	cleanupErr    error
+}
+
+func (f *fakeRemediator) CleanupOldBackups(_ context.Context, _ string) (int64, error) {
+	f.cleanupCalled = true
+	if f.cleanupErr != nil {
+		return 0, f.cleanupErr
+	}
+	return 4096, nil
+}
+
+func (f *fakeRemediator) RetryConnection(_ context.Context, _ string) error {
+	f.retryCalled = true
+	return nil
+}
+
+func (f *fakeRemediator) RetryBackup(_ context.Context, _ string) error {
+	f.retryCalled = true
+	return nil
+}
+
+// TestTroubleshootingAutoFix verifies honest auto-fix behavior with and without
+// a remediation backend wired in.
+func TestTroubleshootingAutoFix(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("NoRemediator_ReportsManualAction", func(t *testing.T) {
+		ate := NewAutomatedTroubleshootingEngine()
+
+		result, err := ate.Diagnose(ctx, "test-db", "no space left on device", nil)
+		if err != nil {
+			t.Fatalf("Diagnose failed: %v", err)
+		}
+		if result.AutoFixApplied || result.AutoFixSuccess {
+			t.Error("Expected no auto-fix without a remediator")
+		}
+		if got := result.Metadata["auto_fix_action"]; got != manualActionRequired {
+			t.Errorf("Expected honest manual-action note, got %v", got)
+		}
+	})
+
+	t.Run("WithRemediator_PerformsRealCleanup", func(t *testing.T) {
+		ate := NewAutomatedTroubleshootingEngine()
+		rem := &fakeRemediator{}
+		ate.SetRemediator(rem)
+
+		result, err := ate.Diagnose(ctx, "test-db", "no space left on device", nil)
+		if err != nil {
+			t.Fatalf("Diagnose failed: %v", err)
+		}
+		if !rem.cleanupCalled {
+			t.Error("Expected remediator CleanupOldBackups to be invoked")
+		}
+		if !result.AutoFixApplied || !result.AutoFixSuccess {
+			t.Error("Expected auto-fix to be applied and succeed with a remediator")
+		}
+		if got, _ := result.Metadata["bytes_freed"].(int64); got != 4096 {
+			t.Errorf("Expected bytes_freed=4096, got %v", result.Metadata["bytes_freed"])
+		}
+	})
+
+	t.Run("WithRemediator_FailureReportsHonestly", func(t *testing.T) {
+		ate := NewAutomatedTroubleshootingEngine()
+		ate.SetRemediator(&fakeRemediator{cleanupErr: fmt.Errorf("permission denied")})
+
+		result, err := ate.Diagnose(ctx, "test-db", "no space left on device", nil)
+		if err != nil {
+			t.Fatalf("Diagnose failed: %v", err)
+		}
+		if !result.AutoFixApplied {
+			t.Error("Expected auto-fix to be attempted")
+		}
+		if result.AutoFixSuccess {
+			t.Error("Expected auto-fix to report failure when remediation errors")
+		}
+	})
+}
+
+// TestFailurePredictionAPI verifies the API delegates to the real predictor and
+// never returns fabricated predictions.
+func TestFailurePredictionAPI(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("NoData_ReturnsEmpty", func(t *testing.T) {
+		api := NewFailurePredictionAPI()
+
+		predictions, err := api.GetPrediction(ctx, "unknown-db")
+		if err != nil {
+			t.Fatalf("GetPrediction failed: %v", err)
+		}
+		if len(predictions) != 0 {
+			t.Errorf("Expected no predictions without recorded events, got %d", len(predictions))
+		}
+	})
+
+	t.Run("RecordedEvents_ReflectRealComputation", func(t *testing.T) {
+		api := NewFailurePredictionAPI()
+
+		// Record 40 days of history where Monday backups at hour 14 fail. This
+		// produces a real time-window pattern in the underlying predictor.
+		for i := 0; i < 40; i++ {
+			day := time.Now().AddDate(0, 0, -i)
+			api.RecordBackupEvent(prediction.BackupEvent{
+				ID:           fmt.Sprintf("event-%d", i),
+				DatabaseName: "prod-db",
+				Timestamp:    day,
+				Success:      day.Weekday() != time.Monday,
+				DayOfWeek:    day.Weekday(),
+				HourOfDay:    14,
+				Duration:     30 * time.Minute,
+			})
+		}
+
+		predictions, err := api.GetPrediction(ctx, "prod-db")
+		if err != nil {
+			t.Fatalf("GetPrediction failed: %v", err)
+		}
+
+		for _, p := range predictions {
+			if p.DatabaseName != "prod-db" {
+				t.Errorf("Expected database prod-db, got %s", p.DatabaseName)
+			}
+			// Real computed values must NOT equal the old hardcoded mock.
+			if p.Confidence == 82.0 && p.Probability == 0.15 {
+				t.Error("Prediction matches the old fabricated mock values")
+			}
+			if p.Confidence <= 0 || p.Confidence > 100 {
+				t.Errorf("Confidence out of range: %.2f", p.Confidence)
+			}
+			if p.Probability < 0 || p.Probability > 1 {
+				t.Errorf("Probability out of range: %.4f", p.Probability)
+			}
+			if len(p.PreventiveActions) == 0 {
+				t.Error("Expected real preventive actions from the predictor")
+			}
 		}
 	})
 }

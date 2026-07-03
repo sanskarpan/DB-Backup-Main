@@ -27,7 +27,18 @@ type ComparisonResult struct {
 	PotentialSavings float64
 	BestProvider     StorageProvider
 	BestCost         float64
+	// Estimated reports that the comparison reflects the pricing source's
+	// rates, which are estimates unless the operator supplied live prices.
+	Estimated bool
+	// PricingSource names the origin of the rates used.
+	PricingSource string
+	// PricingAsOf is when those rates are believed to be accurate.
+	PricingAsOf time.Time
 }
+
+// migrationTransferRatePerGB is a built-in estimate of the one-time per-GB
+// egress cost of migrating data between providers.
+const migrationTransferRatePerGB = 0.01
 
 // ProviderRecommendation represents a provider recommendation.
 type ProviderRecommendation struct {
@@ -73,6 +84,12 @@ type CostOverview struct {
 	DailyAverage      float64
 	MonthlyProjection float64
 	ByProvider        map[StorageProvider]float64
+	// Estimated reports that the figures derive from estimated rates.
+	Estimated bool
+	// PricingSource names the origin of the rates used.
+	PricingSource string
+	// PricingAsOf is when those rates are believed to be accurate.
+	PricingAsOf time.Time
 }
 
 // TopCosts represents top cost contributors.
@@ -187,11 +204,13 @@ type ActiveAlerts struct {
 	Alerts []*BudgetAlert
 }
 
-// NewMultiCloudComparison creates a new multi-cloud comparison engine.
+// NewMultiCloudComparison creates a new multi-cloud comparison engine that
+// draws its provider rates from the cost tracker's pricing source, so the
+// comparison reflects the configured rates rather than a hardcoded table.
 func NewMultiCloudComparison(costTracker *CostTracker) *MultiCloudComparison {
 	return &MultiCloudComparison{
 		costTracker:   costTracker,
-		providerRates: DefaultProviderRates(),
+		providerRates: costTracker.pricing.ProviderRates(),
 		comparisons:   make([]*ComparisonResult, 0),
 	}
 }
@@ -207,12 +226,16 @@ func (mcc *MultiCloudComparison) CompareProviders(ctx context.Context, databaseN
 		return nil, err
 	}
 
+	meta := mcc.costTracker.PricingMetadata()
 	result := &ComparisonResult{
 		Timestamp:       time.Now(),
 		DatabaseName:    databaseName,
 		CurrentProvider: dbCosts.StorageCosts.Provider,
 		CurrentCost:     dbCosts.TotalCost,
 		Recommendations: make([]*ProviderRecommendation, 0),
+		Estimated:       meta.Estimated,
+		PricingSource:   meta.Source,
+		PricingAsOf:     meta.AsOf,
 	}
 
 	// Calculate cost for each provider
@@ -269,8 +292,8 @@ func (mcc *MultiCloudComparison) calculateProviderCost(dbCosts *DatabaseCosts, p
 		savingsPercent = (savings / dbCosts.TotalCost) * 100
 	}
 
-	// Estimate migration cost (simplified)
-	migrationCost := storageGB * 0.01 // $0.01 per GB transfer
+	// Estimate migration cost (simplified, one-time egress estimate)
+	migrationCost := storageGB * migrationTransferRatePerGB
 
 	// Calculate break-even
 	breakEvenDays := 0
@@ -362,6 +385,9 @@ func (cod *CostOptimizationDashboard) getCostOverview() *CostOverview {
 		DailyAverage:      trend.AverageDailyCost,
 		MonthlyProjection: monthlyProjection,
 		ByProvider:        snapshot.ByProvider,
+		Estimated:         snapshot.Estimated,
+		PricingSource:     snapshot.PricingSource,
+		PricingAsOf:       snapshot.PricingAsOf,
 	}
 }
 

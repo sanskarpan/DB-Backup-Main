@@ -43,6 +43,8 @@ import (
 	"github.com/sanskarpan/db-backup/internal/scheduler"
 )
 
+const defaultDataDir = "./data"
+
 var (
 	Version   = "dev"
 	BuildTime = "unknown"
@@ -143,14 +145,24 @@ func main() {
 		})
 	}
 
-	// Initialize catalog search engine (with nil indexer for now)
-	// TODO: Initialize Elasticsearch client when available
-	catalogIndexer, err := catalog.NewCatalogIndexer(nil)
-	if err != nil {
-		log.Warn("Catalog indexer initialization skipped - Elasticsearch not configured")
-		catalogIndexer = nil
+	// Catalog search engine. Elasticsearch is not wired in this build, so use the
+	// embedded, disk-persisted in-memory catalog so /catalog/* works out of the box.
+	catalogDir := cfg.Backup.MetadataDirectory
+	if catalogDir == "" {
+		catalogDir = cfg.Backup.TempDirectory
 	}
-	searchEngine := catalog.NewSearchEngine(catalogIndexer)
+	if catalogDir == "" {
+		catalogDir = defaultDataDir
+	}
+	var searchEngine catalog.SearchEngineInterface
+	memCatalog, catErr := catalog.NewPersistentInMemorySearchEngine(filepath.Join(catalogDir, "catalog"))
+	if catErr != nil {
+		log.Warn("Persistent catalog init failed; using in-memory catalog: " + catErr.Error())
+		searchEngine = catalog.NewInMemorySearchEngine()
+	} else {
+		searchEngine = memCatalog
+	}
+	log.Info("Catalog: using embedded in-memory search engine")
 
 	// Initialize JWT service
 	jwtSecret := cfg.Security.JWT.Secret
@@ -187,7 +199,7 @@ func main() {
 		dbStoreDir = cfg.Backup.TempDirectory
 	}
 	if dbStoreDir == "" {
-		dbStoreDir = "./data"
+		dbStoreDir = defaultDataDir
 	}
 	dbStore, err := dbregistry.NewStore(filepath.Join(dbStoreDir, "databases"), jwtSecret)
 	if err != nil {
@@ -343,7 +355,7 @@ func buildStorageProvider(cfg *config.Config) (storage.Provider, error) {
 	// Fallback: local provider rooted under the temp/data directory.
 	base := cfg.Backup.TempDirectory
 	if base == "" {
-		base = "./data"
+		base = defaultDataDir
 	}
 	return storageLocal.NewLocalProvider(&storage.LocalConfig{Path: filepath.Join(base, "backups")})
 }
