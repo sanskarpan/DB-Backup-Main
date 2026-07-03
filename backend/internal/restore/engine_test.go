@@ -49,14 +49,17 @@ func (d *fakeDriver) Connect(context.Context, *database.ConnectionConfig) error 
 func (d *fakeDriver) Disconnect() error                                         { return nil }
 func (d *fakeDriver) Ping(context.Context) error                                { return nil }
 func (d *fakeDriver) Backup(context.Context, *database.BackupOptions) (*database.BackupResult, error) {
-	return nil, nil
+	return &database.BackupResult{}, nil
 }
+
 func (d *fakeDriver) StreamBackup(context.Context, *database.BackupOptions, io.Writer) error {
 	return nil
 }
+
 func (d *fakeDriver) GetBackupSize(context.Context, *database.BackupOptions) (int64, error) {
 	return 0, nil
 }
+
 func (d *fakeDriver) Restore(_ context.Context, opts *database.RestoreOptions) (*database.RestoreResult, error) {
 	d.gotTables = opts.Tables
 	restored := opts.Tables
@@ -66,6 +69,7 @@ func (d *fakeDriver) Restore(_ context.Context, opts *database.RestoreOptions) (
 	d.restored = restored
 	return &database.RestoreResult{RestoredTables: restored, RowsRestored: 42}, nil
 }
+
 func (d *fakeDriver) StreamRestore(context.Context, *database.RestoreOptions, io.Reader) error {
 	return nil
 }
@@ -73,13 +77,15 @@ func (d *fakeDriver) ValidateRestore(context.Context, *database.RestoreOptions) 
 func (d *fakeDriver) GetDatabases(context.Context) ([]string, error) {
 	return []string{"targetdb"}, nil
 }
+
 func (d *fakeDriver) GetTables(context.Context, string) ([]string, error)         { return nil, nil }
 func (d *fakeDriver) GetTableSize(context.Context, string, string) (int64, error) { return 0, nil }
 func (d *fakeDriver) GetDatabaseSize(context.Context) (int64, error)              { return 0, nil }
 func (d *fakeDriver) GetVersion(context.Context) (string, error)                  { return "1.0", nil }
-func (d *fakeDriver) GetType() database.DatabaseType                              { return "fakedb" }
-func (d *fakeDriver) SupportsIncremental() bool                                   { return false }
-func (d *fakeDriver) SupportsPITR() bool                                          { return false }
+
+func (d *fakeDriver) GetType() database.DatabaseType { return "fakedb" }
+func (d *fakeDriver) SupportsIncremental() bool      { return false }
+func (d *fakeDriver) SupportsPITR() bool             { return false }
 
 // registerFakeDriver registers a fresh fakeDriver under a test database type and
 // returns it for assertions.

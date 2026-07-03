@@ -195,7 +195,7 @@ func newImmutableFakeProvider() *immutableFakeProvider {
 
 // Upload stores the contents of localPath under remotePath.
 func (p *immutableFakeProvider) Upload(_ context.Context, localPath, remotePath string, _ *storage.UploadOptions) error {
-	data, err := os.ReadFile(localPath) //nolint:gosec // test-controlled path
+	data, err := os.ReadFile(localPath)
 	if err != nil {
 		return err
 	}
@@ -320,9 +320,13 @@ func (d *echoDriver) Disconnect() error { return nil }
 // Ping is a no-op for the echo driver.
 func (d *echoDriver) Ping(context.Context) error { return nil }
 
+// errUnusedDriverOp is returned by echoDriver methods that are not exercised by
+// the restore path, so callers get a sentinel error instead of a nil/nil result.
+var errUnusedDriverOp = errors.New("echoDriver: operation not supported")
+
 // Backup is unused by the restore path.
 func (d *echoDriver) Backup(context.Context, *database.BackupOptions) (*database.BackupResult, error) {
-	return nil, nil
+	return nil, errUnusedDriverOp
 }
 
 // StreamBackup is unused by the restore path.

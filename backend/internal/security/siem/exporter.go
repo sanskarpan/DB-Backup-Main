@@ -1,6 +1,6 @@
 // Package siem exports detected threat events to SIEM/EDR platforms such as
 // Splunk HEC, Microsoft Sentinel, CrowdStrike or a generic webhook so that
-// security operations centres can drive their incident-response workflows.
+// security operations centers can drive their incident-response workflows.
 package siem
 
 import (
@@ -50,13 +50,15 @@ type Config struct {
 	SourceType string
 	// Index is the target Splunk index for HEC events. Optional.
 	Index string
-	// TLSClientConfig customises TLS (e.g. custom CA or client certs). Optional.
+	// TLSClientConfig customizes TLS (e.g. custom CA or client certs). Optional.
 	TLSClientConfig *tls.Config
 	// Timeout bounds a single export request. Defaults to 30s.
 	Timeout time.Duration
 }
 
 // SIEMExporter pushes threat events to a configured SIEM endpoint over HTTP.
+//
+//nolint:revive // public name kept stable for API consumers
 type SIEMExporter struct {
 	config     Config
 	httpClient *http.Client
@@ -81,7 +83,7 @@ type ThreatEvent struct {
 }
 
 // NewExporter creates a SIEMExporter for the supplied configuration.
-func NewExporter(config Config) *SIEMExporter {
+func NewExporter(config Config) *SIEMExporter { //nolint:gocritic // hugeParam: value semantics intended for this options/config struct
 	if config.Format == "" {
 		config.Format = FormatWebhook
 	}
@@ -152,7 +154,7 @@ func (e *SIEMExporter) Export(ctx context.Context, report *ransomware.ThreatRepo
 
 	event := BuildThreatEvent(report, e.config.Source)
 
-	body, err := e.encodePayload(event)
+	body, err := e.encodePayload(&event)
 	if err != nil {
 		return err
 	}
@@ -169,15 +171,18 @@ func (e *SIEMExporter) Export(ctx context.Context, report *ransomware.ThreatRepo
 	defer resp.Body.Close()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		snippet, readErr := io.ReadAll(io.LimitReader(resp.Body, 512))
+		if readErr != nil {
+			return fmt.Errorf("siem: endpoint returned status %d and body could not be read: %w", resp.StatusCode, readErr)
+		}
 		return fmt.Errorf("siem: endpoint returned status %d: %s", resp.StatusCode, bytes.TrimSpace(snippet))
 	}
 
 	return nil
 }
 
-// encodePayload serialises the event using the configured format's envelope.
-func (e *SIEMExporter) encodePayload(event ThreatEvent) ([]byte, error) {
+// encodePayload serializes the event using the configured format's envelope.
+func (e *SIEMExporter) encodePayload(event *ThreatEvent) ([]byte, error) {
 	var payload any = event
 	if e.config.Format == FormatSplunkHEC {
 		payload = e.splunkEnvelope(event)
@@ -191,7 +196,7 @@ func (e *SIEMExporter) encodePayload(event ThreatEvent) ([]byte, error) {
 }
 
 // splunkEnvelope wraps an event in the Splunk HEC event structure.
-func (e *SIEMExporter) splunkEnvelope(event ThreatEvent) map[string]any {
+func (e *SIEMExporter) splunkEnvelope(event *ThreatEvent) map[string]any {
 	envelope := map[string]any{
 		"time":  event.Timestamp.Unix(),
 		"event": event,

@@ -127,7 +127,7 @@ func (f *fakeProvider) List(_ context.Context, prefix string) ([]*storage.FileMe
 	defer f.mu.Unlock()
 	var out []*storage.FileMetadata
 	for p, data := range f.objects {
-		if len(prefix) == 0 || (len(p) >= len(prefix) && p[:len(prefix)] == prefix) {
+		if prefix == "" || (len(p) >= len(prefix) && p[:len(prefix)] == prefix) {
 			out = append(out, &storage.FileMetadata{Path: p, Size: int64(len(data))})
 		}
 	}

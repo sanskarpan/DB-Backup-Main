@@ -396,12 +396,12 @@ func (e *Engine) scanArtifact(ctx context.Context, localPath string, _ *RestoreO
 	report, err := e.scanner.ScanFile(ctx, localPath)
 	if err != nil {
 		if e.config.MalwareScanWarnOnly {
-			return nil, nil
+			return nil, nil //nolint:nilnil // warn-only: no report and no abort error by design
 		}
 		return nil, pkgErrors.Wrap(err, pkgErrors.ErrorTypeValidation, "pre-restore malware scan failed")
 	}
 	if report == nil {
-		return nil, nil
+		return nil, nil //nolint:nilnil // no report available and no threat to abort on
 	}
 
 	if severityRank(report.ThreatLevel) >= severityRank(e.malwareThreshold()) && !e.config.MalwareScanWarnOnly {

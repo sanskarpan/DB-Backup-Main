@@ -85,6 +85,8 @@ type Options struct {
 
 // ReplicationResult captures the outcome of replicating a single object to a
 // single destination provider.
+//
+//nolint:revive // public name kept stable for API consumers
 type ReplicationResult struct {
 	// SourceType is the type of the source provider.
 	SourceType storage.ProviderType
@@ -124,7 +126,7 @@ func NewReplicator() *Replicator {
 }
 
 // resolveDestPath computes the destination path from the source path and options.
-func resolveDestPath(remotePath string, opts Options) string {
+func resolveDestPath(remotePath string, opts *Options) string {
 	if opts.DestPathRename != "" {
 		return opts.DestPathRename
 	}
@@ -137,9 +139,11 @@ func resolveDestPath(remotePath string, opts Options) string {
 // Replicate streams a single object from src to dst and returns the outcome.
 // It never returns a nil result: on failure the result carries StatusFailed
 // and Err, which is also returned as the error.
+//
+//nolint:gocritic // hugeParam: value semantics intended for this options struct
 func (r *Replicator) Replicate(ctx context.Context, src, dst storage.Provider, remotePath string, opts Options) (*ReplicationResult, error) {
 	start := time.Now()
-	destPath := resolveDestPath(remotePath, opts)
+	destPath := resolveDestPath(remotePath, &opts)
 	result := &ReplicationResult{
 		SourceType: src.GetType(),
 		DestType:   dst.GetType(),
@@ -176,7 +180,7 @@ func (r *Replicator) Replicate(ctx context.Context, src, dst storage.Provider, r
 		}
 	}
 
-	if err := r.copyWithRetry(ctx, src, dst, remotePath, destPath, opts, result); err != nil {
+	if err := r.copyWithRetry(ctx, src, dst, remotePath, destPath, &opts, result); err != nil {
 		result.Err = err
 		result.DurationMs = time.Since(start).Milliseconds()
 		return result, err
@@ -197,7 +201,7 @@ func (r *Replicator) Replicate(ctx context.Context, src, dst storage.Provider, r
 
 // copyWithRetry performs the streaming copy, retrying transient failures with
 // a quadratic backoff. On success it records BytesCopied and Checksum.
-func (r *Replicator) copyWithRetry(ctx context.Context, src, dst storage.Provider, remotePath, destPath string, opts Options, result *ReplicationResult) error {
+func (r *Replicator) copyWithRetry(ctx context.Context, src, dst storage.Provider, remotePath, destPath string, opts *Options, result *ReplicationResult) error {
 	backoff := opts.RetryBackoff
 	if backoff <= 0 {
 		backoff = time.Second
@@ -305,6 +309,8 @@ func verify(ctx context.Context, src, dst storage.Provider, remotePath, destPath
 // destinations concurrently. It returns the per-destination results in the
 // same order as dsts, and a non-nil aggregate error only when fewer than the
 // configured minimum number of destinations succeeded.
+//
+//nolint:gocritic // hugeParam: value semantics intended for this options struct
 func (r *Replicator) ReplicateToMany(ctx context.Context, src storage.Provider, dsts []storage.Provider, remotePath string, opts Options) ([]*ReplicationResult, error) {
 	if len(dsts) == 0 {
 		return nil, errors.New("no destination providers specified")
@@ -336,15 +342,19 @@ func (r *Replicator) ReplicateToMany(ctx context.Context, src storage.Provider, 
 					SourceType: src.GetType(),
 					DestType:   provider.GetType(),
 					RemotePath: remotePath,
-					DestPath:   resolveDestPath(remotePath, opts),
+					DestPath:   resolveDestPath(remotePath, &opts),
 					Status:     StatusFailed,
 					Err:        ctx.Err(),
 				}
 				return
 			}
 
-			// Replicate always returns a non-nil result.
-			res, _ := r.Replicate(ctx, src, provider, remotePath, opts)
+			// Replicate always returns a non-nil result whose Err mirrors the
+			// returned error; record it either way.
+			res, err := r.Replicate(ctx, src, provider, remotePath, opts)
+			if err != nil && res.Err == nil {
+				res.Err = err
+			}
 			results[idx] = res
 		}(i, dst)
 	}

@@ -501,7 +501,7 @@ func (e *Engine) GetBackupImmutability(ctx context.Context, metadata *models.Bac
 		if !errors.Is(err, storage.ErrNoRetention) {
 			return time.Time{}, "", false, err
 		}
-		until, mode, err = time.Time{}, "", nil
+		until, mode = time.Time{}, ""
 	}
 
 	legalHold, err = imm.GetLegalHold(ctx, remotePath)

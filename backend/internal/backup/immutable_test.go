@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"errors"
 	"io"
 	"path/filepath"
 	"testing"
@@ -11,6 +12,10 @@ import (
 	"github.com/sanskarpan/db-backup/internal/models"
 	stor "github.com/sanskarpan/db-backup/internal/storage"
 )
+
+// errNotImplemented is a sentinel returned by fake providers for methods that
+// are not exercised by these tests.
+var errNotImplemented = errors.New("not implemented")
 
 // fakeImmutableProvider implements storage.Provider + storage.ImmutableProvider
 // and records the object-lock calls it receives so tests can assert on them.
@@ -47,7 +52,7 @@ func (f *fakeImmutableProvider) Download(ctx context.Context, remotePath, localP
 }
 
 func (f *fakeImmutableProvider) DownloadStream(ctx context.Context, remotePath string) (io.ReadCloser, error) {
-	return nil, nil
+	return nil, errNotImplemented
 }
 
 func (f *fakeImmutableProvider) Delete(ctx context.Context, remotePath string) error { return nil }
@@ -242,8 +247,8 @@ func TestGetBackupImmutabilityAndApplyLegalHold(t *testing.T) {
 	}
 
 	// Enabling a legal hold must call the provider and persist on metadata.
-	if err := engine.ApplyLegalHold(context.Background(), metadata, true); err != nil {
-		t.Fatalf("ApplyLegalHold: %v", err)
+	if holdErr := engine.ApplyLegalHold(context.Background(), metadata, true); holdErr != nil {
+		t.Fatalf("ApplyLegalHold: %v", holdErr)
 	}
 	if !metadata.LegalHold {
 		t.Errorf("metadata.LegalHold = false, want true after ApplyLegalHold")

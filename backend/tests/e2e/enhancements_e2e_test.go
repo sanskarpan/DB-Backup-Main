@@ -173,9 +173,14 @@ func TestE2E_StorageToStorageReplication(t *testing.T) {
 // records the protection on the metadata; against a plain provider an immutable
 // backup fails closed.
 func TestE2E_ImmutableBackup(t *testing.T) {
+	t.Run("object_lock_applied", testImmutableObjectLockApplied)
+	t.Run("plain_provider_fails_closed", testImmutablePlainProviderFailsClosed)
+}
+
+func testImmutableObjectLockApplied(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("object_lock_applied", func(t *testing.T) {
+	{
 		root := t.TempDir()
 		dbPath := filepath.Join(root, "source.db")
 		seedUsersDB(t, dbPath)
@@ -225,7 +230,7 @@ func TestE2E_ImmutableBackup(t *testing.T) {
 		}
 
 		// ApplyLegalHold must flip the hold on the provider and the metadata.
-		if err := engine.ApplyLegalHold(ctx, metadata, true); err != nil {
+		if err = engine.ApplyLegalHold(ctx, metadata, true); err != nil {
 			t.Fatalf("ApplyLegalHold: %v", err)
 		}
 		if provider.setLegalHoldCalls != 1 || !provider.legalHolds[remotePath] {
@@ -249,9 +254,13 @@ func TestE2E_ImmutableBackup(t *testing.T) {
 		if !legalHold {
 			t.Errorf("expected legal hold reported on")
 		}
-	})
+	}
+}
 
-	t.Run("plain_provider_fails_closed", func(t *testing.T) {
+func testImmutablePlainProviderFailsClosed(t *testing.T) {
+	ctx := context.Background()
+
+	{
 		root := t.TempDir()
 		dbPath := filepath.Join(root, "source.db")
 		seedUsersDB(t, dbPath)
@@ -279,7 +288,7 @@ func TestE2E_ImmutableBackup(t *testing.T) {
 		if !strings.Contains(strings.ToLower(err.Error()), "object lock") {
 			t.Errorf("expected an object-lock error, got %v", err)
 		}
-	})
+	}
 }
 
 // TestE2E_PreRestoreMalwareScan proves the pre-restore scan fails closed: a

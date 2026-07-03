@@ -136,7 +136,7 @@ func TestTransitEncryptDecryptHelpers(t *testing.T) {
 	if err != nil || ct != "vault:v1:xyz" {
 		t.Fatalf("parseTransitEncryptResponse got %q err %v", ct, err)
 	}
-	if _, err := parseTransitEncryptResponse(map[string]interface{}{}); err == nil {
+	if _, errMissing := parseTransitEncryptResponse(map[string]interface{}{}); errMissing == nil {
 		t.Error("expected error for missing ciphertext")
 	}
 
