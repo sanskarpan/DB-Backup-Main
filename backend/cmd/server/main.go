@@ -22,6 +22,8 @@ import (
 	"github.com/sanskarpan/db-backup/internal/config"
 	"github.com/sanskarpan/db-backup/internal/dbregistry"
 	"github.com/sanskarpan/db-backup/internal/health"
+	"github.com/sanskarpan/db-backup/internal/integrations"
+	integrationsBuilder "github.com/sanskarpan/db-backup/internal/integrations/builder"
 	"github.com/sanskarpan/db-backup/internal/logger"
 	notifyFactory "github.com/sanskarpan/db-backup/internal/notification/factory"
 	"github.com/sanskarpan/db-backup/internal/restore"
@@ -33,6 +35,7 @@ import (
 	storageLocal "github.com/sanskarpan/db-backup/internal/storage/local"
 	storageS3 "github.com/sanskarpan/db-backup/internal/storage/s3"
 	"github.com/sanskarpan/db-backup/internal/storageregistry"
+	"github.com/sanskarpan/db-backup/internal/webhooks"
 	"github.com/sanskarpan/db-backup/internal/websocket"
 
 	// Register database drivers.
@@ -94,6 +97,26 @@ func main() {
 	wsHub := websocket.NewHub()
 	go wsHub.Run()
 	notificationRouter.AddNotifier(websocket.NewNotifierAdapter(wsHub))
+
+	// Start the webhook manager and fan backup/restore notifications out to any
+	// configured webhook subscribers. Delivery is best-effort with retry and a
+	// circuit breaker; a delivery failure never fails the backup.
+	webhookManager := webhooks.NewManager(&webhooks.ManagerConfig{})
+	notificationRouter.AddNotifier(webhooks.NewNotifierAdapter(webhookManager))
+
+	// Build the incident dispatcher from configuration and register it so that
+	// backup failures open tickets/alerts on every enabled integration. A
+	// per-provider construction error is logged, not fatal.
+	incidentDispatcher, err := integrationsBuilder.BuildDispatcher(buildIntegrationsConfig(cfg))
+	if err != nil {
+		log.Warn("Some incident integrations failed to initialize: " + err.Error())
+	}
+	if incidentDispatcher.Enabled() {
+		notificationRouter.AddNotifier(integrations.NewNotifierAdapter(incidentDispatcher))
+		log.Info("Incident integrations enabled", map[string]interface{}{
+			"count": len(incidentDispatcher.Integrations()),
+		})
+	}
 
 	// Initialize components
 	backupEngine := backup.NewEngine(&backup.Config{
@@ -234,7 +257,7 @@ func main() {
 		EnableSwagger: true,
 		JWTSecret:     jwtSecret,
 		ScanBaseDir:   os.Getenv("SCAN_BASE_DIR"),
-	}, backupEngine, restoreEngine, sched, healthChecker, detector, searchEngine, jwtService, oauth2Service, oauth2Handler, dbStore, storageStore, approvalStore, muaEnabled, storageProvider, siemExporter, wsHub, log)
+	}, backupEngine, restoreEngine, sched, healthChecker, detector, searchEngine, jwtService, oauth2Service, oauth2Handler, dbStore, storageStore, approvalStore, muaEnabled, storageProvider, siemExporter, wsHub, webhookManager, incidentDispatcher, log)
 
 	// Setup Gin router
 	if cfg.Logging.Level != "debug" {
@@ -284,11 +307,13 @@ func main() {
 		log.Error("Server forced to shutdown", err)
 	}
 
-	// Stop the scheduler as part of graceful shutdown. Done here (rather than via
-	// defer) because the earlier os.Exit calls would bypass a deferred stop.
+	// Stop the scheduler and webhook manager as part of graceful shutdown. Done
+	// here (rather than via defer) because the earlier os.Exit calls would bypass
+	// a deferred stop.
 	if err := sched.Stop(); err != nil {
 		log.Error("Failed to stop scheduler cleanly", err)
 	}
+	webhookManager.Stop()
 
 	log.Info("Server exited")
 }
@@ -309,6 +334,42 @@ func buildSIEMExporter(cfg *config.Config) *siem.SIEMExporter {
 		SourceType: sc.SourceType,
 		Index:      sc.Index,
 	})
+}
+
+// buildIntegrationsConfig maps the incident-integration configuration into the
+// builder's provider-agnostic Config used to construct the enabled integrations.
+func buildIntegrationsConfig(cfg *config.Config) *integrationsBuilder.Config {
+	ic := cfg.Integrations
+	return &integrationsBuilder.Config{
+		Jira: integrationsBuilder.JiraConfig{
+			Enabled:    ic.Jira.Enabled,
+			BaseURL:    ic.Jira.BaseURL,
+			Username:   ic.Jira.Username,
+			APIToken:   ic.Jira.APIToken,
+			ProjectKey: ic.Jira.ProjectKey,
+			IssueType:  ic.Jira.IssueType,
+		},
+		Opsgenie: integrationsBuilder.OpsgenieConfig{
+			Enabled: ic.Opsgenie.Enabled,
+			APIKey:  ic.Opsgenie.APIKey,
+			APIURL:  ic.Opsgenie.APIURL,
+		},
+		ServiceNow: integrationsBuilder.ServiceNowConfig{
+			Enabled:  ic.ServiceNow.Enabled,
+			BaseURL:  ic.ServiceNow.BaseURL,
+			Username: ic.ServiceNow.Username,
+			Password: ic.ServiceNow.Password,
+		},
+		PagerDuty: integrationsBuilder.PagerDutyConfig{
+			Enabled:    ic.PagerDuty.Enabled,
+			RoutingKey: ic.PagerDuty.RoutingKey,
+			Token:      ic.PagerDuty.Token,
+		},
+		Teams: integrationsBuilder.TeamsConfig{
+			Enabled:    ic.Teams.Enabled,
+			WebhookURL: ic.Teams.WebhookURL,
+		},
+	}
 }
 
 // buildStorageProvider constructs a storage provider from the configuration.

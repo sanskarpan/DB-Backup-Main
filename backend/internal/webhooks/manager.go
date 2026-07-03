@@ -524,9 +524,13 @@ func (m *Manager) processDelivery(task *DeliveryTask) {
 				Dur("retry_in", delay).
 				Msg("Webhook delivery failed, will retry")
 
-			// Re-queue for retry
+			// Re-queue for retry. The manager may have been stopped between
+			// scheduling and firing, so check the cancellation signal first to
+			// avoid re-queueing work onto a manager that is shutting down.
 			time.AfterFunc(delay, func() {
 				select {
+				case <-m.ctx.Done():
+					return
 				case m.deliveryQueue <- task:
 				default:
 					log.Error().Str("task_id", task.ID).Msg("Failed to re-queue task")
@@ -628,7 +632,10 @@ func (m *Manager) retryProcessor() {
 func (m *Manager) Stop() {
 	log.Info().Msg("Stopping webhook manager")
 	m.cancel()
-	close(m.deliveryQueue)
+	// The delivery queue is intentionally not closed: delivery workers exit on
+	// ctx cancellation, and retry tasks scheduled via time.AfterFunc may still
+	// attempt a non-blocking send after Stop returns. Closing the channel would
+	// turn those sends into a panic, so it is left to be garbage collected.
 }
 
 // GetAnalytics returns analytics data.
