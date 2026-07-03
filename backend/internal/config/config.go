@@ -251,6 +251,20 @@ type SecurityConfig struct {
 	APIKeys       APIKeysConfig       `mapstructure:"api_keys"`
 	RateLimiting  RateLimitingConfig  `mapstructure:"rate_limiting"`
 	MultiUserAuth MultiUserAuthConfig `mapstructure:"multi_user_auth"`
+	SIEM          SIEMConfig          `mapstructure:"siem"`
+}
+
+// SIEMConfig holds configuration for exporting detected threat events to a
+// SIEM/EDR platform (a generic webhook or Splunk HTTP Event Collector). When
+// disabled or without an endpoint, threat export is skipped.
+type SIEMConfig struct {
+	Enabled    bool   `mapstructure:"enabled"`
+	Endpoint   string `mapstructure:"endpoint"`
+	Format     string `mapstructure:"format"`
+	AuthToken  string `mapstructure:"auth_token"`
+	Source     string `mapstructure:"source"`
+	SourceType string `mapstructure:"source_type"`
+	Index      string `mapstructure:"index"`
 }
 
 // MultiUserAuthConfig holds multi-user authorization (four-eyes approval)

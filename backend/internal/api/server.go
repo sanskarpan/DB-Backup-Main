@@ -18,6 +18,9 @@ import (
 	"github.com/sanskarpan/db-backup/internal/restore"
 	"github.com/sanskarpan/db-backup/internal/scheduler"
 	"github.com/sanskarpan/db-backup/internal/security/ransomware"
+	"github.com/sanskarpan/db-backup/internal/security/siem"
+	"github.com/sanskarpan/db-backup/internal/storage"
+	"github.com/sanskarpan/db-backup/internal/storage/replication"
 	"github.com/sanskarpan/db-backup/internal/storageregistry"
 	"github.com/sanskarpan/db-backup/internal/websocket"
 )
@@ -41,6 +44,14 @@ type Server struct {
 	logger        *logger.Logger
 	// muaEnabled gates irreversible operations behind four-eyes approval.
 	muaEnabled bool
+	// storageProvider is the durable backup storage backend the backup engine
+	// writes to. It is used as the replication source for backup artifacts.
+	storageProvider storage.Provider
+	// replicator copies backup artifacts between storage providers.
+	replicator *replication.Replicator
+	// siemExporter pushes detected threat events to a SIEM/EDR sink. It may be
+	// nil (or disabled) when SIEM export is not configured.
+	siemExporter *siem.SIEMExporter
 }
 
 // Config holds API server configuration.
@@ -73,26 +84,31 @@ func NewServer(
 	storageStore *storageregistry.Store,
 	approvalStore *approvals.Store,
 	muaEnabled bool,
+	storageProvider storage.Provider,
+	siemExporter *siem.SIEMExporter,
 	wsHub *websocket.Hub,
 	log *logger.Logger,
 ) *Server {
 	return &Server{
-		config:        cfg,
-		backupEngine:  backupEngine,
-		restoreEngine: restoreEngine,
-		scheduler:     sched,
-		healthChecker: healthChecker,
-		detector:      detector,
-		searchEngine:  searchEngine,
-		jwtService:    jwtService,
-		oauth2Service: oauth2Service,
-		oauth2Handler: oauth2Handler,
-		dbStore:       dbStore,
-		storageStore:  storageStore,
-		approvalStore: approvalStore,
-		muaEnabled:    muaEnabled,
-		wsHub:         wsHub,
-		logger:        log,
+		config:          cfg,
+		backupEngine:    backupEngine,
+		restoreEngine:   restoreEngine,
+		scheduler:       sched,
+		healthChecker:   healthChecker,
+		detector:        detector,
+		searchEngine:    searchEngine,
+		jwtService:      jwtService,
+		oauth2Service:   oauth2Service,
+		oauth2Handler:   oauth2Handler,
+		dbStore:         dbStore,
+		storageStore:    storageStore,
+		approvalStore:   approvalStore,
+		muaEnabled:      muaEnabled,
+		storageProvider: storageProvider,
+		replicator:      replication.NewReplicator(),
+		siemExporter:    siemExporter,
+		wsHub:           wsHub,
+		logger:          log,
 	}
 }
 
@@ -192,6 +208,12 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 		backups.DELETE("/:id/purge", s.handlePurgeBackup)
 		backups.GET("/:id/download", s.handleDownloadBackup)
 
+		// Immutability (WORM / object-lock) inspection + legal hold, and
+		// storage-to-storage replication for a stored backup artifact.
+		backups.GET("/:id/immutability", s.handleGetBackupImmutability)
+		backups.POST("/:id/legal-hold", s.handleApplyLegalHold)
+		backups.POST("/:id/replicate", s.handleReplicateBackup)
+
 		// Database registry (the set of databases to back up)
 		{
 			databases := v1.Group("/databases", authMiddleware)
@@ -235,6 +257,9 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 		security.POST("/scan/file", s.handleScanFile)
 		security.POST("/scan/directory", s.handleScanDirectory)
 		security.GET("/stats", s.handleGetSecurityStats)
+
+		// SIEM connectivity self-test (sends a synthetic threat event).
+		security.POST("/siem/test", s.handleSIEMTest)
 
 		// Threat alerts
 		security.GET("/alerts", s.handleListThreatAlerts)
