@@ -181,8 +181,8 @@ func (pm *PortabilityManager) ProcessExportRequest(ctx context.Context, requestI
 
 	// Update status to processing
 	request.Status = ExportStatusProcessing
-	if err := pm.exportStore.Update(ctx, request); err != nil {
-		return err
+	if updErr := pm.exportStore.Update(ctx, request); updErr != nil {
+		return updErr
 	}
 
 	// Retrieve user data

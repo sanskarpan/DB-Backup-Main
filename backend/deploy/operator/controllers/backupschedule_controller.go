@@ -57,8 +57,8 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// Add finalizer if it doesn't exist
 	if !controllerutil.ContainsFinalizer(schedule, backupScheduleFinalizer) {
 		controllerutil.AddFinalizer(schedule, backupScheduleFinalizer)
-		if err := r.Update(ctx, schedule); err != nil {
-			return ctrl.Result{}, err
+		if updErr := r.Update(ctx, schedule); updErr != nil {
+			return ctrl.Result{}, updErr
 		}
 	}
 
@@ -74,8 +74,8 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if schedule.Spec.Suspended {
 		schedule.Status.Phase = "Suspended"
 		r.updateCondition(schedule, "Active", metav1.ConditionFalse, "Suspended", "Schedule is suspended")
-		if err := r.Status().Update(ctx, schedule); err != nil {
-			return ctrl.Result{}, err
+		if statusErr := r.Status().Update(ctx, schedule); statusErr != nil {
+			return ctrl.Result{}, statusErr
 		}
 		return ctrl.Result{}, nil
 	}
@@ -240,8 +240,8 @@ func (r *BackupScheduleReconciler) reconcileDelete(ctx context.Context, schedule
 
 		// Remove finalizer
 		controllerutil.RemoveFinalizer(schedule, backupScheduleFinalizer)
-		if err := r.Update(ctx, schedule); err != nil {
-			return ctrl.Result{}, err
+		if updErr := r.Update(ctx, schedule); updErr != nil {
+			return ctrl.Result{}, updErr
 		}
 	}
 

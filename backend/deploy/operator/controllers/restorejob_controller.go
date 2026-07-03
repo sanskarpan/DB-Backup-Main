@@ -55,8 +55,8 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Add finalizer if it doesn't exist
 	if !controllerutil.ContainsFinalizer(restoreJob, restoreJobFinalizer) {
 		controllerutil.AddFinalizer(restoreJob, restoreJobFinalizer)
-		if err := r.Update(ctx, restoreJob); err != nil {
-			return ctrl.Result{}, err
+		if updErr := r.Update(ctx, restoreJob); updErr != nil {
+			return ctrl.Result{}, updErr
 		}
 	}
 
@@ -82,8 +82,8 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 		r.updateCondition(restoreJob, "Initialized", metav1.ConditionTrue, "JobCreated", "Restore job initialized")
 
-		if err := r.Status().Update(ctx, restoreJob); err != nil {
-			return ctrl.Result{}, err
+		if statusErr := r.Status().Update(ctx, restoreJob); statusErr != nil {
+			return ctrl.Result{}, statusErr
 		}
 	}
 
@@ -126,8 +126,8 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 
 		r.updateCondition(restoreJob, "Failed", metav1.ConditionTrue, "MaxRetriesExceeded", "Maximum retry attempts exceeded")
-		if err := r.Status().Update(ctx, restoreJob); err != nil {
-			return ctrl.Result{}, err
+		if statusErr := r.Status().Update(ctx, restoreJob); statusErr != nil {
+			return ctrl.Result{}, statusErr
 		}
 		return ctrl.Result{}, nil
 	}
@@ -212,8 +212,8 @@ func (r *RestoreJobReconciler) reconcileDelete(ctx context.Context, restoreJob *
 
 		// Remove finalizer
 		controllerutil.RemoveFinalizer(restoreJob, restoreJobFinalizer)
-		if err := r.Update(ctx, restoreJob); err != nil {
-			return ctrl.Result{}, err
+		if updErr := r.Update(ctx, restoreJob); updErr != nil {
+			return ctrl.Result{}, updErr
 		}
 	}
 

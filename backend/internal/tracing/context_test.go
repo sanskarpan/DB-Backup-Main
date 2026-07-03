@@ -48,7 +48,7 @@ func TestInjectExtractHTTP(t *testing.T) {
 	defer span.End()
 
 	// Create HTTP request
-	req, err := http.NewRequestWithContext(context.Background(), "GET", "http://example.com", http.NoBody)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", http.NoBody)
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
@@ -322,7 +322,7 @@ func TestContextPropagationEndToEnd(t *testing.T) {
 
 	// Service A makes HTTP call to Service B
 	propagator := NewContextPropagator()
-	reqToB, err := http.NewRequestWithContext(context.Background(), "GET", "http://service-b/endpoint", http.NoBody)
+	reqToB, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://service-b/endpoint", http.NoBody)
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
