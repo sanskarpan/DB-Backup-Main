@@ -10,7 +10,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/webhooks"
 )
 
-func newWebhookTestServer(t *testing.T) (*gin.Engine, *webhooks.Manager) {
+func newWebhookTestServer(t *testing.T) *gin.Engine {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
@@ -28,11 +28,11 @@ func newWebhookTestServer(t *testing.T) (*gin.Engine, *webhooks.Manager) {
 	g.DELETE("/:id", s.handleDeleteWebhook)
 	g.POST("/:id/enable", s.handleEnableWebhook)
 	g.POST("/:id/disable", s.handleDisableWebhook)
-	return r, mgr
+	return r
 }
 
 func TestWebhookHandlers_CRUDLifecycle(t *testing.T) {
-	r, _ := newWebhookTestServer(t)
+	r := newWebhookTestServer(t)
 
 	// Create.
 	w := doJSON(t, r, http.MethodPost, "/api/v1/webhooks", map[string]interface{}{
@@ -95,7 +95,7 @@ func TestWebhookHandlers_CRUDLifecycle(t *testing.T) {
 }
 
 func TestWebhookHandlers_CreateValidation(t *testing.T) {
-	r, _ := newWebhookTestServer(t)
+	r := newWebhookTestServer(t)
 	// Missing url + events -> Subscribe returns a validation error -> 400.
 	w := doJSON(t, r, http.MethodPost, "/api/v1/webhooks", map[string]interface{}{"name": "bad"})
 	if w.Code != http.StatusBadRequest {

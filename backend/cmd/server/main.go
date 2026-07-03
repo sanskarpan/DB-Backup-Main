@@ -102,7 +102,6 @@ func main() {
 	// configured webhook subscribers. Delivery is best-effort with retry and a
 	// circuit breaker; a delivery failure never fails the backup.
 	webhookManager := webhooks.NewManager(&webhooks.ManagerConfig{})
-	defer webhookManager.Stop()
 	notificationRouter.AddNotifier(webhooks.NewNotifierAdapter(webhookManager))
 
 	// Build the incident dispatcher from configuration and register it so that
@@ -308,11 +307,13 @@ func main() {
 		log.Error("Server forced to shutdown", err)
 	}
 
-	// Stop the scheduler as part of graceful shutdown. Done here (rather than via
-	// defer) because the earlier os.Exit calls would bypass a deferred stop.
+	// Stop the scheduler and webhook manager as part of graceful shutdown. Done
+	// here (rather than via defer) because the earlier os.Exit calls would bypass
+	// a deferred stop.
 	if err := sched.Stop(); err != nil {
 		log.Error("Failed to stop scheduler cleanly", err)
 	}
+	webhookManager.Stop()
 
 	log.Info("Server exited")
 }
