@@ -7,13 +7,13 @@ import (
 	"time"
 )
 
-// fakeSource is a legitimate test double for RecoveryPointSource.
+// fakeSource is a legitimate test double for PointSource.
 type fakeSource struct {
-	points []RecoveryPoint
+	points []Point
 	err    error
 }
 
-func (f *fakeSource) AvailablePoints(_ context.Context, _ string) ([]RecoveryPoint, error) {
+func (f *fakeSource) AvailablePoints(_ context.Context, _ string) ([]Point, error) {
 	return f.points, f.err
 }
 
@@ -26,7 +26,7 @@ type fakeValidator struct {
 	failAll bool
 }
 
-func (f *fakeValidator) Validate(_ context.Context, rp RecoveryPoint) (bool, string, error) {
+func (f *fakeValidator) Validate(_ context.Context, rp *Point) (ok bool, detail string, err error) {
 	f.called = append(f.called, rp.BackupID)
 	if f.err != nil {
 		return false, "boom", f.err
@@ -41,14 +41,14 @@ func (f *fakeValidator) Validate(_ context.Context, rp RecoveryPoint) (bool, str
 type fakeRestorer struct {
 	called bool
 	target string
-	rp     RecoveryPoint
+	rp     Point
 	err    error
 }
 
-func (f *fakeRestorer) Restore(_ context.Context, rp RecoveryPoint, target string) error {
+func (f *fakeRestorer) Restore(_ context.Context, rp *Point, target string) error {
 	f.called = true
 	f.target = target
-	f.rp = rp
+	f.rp = *rp
 	return f.err
 }
 
@@ -59,14 +59,14 @@ type fakeVerifier struct {
 	called bool
 }
 
-func (f *fakeVerifier) Verify(_ context.Context, _ string) (bool, string, error) {
+func (f *fakeVerifier) Verify(_ context.Context, _ string) (ok bool, detail string, err error) {
 	f.called = true
 	return f.ok, "verified", f.err
 }
 
 // threePoints builds a canonical field of 3 recovery points relative to now.
-func threePoints(now time.Time) []RecoveryPoint {
-	return []RecoveryPoint{
+func threePoints(now time.Time) []Point {
+	return []Point{
 		{BackupID: "p1", DBName: "app", Time: now.Add(-3 * time.Hour), Kind: KindFull, SizeBytes: 100, Immutable: true},
 		{BackupID: "p2", DBName: "app", Time: now.Add(-1 * time.Hour), Kind: KindFull, SizeBytes: 120, Immutable: false},
 		{BackupID: "p3", DBName: "app", Time: now.Add(-2 * time.Hour), Kind: KindIncremental, SizeBytes: 40, Immutable: false},
@@ -282,7 +282,7 @@ func TestExecutePropagatesRestoreError(t *testing.T) {
 func TestPlanNoEligiblePointsReturnsSentinel(t *testing.T) {
 	now := time.Now()
 	// Only one point, newer than the target -> nothing eligible.
-	src := &fakeSource{points: []RecoveryPoint{
+	src := &fakeSource{points: []Point{
 		{BackupID: "px", DBName: "app", Time: now, Kind: KindFull},
 	}}
 	val := &fakeValidator{ok: map[string]bool{}}

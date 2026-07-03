@@ -26,7 +26,7 @@ import (
 // newRecoveryTestServer seeds a real sqlite database, backs it up through the
 // real backup engine into a real local storage provider, and returns a Server
 // wired with matching backup + restore engines plus the created backup's ID.
-func newRecoveryTestServer(t *testing.T) (*Server, string) {
+func newRecoveryTestServer(t *testing.T) (server *Server, backupID string) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 

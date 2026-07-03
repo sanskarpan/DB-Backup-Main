@@ -19,21 +19,21 @@ import (
 	"time"
 )
 
-// RecoveryPointKind classifies a recovery point by the type of artifact it
+// PointKind classifies a recovery point by the type of artifact it
 // restores from.
-type RecoveryPointKind string
+type PointKind string
 
 const (
 	// KindFull is a self-contained full backup.
-	KindFull RecoveryPointKind = "Full"
+	KindFull PointKind = "Full"
 	// KindIncremental is an incremental backup that layers on a base.
-	KindIncremental RecoveryPointKind = "Incremental"
+	KindIncremental PointKind = "Incremental"
 	// KindJournal is a transaction-journal (WAL) based point-in-time source.
-	KindJournal RecoveryPointKind = "Journal"
+	KindJournal PointKind = "Journal"
 )
 
-// RecoveryPoint describes a single candidate the assistant can recover from.
-type RecoveryPoint struct {
+// Point describes a single candidate the assistant can recover from.
+type Point struct {
 	// BackupID uniquely identifies the underlying backup artifact.
 	BackupID string
 	// DBName is the logical database the point belongs to.
@@ -41,7 +41,7 @@ type RecoveryPoint struct {
 	// Time is the moment the recovery point represents.
 	Time time.Time
 	// Kind is the artifact classification of the point.
-	Kind RecoveryPointKind
+	Kind PointKind
 	// SizeBytes is the on-disk size of the recovery artifact.
 	SizeBytes int64
 	// Immutable indicates the artifact is protected by object-lock (WORM).
@@ -67,12 +67,12 @@ type Step struct {
 	Rationale string
 }
 
-// RecoveryPlan is the ordered, executable output of Plan.
-type RecoveryPlan struct {
+// Plan is the ordered, executable output of Assistant.Plan.
+type Plan struct {
 	// Steps are the actions to run, in order.
 	Steps []Step
 	// ChosenPoint is the recovery point the plan will restore from.
-	ChosenPoint RecoveryPoint
+	ChosenPoint Point
 	// Score is the numeric score the chosen point earned.
 	Score float64
 	// Rationale is the overall explanation of the plan and point selection.
@@ -119,10 +119,10 @@ var ErrNoRecoveryPoints = errors.New("recovery: no recovery point satisfies the 
 // ErrNilPlan is returned by Execute when it is called with a nil plan.
 var ErrNilPlan = errors.New("recovery: plan is nil")
 
-// RecoveryPointSource discovers the recovery points available for a database.
-type RecoveryPointSource interface {
+// PointSource discovers the recovery points available for a database.
+type PointSource interface {
 	// AvailablePoints returns the recovery points known for dbName.
-	AvailablePoints(ctx context.Context, dbName string) ([]RecoveryPoint, error)
+	AvailablePoints(ctx context.Context, dbName string) ([]Point, error)
 }
 
 // CleanRoomValidator validates a recovery point by restoring it into an
@@ -130,13 +130,13 @@ type RecoveryPointSource interface {
 type CleanRoomValidator interface {
 	// Validate reports whether rp is safe to recover from. The detail string
 	// carries a human-readable explanation regardless of the outcome.
-	Validate(ctx context.Context, rp RecoveryPoint) (ok bool, detail string, err error)
+	Validate(ctx context.Context, rp *Point) (ok bool, detail string, err error)
 }
 
 // Restorer restores a recovery point into a concrete target.
 type Restorer interface {
 	// Restore restores rp into target.
-	Restore(ctx context.Context, rp RecoveryPoint, target string) error
+	Restore(ctx context.Context, rp *Point, target string) error
 }
 
 // Verifier checks that a restored target is healthy.
@@ -149,14 +149,14 @@ type Verifier interface {
 // Assistant is the agentic recovery planner and executor. It is safe to reuse
 // across incidents and holds only the injected capability interfaces.
 type Assistant struct {
-	source    RecoveryPointSource
+	source    PointSource
 	validator CleanRoomValidator
 	restorer  Restorer
 	verifier  Verifier
 }
 
 // NewAssistant builds an Assistant from the capability interfaces it drives.
-func NewAssistant(source RecoveryPointSource, validator CleanRoomValidator, restorer Restorer, verifier Verifier) *Assistant {
+func NewAssistant(source PointSource, validator CleanRoomValidator, restorer Restorer, verifier Verifier) *Assistant {
 	return &Assistant{
 		source:    source,
 		validator: validator,
@@ -167,7 +167,7 @@ func NewAssistant(source RecoveryPointSource, validator CleanRoomValidator, rest
 
 // scoredPoint pairs a candidate with its computed score and probe result.
 type scoredPoint struct {
-	point     RecoveryPoint
+	point     Point
 	score     float64
 	validated bool
 	detail    string
@@ -181,7 +181,7 @@ type scoredPoint struct {
 // validated points are strongly preferred; among those, the most recent point
 // wins; immutability is the final tie-breaker. The scoring behind the choice is
 // explained in the returned plan's Rationale and in the select step.
-func (a *Assistant) Plan(ctx context.Context, incident Incident) (*RecoveryPlan, error) {
+func (a *Assistant) Plan(ctx context.Context, incident Incident) (*Plan, error) {
 	points, err := a.source.AvailablePoints(ctx, incident.DBName)
 	if err != nil {
 		return nil, fmt.Errorf("recovery: discover points: %w", err)
@@ -195,18 +195,18 @@ func (a *Assistant) Plan(ctx context.Context, incident Incident) (*RecoveryPlan,
 	scored := a.scoreCandidates(ctx, candidates)
 	best := scored[0]
 
-	plan := &RecoveryPlan{
+	plan := &Plan{
 		ChosenPoint: best.point,
 		Score:       best.score,
 		Rationale:   planRationale(incident, scored),
-		Steps:       buildSteps(incident, best),
+		Steps:       buildSteps(incident, &best),
 	}
 	return plan, nil
 }
 
 // eligiblePoints filters to the database's points that satisfy the target time.
-func eligiblePoints(points []RecoveryPoint, target *time.Time) []RecoveryPoint {
-	eligible := make([]RecoveryPoint, 0, len(points))
+func eligiblePoints(points []Point, target *time.Time) []Point {
+	eligible := make([]Point, 0, len(points))
 	for _, p := range points {
 		if target != nil && p.Time.After(*target) {
 			continue
@@ -218,15 +218,16 @@ func eligiblePoints(points []RecoveryPoint, target *time.Time) []RecoveryPoint {
 
 // scoreCandidates probes and scores every candidate, returning them sorted best
 // first. Ties are broken deterministically by recency then BackupID.
-func (a *Assistant) scoreCandidates(ctx context.Context, candidates []RecoveryPoint) []scoredPoint {
+func (a *Assistant) scoreCandidates(ctx context.Context, candidates []Point) []scoredPoint {
 	minT, maxT := timeRange(candidates)
 
 	scored := make([]scoredPoint, 0, len(candidates))
-	for _, p := range candidates {
-		ok, detail := a.probe(ctx, p)
+	for i := range candidates {
+		p := candidates[i]
+		ok, detail := a.probe(ctx, &p)
 		scored = append(scored, scoredPoint{
 			point:     p,
-			score:     score(p, ok, minT, maxT),
+			score:     score(&p, ok, minT, maxT),
 			validated: ok,
 			detail:    detail,
 		})
@@ -247,7 +248,7 @@ func (a *Assistant) scoreCandidates(ctx context.Context, candidates []RecoveryPo
 // probe runs the clean-room validator to learn whether a candidate is safe. A
 // validator error is treated as "not validated" for scoring so a flaky probe
 // downranks rather than aborts planning; the detail is preserved.
-func (a *Assistant) probe(ctx context.Context, p RecoveryPoint) (bool, string) {
+func (a *Assistant) probe(ctx context.Context, p *Point) (bool, string) {
 	ok, detail, err := a.validator.Validate(ctx, p)
 	if err != nil {
 		return false, fmt.Sprintf("validation probe failed: %v", err)
@@ -256,7 +257,7 @@ func (a *Assistant) probe(ctx context.Context, p RecoveryPoint) (bool, string) {
 }
 
 // timeRange returns the earliest and latest times among the candidates.
-func timeRange(candidates []RecoveryPoint) (minT, maxT time.Time) {
+func timeRange(candidates []Point) (minT, maxT time.Time) {
 	minT = candidates[0].Time
 	maxT = candidates[0].Time
 	for _, p := range candidates[1:] {
@@ -272,7 +273,7 @@ func timeRange(candidates []RecoveryPoint) (minT, maxT time.Time) {
 
 // score computes a candidate's composite score from its validation state,
 // recency (normalized across the candidate pool) and immutability.
-func score(p RecoveryPoint, validated bool, minT, maxT time.Time) float64 {
+func score(p *Point, validated bool, minT, maxT time.Time) float64 {
 	var total float64
 	if validated {
 		total += weightValidated
@@ -295,7 +296,7 @@ func recencyNorm(t, minT, maxT time.Time) float64 {
 }
 
 // buildSteps assembles the ordered, executable steps for the chosen point.
-func buildSteps(incident Incident, best scoredPoint) []Step {
+func buildSteps(incident Incident, best *scoredPoint) []Step {
 	symptom := incident.Symptom
 	if symptom == "" {
 		symptom = "unspecified failure"
@@ -325,7 +326,7 @@ func buildSteps(incident Incident, best scoredPoint) []Step {
 }
 
 // selectRationale explains the score breakdown for the chosen point.
-func selectRationale(best scoredPoint) string {
+func selectRationale(best *scoredPoint) string {
 	return fmt.Sprintf(
 		"Chose backup %s (%s, %s) scoring %.2f: clean-room validated=%t, immutable=%t, most recent eligible point.",
 		best.point.BackupID,
@@ -358,7 +359,7 @@ func planRationale(incident Incident, scored []scoredPoint) string {
 // fail-closed: a failed clean-room validation or verification (or any step
 // error) stops execution immediately with Success=false, and later steps
 // (notably restore) are not reached.
-func (a *Assistant) Execute(ctx context.Context, plan *RecoveryPlan, target string) (*ExecutionResult, error) {
+func (a *Assistant) Execute(ctx context.Context, plan *Plan, target string) (*ExecutionResult, error) {
 	if plan == nil {
 		return nil, ErrNilPlan
 	}
@@ -366,7 +367,7 @@ func (a *Assistant) Execute(ctx context.Context, plan *RecoveryPlan, target stri
 	result := &ExecutionResult{Completed: make([]string, 0, len(plan.Steps))}
 	for i := range plan.Steps {
 		step := plan.Steps[i]
-		ok, err := a.runStep(ctx, step.Name, plan.ChosenPoint, target)
+		ok, err := a.runStep(ctx, step.Name, &plan.ChosenPoint, target)
 		if err != nil {
 			result.Failed = step.Name
 			return result, fmt.Errorf("recovery: step %q: %w", step.Name, err)
@@ -385,7 +386,7 @@ func (a *Assistant) Execute(ctx context.Context, plan *RecoveryPlan, target stri
 // runStep dispatches a single step to the appropriate injected capability. The
 // diagnose and select steps are planning artifacts with no side effects and
 // always succeed; the remaining steps drive the real recovery interfaces.
-func (a *Assistant) runStep(ctx context.Context, name string, rp RecoveryPoint, target string) (bool, error) {
+func (a *Assistant) runStep(ctx context.Context, name string, rp *Point, target string) (bool, error) {
 	switch name {
 	case StepDiagnose, StepSelect:
 		return true, nil

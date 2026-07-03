@@ -39,13 +39,13 @@ type backupPointSource struct {
 
 // AvailablePoints returns a recovery point for every backup of the named
 // database.
-func (s *backupPointSource) AvailablePoints(_ context.Context, dbName string) ([]aiRecovery.RecoveryPoint, error) {
-	var points []aiRecovery.RecoveryPoint
+func (s *backupPointSource) AvailablePoints(_ context.Context, dbName string) ([]aiRecovery.Point, error) {
+	points := make([]aiRecovery.Point, 0, len(s.backups))
 	for _, meta := range s.backups {
 		if dbName != "" && s.dbName != dbName {
 			continue
 		}
-		points = append(points, aiRecovery.RecoveryPoint{
+		points = append(points, aiRecovery.Point{
 			BackupID:  meta.ID,
 			DBName:    dbName,
 			Time:      meta.EndTime,
@@ -67,7 +67,7 @@ type cleanRoomAdapter struct {
 
 // Validate runs a real clean-room recovery for the point's backup and reports
 // whether the backup is promotable.
-func (c *cleanRoomAdapter) Validate(ctx context.Context, rp aiRecovery.RecoveryPoint) (bool, string, error) {
+func (c *cleanRoomAdapter) Validate(ctx context.Context, rp *aiRecovery.Point) (bool, string, error) {
 	meta, ok := c.backups[rp.BackupID]
 	if !ok {
 		return false, "", errors.New("unknown backup for recovery point")
@@ -92,7 +92,7 @@ type restoreAdapter struct {
 
 // Restore restores the point's backup into the target path via the real
 // restore engine.
-func (r *restoreAdapter) Restore(ctx context.Context, rp aiRecovery.RecoveryPoint, target string) error {
+func (r *restoreAdapter) Restore(ctx context.Context, rp *aiRecovery.Point, target string) error {
 	meta, ok := r.backups[rp.BackupID]
 	if !ok {
 		return errors.New("unknown backup for recovery point")
@@ -117,7 +117,7 @@ func openSQLite(path string) (*sql.DB, error) {
 type sqliteVerifier struct{}
 
 // Verify opens the restored database and confirms the users table is readable.
-func (sqliteVerifier) Verify(ctx context.Context, target string) (bool, string, error) {
+func (sqliteVerifier) Verify(ctx context.Context, target string) (ok bool, detail string, err error) {
 	db, err := openSQLite(target)
 	if err != nil {
 		return false, "open failed", err

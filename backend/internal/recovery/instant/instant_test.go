@@ -86,7 +86,7 @@ func TestPrepareInstant_RunsFromBackup(t *testing.T) {
 	})
 
 	recoverer := NewRecoverer(restoreEngine)
-	handle, err := recoverer.PrepareInstant(context.Background(), meta, &InstantOptions{
+	handle, err := recoverer.PrepareInstant(context.Background(), meta, &Options{
 		WorkDir: filepath.Join(root, "work"),
 	})
 	if err != nil {
@@ -222,7 +222,7 @@ func TestPrepareInstant_CorruptArtifactReturnsNotUsable(t *testing.T) {
 	}
 
 	handle, err := NewRecoverer(corruptMaterializer{}).PrepareInstant(
-		context.Background(), meta, &InstantOptions{WorkDir: filepath.Join(root, "work")},
+		context.Background(), meta, &Options{WorkDir: filepath.Join(root, "work")},
 	)
 	if err == nil {
 		t.Fatal("expected error for corrupt artifact, got nil")
@@ -265,7 +265,7 @@ func TestHandleClosedAfterClose(t *testing.T) {
 	})
 
 	handle, err := NewRecoverer(restoreEngine).PrepareInstant(context.Background(), meta,
-		&InstantOptions{WorkDir: filepath.Join(root, "work")})
+		&Options{WorkDir: filepath.Join(root, "work")})
 	if err != nil {
 		t.Fatalf("PrepareInstant: %v", err)
 	}

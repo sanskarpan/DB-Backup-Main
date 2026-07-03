@@ -96,14 +96,14 @@ func sha256File(t *testing.T, path string) string {
 }
 
 // makeBackup performs a real SQLite backup into the source provider and returns
-// its metadata plus the source provider and store directory.
-func makeBackup(t *testing.T) (meta *models.BackupMetadata, src stor.Provider, srcStore string) {
+// its metadata plus the source provider.
+func makeBackup(t *testing.T) (meta *models.BackupMetadata, src stor.Provider) {
 	t.Helper()
 	root := t.TempDir()
 	dbPath := filepath.Join(root, "source.db")
 	seedSQLiteDB(t, dbPath)
 
-	srcStore = filepath.Join(root, "src-store")
+	srcStore := filepath.Join(root, "src-store")
 	src = newLocalProvider(t, srcStore)
 
 	engine := backup.NewEngine(&backup.Config{
@@ -125,14 +125,14 @@ func makeBackup(t *testing.T) (meta *models.BackupMetadata, src stor.Provider, s
 	if !strings.HasPrefix(meta.StorageLocation, localScheme) {
 		t.Fatalf("unexpected storage location: %q", meta.StorageLocation)
 	}
-	return meta, src, srcStore
+	return meta, src
 }
 
 // TestMigrateArtifact_CrossProvider proves an artifact and its metadata.json are
 // streamed from one local provider to a second provider with a different root,
 // and that the destination bytes and checksum match the recorded backup.
 func TestMigrateArtifact_CrossProvider(t *testing.T) {
-	meta, src, _ := makeBackup(t)
+	meta, src := makeBackup(t)
 
 	dstStore := filepath.Join(t.TempDir(), "dst-store")
 	dst := newLocalProvider(t, dstStore)
@@ -187,7 +187,7 @@ func TestMigrateArtifact_CrossProvider(t *testing.T) {
 // migrated to a different storage provider and then restored into a fresh,
 // different target database path, with the original data intact.
 func TestMigrateAndRestoreToTarget(t *testing.T) {
-	meta, src, _ := makeBackup(t)
+	meta, src := makeBackup(t)
 
 	dstStore := filepath.Join(t.TempDir(), "dst-store")
 	dst := newLocalProvider(t, dstStore)
@@ -232,7 +232,7 @@ func TestMigrateAndRestoreToTarget(t *testing.T) {
 // TestMigrateArtifact_ChecksumMismatch ensures a mismatch between the migrated
 // bytes and the recorded checksum is reported as an error rather than success.
 func TestMigrateArtifact_ChecksumMismatch(t *testing.T) {
-	meta, src, _ := makeBackup(t)
+	meta, src := makeBackup(t)
 
 	// Corrupt the expected checksum so the honest destination bytes no longer
 	// match what the metadata claims.

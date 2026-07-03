@@ -56,8 +56,8 @@ type Scanner interface {
 	ScanFile(ctx context.Context, path string) (*ransomware.ThreatReport, error)
 }
 
-// GoldenRecord is an immutable record of a backup that was promoted to golden.
-type GoldenRecord struct {
+// Record is an immutable record of a backup that was promoted to golden.
+type Record struct {
 	// BackupID is the ID of the promoted backup.
 	BackupID string `json:"backup_id"`
 	// PromotedAt is the time the backup became the golden snapshot.
@@ -88,8 +88,8 @@ type Config struct {
 
 // curatorState is the persisted on-disk representation of a Curator.
 type curatorState struct {
-	Current *GoldenRecord  `json:"current,omitempty"`
-	History []GoldenRecord `json:"history"`
+	Current *Record  `json:"current,omitempty"`
+	History []Record `json:"history"`
 }
 
 // Curator maintains and persists the current golden snapshot pointer and its
@@ -126,7 +126,7 @@ func NewCurator(cfg *Config) (*Curator, error) {
 		dir:       cfg.Directory,
 		validator: cfg.Validator,
 		scanner:   cfg.Scanner,
-		state:     curatorState{History: []GoldenRecord{}},
+		state:     curatorState{History: []Record{}},
 	}
 	if err := c.load(); err != nil {
 		return nil, err
@@ -153,7 +153,7 @@ func (c *Curator) load() error {
 		return fmt.Errorf("golden: decode state: %w", err)
 	}
 	if st.History == nil {
-		st.History = []GoldenRecord{}
+		st.History = []Record{}
 	}
 	c.state = st
 	return nil
@@ -184,7 +184,7 @@ func (c *Curator) Promote(
 	ctx context.Context,
 	meta *models.BackupMetadata,
 	opts *PromoteOptions,
-) (*GoldenRecord, error) {
+) (*Record, error) {
 	if meta == nil {
 		return nil, errors.New("golden: candidate metadata is required")
 	}
@@ -208,7 +208,7 @@ func (c *Curator) Promote(
 		return nil, fmt.Errorf("%w: %s threat detected", ErrCandidateUnclean, report.ThreatLevel)
 	}
 
-	record := GoldenRecord{
+	record := Record{
 		BackupID:   meta.ID,
 		PromotedAt: time.Now().UTC(),
 		Checksum:   meta.Checksum,
@@ -239,7 +239,7 @@ func (c *Curator) Promote(
 // previousCurrent returns a pointer to the last record in history, or nil when
 // history is empty. It is used to restore the current pointer after a failed
 // save.
-func previousCurrent(history []GoldenRecord) *GoldenRecord {
+func previousCurrent(history []Record) *Record {
 	if len(history) == 0 {
 		return nil
 	}
@@ -249,7 +249,7 @@ func previousCurrent(history []GoldenRecord) *GoldenRecord {
 
 // Current returns a copy of the active golden pointer and true, or the zero
 // record and false when no backup has been promoted.
-func (c *Curator) Current() (*GoldenRecord, bool) {
+func (c *Curator) Current() (*Record, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if c.state.Current == nil {
@@ -260,10 +260,10 @@ func (c *Curator) Current() (*GoldenRecord, bool) {
 }
 
 // History returns a copy of the promotion history, oldest first.
-func (c *Curator) History() []GoldenRecord {
+func (c *Curator) History() []Record {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	out := make([]GoldenRecord, len(c.state.History))
+	out := make([]Record, len(c.state.History))
 	copy(out, c.state.History)
 	return out
 }

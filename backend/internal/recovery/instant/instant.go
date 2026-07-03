@@ -68,8 +68,8 @@ func NewRecoverer(materializer Materializer) *Recoverer {
 	return &Recoverer{materializer: materializer}
 }
 
-// InstantOptions controls how an instant database is prepared.
-type InstantOptions struct {
+// Options controls how an instant database is prepared.
+type Options struct {
 	// WorkDir is the isolated directory the artifact is materialized into. When
 	// empty a fresh temporary directory is created and owned by the handle
 	// (removed on Cleanup).
@@ -80,8 +80,8 @@ type InstantOptions struct {
 	RemoveWorkDir bool
 }
 
-// InstantHandle is a ready-to-use database materialized from a backup.
-type InstantHandle struct {
+// Handle is a ready-to-use database materialized from a backup.
+type Handle struct {
 	// Path is the absolute path to the runnable database file on disk.
 	Path string
 	// DSN is the database/sql data source name for opening the database.
@@ -109,8 +109,8 @@ type InstantHandle struct {
 func (r *Recoverer) PrepareInstant(
 	ctx context.Context,
 	meta *models.BackupMetadata,
-	opts *InstantOptions,
-) (*InstantHandle, error) {
+	opts *Options,
+) (*Handle, error) {
 	start := time.Now()
 
 	if meta == nil {
@@ -120,7 +120,7 @@ func (r *Recoverer) PrepareInstant(
 		return nil, fmt.Errorf("%w: %s", ErrUnsupportedDatabaseType, meta.DatabaseType)
 	}
 	if opts == nil {
-		opts = &InstantOptions{}
+		opts = &Options{}
 	}
 
 	workDir, ownWorkDir, err := prepareWorkDir(opts.WorkDir)
@@ -130,17 +130,18 @@ func (r *Recoverer) PrepareInstant(
 
 	dbPath := filepath.Join(workDir, materializedFileName)
 	if err = r.materializer.DownloadBackup(ctx, meta, dbPath); err != nil {
-		cleanupWorkDir(ownWorkDir, workDir)
-		return nil, fmt.Errorf("instant: materialize backup: %w", err)
+		return nil, errors.Join(
+			fmt.Errorf("instant: materialize backup: %w", err),
+			cleanupWorkDir(ownWorkDir, workDir),
+		)
 	}
 
 	if err = quickCheck(ctx, dbPath); err != nil {
-		cleanupWorkDir(ownWorkDir, workDir)
-		return nil, err
+		return nil, errors.Join(err, cleanupWorkDir(ownWorkDir, workDir))
 	}
 
 	now := time.Now()
-	return &InstantHandle{
+	return &Handle{
 		Path:          dbPath,
 		DSN:           dbPath,
 		ReadyAt:       now,
@@ -167,23 +168,30 @@ func prepareWorkDir(requested string) (dir string, owned bool, err error) {
 	return requested, false, nil
 }
 
-// cleanupWorkDir removes an owned working directory, ignoring errors because it
-// runs on an already-failing path.
-func cleanupWorkDir(owned bool, dir string) {
-	if owned && dir != "" {
-		_ = os.RemoveAll(dir) //nolint:errcheck // best-effort cleanup on failure path
+// cleanupWorkDir removes an owned working directory. It returns any removal
+// error so callers on a failing path can surface it alongside the primary
+// error.
+func cleanupWorkDir(owned bool, dir string) error {
+	if !owned || dir == "" {
+		return nil
 	}
+	if err := os.RemoveAll(dir); err != nil {
+		return fmt.Errorf("instant: remove work dir: %w", err)
+	}
+	return nil
 }
 
 // quickCheck opens the SQLite database at path read-write and runs PRAGMA
 // quick_check to confirm it is usable.
-func quickCheck(ctx context.Context, path string) error {
+func quickCheck(ctx context.Context, path string) (err error) {
 	db, err := sql.Open(sqlDriverName, path)
 	if err != nil {
 		return fmt.Errorf("instant: open database: %w", err)
 	}
 	defer func() {
-		_ = db.Close() //nolint:errcheck // read-only probe connection
+		if closeErr := db.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("instant: close probe database: %w", closeErr)
+		}
 	}()
 
 	var result string
@@ -198,7 +206,7 @@ func quickCheck(ctx context.Context, path string) error {
 
 // Open returns a read-write *sql.DB for the materialized database. Repeated
 // calls return the same pooled handle, which Close and Cleanup release.
-func (h *InstantHandle) Open() (*sql.DB, error) {
+func (h *Handle) Open() (*sql.DB, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -219,14 +227,14 @@ func (h *InstantHandle) Open() (*sql.DB, error) {
 
 // Close releases the pooled database connection without removing the working
 // directory.
-func (h *InstantHandle) Close() error {
+func (h *Handle) Close() error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.closeLocked()
 }
 
 // closeLocked closes the pooled connection. The caller must hold h.mu.
-func (h *InstantHandle) closeLocked() error {
+func (h *Handle) closeLocked() error {
 	h.closed = true
 	if h.db == nil {
 		return nil
@@ -241,7 +249,7 @@ func (h *InstantHandle) closeLocked() error {
 
 // Cleanup releases the database connection and, when the working directory is
 // owned by the handle (or removal was requested), removes it from disk.
-func (h *InstantHandle) Cleanup() error {
+func (h *Handle) Cleanup() error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 

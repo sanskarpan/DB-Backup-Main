@@ -133,7 +133,7 @@ func (j *Journal) openActive() error {
 // The LSN is monotonically increasing and gap-free. The record is flushed and
 // fsynced before Append returns, so a successful call guarantees the change is
 // on stable storage. The supplied change.Time is stored verbatim.
-func (j *Journal) Append(ctx context.Context, change ChangeRecord) (uint64, error) {
+func (j *Journal) Append(ctx context.Context, change *ChangeRecord) (uint64, error) {
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
@@ -291,7 +291,7 @@ func (j *Journal) segmentSeqs() ([]int, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cdp: read journal dir: %w", err)
 	}
-	var seqs []int
+	seqs := make([]int, 0, len(entries))
 	for _, e := range entries {
 		if e.IsDir() {
 			continue

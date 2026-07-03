@@ -171,14 +171,16 @@ func (o *Orchestrator) Recover(ctx context.Context, meta *models.BackupMetadata,
 		return report, err
 	}
 	if opts.Cleanup {
-		defer func() { _ = os.RemoveAll(isolated) }() //nolint:errcheck // best-effort cleanup of isolated dir
+		defer func() {
+			_ = os.RemoveAll(isolated) //nolint:errcheck // best-effort cleanup of isolated dir
+		}()
 	}
 
 	recoveredPath := filepath.Join(isolated, recoveredArtifactName)
 	report.RecoveredPath = recoveredPath
 
-	if err = o.restoreIsolated(ctx, meta, recoveredPath, report); err != nil {
-		return report, err
+	if restoreErr := o.restoreIsolated(ctx, meta, recoveredPath, report); restoreErr != nil {
+		return report, restoreErr
 	}
 
 	quarantined, err := o.scan(ctx, recoveredPath, opts, report)
@@ -277,7 +279,9 @@ func validateIntegrity(ctx context.Context, dbPath string, expectedTables []stri
 	if err != nil {
 		return fmt.Errorf("open recovered database: %w", err)
 	}
-	defer func() { _ = db.Close() }() //nolint:errcheck // read-only handle, close error is not actionable
+	defer func() {
+		_ = db.Close() //nolint:errcheck // read-only handle, close error is not actionable
+	}()
 
 	if err = db.PingContext(ctx); err != nil {
 		return fmt.Errorf("ping recovered database: %w", err)
@@ -304,7 +308,9 @@ func userTables(ctx context.Context, db *sql.DB) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list tables: %w", err)
 	}
-	defer func() { _ = rows.Close() }() //nolint:errcheck // rows error surfaced via rows.Err below
+	defer func() {
+		_ = rows.Close() //nolint:errcheck // rows error surfaced via rows.Err below
+	}()
 
 	var tables []string
 	for rows.Next() {

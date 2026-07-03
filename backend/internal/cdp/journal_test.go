@@ -27,7 +27,7 @@ func appendAll(t *testing.T, j *Journal, changes []ChangeRecord) []uint64 {
 	ctx := context.Background()
 	lsns := make([]uint64, 0, len(changes))
 	for _, c := range changes {
-		lsn, err := j.Append(ctx, c)
+		lsn, err := j.Append(ctx, &c)
 		if err != nil {
 			t.Fatalf("Append(%s/%s): %v", c.Table, c.Key, err)
 		}
@@ -93,8 +93,8 @@ func TestRecoverToLSNGranularity(t *testing.T) {
 		t.Fatalf("RecoverToLSN(3) returned %d records, want 3", len(recs))
 	}
 	state := Reconstruct(recs)
-	assertRow(t, state, "t", "x", "v2")
-	assertRow(t, state, "t", "y", "yv")
+	assertRow(t, state, "x", "v2")
+	assertRow(t, state, "y", "yv")
 	assertAbsent(t, state, "t", "z")
 
 	// Recover to lsn 4 (just past the delete): x gone.
@@ -104,7 +104,7 @@ func TestRecoverToLSNGranularity(t *testing.T) {
 	}
 	state4 := Reconstruct(recs4)
 	assertAbsent(t, state4, "t", "x")
-	assertRow(t, state4, "t", "y", "yv")
+	assertRow(t, state4, "y", "yv")
 }
 
 func TestRecoverToTime(t *testing.T) {
@@ -128,14 +128,14 @@ func TestRecoverToTime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RecoverToTime: %v", err)
 	}
-	assertRow(t, Reconstruct(recs), "t", "x", "v1")
+	assertRow(t, Reconstruct(recs), "x", "v1")
 
 	// At exactly +10s the update is included (inclusive bound).
 	recs, err = j.RecoverToTime(ctx, baseTime.Add(10*time.Second))
 	if err != nil {
 		t.Fatalf("RecoverToTime: %v", err)
 	}
-	assertRow(t, Reconstruct(recs), "t", "x", "v2")
+	assertRow(t, Reconstruct(recs), "x", "v2")
 
 	// At +25s the delete has taken effect.
 	recs, err = j.RecoverToTime(ctx, baseTime.Add(25*time.Second))
@@ -155,8 +155,8 @@ func TestDurabilityAcrossReopen(t *testing.T) {
 		changeAt("t", OpInsert, "a", "1", 0),
 		changeAt("t", OpInsert, "b", "2", 1),
 	})
-	if err := j.Close(); err != nil {
-		t.Fatalf("Close: %v", err)
+	if closeErr := j.Close(); closeErr != nil {
+		t.Fatalf("Close: %v", closeErr)
 	}
 
 	// Reopen the same directory: numbering must continue from 3.
@@ -168,7 +168,8 @@ func TestDurabilityAcrossReopen(t *testing.T) {
 	if last := j2.LastLSN(); last != 2 {
 		t.Fatalf("LastLSN after reopen = %d, want 2", last)
 	}
-	lsn, err := j2.Append(context.Background(), changeAt("t", OpInsert, "c", "3", 2))
+	rec := changeAt("t", OpInsert, "c", "3", 2)
+	lsn, err := j2.Append(context.Background(), &rec)
 	if err != nil {
 		t.Fatalf("Append after reopen: %v", err)
 	}
@@ -181,9 +182,9 @@ func TestDurabilityAcrossReopen(t *testing.T) {
 		t.Fatalf("RecoverToLSN: %v", err)
 	}
 	state := Reconstruct(recs)
-	assertRow(t, state, "t", "a", "1")
-	assertRow(t, state, "t", "b", "2")
-	assertRow(t, state, "t", "c", "3")
+	assertRow(t, state, "a", "1")
+	assertRow(t, state, "b", "2")
+	assertRow(t, state, "c", "3")
 }
 
 func TestSegmentRollingPreservesOrder(t *testing.T) {
@@ -200,8 +201,8 @@ func TestSegmentRollingPreservesOrder(t *testing.T) {
 		changes = append(changes, changeAt("t", OpInsert, string(rune('a'+i%26))+itoa(i), itoa(i), i))
 	}
 	appendAll(t, j, changes)
-	if err := j.Close(); err != nil {
-		t.Fatalf("Close: %v", err)
+	if closeErr := j.Close(); closeErr != nil {
+		t.Fatalf("Close: %v", closeErr)
 	}
 
 	seqs, err := (&Journal{dir: dir}).segmentSeqs()
@@ -241,10 +242,10 @@ func TestAppendValidation(t *testing.T) {
 	defer func() { _ = j.Close() }()
 	ctx := context.Background()
 
-	if _, err := j.Append(ctx, ChangeRecord{Op: OpInsert, Key: "k"}); err == nil {
+	if _, err := j.Append(ctx, &ChangeRecord{Op: OpInsert, Key: "k"}); err == nil {
 		t.Fatal("expected error for empty table")
 	}
-	if _, err := j.Append(ctx, ChangeRecord{Table: "t", Key: "k"}); err == nil {
+	if _, err := j.Append(ctx, &ChangeRecord{Table: "t", Key: "k"}); err == nil {
 		t.Fatal("expected error for invalid op")
 	}
 }
@@ -258,7 +259,7 @@ func TestRecordRoundTrip(t *testing.T) {
 		Time:  baseTime,
 		LSN:   99,
 	}
-	frame := encodeRecord(rec)
+	frame := encodeRecord(&rec)
 	got, n, err := decodeRecord(frame)
 	if err != nil {
 		t.Fatalf("decodeRecord: %v", err)
@@ -278,7 +279,8 @@ func TestRecordRoundTrip(t *testing.T) {
 }
 
 func TestDecodeDetectsCorruption(t *testing.T) {
-	frame := encodeRecord(changeAt("t", OpInsert, "k", "v", 0))
+	rec := changeAt("t", OpInsert, "k", "v", 0)
+	frame := encodeRecord(&rec)
 	// Flip a byte inside the payload to break the CRC.
 	corrupt := make([]byte, len(frame))
 	copy(corrupt, frame)
@@ -293,8 +295,9 @@ func TestDecodeDetectsCorruption(t *testing.T) {
 	}
 }
 
-func assertRow(t *testing.T, s SnapshotState, table, key, want string) {
+func assertRow(t *testing.T, s SnapshotState, key, want string) {
 	t.Helper()
+	const table = "t"
 	tbl, ok := s[table]
 	if !ok {
 		t.Fatalf("table %q missing from state", table)

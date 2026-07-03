@@ -63,7 +63,12 @@ func (s *Server) handleQueryBackup(c *gin.Context) {
 		s.respondError(c, http.StatusUnprocessableEntity, err, "Failed to mount backup")
 		return
 	}
-	defer func() { _ = mount.Unmount() }()
+	defer func() {
+		// Best-effort unmount; the response already reflects the query outcome.
+		if uerr := mount.Unmount(); uerr != nil {
+			_ = uerr
+		}
+	}()
 
 	result, err := mount.Query(ctx, req.Query, req.Args...)
 	if err != nil {

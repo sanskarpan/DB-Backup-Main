@@ -87,7 +87,7 @@ const recordMagic uint32 = 0x43445052 // "CDPR".
 // The frame layout is: a uint32 payload length, the payload bytes, and a
 // trailing uint32 CRC32 (IEEE) of the payload. The payload itself begins with
 // recordMagic so that a decoder can reject foreign or misaligned data.
-func encodeRecord(r ChangeRecord) []byte {
+func encodeRecord(r *ChangeRecord) []byte {
 	var payload bytes.Buffer
 	writeU32(&payload, recordMagic)
 	writeU64(&payload, r.LSN)
@@ -101,7 +101,7 @@ func encodeRecord(r ChangeRecord) []byte {
 	crc := crc32.ChecksumIEEE(body)
 
 	var frame bytes.Buffer
-	writeU32(&frame, uint32(len(body)))
+	writeU32(&frame, uint32(len(body))) //nolint:gosec // G115: payload length is bounded by the in-memory frame size, well under uint32 max.
 	frame.Write(body)
 	writeU32(&frame, crc)
 	return frame.Bytes()
@@ -195,12 +195,12 @@ func writeU64(buf *bytes.Buffer, v uint64) {
 
 // writeI64 appends a big-endian int64 to buf.
 func writeI64(buf *bytes.Buffer, v int64) {
-	writeU64(buf, uint64(v))
+	writeU64(buf, uint64(v)) //nolint:gosec // G115: deliberate reversible int64->uint64 bit-cast, decoded symmetrically by reader.i64.
 }
 
 // writeBytes appends a uint32 length prefix followed by the raw bytes.
 func writeBytes(buf *bytes.Buffer, v []byte) {
-	writeU32(buf, uint32(len(v)))
+	writeU32(buf, uint32(len(v))) //nolint:gosec // G115: byte-slice length is bounded by the in-memory frame size, well under uint32 max.
 	buf.Write(v)
 }
 
@@ -236,7 +236,7 @@ func (r *reader) i64() (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return int64(v), nil
+	return int64(v), nil //nolint:gosec // G115: reversible bit-cast symmetric with writeI64's int64->uint64.
 }
 
 func (r *reader) byte() (byte, error) {

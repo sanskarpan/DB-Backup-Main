@@ -114,9 +114,9 @@ func (m *Mounter) Mount(ctx context.Context, meta *models.BackupMetadata, opts *
 	}
 
 	artifactPath := filepath.Join(workDir, artifactFileName)
-	if err := m.materializer.DownloadBackup(ctx, meta, artifactPath); err != nil {
+	if dlErr := m.materializer.DownloadBackup(ctx, meta, artifactPath); dlErr != nil {
 		cleanupDir(workDir)
-		return nil, fmt.Errorf("queryable: materialize artifact: %w", err)
+		return nil, fmt.Errorf("queryable: materialize artifact: %w", dlErr)
 	}
 
 	db, err := openReadOnlySQLite(ctx, artifactPath)
@@ -138,11 +138,9 @@ func openReadOnlySQLite(ctx context.Context, path string) (*sql.DB, error) {
 	}
 	// A read-only SQLite database supports a single connection safely.
 	db.SetMaxOpenConns(1)
-	if err := db.PingContext(ctx); err != nil {
-		if cerr := db.Close(); cerr != nil {
-			_ = cerr //nolint:errcheck // best-effort close on a failed open
-		}
-		return nil, fmt.Errorf("queryable: verify sqlite artifact: %w", err)
+	if pingErr := db.PingContext(ctx); pingErr != nil {
+		_ = db.Close() //nolint:errcheck // best-effort close on a failed open
+		return nil, fmt.Errorf("queryable: verify sqlite artifact: %w", pingErr)
 	}
 	return db, nil
 }
@@ -253,13 +251,13 @@ func hasWordPrefix(s, word string) bool {
 
 // scanRows reads every row from rows, returning the column names and the row
 // values. Byte-slice values are converted to strings for readability.
-func scanRows(rows *sql.Rows) ([]string, [][]any, error) {
-	cols, err := rows.Columns()
+func scanRows(rows *sql.Rows) (cols []string, out [][]any, err error) {
+	cols, err = rows.Columns()
 	if err != nil {
 		return nil, nil, fmt.Errorf("queryable: columns: %w", err)
 	}
 
-	out := make([][]any, 0)
+	out = make([][]any, 0)
 	for rows.Next() {
 		values := make([]any, len(cols))
 		pointers := make([]any, len(cols))
@@ -280,7 +278,7 @@ func scanRows(rows *sql.Rows) ([]string, [][]any, error) {
 		}
 		out = append(out, row)
 	}
-	if err := rows.Err(); err != nil {
+	if err = rows.Err(); err != nil {
 		return nil, nil, fmt.Errorf("queryable: iterate rows: %w", err)
 	}
 	return cols, out, nil
@@ -289,7 +287,5 @@ func scanRows(rows *sql.Rows) ([]string, [][]any, error) {
 // cleanupDir removes dir best-effort, ignoring any error (used on failure
 // paths where the original error is what matters).
 func cleanupDir(dir string) {
-	if err := os.RemoveAll(dir); err != nil {
-		_ = err //nolint:errcheck // best-effort cleanup on an error path
-	}
+	_ = os.RemoveAll(dir) //nolint:errcheck // best-effort cleanup on an error path
 }

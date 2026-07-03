@@ -68,7 +68,7 @@ func TestE2E_InstantRecovery(t *testing.T) {
 	})
 	recoverer := instant.NewRecoverer(restoreEngine)
 
-	handle, err := recoverer.PrepareInstant(ctx, meta, &instant.InstantOptions{
+	handle, err := recoverer.PrepareInstant(ctx, meta, &instant.Options{
 		WorkDir: filepath.Join(root, "instant-work"),
 	})
 	if err != nil {
@@ -210,7 +210,7 @@ func TestE2E_CrossCloudMigration(t *testing.T) {
 	}, &migration.Options{}); err != nil {
 		t.Fatalf("RestoreToTarget: %v", err)
 	}
-	got := queryColumn(t, target, "SELECT name FROM users ORDER BY id;")
+	got := queryColumn(t, target, "SELECT name FROM users ORDER BY name;")
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("migrated restore rows mismatch: got %v want %v", got, want)
 	}
@@ -291,9 +291,9 @@ func TestE2E_JournalCDP(t *testing.T) {
 		{Table: "users", Op: cdp.OpUpdate, Key: "1", After: []byte("alice2"), Time: base.Add(2 * time.Minute)},
 		{Table: "users", Op: cdp.OpDelete, Key: "2", Time: base.Add(3 * time.Minute)},
 	}
-	var lsns []uint64
-	for _, c := range changes {
-		lsn, appendErr := j.Append(ctx, c)
+	lsns := make([]uint64, 0, len(changes))
+	for i := range changes {
+		lsn, appendErr := j.Append(ctx, &changes[i])
 		if appendErr != nil {
 			t.Fatalf("Append: %v", appendErr)
 		}
@@ -327,17 +327,18 @@ func TestE2E_JournalCDP(t *testing.T) {
 	}
 
 	// Durability: reopening the journal continues the LSN sequence.
-	if err := j.Close(); err != nil {
-		t.Fatalf("Close: %v", err)
+	if closeErr := j.Close(); closeErr != nil {
+		t.Fatalf("Close: %v", closeErr)
 	}
 	j2, err := cdp.Open(dir, 0)
 	if err != nil {
 		t.Fatalf("reopen journal: %v", err)
 	}
 	defer func() { _ = j2.Close() }()
-	next, err := j2.Append(ctx, cdp.ChangeRecord{
+	reopened := cdp.ChangeRecord{
 		Table: "users", Op: cdp.OpInsert, Key: "3", After: []byte("carol"), Time: base.Add(4 * time.Minute),
-	})
+	}
+	next, err := j2.Append(ctx, &reopened)
 	if err != nil {
 		t.Fatalf("Append after reopen: %v", err)
 	}

@@ -116,8 +116,8 @@ func TestMount_QueryRealBackup(t *testing.T) {
 		t.Fatalf("Mount: %v", err)
 	}
 	defer func() {
-		if err := mount.Unmount(); err != nil {
-			t.Errorf("Unmount: %v", err)
+		if unmountErr := mount.Unmount(); unmountErr != nil {
+			t.Errorf("Unmount: %v", unmountErr)
 		}
 	}()
 
@@ -165,14 +165,14 @@ func TestMount_QueryRealBackup(t *testing.T) {
 		"DROP TABLE users",
 		"INSERT INTO users (id, name) VALUES (99,'mallory')",
 	} {
-		if _, err := mount.Query(ctx, mut); !errors.Is(err, ErrNotReadOnly) {
-			t.Fatalf("expected ErrNotReadOnly for %q, got %v", mut, err)
+		if _, mutErr := mount.Query(ctx, mut); !errors.Is(mutErr, ErrNotReadOnly) {
+			t.Fatalf("expected ErrNotReadOnly for %q, got %v", mut, mutErr)
 		}
 	}
 
 	// An empty query is rejected too.
-	if _, err := mount.Query(ctx, "   "); !errors.Is(err, ErrEmptyQuery) {
-		t.Fatalf("expected ErrEmptyQuery, got %v", err)
+	if _, emptyErr := mount.Query(ctx, "   "); !errors.Is(emptyErr, ErrEmptyQuery) {
+		t.Fatalf("expected ErrEmptyQuery, got %v", emptyErr)
 	}
 
 	// The stored backup artifact must be byte-for-byte unchanged after querying.
