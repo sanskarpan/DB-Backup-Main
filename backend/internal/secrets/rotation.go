@@ -24,7 +24,7 @@ type KeyRotationConfig struct {
 	AutoRotate bool `mapstructure:"auto_rotate"`
 
 	// NotifyOnRotation callback for rotation notifications
-	NotifyOnRotation func(keyID string, oldKey, newKey string) error
+	NotifyOnRotation func(keyID, oldKey, newKey string) error
 }
 
 // KeyRotationManager manages automatic key rotation.

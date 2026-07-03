@@ -12,7 +12,7 @@ type SearchEngineInterface interface {
 	IsAvailable() bool
 	Search(ctx context.Context, query *SearchQuery) (*SearchResults, error)
 	ParseQueryString(queryString string) (*SearchQuery, error)
-	Suggest(ctx context.Context, prefix string, field string, limit int) ([]string, error)
+	Suggest(ctx context.Context, prefix, field string, limit int) ([]string, error)
 	GetStats(ctx context.Context) (*CatalogStats, error)
 }
 
