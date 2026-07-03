@@ -9,29 +9,29 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// ConversationManager manages conversational interactions
+// ConversationManager manages conversational interactions.
 type ConversationManager struct {
-	mu            sync.RWMutex
-	parser        *QueryParser
-	llmClient     *LLMClient
-	translator    *Translator
-	sessions      map[string]*ConversationSession
-	sessionTTL    time.Duration
+	mu         sync.RWMutex
+	parser     *QueryParser
+	llmClient  *LLMClient
+	translator *Translator
+	sessions   map[string]*ConversationSession
+	sessionTTL time.Duration
 }
 
-// ConversationSession represents an ongoing conversation
+// ConversationSession represents an ongoing conversation.
 type ConversationSession struct {
-	ID             string                   `json:"id"`
-	UserID         string                   `json:"user_id"`
-	StartTime      time.Time                `json:"start_time"`
-	LastActivity   time.Time                `json:"last_activity"`
-	Messages       []*Message               `json:"messages"`
-	Context        map[string]interface{}   `json:"context"`
-	PendingActions []*PendingAction         `json:"pending_actions"`
-	State          ConversationState        `json:"state"`
+	ID             string                 `json:"id"`
+	UserID         string                 `json:"user_id"`
+	StartTime      time.Time              `json:"start_time"`
+	LastActivity   time.Time              `json:"last_activity"`
+	Messages       []*Message             `json:"messages"`
+	Context        map[string]interface{} `json:"context"`
+	PendingActions []*PendingAction       `json:"pending_actions"`
+	State          ConversationState      `json:"state"`
 }
 
-// Message represents a conversation message
+// Message represents a conversation message.
 type Message struct {
 	ID        string                 `json:"id"`
 	Role      string                 `json:"role"` // "user" or "assistant"
@@ -42,7 +42,7 @@ type Message struct {
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// PendingAction represents an action awaiting confirmation
+// PendingAction represents an action awaiting confirmation.
 type PendingAction struct {
 	ID              string                 `json:"id"`
 	Action          string                 `json:"action"`
@@ -52,28 +52,28 @@ type PendingAction struct {
 	ExpiresAt       time.Time              `json:"expires_at"`
 }
 
-// ConversationState represents the state of a conversation
+// ConversationState represents the state of a conversation.
 type ConversationState string
 
 const (
-	StateActive        ConversationState = "active"
-	StateAwaitingInput ConversationState = "awaiting_input"
+	StateActive               ConversationState = "active"
+	StateAwaitingInput        ConversationState = "awaiting_input"
 	StateAwaitingConfirmation ConversationState = "awaiting_confirmation"
-	StateCompleted     ConversationState = "completed"
+	StateCompleted            ConversationState = "completed"
 )
 
-// ConversationResponse represents a response in the conversation
+// ConversationResponse represents a response in the conversation.
 type ConversationResponse struct {
-	Message            string                 `json:"message"`
-	Intent             Intent                 `json:"intent,omitempty"`
-	APICalls           []APICall              `json:"api_calls,omitempty"`
+	Message              string                 `json:"message"`
+	Intent               Intent                 `json:"intent,omitempty"`
+	APICalls             []APICall              `json:"api_calls,omitempty"`
 	RequiresConfirmation bool                   `json:"requires_confirmation"`
 	ConfirmationMessage  string                 `json:"confirmation_message,omitempty"`
-	Suggestions        []string               `json:"suggestions,omitempty"`
-	Context            map[string]interface{} `json:"context,omitempty"`
+	Suggestions          []string               `json:"suggestions,omitempty"`
+	Context              map[string]interface{} `json:"context,omitempty"`
 }
 
-// NewConversationManager creates a new conversation manager
+// NewConversationManager creates a new conversation manager.
 func NewConversationManager(llmClient *LLMClient, baseURL string) *ConversationManager {
 	return &ConversationManager{
 		parser:     NewQueryParser(),
@@ -84,7 +84,7 @@ func NewConversationManager(llmClient *LLMClient, baseURL string) *ConversationM
 	}
 }
 
-// StartSession starts a new conversation session
+// StartSession starts a new conversation session.
 func (cm *ConversationManager) StartSession(userID string) *ConversationSession {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
@@ -116,7 +116,7 @@ func (cm *ConversationManager) StartSession(userID string) *ConversationSession 
 	return session
 }
 
-// ProcessMessage processes a user message and generates a response
+// ProcessMessage processes a user message and generates a response.
 func (cm *ConversationManager) ProcessMessage(sessionID, message string) (*ConversationResponse, error) {
 	cm.mu.Lock()
 	session, exists := cm.sessions[sessionID]
@@ -195,7 +195,7 @@ func (cm *ConversationManager) ProcessMessage(sessionID, message string) (*Conve
 	return response, nil
 }
 
-// processWithRules processes a query using rule-based translation
+// processWithRules processes a query using rule-based translation.
 func (cm *ConversationManager) processWithRules(session *ConversationSession, parsed *ParsedQuery) (*ConversationResponse, error) {
 	// Translate to API calls
 	translation, err := cm.translator.Translate(parsed)
@@ -216,14 +216,14 @@ func (cm *ConversationManager) processWithRules(session *ConversationSession, pa
 	return response, nil
 }
 
-// processWithLLM processes a query using LLM
+// processWithLLM processes a query using LLM.
 func (cm *ConversationManager) processWithLLM(session *ConversationSession, message string, parsed *ParsedQuery) (*ConversationResponse, error) {
 	// Build context from conversation history
 	contextStr := cm.buildContextString(session)
 
 	// Query LLM
 	llmReq := &LLMRequest{
-		Query:   message,
+		Query: message,
 		Context: map[string]interface{}{
 			"conversation_history": contextStr,
 			"session_context":      session.Context,
@@ -264,7 +264,7 @@ func (cm *ConversationManager) processWithLLM(session *ConversationSession, mess
 	return response, nil
 }
 
-// handleConfirmation handles user confirmation responses
+// handleConfirmation handles user confirmation responses.
 func (cm *ConversationManager) handleConfirmation(session *ConversationSession, message string) (*ConversationResponse, error) {
 	// Check if user confirmed or denied
 	confirmed := isConfirmation(message)
@@ -300,7 +300,7 @@ func (cm *ConversationManager) handleConfirmation(session *ConversationSession, 
 
 	// User denied
 	response := &ConversationResponse{
-		Message: "Okay, I've cancelled that action. Is there something else I can help you with?",
+		Message: "Okay, I've canceled that action. Is there something else I can help you with?",
 	}
 
 	// Remove pending action
@@ -310,7 +310,7 @@ func (cm *ConversationManager) handleConfirmation(session *ConversationSession, 
 	return response, nil
 }
 
-// buildContextString builds a context string from conversation history
+// buildContextString builds a context string from conversation history.
 func (cm *ConversationManager) buildContextString(session *ConversationSession) string {
 	recentMessages := session.Messages
 	if len(recentMessages) > 10 {
@@ -325,7 +325,7 @@ func (cm *ConversationManager) buildContextString(session *ConversationSession) 
 	return context
 }
 
-// generateSuggestions generates follow-up suggestions
+// generateSuggestions generates follow-up suggestions.
 func (cm *ConversationManager) generateSuggestions(session *ConversationSession, parsed *ParsedQuery) []string {
 	suggestions := []string{}
 
@@ -361,7 +361,7 @@ func (cm *ConversationManager) generateSuggestions(session *ConversationSession,
 	return suggestions
 }
 
-// isConfirmation checks if a message is a confirmation
+// isConfirmation checks if a message is a confirmation.
 func isConfirmation(message string) bool {
 	lower := strings.ToLower(strings.TrimSpace(message))
 
@@ -381,7 +381,7 @@ func isConfirmation(message string) bool {
 	return false
 }
 
-// GetSession retrieves a conversation session
+// GetSession retrieves a conversation session.
 func (cm *ConversationManager) GetSession(sessionID string) (*ConversationSession, error) {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
@@ -399,7 +399,7 @@ func (cm *ConversationManager) GetSession(sessionID string) (*ConversationSessio
 	return session, nil
 }
 
-// EndSession ends a conversation session
+// EndSession ends a conversation session.
 func (cm *ConversationManager) EndSession(sessionID string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
@@ -408,7 +408,7 @@ func (cm *ConversationManager) EndSession(sessionID string) error {
 	return nil
 }
 
-// CleanupExpiredSessions removes expired sessions
+// CleanupExpiredSessions removes expired sessions.
 func (cm *ConversationManager) CleanupExpiredSessions() int {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
@@ -426,7 +426,7 @@ func (cm *ConversationManager) CleanupExpiredSessions() int {
 	return removed
 }
 
-// GetActiveSessionCount returns the number of active sessions
+// GetActiveSessionCount returns the number of active sessions.
 func (cm *ConversationManager) GetActiveSessionCount() int {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
@@ -434,7 +434,7 @@ func (cm *ConversationManager) GetActiveSessionCount() int {
 	return len(cm.sessions)
 }
 
-// UpdateSessionContext updates the context for a session
+// UpdateSessionContext updates the context for a session.
 func (cm *ConversationManager) UpdateSessionContext(sessionID string, key string, value interface{}) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
@@ -448,7 +448,7 @@ func (cm *ConversationManager) UpdateSessionContext(sessionID string, key string
 	return nil
 }
 
-// GetConversationHistory returns the message history for a session
+// GetConversationHistory returns the message history for a session.
 func (cm *ConversationManager) GetConversationHistory(sessionID string, limit int) ([]*Message, error) {
 	session, err := cm.GetSession(sessionID)
 	if err != nil {
@@ -463,7 +463,7 @@ func (cm *ConversationManager) GetConversationHistory(sessionID string, limit in
 	return messages, nil
 }
 
-// GetStatistics returns conversation manager statistics
+// GetStatistics returns conversation manager statistics.
 func (cm *ConversationManager) GetStatistics() map[string]interface{} {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
@@ -479,14 +479,14 @@ func (cm *ConversationManager) GetStatistics() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"total_sessions":        len(cm.sessions),
-		"active_conversations":  activeConversations,
-		"total_messages":        totalMessages,
-		"llm_stats":             cm.llmClient.GetStatistics(),
+		"total_sessions":       len(cm.sessions),
+		"active_conversations": activeConversations,
+		"total_messages":       totalMessages,
+		"llm_stats":            cm.llmClient.GetStatistics(),
 	}
 }
 
-// ExportSession exports a session to JSON
+// ExportSession exports a session to JSON.
 func (cm *ConversationManager) ExportSession(sessionID string) (map[string]interface{}, error) {
 	session, err := cm.GetSession(sessionID)
 	if err != nil {

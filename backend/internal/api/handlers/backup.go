@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/sanskarpan/db-backup/internal/backup"
 	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/sanskarpan/db-backup/internal/repository"
@@ -43,7 +44,7 @@ type CreateBackupRequest struct {
 	Tags          map[string]string `json:"tags"`
 }
 
-// HandleCreateBackup creates a new backup
+// HandleCreateBackup creates a new backup.
 func (h *BackupHandler) HandleCreateBackup(c *gin.Context) {
 	var req CreateBackupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -140,7 +141,7 @@ func (h *BackupHandler) HandleCreateBackup(c *gin.Context) {
 }
 
 // HandleListBackups lists all backups
-// validateQueryParams validates and sanitizes query parameters
+// validateQueryParams validates and sanitizes query parameters.
 func validateQueryParams(c *gin.Context) error {
 	// Validate sort_by parameter
 	sortBy := c.DefaultQuery("sort_by", "date")
@@ -150,20 +151,20 @@ func validateQueryParams(c *gin.Context) error {
 	if !validSortFields[sortBy] {
 		return fmt.Errorf("invalid sort_by parameter: %s", sortBy)
 	}
-	
+
 	// Validate sort_order parameter
 	sortOrder := c.DefaultQuery("sort_order", "desc")
 	if sortOrder != "asc" && sortOrder != "desc" {
 		return fmt.Errorf("invalid sort_order parameter: %s", sortOrder)
 	}
-	
+
 	// Validate limit parameter
 	limitStr := c.DefaultQuery("limit", "100")
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit < 1 || limit > 1000 {
 		return fmt.Errorf("invalid limit parameter: must be between 1 and 1000")
 	}
-	
+
 	return nil
 }
 
@@ -198,7 +199,7 @@ func (h *BackupHandler) HandleListBackups(c *gin.Context) {
 	})
 }
 
-// HandleGetBackup retrieves a single backup by ID
+// HandleGetBackup retrieves a single backup by ID.
 func (h *BackupHandler) HandleGetBackup(c *gin.Context) {
 	ctx := c.Request.Context()
 	id := c.Param("id")
@@ -212,7 +213,7 @@ func (h *BackupHandler) HandleGetBackup(c *gin.Context) {
 	c.JSON(http.StatusOK, metadata)
 }
 
-// HandleDeleteBackup deletes a backup
+// HandleDeleteBackup deletes a backup.
 func (h *BackupHandler) HandleDeleteBackup(c *gin.Context) {
 	ctx := c.Request.Context()
 	id := c.Param("id")
@@ -238,7 +239,7 @@ func (h *BackupHandler) HandleDeleteBackup(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Backup deleted successfully"})
 }
 
-// HandleDownloadBackup downloads a backup file
+// HandleDownloadBackup downloads a backup file.
 func (h *BackupHandler) HandleDownloadBackup(c *gin.Context) {
 	ctx := c.Request.Context()
 	id := c.Param("id")
@@ -257,6 +258,7 @@ func (h *BackupHandler) HandleDownloadBackup(c *gin.Context) {
 
 	c.File(metadata.BackupPath)
 }
+
 // Bulk Operations
 
 type BulkOperationRequest struct {
@@ -277,7 +279,7 @@ type BulkOperationResponse struct {
 	Results   []BulkOperationResult `json:"results"`
 }
 
-// HandleBulkDelete deletes multiple backups
+// HandleBulkDelete deletes multiple backups.
 func (h *BackupHandler) HandleBulkDelete(c *gin.Context) {
 	var req BulkOperationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -319,7 +321,7 @@ func (h *BackupHandler) HandleBulkDelete(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// HandleBulkRetry retries failed backups
+// HandleBulkRetry retries failed backups.
 func (h *BackupHandler) HandleBulkRetry(c *gin.Context) {
 	var req BulkOperationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -372,7 +374,7 @@ func (h *BackupHandler) HandleBulkRetry(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// HandleBulkExport exports multiple backups metadata
+// HandleBulkExport exports multiple backups metadata.
 func (h *BackupHandler) HandleBulkExport(c *gin.Context) {
 	var req BulkOperationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -420,7 +422,7 @@ func (h *BackupHandler) HandleBulkExport(c *gin.Context) {
 	})
 }
 
-// HandleBulkUpdateTags updates tags for multiple backups
+// HandleBulkUpdateTags updates tags for multiple backups.
 func (h *BackupHandler) HandleBulkUpdateTags(c *gin.Context) {
 	type BulkUpdateTagsRequest struct {
 		BackupIDs []string          `json:"backup_ids" binding:"required,min=1"`

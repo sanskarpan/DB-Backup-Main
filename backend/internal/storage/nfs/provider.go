@@ -15,7 +15,7 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// NFSProvider implements NFS storage
+// NFSProvider implements NFS storage.
 type NFSProvider struct {
 	config      *NFSConfig
 	mountPoint  string
@@ -23,7 +23,7 @@ type NFSProvider struct {
 	autoCleanup bool
 }
 
-// NFSConfig holds NFS configuration
+// NFSConfig holds NFS configuration.
 type NFSConfig struct {
 	Server      string            // NFS server address (e.g., "192.168.1.100")
 	Export      string            // NFS export path (e.g., "/export/backups")
@@ -35,7 +35,7 @@ type NFSConfig struct {
 	AutoUnmount bool              // Automatically unmount on close
 }
 
-// NewNFSProvider creates a new NFS storage provider
+// NewNFSProvider creates a new NFS storage provider.
 func NewNFSProvider(config *NFSConfig) (*NFSProvider, error) {
 	if config == nil {
 		return nil, pkgErrors.New(pkgErrors.ErrorTypeConfiguration, "NFS config is required")
@@ -72,14 +72,14 @@ func NewNFSProvider(config *NFSConfig) (*NFSProvider, error) {
 	return provider, nil
 }
 
-// Mount mounts the NFS share
+// Mount mounts the NFS share.
 func (p *NFSProvider) Mount(ctx context.Context) error {
 	if p.isMounted {
 		return nil // Already mounted
 	}
 
 	// Create mount point if it doesn't exist
-	if err := os.MkdirAll(p.mountPoint, 0755); err != nil {
+	if err := os.MkdirAll(p.mountPoint, 0o755); err != nil {
 		return pkgErrors.New(pkgErrors.ErrorTypeStorage, fmt.Sprintf("failed to create mount point: %v", err))
 	}
 
@@ -107,7 +107,7 @@ func (p *NFSProvider) Mount(ctx context.Context) error {
 	return nil
 }
 
-// Unmount unmounts the NFS share
+// Unmount unmounts the NFS share.
 func (p *NFSProvider) Unmount(ctx context.Context) error {
 	if !p.isMounted {
 		return nil // Not mounted
@@ -130,7 +130,7 @@ func (p *NFSProvider) Unmount(ctx context.Context) error {
 	return nil
 }
 
-// Upload uploads a file to NFS storage
+// Upload uploads a file to NFS storage.
 func (p *NFSProvider) Upload(ctx context.Context, localPath, remotePath string, opts *storage.UploadOptions) error {
 	if !p.isMounted {
 		if err := p.Mount(ctx); err != nil {
@@ -156,7 +156,7 @@ func (p *NFSProvider) Upload(ctx context.Context, localPath, remotePath string, 
 
 	// Ensure destination directory exists
 	destDir := filepath.Dir(destPath)
-	if err := os.MkdirAll(destDir, 0755); err != nil {
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return pkgErrors.ErrStorageUpload(err)
 	}
 
@@ -191,7 +191,7 @@ func (p *NFSProvider) Upload(ctx context.Context, localPath, remotePath string, 
 	return nil
 }
 
-// UploadStream uploads data from a reader to NFS storage
+// UploadStream uploads data from a reader to NFS storage.
 func (p *NFSProvider) UploadStream(ctx context.Context, reader io.Reader, remotePath string, opts *storage.UploadOptions) error {
 	if !p.isMounted {
 		if err := p.Mount(ctx); err != nil {
@@ -203,7 +203,7 @@ func (p *NFSProvider) UploadStream(ctx context.Context, reader io.Reader, remote
 
 	// Ensure destination directory exists
 	destDir := filepath.Dir(destPath)
-	if err := os.MkdirAll(destDir, 0755); err != nil {
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return pkgErrors.ErrStorageUpload(err)
 	}
 
@@ -228,7 +228,7 @@ func (p *NFSProvider) UploadStream(ctx context.Context, reader io.Reader, remote
 	return nil
 }
 
-// Download downloads a file from NFS storage
+// Download downloads a file from NFS storage.
 func (p *NFSProvider) Download(ctx context.Context, remotePath, localPath string) error {
 	if !p.isMounted {
 		if err := p.Mount(ctx); err != nil {
@@ -247,7 +247,7 @@ func (p *NFSProvider) Download(ctx context.Context, remotePath, localPath string
 
 	// Ensure local directory exists
 	localDir := filepath.Dir(localPath)
-	if err := os.MkdirAll(localDir, 0755); err != nil {
+	if err := os.MkdirAll(localDir, 0o755); err != nil {
 		return pkgErrors.ErrStorageDownload(err)
 	}
 
@@ -267,7 +267,7 @@ func (p *NFSProvider) Download(ctx context.Context, remotePath, localPath string
 	return nil
 }
 
-// DownloadStream downloads data to a reader
+// DownloadStream downloads data to a reader.
 func (p *NFSProvider) DownloadStream(ctx context.Context, remotePath string) (io.ReadCloser, error) {
 	if !p.isMounted {
 		if err := p.Mount(ctx); err != nil {
@@ -285,7 +285,7 @@ func (p *NFSProvider) DownloadStream(ctx context.Context, remotePath string) (io
 	return file, nil
 }
 
-// Delete deletes a file from NFS storage
+// Delete deletes a file from NFS storage.
 func (p *NFSProvider) Delete(ctx context.Context, remotePath string) error {
 	if !p.isMounted {
 		if err := p.Mount(ctx); err != nil {
@@ -302,7 +302,7 @@ func (p *NFSProvider) Delete(ctx context.Context, remotePath string) error {
 	return nil
 }
 
-// Exists checks if a file exists in NFS storage
+// Exists checks if a file exists in NFS storage.
 func (p *NFSProvider) Exists(ctx context.Context, remotePath string) (bool, error) {
 	if !p.isMounted {
 		if err := p.Mount(ctx); err != nil {
@@ -324,7 +324,7 @@ func (p *NFSProvider) Exists(ctx context.Context, remotePath string) (bool, erro
 	return false, err
 }
 
-// GetMetadata retrieves file metadata
+// GetMetadata retrieves file metadata.
 func (p *NFSProvider) GetMetadata(ctx context.Context, remotePath string) (*storage.FileMetadata, error) {
 	if !p.isMounted {
 		if err := p.Mount(ctx); err != nil {
@@ -350,7 +350,7 @@ func (p *NFSProvider) GetMetadata(ctx context.Context, remotePath string) (*stor
 	return metadata, nil
 }
 
-// List lists files with a given prefix
+// List lists files with a given prefix.
 func (p *NFSProvider) List(ctx context.Context, prefix string) ([]*storage.FileMetadata, error) {
 	if !p.isMounted {
 		if err := p.Mount(ctx); err != nil {
@@ -395,12 +395,12 @@ func (p *NFSProvider) List(ctx context.Context, prefix string) ([]*storage.FileM
 	return files, nil
 }
 
-// GetType returns the provider type
+// GetType returns the provider type.
 func (p *NFSProvider) GetType() storage.ProviderType {
 	return "nfs"
 }
 
-// ValidateConfig validates the provider configuration
+// ValidateConfig validates the provider configuration.
 func (p *NFSProvider) ValidateConfig() error {
 	if p.config.Server == "" {
 		return fmt.Errorf("NFS server is required")
@@ -418,7 +418,7 @@ func (p *NFSProvider) ValidateConfig() error {
 	return nil
 }
 
-// Close closes the provider and unmounts if configured
+// Close closes the provider and unmounts if configured.
 func (p *NFSProvider) Close() error {
 	if p.autoCleanup && p.isMounted {
 		return p.Unmount(context.Background())
@@ -481,7 +481,7 @@ func (p *NFSProvider) checkMounted() (bool, error) {
 	return false, nil
 }
 
-// progressReader wraps a reader to track progress
+// progressReader wraps a reader to track progress.
 type progressReader struct {
 	reader   io.Reader
 	total    int64

@@ -35,14 +35,14 @@ type PITRManager struct {
 	driver *RedisDriver
 }
 
-// NewPITRManager creates a new PITR manager
+// NewPITRManager creates a new PITR manager.
 func NewPITRManager(driver *RedisDriver) *PITRManager {
 	return &PITRManager{
 		driver: driver,
 	}
 }
 
-// EnablePITR enables point-in-time recovery by enabling AOF
+// EnablePITR enables point-in-time recovery by enabling AOF.
 func (p *PITRManager) EnablePITR(ctx context.Context) error {
 	// Enable AOF
 	if err := p.driver.client.ConfigSet(ctx, "appendonly", "yes").Err(); err != nil {
@@ -57,7 +57,7 @@ func (p *PITRManager) EnablePITR(ctx context.Context) error {
 	return nil
 }
 
-// DisablePITR disables point-in-time recovery
+// DisablePITR disables point-in-time recovery.
 func (p *PITRManager) DisablePITR(ctx context.Context) error {
 	return p.driver.client.ConfigSet(ctx, "appendonly", "no").Err()
 }
@@ -107,7 +107,7 @@ func (p *PITRManager) RestoreToPIT(ctx context.Context, targetTime time.Time, ba
 	return p.driver.restoreRDB(ctx, restoreOpts, result)
 }
 
-// CreatePITRCheckpoint creates a consistent checkpoint for PITR
+// CreatePITRCheckpoint creates a consistent checkpoint for PITR.
 func (p *PITRManager) CreatePITRCheckpoint(ctx context.Context, outputDir string) (string, error) {
 	// Trigger AOF rewrite to create a clean checkpoint
 	if err := p.driver.client.BgRewriteAOF(ctx).Err(); err != nil {

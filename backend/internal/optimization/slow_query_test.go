@@ -73,10 +73,10 @@ func TestCalculateSeverity(t *testing.T) {
 		executionTime time.Duration
 		expected      Severity
 	}{
-		{1500 * time.Millisecond, SeverityLow},      // 1.5x threshold
-		{3 * time.Second, SeverityMedium},           // 3x threshold
-		{7 * time.Second, SeverityHigh},             // 7x threshold
-		{15 * time.Second, SeverityCritical},        // 15x threshold
+		{1500 * time.Millisecond, SeverityLow}, // 1.5x threshold
+		{3 * time.Second, SeverityMedium},      // 3x threshold
+		{7 * time.Second, SeverityHigh},        // 7x threshold
+		{15 * time.Second, SeverityCritical},   // 15x threshold
 	}
 
 	for _, tt := range tests {
@@ -255,9 +255,9 @@ func TestGenerateRecommendations(t *testing.T) {
 		executionTime time.Duration
 		minRecsCount  int
 	}{
-		{15 * time.Second, 1},  // Should get basic recommendations
-		{35 * time.Second, 2},  // Should get more recommendations
-		{65 * time.Second, 3},  // Should get even more recommendations
+		{15 * time.Second, 1}, // Should get basic recommendations
+		{35 * time.Second, 2}, // Should get more recommendations
+		{65 * time.Second, 3}, // Should get even more recommendations
 	}
 
 	for _, tt := range tests {

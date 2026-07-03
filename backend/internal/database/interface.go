@@ -9,7 +9,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/types"
 )
 
-// DatabaseType represents the type of database
+// DatabaseType represents the type of database.
 type DatabaseType string
 
 const (
@@ -19,7 +19,7 @@ const (
 	DatabaseTypeSQLite     DatabaseType = "sqlite"
 )
 
-// Driver interface that all database drivers must implement
+// Driver interface that all database drivers must implement.
 type Driver interface {
 	// Connection management
 	Connect(ctx context.Context, config *ConnectionConfig) error
@@ -49,7 +49,7 @@ type Driver interface {
 	SupportsPITR() bool
 }
 
-// ConnectionConfig holds database connection configuration
+// ConnectionConfig holds database connection configuration.
 type ConnectionConfig struct {
 	Type              DatabaseType
 	Host              string
@@ -64,7 +64,7 @@ type ConnectionConfig struct {
 	MaxConnections    int
 }
 
-// BackupOptions holds backup operation options
+// BackupOptions holds backup operation options.
 type BackupOptions struct {
 	Database         string
 	Databases        []string
@@ -74,21 +74,21 @@ type BackupOptions struct {
 	Incremental      bool
 	ConsistentBackup bool
 	OutputPath       string
-	OutputDir        string            // Output directory for backups
-	BackupType       string            // Type of backup (e.g., "rdb", "aof", "snapshot")
-	IncludeSchemas   []string          // Schemas/keyspaces/indices to include
+	OutputDir        string   // Output directory for backups
+	BackupType       string   // Type of backup (e.g., "rdb", "aof", "snapshot")
+	IncludeSchemas   []string // Schemas/keyspaces/indices to include
 	Compression      CompressionType
 	Parallel         int
 	ChunkSize        int64
 	Metadata         map[string]interface{} // Changed to interface{} for flexibility
 }
 
-// RestoreOptions holds restore operation options
+// RestoreOptions holds restore operation options.
 type RestoreOptions struct {
 	Database       string
 	SourceBackup   string
-	BackupPath     string    // Path to backup file/directory
-	SourceDatabase string    // Source database name for PITR
+	BackupPath     string // Path to backup file/directory
+	SourceDatabase string // Source database name for PITR
 	Tables         []string
 	ExcludeTables  []string
 	PointInTime    *time.Time
@@ -98,14 +98,14 @@ type RestoreOptions struct {
 	Metadata       map[string]interface{} // Changed to interface{} for flexibility
 }
 
-// BackupResult contains the result of a backup operation
+// BackupResult contains the result of a backup operation.
 type BackupResult struct {
 	ID              string
 	StartTime       time.Time
 	EndTime         time.Time
 	Duration        time.Duration
 	Size            int64
-	BackupSize      int64 // Alias for Size for compatibility
+	BackupSize      int64  // Alias for Size for compatibility
 	BackupPath      string // Path to the backup file/directory
 	CompressedSize  int64
 	DatabaseVersion string
@@ -116,7 +116,7 @@ type BackupResult struct {
 	Error           error
 }
 
-// RestoreResult contains the result of a restore operation
+// RestoreResult contains the result of a restore operation.
 type RestoreResult struct {
 	ID             string
 	StartTime      time.Time
@@ -129,7 +129,7 @@ type RestoreResult struct {
 	Error          error
 }
 
-// TableInfo contains information about a table
+// TableInfo contains information about a table.
 type TableInfo struct {
 	Name      string
 	RowCount  int64
@@ -137,7 +137,7 @@ type TableInfo struct {
 	IndexSize int64
 }
 
-// BackupStatus represents the status of a backup
+// BackupStatus represents the status of a backup.
 type BackupStatus string
 
 const (
@@ -148,7 +148,7 @@ const (
 	BackupStatusFailed     BackupStatus = "failed"
 )
 
-// RestoreStatus represents the status of a restore
+// RestoreStatus represents the status of a restore.
 type RestoreStatus string
 
 const (
@@ -159,10 +159,10 @@ const (
 	RestoreStatusFailed     RestoreStatus = "failed"
 )
 
-// CompressionType is an alias for types.CompressionType for backward compatibility
+// CompressionType is an alias for types.CompressionType for backward compatibility.
 type CompressionType = types.CompressionType
 
-// Re-export compression type constants
+// Re-export compression type constants.
 const (
 	CompressionNone = types.CompressionNone
 	CompressionGzip = types.CompressionGzip
@@ -170,7 +170,7 @@ const (
 	CompressionLZ4  = types.CompressionLZ4
 )
 
-// DriverError represents a driver-specific error
+// DriverError represents a driver-specific error.
 type DriverError struct {
 	Type    DatabaseType
 	Message string

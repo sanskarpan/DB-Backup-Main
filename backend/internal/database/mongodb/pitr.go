@@ -12,25 +12,26 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// PITRManager handles Point-in-Time Recovery for MongoDB
+// PITRManager handles Point-in-Time Recovery for MongoDB.
 type PITRManager struct {
 	driver *MongoDBDriver
 }
 
-// NewPITRManager creates a new PITR manager
+// NewPITRManager creates a new PITR manager.
 func NewPITRManager(driver *MongoDBDriver) *PITRManager {
 	return &PITRManager{
 		driver: driver,
 	}
 }
 
-// BackupOplog backs up MongoDB oplog for PITR
+// BackupOplog backs up MongoDB oplog for PITR.
 func (p *PITRManager) BackupOplog(ctx context.Context, outputDir string, since *time.Time) error {
 	// Ensure output directory exists
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return pkgErrors.ErrDatabaseBackup(err).WithMetadata("output_dir", outputDir)
 	}
 
@@ -57,7 +58,7 @@ func (p *PITRManager) BackupOplog(ctx context.Context, outputDir string, since *
 	return nil
 }
 
-// RestoreToPointInTime restores database to a specific point in time
+// RestoreToPointInTime restores database to a specific point in time.
 func (p *PITRManager) RestoreToPointInTime(ctx context.Context, opts *PITRRestoreOptions) error {
 	// Validate options
 	if err := p.validatePITROptions(opts); err != nil {
@@ -86,7 +87,7 @@ func (p *PITRManager) RestoreToPointInTime(ctx context.Context, opts *PITRRestor
 	return nil
 }
 
-// GetOplogPosition gets the current oplog position
+// GetOplogPosition gets the current oplog position.
 func (p *PITRManager) GetOplogPosition(ctx context.Context) (*OplogPosition, error) {
 	return p.getCurrentOplogPosition(ctx)
 }
@@ -339,7 +340,7 @@ func (p *PITRManager) verifyTimestamp(ctx context.Context, opts *PITRRestoreOpti
 	return nil
 }
 
-// BackupWithOplog creates a backup with oplog for PITR
+// BackupWithOplog creates a backup with oplog for PITR.
 func (p *PITRManager) BackupWithOplog(ctx context.Context, outputDir string, database string) error {
 	// Create mongodump with --oplog flag
 	args := []string{
@@ -371,7 +372,7 @@ func (p *PITRManager) BackupWithOplog(ctx context.Context, outputDir string, dat
 	return nil
 }
 
-// PITRRestoreOptions holds options for PITR restore
+// PITRRestoreOptions holds options for PITR restore.
 type PITRRestoreOptions struct {
 	Database         string
 	BaseBackupPath   string
@@ -380,13 +381,13 @@ type PITRRestoreOptions struct {
 	SkipVerification bool
 }
 
-// OplogPosition represents a position in MongoDB oplog
+// OplogPosition represents a position in MongoDB oplog.
 type OplogPosition struct {
 	Timestamp primitive.Timestamp
 	Time      time.Time
 }
 
-// String returns string representation of oplog position
+// String returns string representation of oplog position.
 func (o *OplogPosition) String() string {
 	return fmt.Sprintf("Timestamp: T=%d I=%d, Time: %s",
 		o.Timestamp.T,
@@ -394,7 +395,7 @@ func (o *OplogPosition) String() string {
 		o.Time.Format(time.RFC3339))
 }
 
-// TimeToTimestamp converts a time.Time to MongoDB timestamp
+// TimeToTimestamp converts a time.Time to MongoDB timestamp.
 func TimeToTimestamp(t time.Time) primitive.Timestamp {
 	return primitive.Timestamp{
 		T: uint32(t.Unix()),
@@ -402,7 +403,7 @@ func TimeToTimestamp(t time.Time) primitive.Timestamp {
 	}
 }
 
-// TimestampToTime converts a MongoDB timestamp to time.Time
+// TimestampToTime converts a MongoDB timestamp to time.Time.
 func TimestampToTime(ts primitive.Timestamp) time.Time {
 	return time.Unix(int64(ts.T), 0)
 }

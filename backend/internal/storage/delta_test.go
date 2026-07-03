@@ -39,7 +39,7 @@ func TestCreateAndApplyDelta(t *testing.T) {
 		DeltaStorePath: filepath.Join(tempDir, "deltas"),
 		MetadataPath:   filepath.Join(tempDir, "metadata"),
 		BlockSize:      512, // Smaller for testing
-		MinFileSize:    1, // Minimum 1 byte, allowing small test files
+		MinFileSize:    1,   // Minimum 1 byte, allowing small test files
 	}
 
 	manager, err := NewDeltaManager(config)
@@ -50,7 +50,7 @@ func TestCreateAndApplyDelta(t *testing.T) {
 	// Create source file
 	sourcePath := filepath.Join(tempDir, "source.txt")
 	sourceData := []byte("Hello, this is the original content of the file.")
-	err = os.WriteFile(sourcePath, sourceData, 0644)
+	err = os.WriteFile(sourcePath, sourceData, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create source file: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestCreateAndApplyDelta(t *testing.T) {
 	// Create target file (modified version)
 	targetPath := filepath.Join(tempDir, "target.txt")
 	targetData := []byte("Hello, this is the MODIFIED content of the file with more data.")
-	err = os.WriteFile(targetPath, targetData, 0644)
+	err = os.WriteFile(targetPath, targetData, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create target file: %v", err)
 	}
@@ -122,8 +122,8 @@ func TestDeltaWithIdenticalFiles(t *testing.T) {
 	sourcePath := filepath.Join(tempDir, "source.txt")
 	targetPath := filepath.Join(tempDir, "target.txt")
 
-	os.WriteFile(sourcePath, data, 0644)
-	os.WriteFile(targetPath, data, 0644)
+	os.WriteFile(sourcePath, data, 0o644)
+	os.WriteFile(targetPath, data, 0o644)
 
 	// Create delta
 	delta, err := manager.CreateDelta(sourcePath, targetPath, "base-1")
@@ -165,8 +165,8 @@ func TestDeltaWithCompression(t *testing.T) {
 	sourceData := bytes.Repeat([]byte("A"), 1000)
 	targetData := bytes.Repeat([]byte("B"), 1000)
 
-	os.WriteFile(sourcePath, sourceData, 0644)
-	os.WriteFile(targetPath, targetData, 0644)
+	os.WriteFile(sourcePath, sourceData, 0o644)
+	os.WriteFile(targetPath, targetData, 0o644)
 
 	// Create delta
 	delta, err := manager.CreateDelta(sourcePath, targetPath, "base-1")
@@ -218,14 +218,14 @@ func TestBackupChain(t *testing.T) {
 	// Create base file
 	basePath := filepath.Join(tempDir, "base.txt")
 	baseData := []byte("Version 0: Original content")
-	os.WriteFile(basePath, baseData, 0644)
+	os.WriteFile(basePath, baseData, 0o644)
 
 	// Create a chain of 3 versions
 	currentPath := basePath
 	for i := 1; i <= 3; i++ {
 		nextPath := filepath.Join(tempDir, "version-"+string(rune('0'+i))+".txt")
 		nextData := append(baseData, []byte(" - Update "+string(rune('0'+i)))...)
-		os.WriteFile(nextPath, nextData, 0644)
+		os.WriteFile(nextPath, nextData, 0o644)
 
 		_, err := manager.CreateDelta(currentPath, nextPath, baseID)
 		if err != nil {
@@ -277,12 +277,12 @@ func TestRestoreFromChain(t *testing.T) {
 	}
 
 	basePath := filepath.Join(tempDir, "v0.txt")
-	os.WriteFile(basePath, []byte(versions[0]), 0644)
+	os.WriteFile(basePath, []byte(versions[0]), 0o644)
 
 	for i := 1; i < len(versions); i++ {
 		prevPath := filepath.Join(tempDir, "v"+string(rune('0'+i-1))+".txt")
 		nextPath := filepath.Join(tempDir, "v"+string(rune('0'+i))+".txt")
-		os.WriteFile(nextPath, []byte(versions[i]), 0644)
+		os.WriteFile(nextPath, []byte(versions[i]), 0o644)
 
 		_, err := manager.CreateDelta(prevPath, nextPath, baseID)
 		if err != nil {
@@ -332,8 +332,8 @@ func TestHashVerification(t *testing.T) {
 	sourceData := []byte("Source data")
 	targetData := []byte("Target data")
 
-	os.WriteFile(sourcePath, sourceData, 0644)
-	os.WriteFile(targetPath, targetData, 0644)
+	os.WriteFile(sourcePath, sourceData, 0o644)
+	os.WriteFile(targetPath, targetData, 0o644)
 
 	// Create delta
 	delta, err := manager.CreateDelta(sourcePath, targetPath, "base-1")
@@ -343,7 +343,7 @@ func TestHashVerification(t *testing.T) {
 
 	// Corrupt source file
 	corruptedSource := filepath.Join(tempDir, "corrupted.txt")
-	os.WriteFile(corruptedSource, []byte("Wrong data"), 0644)
+	os.WriteFile(corruptedSource, []byte("Wrong data"), 0o644)
 
 	// Try to apply delta with wrong source
 	outputPath := filepath.Join(tempDir, "output.txt")
@@ -379,8 +379,8 @@ func TestDeltaMetrics(t *testing.T) {
 		sourceData := bytes.Repeat([]byte("X"), 1000)
 		targetData := bytes.Repeat([]byte("Y"), 1000)
 
-		os.WriteFile(sourcePath, sourceData, 0644)
-		os.WriteFile(targetPath, targetData, 0644)
+		os.WriteFile(sourcePath, sourceData, 0o644)
+		os.WriteFile(targetPath, targetData, 0o644)
 
 		_, err := manager.CreateDelta(sourcePath, targetPath, "base-"+string(rune('0'+i)))
 		if err != nil {
@@ -424,8 +424,8 @@ func TestListChains(t *testing.T) {
 		sourcePath := filepath.Join(tempDir, baseID+"-source.txt")
 		targetPath := filepath.Join(tempDir, baseID+"-target.txt")
 
-		os.WriteFile(sourcePath, []byte("source"), 0644)
-		os.WriteFile(targetPath, []byte("target"), 0644)
+		os.WriteFile(sourcePath, []byte("source"), 0o644)
+		os.WriteFile(targetPath, []byte("target"), 0o644)
 
 		_, err := manager.CreateDelta(sourcePath, targetPath, baseID)
 		if err != nil {
@@ -546,8 +546,8 @@ func BenchmarkCreateDelta(b *testing.B) {
 	sourcePath := filepath.Join(tempDir, "source.txt")
 	targetPath := filepath.Join(tempDir, "target.txt")
 
-	os.WriteFile(sourcePath, sourceData, 0644)
-	os.WriteFile(targetPath, targetData, 0644)
+	os.WriteFile(sourcePath, sourceData, 0o644)
+	os.WriteFile(targetPath, targetData, 0o644)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -575,8 +575,8 @@ func BenchmarkApplyDelta(b *testing.B) {
 	targetPath := filepath.Join(tempDir, "target.txt")
 	outputPath := filepath.Join(tempDir, "output.txt")
 
-	os.WriteFile(sourcePath, sourceData, 0644)
-	os.WriteFile(targetPath, targetData, 0644)
+	os.WriteFile(sourcePath, sourceData, 0o644)
+	os.WriteFile(targetPath, targetData, 0o644)
 
 	delta, _ := manager.CreateDelta(sourcePath, targetPath, "bench-base")
 

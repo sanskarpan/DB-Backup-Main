@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// NetworkPolicyConfig contains configuration for network policy enforcement
+// NetworkPolicyConfig contains configuration for network policy enforcement.
 type NetworkPolicyConfig struct {
 	// Enable network policy enforcement
 	Enabled bool `mapstructure:"enabled"`
@@ -31,14 +31,14 @@ type NetworkPolicyConfig struct {
 	BlockedPorts []int `mapstructure:"blocked_ports"`
 
 	// Rate limiting
-	RateLimitEnabled      bool          `mapstructure:"rate_limit_enabled"`
-	RateLimitRequests     int           `mapstructure:"rate_limit_requests"`
-	RateLimitWindow       time.Duration `mapstructure:"rate_limit_window"`
-	RateLimitBurstSize    int           `mapstructure:"rate_limit_burst_size"`
+	RateLimitEnabled   bool          `mapstructure:"rate_limit_enabled"`
+	RateLimitRequests  int           `mapstructure:"rate_limit_requests"`
+	RateLimitWindow    time.Duration `mapstructure:"rate_limit_window"`
+	RateLimitBurstSize int           `mapstructure:"rate_limit_burst_size"`
 
 	// Connection limits
-	MaxConnectionsPerIP   int           `mapstructure:"max_connections_per_ip"`
-	ConnectionTimeout     time.Duration `mapstructure:"connection_timeout"`
+	MaxConnectionsPerIP int           `mapstructure:"max_connections_per_ip"`
+	ConnectionTimeout   time.Duration `mapstructure:"connection_timeout"`
 
 	// Geographic restrictions
 	AllowedCountries []string `mapstructure:"allowed_countries"`
@@ -48,7 +48,7 @@ type NetworkPolicyConfig struct {
 	CustomRules []*NetworkRule `mapstructure:"custom_rules"`
 }
 
-// PolicyAction represents the action to take on a policy match
+// PolicyAction represents the action to take on a policy match.
 type PolicyAction string
 
 const (
@@ -57,7 +57,7 @@ const (
 	PolicyActionLog   PolicyAction = "log"
 )
 
-// NetworkRule represents a custom network access rule
+// NetworkRule represents a custom network access rule.
 type NetworkRule struct {
 	Name        string       `mapstructure:"name"`
 	Description string       `mapstructure:"description"`
@@ -67,75 +67,75 @@ type NetworkRule struct {
 	Action      PolicyAction `mapstructure:"action"`
 }
 
-// Condition represents a rule condition
+// Condition represents a rule condition.
 type Condition struct {
 	Type     ConditionType `mapstructure:"type"`
 	Operator Operator      `mapstructure:"operator"`
 	Value    string        `mapstructure:"value"`
 }
 
-// ConditionType represents the type of condition
+// ConditionType represents the type of condition.
 type ConditionType string
 
 const (
-	ConditionTypeSourceIP     ConditionType = "source_ip"
-	ConditionTypeSourceCIDR   ConditionType = "source_cidr"
-	ConditionTypeDestPort     ConditionType = "dest_port"
-	ConditionTypeProtocol     ConditionType = "protocol"
-	ConditionTypeHost         ConditionType = "host"
-	ConditionTypePath         ConditionType = "path"
-	ConditionTypeMethod       ConditionType = "method"
-	ConditionTypeUserAgent    ConditionType = "user_agent"
-	ConditionTypeCountry      ConditionType = "country"
-	ConditionTypeTimeOfDay    ConditionType = "time_of_day"
-	ConditionTypeDayOfWeek    ConditionType = "day_of_week"
+	ConditionTypeSourceIP   ConditionType = "source_ip"
+	ConditionTypeSourceCIDR ConditionType = "source_cidr"
+	ConditionTypeDestPort   ConditionType = "dest_port"
+	ConditionTypeProtocol   ConditionType = "protocol"
+	ConditionTypeHost       ConditionType = "host"
+	ConditionTypePath       ConditionType = "path"
+	ConditionTypeMethod     ConditionType = "method"
+	ConditionTypeUserAgent  ConditionType = "user_agent"
+	ConditionTypeCountry    ConditionType = "country"
+	ConditionTypeTimeOfDay  ConditionType = "time_of_day"
+	ConditionTypeDayOfWeek  ConditionType = "day_of_week"
 )
 
-// Operator represents a condition operator
+// Operator represents a condition operator.
 type Operator string
 
 const (
-	OperatorEquals       Operator = "equals"
-	OperatorNotEquals    Operator = "not_equals"
-	OperatorContains     Operator = "contains"
-	OperatorNotContains  Operator = "not_contains"
-	OperatorMatches      Operator = "matches"      // Regex
-	OperatorNotMatches   Operator = "not_matches"  // Regex
-	OperatorIn           Operator = "in"           // In list
-	OperatorNotIn        Operator = "not_in"       // Not in list
+	OperatorEquals      Operator = "equals"
+	OperatorNotEquals   Operator = "not_equals"
+	OperatorContains    Operator = "contains"
+	OperatorNotContains Operator = "not_contains"
+	OperatorMatches     Operator = "matches"     // Regex
+	OperatorNotMatches  Operator = "not_matches" // Regex
+	OperatorIn          Operator = "in"          // In list
+	OperatorNotIn       Operator = "not_in"      // Not in list
 )
 
-// NetworkPolicyManager manages network access policies
+// NetworkPolicyManager manages network access policies.
 type NetworkPolicyManager struct {
-	config         *NetworkPolicyConfig
-	mu             sync.RWMutex
+	config *NetworkPolicyConfig
+	mu     sync.RWMutex
 
 	// Parsed CIDR blocks
 	whitelistCIDRs []*net.IPNet
 	blacklistCIDRs []*net.IPNet
 
 	// Rate limiting
-	rateLimiter    *RateLimiter
+	rateLimiter *RateLimiter
 
 	// Connection tracking
-	connections    map[string]int
-	connectionsMu  sync.RWMutex
+	connections   map[string]int
+	connectionsMu sync.RWMutex
 
 	// Metrics
-	metrics        *PolicyMetrics
+	metrics *PolicyMetrics
 }
 
-// PolicyMetrics tracks policy enforcement metrics
+// PolicyMetrics tracks policy enforcement metrics.
 type PolicyMetrics struct {
-	TotalRequests      int64
-	AllowedRequests    int64
-	DeniedRequests     int64
+	TotalRequests       int64
+	AllowedRequests     int64
+	DeniedRequests      int64
 	RateLimitedRequests int64
-	BlockedIPs         map[string]int64
-	mu                 sync.RWMutex
+	BlockedIPs          map[string]int64
+	mu                  sync.RWMutex
 }
 
-// RateLimiter implements token bucket rate limiting
+// RateLimiter implements token bucket rate limiting.
 type RateLimiter struct {
 	requests  int
 	window    time.Duration
@@ -150,29 +150,29 @@ type tokenBucket struct {
 	mu         sync.Mutex
 }
 
-// ConnectionInfo contains information about a connection
+// ConnectionInfo contains information about a connection.
 type ConnectionInfo struct {
-	SourceIP      string
-	SourcePort    int
-	DestPort      int
-	Protocol      string
-	Host          string
-	Path          string
-	Method        string
-	UserAgent     string
-	Country       string
-	RequestTime   time.Time
+	SourceIP    string
+	SourcePort  int
+	DestPort    int
+	Protocol    string
+	Host        string
+	Path        string
+	Method      string
+	UserAgent   string
+	Country     string
+	RequestTime time.Time
 }
 
-// PolicyDecision represents the result of policy evaluation
+// PolicyDecision represents the result of policy evaluation.
 type PolicyDecision struct {
-	Action     PolicyAction
-	Allowed    bool
-	Reason     string
+	Action      PolicyAction
+	Allowed     bool
+	Reason      string
 	MatchedRule *NetworkRule
 }
 
-// NewNetworkPolicyManager creates a new network policy manager
+// NewNetworkPolicyManager creates a new network policy manager.
 func NewNetworkPolicyManager(config *NetworkPolicyConfig) (*NetworkPolicyManager, error) {
 	if config == nil {
 		return nil, fmt.Errorf("network policy config is required")
@@ -207,7 +207,7 @@ func NewNetworkPolicyManager(config *NetworkPolicyConfig) (*NetworkPolicyManager
 	return manager, nil
 }
 
-// parseCIDRs parses CIDR notation into IPNet objects
+// parseCIDRs parses CIDR notation into IPNet objects.
 func (m *NetworkPolicyManager) parseCIDRs() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -233,7 +233,7 @@ func (m *NetworkPolicyManager) parseCIDRs() error {
 	return nil
 }
 
-// sortRulesByPriority sorts custom rules by priority (lower number = higher priority)
+// sortRulesByPriority sorts custom rules by priority (lower number = higher priority).
 func (m *NetworkPolicyManager) sortRulesByPriority() {
 	if len(m.config.CustomRules) == 0 {
 		return
@@ -249,7 +249,7 @@ func (m *NetworkPolicyManager) sortRulesByPriority() {
 	}
 }
 
-// EvaluateConnection evaluates a connection against network policies
+// EvaluateConnection evaluates a connection against network policies.
 func (m *NetworkPolicyManager) EvaluateConnection(ctx context.Context, conn *ConnectionInfo) (*PolicyDecision, error) {
 	if !m.config.Enabled {
 		return &PolicyDecision{
@@ -335,7 +335,7 @@ func (m *NetworkPolicyManager) EvaluateConnection(ctx context.Context, conn *Con
 	return m.allowConnection(conn, "No matching rules, default allow", nil)
 }
 
-// isIPBlacklisted checks if an IP is blacklisted
+// isIPBlacklisted checks if an IP is blacklisted.
 func (m *NetworkPolicyManager) isIPBlacklisted(ip string) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -362,7 +362,7 @@ func (m *NetworkPolicyManager) isIPBlacklisted(ip string) bool {
 	return false
 }
 
-// isIPWhitelisted checks if an IP is whitelisted
+// isIPWhitelisted checks if an IP is whitelisted.
 func (m *NetworkPolicyManager) isIPWhitelisted(ip string) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -389,7 +389,7 @@ func (m *NetworkPolicyManager) isIPWhitelisted(ip string) bool {
 	return false
 }
 
-// isPortBlocked checks if a port is blocked
+// isPortBlocked checks if a port is blocked.
 func (m *NetworkPolicyManager) isPortBlocked(port int) bool {
 	for _, blockedPort := range m.config.BlockedPorts {
 		if port == blockedPort {
@@ -399,7 +399,7 @@ func (m *NetworkPolicyManager) isPortBlocked(port int) bool {
 	return false
 }
 
-// isPortAllowed checks if a port is allowed
+// isPortAllowed checks if a port is allowed.
 func (m *NetworkPolicyManager) isPortAllowed(port int) bool {
 	for _, allowedPort := range m.config.AllowedPorts {
 		if port == allowedPort {
@@ -409,7 +409,7 @@ func (m *NetworkPolicyManager) isPortAllowed(port int) bool {
 	return false
 }
 
-// isCountryBlocked checks if a country is blocked
+// isCountryBlocked checks if a country is blocked.
 func (m *NetworkPolicyManager) isCountryBlocked(country string) bool {
 	for _, blockedCountry := range m.config.BlockedCountries {
 		if strings.EqualFold(country, blockedCountry) {
@@ -419,7 +419,7 @@ func (m *NetworkPolicyManager) isCountryBlocked(country string) bool {
 	return false
 }
 
-// isCountryAllowed checks if a country is allowed
+// isCountryAllowed checks if a country is allowed.
 func (m *NetworkPolicyManager) isCountryAllowed(country string) bool {
 	for _, allowedCountry := range m.config.AllowedCountries {
 		if strings.EqualFold(country, allowedCountry) {
@@ -429,7 +429,7 @@ func (m *NetworkPolicyManager) isCountryAllowed(country string) bool {
 	return false
 }
 
-// checkRateLimit checks if the rate limit is exceeded
+// checkRateLimit checks if the rate limit is exceeded.
 func (m *NetworkPolicyManager) checkRateLimit(ip string) bool {
 	if m.rateLimiter == nil {
 		return true
@@ -472,7 +472,7 @@ func (m *NetworkPolicyManager) checkRateLimit(ip string) bool {
 	return false
 }
 
-// checkConnectionLimit checks if connection limit is exceeded
+// checkConnectionLimit checks if connection limit is exceeded.
 func (m *NetworkPolicyManager) checkConnectionLimit(ip string) bool {
 	m.connectionsMu.Lock()
 	defer m.connectionsMu.Unlock()
@@ -486,7 +486,7 @@ func (m *NetworkPolicyManager) checkConnectionLimit(ip string) bool {
 	return true
 }
 
-// ReleaseConnection releases a connection from tracking
+// ReleaseConnection releases a connection from tracking.
 func (m *NetworkPolicyManager) ReleaseConnection(ip string) {
 	m.connectionsMu.Lock()
 	defer m.connectionsMu.Unlock()
@@ -501,7 +501,7 @@ func (m *NetworkPolicyManager) ReleaseConnection(ip string) {
 	}
 }
 
-// evaluateRule evaluates a custom rule against a connection
+// evaluateRule evaluates a custom rule against a connection.
 func (m *NetworkPolicyManager) evaluateRule(rule *NetworkRule, conn *ConnectionInfo) bool {
 	// All conditions must match for the rule to apply
 	for _, condition := range rule.Conditions {
@@ -512,7 +512,7 @@ func (m *NetworkPolicyManager) evaluateRule(rule *NetworkRule, conn *ConnectionI
 	return true
 }
 
-// evaluateCondition evaluates a single condition
+// evaluateCondition evaluates a single condition.
 func (m *NetworkPolicyManager) evaluateCondition(condition *Condition, conn *ConnectionInfo) bool {
 	var value string
 
@@ -551,7 +551,7 @@ func (m *NetworkPolicyManager) evaluateCondition(condition *Condition, conn *Con
 	}
 }
 
-// allowConnection creates an allow decision
+// allowConnection creates an allow decision.
 func (m *NetworkPolicyManager) allowConnection(conn *ConnectionInfo, reason string, rule *NetworkRule) (*PolicyDecision, error) {
 	m.metrics.mu.Lock()
 	m.metrics.AllowedRequests++
@@ -565,7 +565,7 @@ func (m *NetworkPolicyManager) allowConnection(conn *ConnectionInfo, reason stri
 	}, nil
 }
 
-// denyConnection creates a deny decision
+// denyConnection creates a deny decision.
 func (m *NetworkPolicyManager) denyConnection(conn *ConnectionInfo, reason string, rule *NetworkRule) (*PolicyDecision, error) {
 	m.metrics.mu.Lock()
 	m.metrics.DeniedRequests++
@@ -580,7 +580,7 @@ func (m *NetworkPolicyManager) denyConnection(conn *ConnectionInfo, reason strin
 	}, nil
 }
 
-// GetMetrics returns policy enforcement metrics
+// GetMetrics returns policy enforcement metrics.
 func (m *NetworkPolicyManager) GetMetrics() *PolicyMetrics {
 	m.metrics.mu.RLock()
 	defer m.metrics.mu.RUnlock()
@@ -601,7 +601,7 @@ func (m *NetworkPolicyManager) GetMetrics() *PolicyMetrics {
 	return metrics
 }
 
-// HTTPMiddleware returns an HTTP middleware that enforces network policies
+// HTTPMiddleware returns an HTTP middleware that enforces network policies.
 func (m *NetworkPolicyManager) HTTPMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Extract connection info from request
@@ -635,7 +635,7 @@ func (m *NetworkPolicyManager) HTTPMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// getClientIP extracts the client IP from the request
+// getClientIP extracts the client IP from the request.
 func getClientIP(r *http.Request) string {
 	// Check X-Forwarded-For header
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
@@ -655,7 +655,7 @@ func getClientIP(r *http.Request) string {
 	return ip
 }
 
-// getDestPort extracts the destination port from the request
+// getDestPort extracts the destination port from the request.
 func getDestPort(r *http.Request) int {
 	if r.TLS != nil {
 		return 443
@@ -663,7 +663,7 @@ func getDestPort(r *http.Request) int {
 	return 80
 }
 
-// AddRule adds a custom rule
+// AddRule adds a custom rule.
 func (m *NetworkPolicyManager) AddRule(rule *NetworkRule) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -672,7 +672,7 @@ func (m *NetworkPolicyManager) AddRule(rule *NetworkRule) {
 	m.sortRulesByPriority()
 }
 
-// RemoveRule removes a rule by name
+// RemoveRule removes a rule by name.
 func (m *NetworkPolicyManager) RemoveRule(name string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -685,7 +685,7 @@ func (m *NetworkPolicyManager) RemoveRule(name string) {
 	}
 }
 
-// UpdateRule updates a rule by name
+// UpdateRule updates a rule by name.
 func (m *NetworkPolicyManager) UpdateRule(name string, updatedRule *NetworkRule) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -701,7 +701,7 @@ func (m *NetworkPolicyManager) UpdateRule(name string, updatedRule *NetworkRule)
 	return fmt.Errorf("rule %s not found", name)
 }
 
-// GetRules returns all custom rules
+// GetRules returns all custom rules.
 func (m *NetworkPolicyManager) GetRules() []*NetworkRule {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

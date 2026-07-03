@@ -40,15 +40,15 @@ func TestNewVPNManager(t *testing.T) {
 		{
 			name: "valid OpenVPN config",
 			config: &VPNConfig{
-				Enabled:        true,
-				Type:           VPNTypeOpenVPN,
-				ServerAddress:  "203.0.113.1",
-				ServerPort:     1194,
-				Network:        "10.0.0.0/24",
+				Enabled:         true,
+				Type:            VPNTypeOpenVPN,
+				ServerAddress:   "203.0.113.1",
+				ServerPort:      1194,
+				Network:         "10.0.0.0/24",
 				OpenVPNProtocol: "udp",
-				CAPath:         "/etc/openvpn/ca.crt",
-				CertPath:       "/etc/openvpn/server.crt",
-				KeyPath:        "/etc/openvpn/server.key",
+				CAPath:          "/etc/openvpn/ca.crt",
+				CertPath:        "/etc/openvpn/server.crt",
+				KeyPath:         "/etc/openvpn/server.key",
 			},
 			wantErr: false,
 		},
@@ -471,12 +471,12 @@ func TestStartStop(t *testing.T) {
 
 func TestGenerateWireGuardServerConfig(t *testing.T) {
 	config := &VPNConfig{
-		Enabled:             true,
-		Type:                VPNTypeWireGuard,
-		ServerAddress:       "203.0.113.1",
-		ServerPort:          51820,
-		Network:             "10.0.0.0/24",
-		WireGuardInterface:  "wg0",
+		Enabled:            true,
+		Type:               VPNTypeWireGuard,
+		ServerAddress:      "203.0.113.1",
+		ServerPort:         51820,
+		Network:            "10.0.0.0/24",
+		WireGuardInterface: "wg0",
 	}
 
 	manager, err := NewVPNManager(config)

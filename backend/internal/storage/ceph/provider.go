@@ -14,10 +14,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+
 	"github.com/sanskarpan/db-backup/internal/storage"
 )
 
-// CephProvider implements storage provider for Ceph via RADOS Gateway
+// CephProvider implements storage provider for Ceph via RADOS Gateway.
 type CephProvider struct {
 	config     *storage.CephConfig
 	client     *s3.Client
@@ -25,7 +26,7 @@ type CephProvider struct {
 	downloader *manager.Downloader
 }
 
-// NewCephProvider creates a new Ceph storage provider using RADOS Gateway S3 API
+// NewCephProvider creates a new Ceph storage provider using RADOS Gateway S3 API.
 func NewCephProvider(cfg *storage.CephConfig) (*CephProvider, error) {
 	if err := validateConfig(cfg); err != nil {
 		return nil, &storage.ProviderError{
@@ -36,7 +37,8 @@ func NewCephProvider(cfg *storage.CephConfig) (*CephProvider, error) {
 	}
 
 	// Create AWS config with Ceph RADOS Gateway endpoint
-	awsConfig, err := config.LoadDefaultConfig(context.Background(),
+	awsConfig, err := config.LoadDefaultConfig(
+		context.Background(),
 		config.WithRegion(cfg.Region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
 			cfg.AccessKey,
@@ -77,7 +79,7 @@ func NewCephProvider(cfg *storage.CephConfig) (*CephProvider, error) {
 	}, nil
 }
 
-// Upload uploads a file to Ceph storage
+// Upload uploads a file to Ceph storage.
 func (p *CephProvider) Upload(ctx context.Context, localPath, remotePath string, opts *storage.UploadOptions) error {
 	file, err := os.Open(localPath)
 	if err != nil {
@@ -92,7 +94,7 @@ func (p *CephProvider) Upload(ctx context.Context, localPath, remotePath string,
 	return p.UploadStream(ctx, file, remotePath, opts)
 }
 
-// UploadStream uploads data from a reader to Ceph storage
+// UploadStream uploads data from a reader to Ceph storage.
 func (p *CephProvider) UploadStream(ctx context.Context, reader io.Reader, remotePath string, opts *storage.UploadOptions) error {
 	input := &s3.PutObjectInput{
 		Bucket: aws.String(p.config.Bucket),
@@ -127,7 +129,7 @@ func (p *CephProvider) UploadStream(ctx context.Context, reader io.Reader, remot
 	return nil
 }
 
-// Download downloads a file from Ceph storage
+// Download downloads a file from Ceph storage.
 func (p *CephProvider) Download(ctx context.Context, remotePath, localPath string) error {
 	file, err := createFile(localPath)
 	if err != nil {
@@ -150,7 +152,7 @@ func (p *CephProvider) Download(ctx context.Context, remotePath, localPath strin
 	return nil
 }
 
-// DownloadStream downloads data to a writer
+// DownloadStream downloads data to a writer.
 func (p *CephProvider) DownloadStream(ctx context.Context, remotePath string) (io.ReadCloser, error) {
 	result, err := p.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(p.config.Bucket),
@@ -167,7 +169,7 @@ func (p *CephProvider) DownloadStream(ctx context.Context, remotePath string) (i
 	return result.Body, nil
 }
 
-// Delete deletes a file from Ceph storage
+// Delete deletes a file from Ceph storage.
 func (p *CephProvider) Delete(ctx context.Context, remotePath string) error {
 	_, err := p.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(p.config.Bucket),
@@ -184,7 +186,7 @@ func (p *CephProvider) Delete(ctx context.Context, remotePath string) error {
 	return nil
 }
 
-// Exists checks if a file exists in Ceph storage
+// Exists checks if a file exists in Ceph storage.
 func (p *CephProvider) Exists(ctx context.Context, remotePath string) (bool, error) {
 	_, err := p.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(p.config.Bucket),
@@ -206,7 +208,7 @@ func (p *CephProvider) Exists(ctx context.Context, remotePath string) (bool, err
 	return true, nil
 }
 
-// GetMetadata retrieves file metadata
+// GetMetadata retrieves file metadata.
 func (p *CephProvider) GetMetadata(ctx context.Context, remotePath string) (*storage.FileMetadata, error) {
 	result, err := p.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(p.config.Bucket),
@@ -233,7 +235,7 @@ func (p *CephProvider) GetMetadata(ctx context.Context, remotePath string) (*sto
 	return metadata, nil
 }
 
-// List lists files with a given prefix
+// List lists files with a given prefix.
 func (p *CephProvider) List(ctx context.Context, prefix string) ([]*storage.FileMetadata, error) {
 	result, err := p.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: aws.String(p.config.Bucket),
@@ -261,17 +263,17 @@ func (p *CephProvider) List(ctx context.Context, prefix string) ([]*storage.File
 	return files, nil
 }
 
-// GetType returns the provider type
+// GetType returns the provider type.
 func (p *CephProvider) GetType() storage.ProviderType {
 	return storage.ProviderTypeCeph
 }
 
-// ValidateConfig validates the provider configuration
+// ValidateConfig validates the provider configuration.
 func (p *CephProvider) ValidateConfig() error {
 	return validateConfig(p.config)
 }
 
-// CreateBucket creates a bucket in Ceph
+// CreateBucket creates a bucket in Ceph.
 func (p *CephProvider) CreateBucket(ctx context.Context) error {
 	_, err := p.client.CreateBucket(ctx, &s3.CreateBucketInput{
 		Bucket: aws.String(p.config.Bucket),
@@ -292,7 +294,7 @@ func (p *CephProvider) CreateBucket(ctx context.Context) error {
 	return nil
 }
 
-// DeleteBucket deletes a bucket from Ceph
+// DeleteBucket deletes a bucket from Ceph.
 func (p *CephProvider) DeleteBucket(ctx context.Context) error {
 	_, err := p.client.DeleteBucket(ctx, &s3.DeleteBucketInput{
 		Bucket: aws.String(p.config.Bucket),
@@ -308,7 +310,7 @@ func (p *CephProvider) DeleteBucket(ctx context.Context) error {
 	return nil
 }
 
-// SetReplication sets replication rules for Ceph bucket
+// SetReplication sets replication rules for Ceph bucket.
 func (p *CephProvider) SetReplication(ctx context.Context, rules []types.ReplicationRule) error {
 	_, err := p.client.PutBucketReplication(ctx, &s3.PutBucketReplicationInput{
 		Bucket: aws.String(p.config.Bucket),
@@ -328,7 +330,7 @@ func (p *CephProvider) SetReplication(ctx context.Context, rules []types.Replica
 	return nil
 }
 
-// GetReplication gets replication configuration
+// GetReplication gets replication configuration.
 func (p *CephProvider) GetReplication(ctx context.Context) (*types.ReplicationConfiguration, error) {
 	result, err := p.client.GetBucketReplication(ctx, &s3.GetBucketReplicationInput{
 		Bucket: aws.String(p.config.Bucket),
@@ -344,7 +346,7 @@ func (p *CephProvider) GetReplication(ctx context.Context) (*types.ReplicationCo
 	return result.ReplicationConfiguration, nil
 }
 
-// SetLifecyclePolicy sets lifecycle policy for Ceph bucket
+// SetLifecyclePolicy sets lifecycle policy for Ceph bucket.
 func (p *CephProvider) SetLifecyclePolicy(ctx context.Context, rules []types.LifecycleRule) error {
 	_, err := p.client.PutBucketLifecycleConfiguration(ctx, &s3.PutBucketLifecycleConfigurationInput{
 		Bucket: aws.String(p.config.Bucket),
@@ -363,7 +365,7 @@ func (p *CephProvider) SetLifecyclePolicy(ctx context.Context, rules []types.Lif
 	return nil
 }
 
-// GetLifecyclePolicy gets lifecycle policy
+// GetLifecyclePolicy gets lifecycle policy.
 func (p *CephProvider) GetLifecyclePolicy(ctx context.Context) ([]types.LifecycleRule, error) {
 	result, err := p.client.GetBucketLifecycleConfiguration(ctx, &s3.GetBucketLifecycleConfigurationInput{
 		Bucket: aws.String(p.config.Bucket),

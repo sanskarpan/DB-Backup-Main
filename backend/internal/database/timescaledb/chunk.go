@@ -8,32 +8,32 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ChunkManager handles TimescaleDB chunk operations
+// ChunkManager handles TimescaleDB chunk operations.
 type ChunkManager struct {
 	driver *TimescaleDBDriver
 }
 
-// NewChunkManager creates a new chunk manager
+// NewChunkManager creates a new chunk manager.
 func NewChunkManager(driver *TimescaleDBDriver) *ChunkManager {
 	return &ChunkManager{
 		driver: driver,
 	}
 }
 
-// ChunkInfo represents information about a TimescaleDB chunk
+// ChunkInfo represents information about a TimescaleDB chunk.
 type ChunkInfo struct {
-	ChunkSchema    string
-	ChunkName      string
-	TableSchema    string
-	TableName      string
-	RangeStart     time.Time
-	RangeEnd       time.Time
-	IsCompressed   bool
-	CompressedSize int64
+	ChunkSchema      string
+	ChunkName        string
+	TableSchema      string
+	TableName        string
+	RangeStart       time.Time
+	RangeEnd         time.Time
+	IsCompressed     bool
+	CompressedSize   int64
 	UncompressedSize int64
 }
 
-// GetChunks returns all chunks for a hypertable
+// GetChunks returns all chunks for a hypertable.
 func (m *ChunkManager) GetChunks(ctx context.Context, hypertable string) ([]ChunkInfo, error) {
 	query := `
 		SELECT
@@ -80,7 +80,7 @@ func (m *ChunkManager) GetChunks(ctx context.Context, hypertable string) ([]Chun
 	return chunks, rows.Err()
 }
 
-// GetChunksByTimeRange returns chunks within a specific time range
+// GetChunksByTimeRange returns chunks within a specific time range.
 func (m *ChunkManager) GetChunksByTimeRange(ctx context.Context, hypertable string, start, end time.Time) ([]ChunkInfo, error) {
 	query := `
 		SELECT
@@ -129,7 +129,7 @@ func (m *ChunkManager) GetChunksByTimeRange(ctx context.Context, hypertable stri
 	return chunks, rows.Err()
 }
 
-// DropChunk drops a specific chunk
+// DropChunk drops a specific chunk.
 func (m *ChunkManager) DropChunk(ctx context.Context, chunkName string) error {
 	// Use pgx.Identifier to properly quote the chunk name and prevent SQL injection.
 	query := fmt.Sprintf("SELECT drop_chunks(%s)", pgx.Identifier{chunkName}.Sanitize())
@@ -137,7 +137,7 @@ func (m *ChunkManager) DropChunk(ctx context.Context, chunkName string) error {
 	return err
 }
 
-// DropOldChunks drops chunks older than a specific time
+// DropOldChunks drops chunks older than a specific time.
 func (m *ChunkManager) DropOldChunks(ctx context.Context, hypertable string, olderThan time.Time) (int, error) {
 	// Use pgx.Identifier to properly quote the hypertable name; pass timestamp as a parameter.
 	query := fmt.Sprintf(
@@ -150,7 +150,7 @@ func (m *ChunkManager) DropOldChunks(ctx context.Context, hypertable string, old
 	return droppedCount, err
 }
 
-// ReorderChunk reorders a chunk to improve compression
+// ReorderChunk reorders a chunk to improve compression.
 func (m *ChunkManager) ReorderChunk(ctx context.Context, chunkName, indexName string) error {
 	// Use pgx.Identifier to properly quote chunk and index names.
 	query := fmt.Sprintf(
@@ -162,7 +162,7 @@ func (m *ChunkManager) ReorderChunk(ctx context.Context, chunkName, indexName st
 	return err
 }
 
-// GetChunkStatistics returns statistics for all chunks
+// GetChunkStatistics returns statistics for all chunks.
 func (m *ChunkManager) GetChunkStatistics(ctx context.Context) (map[string]interface{}, error) {
 	query := `
 		SELECT
@@ -210,7 +210,7 @@ func (m *ChunkManager) GetChunkStatistics(ctx context.Context) (map[string]inter
 	return stats, nil
 }
 
-// BackupChunk backs up a specific chunk
+// BackupChunk backs up a specific chunk.
 func (m *ChunkManager) BackupChunk(ctx context.Context, chunkSchema, chunkName, outputPath string) error {
 	// This would use pg_dump to backup just the specific chunk table
 	fullChunkName := fmt.Sprintf("%s.%s", chunkSchema, chunkName)
@@ -220,7 +220,7 @@ func (m *ChunkManager) BackupChunk(ctx context.Context, chunkSchema, chunkName, 
 	return err
 }
 
-// RestoreChunk restores a specific chunk
+// RestoreChunk restores a specific chunk.
 func (m *ChunkManager) RestoreChunk(ctx context.Context, chunkSchema, chunkName, inputPath string) error {
 	fullChunkName := fmt.Sprintf("%s.%s", chunkSchema, chunkName)
 

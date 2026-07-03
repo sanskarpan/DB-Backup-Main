@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// DeltaConfig contains configuration for delta backups
+// DeltaConfig contains configuration for delta backups.
 type DeltaConfig struct {
 	// Enable delta backups
 	Enabled bool `mapstructure:"enabled"`
@@ -39,19 +39,19 @@ type DeltaConfig struct {
 	MinFileSize int64 `mapstructure:"min_file_size"`
 }
 
-// DeltaManager manages delta backup operations
+// DeltaManager manages delta backup operations.
 type DeltaManager struct {
-	config    *DeltaConfig
-	mu        sync.RWMutex
+	config *DeltaConfig
+	mu     sync.RWMutex
 
 	// Chain tracking: baseID -> chain of deltas
-	chains    map[string]*BackupChain
+	chains map[string]*BackupChain
 
 	// Metrics
-	metrics   *DeltaMetrics
+	metrics *DeltaMetrics
 }
 
-// BackupChain represents a chain of delta backups
+// BackupChain represents a chain of delta backups.
 type BackupChain struct {
 	BaseID      string
 	BaseHash    string
@@ -63,22 +63,22 @@ type BackupChain struct {
 	LastUpdated time.Time
 }
 
-// DeltaBackup represents a single delta backup
+// DeltaBackup represents a single delta backup.
 type DeltaBackup struct {
-	ID           string
-	BaseID       string
-	DeltaPath    string
-	SourceHash   string
-	TargetHash   string
-	SourceSize   int64
-	TargetSize   int64
-	DeltaSize    int64
-	Compressed   bool
-	CreatedAt    time.Time
-	Operations   []DeltaOperation
+	ID         string
+	BaseID     string
+	DeltaPath  string
+	SourceHash string
+	TargetHash string
+	SourceSize int64
+	TargetSize int64
+	DeltaSize  int64
+	Compressed bool
+	CreatedAt  time.Time
+	Operations []DeltaOperation
 }
 
-// DeltaOperation represents a single diff operation
+// DeltaOperation represents a single diff operation.
 type DeltaOperation struct {
 	Type   OperationType // insert, delete, copy
 	Offset int64         // offset in source
@@ -86,7 +86,7 @@ type DeltaOperation struct {
 	Data   []byte        // data for insert operations
 }
 
-// OperationType represents the type of delta operation
+// OperationType represents the type of delta operation.
 type OperationType byte
 
 const (
@@ -95,7 +95,7 @@ const (
 	OpCopy   OperationType = 3
 )
 
-// DeltaMetrics tracks delta backup statistics
+// DeltaMetrics tracks delta backup statistics.
 type DeltaMetrics struct {
 	TotalDeltaBackups  int64
 	TotalFullBackups   int64
@@ -107,14 +107,14 @@ type DeltaMetrics struct {
 	mu                 sync.RWMutex
 }
 
-// Block represents a block of data with its hash
+// Block represents a block of data with its hash.
 type Block struct {
 	Offset int64
 	Length int64
 	Hash   string
 }
 
-// NewDeltaManager creates a new delta backup manager
+// NewDeltaManager creates a new delta backup manager.
 func NewDeltaManager(config *DeltaConfig) (*DeltaManager, error) {
 	if config == nil {
 		return nil, fmt.Errorf("delta config is required")
@@ -138,10 +138,10 @@ func NewDeltaManager(config *DeltaConfig) (*DeltaManager, error) {
 	}
 
 	// Create directories
-	if err := os.MkdirAll(config.DeltaStorePath, 0755); err != nil {
+	if err := os.MkdirAll(config.DeltaStorePath, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create delta store: %w", err)
 	}
-	if err := os.MkdirAll(config.MetadataPath, 0755); err != nil {
+	if err := os.MkdirAll(config.MetadataPath, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create metadata directory: %w", err)
 	}
 
@@ -154,7 +154,7 @@ func NewDeltaManager(config *DeltaConfig) (*DeltaManager, error) {
 	return manager, nil
 }
 
-// CreateDelta creates a delta backup from source to target
+// CreateDelta creates a delta backup from source to target.
 func (m *DeltaManager) CreateDelta(sourcePath, targetPath, baseID string) (*DeltaBackup, error) {
 	if !m.config.Enabled {
 		return nil, fmt.Errorf("delta backups are not enabled")
@@ -202,22 +202,22 @@ func (m *DeltaManager) CreateDelta(sourcePath, targetPath, baseID string) (*Delt
 
 	// Save delta to disk
 	deltaPath := filepath.Join(m.config.DeltaStorePath, deltaID+".delta")
-	if err := os.WriteFile(deltaPath, deltaData, 0644); err != nil {
+	if err := os.WriteFile(deltaPath, deltaData, 0o644); err != nil {
 		return nil, fmt.Errorf("failed to write delta: %w", err)
 	}
 
 	delta := &DeltaBackup{
-		ID:          deltaID,
-		BaseID:      baseID,
-		DeltaPath:   deltaPath,
-		SourceHash:  sourceHash,
-		TargetHash:  targetHash,
-		SourceSize:  int64(len(sourceData)),
-		TargetSize:  int64(len(targetData)),
-		DeltaSize:   int64(len(deltaData)),
-		Compressed:  m.config.Compression,
-		CreatedAt:   time.Now(),
-		Operations:  operations,
+		ID:         deltaID,
+		BaseID:     baseID,
+		DeltaPath:  deltaPath,
+		SourceHash: sourceHash,
+		TargetHash: targetHash,
+		SourceSize: int64(len(sourceData)),
+		TargetSize: int64(len(targetData)),
+		DeltaSize:  int64(len(deltaData)),
+		Compressed: m.config.Compression,
+		CreatedAt:  time.Now(),
+		Operations: operations,
 	}
 
 	// Update chain
@@ -229,7 +229,7 @@ func (m *DeltaManager) CreateDelta(sourcePath, targetPath, baseID string) (*Delt
 	return delta, nil
 }
 
-// ApplyDelta applies a delta to reconstruct the target
+// ApplyDelta applies a delta to reconstruct the target.
 func (m *DeltaManager) ApplyDelta(sourcePath string, delta *DeltaBackup, outputPath string) error {
 	// Read source data
 	sourceData, err := os.ReadFile(sourcePath)
@@ -274,14 +274,14 @@ func (m *DeltaManager) ApplyDelta(sourcePath string, delta *DeltaBackup, outputP
 	}
 
 	// Write output
-	if err := os.WriteFile(outputPath, targetData, 0644); err != nil {
+	if err := os.WriteFile(outputPath, targetData, 0o644); err != nil {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 
 	return nil
 }
 
-// generateDelta generates delta operations using a rolling hash algorithm
+// generateDelta generates delta operations using a rolling hash algorithm.
 func (m *DeltaManager) generateDelta(source, target []byte) []DeltaOperation {
 	operations := make([]DeltaOperation, 0)
 
@@ -358,7 +358,7 @@ func (m *DeltaManager) generateDelta(source, target []byte) []DeltaOperation {
 	return m.optimizeOperations(operations)
 }
 
-// buildBlockIndex builds a hash index of source blocks
+// buildBlockIndex builds a hash index of source blocks.
 func (m *DeltaManager) buildBlockIndex(data []byte) map[string]*Block {
 	blocks := make(map[string]*Block)
 
@@ -385,7 +385,7 @@ func (m *DeltaManager) buildBlockIndex(data []byte) map[string]*Block {
 	return blocks
 }
 
-// optimizeOperations combines adjacent insert operations
+// optimizeOperations combines adjacent insert operations.
 func (m *DeltaManager) optimizeOperations(ops []DeltaOperation) []DeltaOperation {
 	if len(ops) == 0 {
 		return ops
@@ -412,7 +412,7 @@ func (m *DeltaManager) optimizeOperations(ops []DeltaOperation) []DeltaOperation
 	return optimized
 }
 
-// applyOperations applies delta operations to source data
+// applyOperations applies delta operations to source data.
 func (m *DeltaManager) applyOperations(source []byte, operations []DeltaOperation) ([]byte, error) {
 	result := make([]byte, 0)
 
@@ -439,7 +439,7 @@ func (m *DeltaManager) applyOperations(source []byte, operations []DeltaOperatio
 	return result, nil
 }
 
-// serializeDelta serializes delta operations
+// serializeDelta serializes delta operations.
 func (m *DeltaManager) serializeDelta(operations []DeltaOperation) ([]byte, error) {
 	var buf bytes.Buffer
 	encoder := gob.NewEncoder(&buf)
@@ -451,7 +451,7 @@ func (m *DeltaManager) serializeDelta(operations []DeltaOperation) ([]byte, erro
 	return buf.Bytes(), nil
 }
 
-// deserializeDelta deserializes delta operations
+// deserializeDelta deserializes delta operations.
 func (m *DeltaManager) deserializeDelta(data []byte) ([]DeltaOperation, error) {
 	var operations []DeltaOperation
 
@@ -465,7 +465,7 @@ func (m *DeltaManager) deserializeDelta(data []byte) ([]DeltaOperation, error) {
 	return operations, nil
 }
 
-// addToChain adds a delta to a backup chain
+// addToChain adds a delta to a backup chain.
 func (m *DeltaManager) addToChain(baseID string, delta *DeltaBackup) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -473,9 +473,9 @@ func (m *DeltaManager) addToChain(baseID string, delta *DeltaBackup) {
 	chain, exists := m.chains[baseID]
 	if !exists {
 		chain = &BackupChain{
-			BaseID:      baseID,
-			Deltas:      make([]*DeltaBackup, 0),
-			CreatedAt:   time.Now(),
+			BaseID:    baseID,
+			Deltas:    make([]*DeltaBackup, 0),
+			CreatedAt: time.Now(),
 		}
 		m.chains[baseID] = chain
 	}
@@ -486,7 +486,7 @@ func (m *DeltaManager) addToChain(baseID string, delta *DeltaBackup) {
 	chain.LastUpdated = time.Now()
 }
 
-// NeedsFullBackup determines if a new full backup is needed
+// NeedsFullBackup determines if a new full backup is needed.
 func (m *DeltaManager) NeedsFullBackup(baseID string) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -499,7 +499,7 @@ func (m *DeltaManager) NeedsFullBackup(baseID string) bool {
 	return chain.ChainLength >= m.config.MaxChainLength
 }
 
-// GetChain retrieves a backup chain
+// GetChain retrieves a backup chain.
 func (m *DeltaManager) GetChain(baseID string) (*BackupChain, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -512,7 +512,7 @@ func (m *DeltaManager) GetChain(baseID string) (*BackupChain, error) {
 	return chain, nil
 }
 
-// RestoreFromChain restores a file by applying all deltas in a chain
+// RestoreFromChain restores a file by applying all deltas in a chain.
 func (m *DeltaManager) RestoreFromChain(basePath string, chainID string, version int, outputPath string) error {
 	chain, err := m.GetChain(chainID)
 	if err != nil {
@@ -550,7 +550,7 @@ func (m *DeltaManager) RestoreFromChain(basePath string, chainID string, version
 		return err
 	}
 
-	if err := os.WriteFile(outputPath, finalData, 0644); err != nil {
+	if err := os.WriteFile(outputPath, finalData, 0o644); err != nil {
 		return err
 	}
 
@@ -562,7 +562,7 @@ func (m *DeltaManager) RestoreFromChain(basePath string, chainID string, version
 	return nil
 }
 
-// updateMetrics updates delta backup metrics
+// updateMetrics updates delta backup metrics.
 func (m *DeltaManager) updateMetrics(delta *DeltaBackup) {
 	m.metrics.mu.Lock()
 	defer m.metrics.mu.Unlock()
@@ -588,7 +588,7 @@ func (m *DeltaManager) updateMetrics(delta *DeltaBackup) {
 	}
 }
 
-// GetMetrics returns current delta metrics
+// GetMetrics returns current delta metrics.
 func (m *DeltaManager) GetMetrics() *DeltaMetrics {
 	m.metrics.mu.RLock()
 	defer m.metrics.mu.RUnlock()
@@ -604,7 +604,7 @@ func (m *DeltaManager) GetMetrics() *DeltaMetrics {
 	}
 }
 
-// ListChains returns all backup chains sorted by creation date
+// ListChains returns all backup chains sorted by creation date.
 func (m *DeltaManager) ListChains() []*BackupChain {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

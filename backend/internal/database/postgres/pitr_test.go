@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/sanskarpan/db-backup/internal/database"
 )
 
 func TestPostgresPITR_BackupWALFiles(t *testing.T) {
@@ -186,7 +187,7 @@ func TestIsWALFile(t *testing.T) {
 	}
 }
 
-// Helper function to setup test PostgreSQL connection
+// Helper function to setup test PostgreSQL connection.
 func setupTestPostgres(t *testing.T) *PostgreSQLDriver {
 	host := os.Getenv("POSTGRES_TEST_HOST")
 	if host == "" {

@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sanskarpan/db-backup/internal/config"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/jaeger"
@@ -18,15 +17,17 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/sanskarpan/db-backup/internal/config"
 )
 
-// TracerProvider wraps the OpenTelemetry tracer provider
+// TracerProvider wraps the OpenTelemetry tracer provider.
 type TracerProvider struct {
 	provider *sdktrace.TracerProvider
 	config   *config.TracingConfig
 }
 
-// NewTracerProvider creates and configures a new tracer provider
+// NewTracerProvider creates and configures a new tracer provider.
 func NewTracerProvider(cfg *config.TracingConfig) (*TracerProvider, error) {
 	if cfg == nil || !cfg.Enabled {
 		// Return a no-op provider
@@ -82,7 +83,7 @@ func NewTracerProvider(cfg *config.TracingConfig) (*TracerProvider, error) {
 	}, nil
 }
 
-// Shutdown gracefully shuts down the tracer provider
+// Shutdown gracefully shuts down the tracer provider.
 func (tp *TracerProvider) Shutdown(ctx context.Context) error {
 	if tp.provider == nil {
 		return nil
@@ -90,7 +91,7 @@ func (tp *TracerProvider) Shutdown(ctx context.Context) error {
 	return tp.provider.Shutdown(ctx)
 }
 
-// ForceFlush forces a flush of pending spans
+// ForceFlush forces a flush of pending spans.
 func (tp *TracerProvider) ForceFlush(ctx context.Context) error {
 	if tp.provider == nil {
 		return nil
@@ -98,7 +99,7 @@ func (tp *TracerProvider) ForceFlush(ctx context.Context) error {
 	return tp.provider.ForceFlush(ctx)
 }
 
-// GetTracer returns a tracer with the given name
+// GetTracer returns a tracer with the given name.
 func (tp *TracerProvider) GetTracer(name string, options ...trace.TracerOption) trace.Tracer {
 	if tp.provider == nil {
 		return otel.Tracer(name, options...)
@@ -229,10 +230,10 @@ func createSampler(cfg config.SamplingConfig) sdktrace.Sampler {
 	}
 }
 
-// Global tracer provider instance
+// Global tracer provider instance.
 var globalProvider *TracerProvider
 
-// InitGlobalTracer initializes the global tracer provider
+// InitGlobalTracer initializes the global tracer provider.
 func InitGlobalTracer(cfg *config.TracingConfig) error {
 	provider, err := NewTracerProvider(cfg)
 	if err != nil {
@@ -242,7 +243,7 @@ func InitGlobalTracer(cfg *config.TracingConfig) error {
 	return nil
 }
 
-// ShutdownGlobalTracer shuts down the global tracer provider
+// ShutdownGlobalTracer shuts down the global tracer provider.
 func ShutdownGlobalTracer(ctx context.Context) error {
 	if globalProvider == nil {
 		return nil
@@ -250,7 +251,7 @@ func ShutdownGlobalTracer(ctx context.Context) error {
 	return globalProvider.Shutdown(ctx)
 }
 
-// GetGlobalTracer returns the global tracer
+// GetGlobalTracer returns the global tracer.
 func GetGlobalTracer(name string) trace.Tracer {
 	if globalProvider == nil {
 		return otel.Tracer(name)
@@ -258,7 +259,7 @@ func GetGlobalTracer(name string) trace.Tracer {
 	return globalProvider.GetTracer(name)
 }
 
-// ForceFlushGlobal forces a flush of the global tracer provider
+// ForceFlushGlobal forces a flush of the global tracer provider.
 func ForceFlushGlobal(ctx context.Context) error {
 	if globalProvider == nil {
 		return nil

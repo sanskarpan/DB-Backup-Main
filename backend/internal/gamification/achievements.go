@@ -5,14 +5,14 @@ import (
 	"time"
 )
 
-// AchievementManager manages achievements and badges
+// AchievementManager manages achievements and badges.
 type AchievementManager struct {
 	achievements     map[string]*Achievement
 	userAchievements map[string]map[string]*UserAchievement // userID -> achievementID -> UserAchievement
 	mu               sync.RWMutex
 }
 
-// Achievement represents an achievement/badge
+// Achievement represents an achievement/badge.
 type Achievement struct {
 	ID          string
 	Name        string
@@ -26,14 +26,14 @@ type Achievement struct {
 	Hidden      bool // Secret achievements
 }
 
-// UserAchievement represents a user's earned achievement
+// UserAchievement represents a user's earned achievement.
 type UserAchievement struct {
 	AchievementID string
 	UnlockedAt    time.Time
 	Progress      float64 // 0.0 to 1.0
 }
 
-// AchievementTier represents achievement difficulty tiers
+// AchievementTier represents achievement difficulty tiers.
 type AchievementTier string
 
 const (
@@ -44,7 +44,7 @@ const (
 	TierDiamond  AchievementTier = "diamond"
 )
 
-// AchievementRarity represents how rare an achievement is
+// AchievementRarity represents how rare an achievement is.
 type AchievementRarity string
 
 const (
@@ -56,21 +56,21 @@ const (
 	RarityMythic    AchievementRarity = "mythic"
 )
 
-// AchievementCategory categorizes achievements
+// AchievementCategory categorizes achievements.
 type AchievementCategory string
 
 const (
-	CategoryBackups     AchievementCategory = "backups"
-	CategoryStreaks     AchievementCategory = "streaks"
-	CategorySize        AchievementCategory = "size"
-	CategorySpeed       AchievementCategory = "speed"
-	CategoryMilestones  AchievementCategory = "milestones"
-	CategoryChallenges  AchievementCategory = "challenges"
-	CategorySocial      AchievementCategory = "social"
-	CategoryExpertise   AchievementCategory = "expertise"
+	CategoryBackups    AchievementCategory = "backups"
+	CategoryStreaks    AchievementCategory = "streaks"
+	CategorySize       AchievementCategory = "size"
+	CategorySpeed      AchievementCategory = "speed"
+	CategoryMilestones AchievementCategory = "milestones"
+	CategoryChallenges AchievementCategory = "challenges"
+	CategorySocial     AchievementCategory = "social"
+	CategoryExpertise  AchievementCategory = "expertise"
 )
 
-// AchievementRequirement defines what's needed to unlock an achievement
+// AchievementRequirement defines what's needed to unlock an achievement.
 type AchievementRequirement struct {
 	Type         string
 	MinValue     int64
@@ -79,7 +79,7 @@ type AchievementRequirement struct {
 	SpecificData map[string]interface{}
 }
 
-// NewAchievementManager creates a new achievement manager
+// NewAchievementManager creates a new achievement manager.
 func NewAchievementManager() *AchievementManager {
 	am := &AchievementManager{
 		achievements:     make(map[string]*Achievement),
@@ -92,7 +92,7 @@ func NewAchievementManager() *AchievementManager {
 	return am
 }
 
-// registerDefaultAchievements registers all built-in achievements
+// registerDefaultAchievements registers all built-in achievements.
 func (am *AchievementManager) registerDefaultAchievements() {
 	achievements := []*Achievement{
 		// First Steps
@@ -305,7 +305,7 @@ func (am *AchievementManager) registerDefaultAchievements() {
 	}
 }
 
-// CheckAchievements checks if any new achievements were unlocked
+// CheckAchievements checks if any new achievements were unlocked.
 func (am *AchievementManager) CheckAchievements(userID string, backupData *BackupData, stats *UserStats) []*Achievement {
 	am.mu.Lock()
 	defer am.mu.Unlock()
@@ -337,7 +337,7 @@ func (am *AchievementManager) CheckAchievements(userID string, backupData *Backu
 	return newAchievements
 }
 
-// checkRequirement checks if an achievement requirement is met
+// checkRequirement checks if an achievement requirement is met.
 func (am *AchievementManager) checkRequirement(req AchievementRequirement, data *BackupData, stats *UserStats) bool {
 	switch req.Type {
 	case "total_backups":
@@ -364,7 +364,7 @@ func (am *AchievementManager) checkRequirement(req AchievementRequirement, data 
 	}
 }
 
-// GetUserAchievements returns all achievements for a user
+// GetUserAchievements returns all achievements for a user.
 func (am *AchievementManager) GetUserAchievements(userID string) []*Achievement {
 	am.mu.RLock()
 	defer am.mu.RUnlock()
@@ -381,7 +381,7 @@ func (am *AchievementManager) GetUserAchievements(userID string) []*Achievement 
 	return achievements
 }
 
-// GetAchievement returns a specific achievement for a user
+// GetAchievement returns a specific achievement for a user.
 func (am *AchievementManager) GetAchievement(userID, achievementID string) *Achievement {
 	am.mu.RLock()
 	defer am.mu.RUnlock()
@@ -395,7 +395,7 @@ func (am *AchievementManager) GetAchievement(userID, achievementID string) *Achi
 	return nil
 }
 
-// GetAchievementProgress returns progress towards all achievements
+// GetAchievementProgress returns progress towards all achievements.
 func (am *AchievementManager) GetAchievementProgress(userID string, stats *UserStats) map[string]float64 {
 	am.mu.RLock()
 	defer am.mu.RUnlock()
@@ -418,7 +418,7 @@ func (am *AchievementManager) GetAchievementProgress(userID string, stats *UserS
 	return progress
 }
 
-// calculateProgress calculates progress towards an achievement (0.0 to 1.0)
+// calculateProgress calculates progress towards an achievement (0.0 to 1.0).
 func (am *AchievementManager) calculateProgress(req AchievementRequirement, stats *UserStats) float64 {
 	switch req.Type {
 	case "total_backups":
@@ -453,7 +453,7 @@ func (am *AchievementManager) calculateProgress(req AchievementRequirement, stat
 	}
 }
 
-// GetAllAchievements returns all available achievements (including hidden ones for admins)
+// GetAllAchievements returns all available achievements (including hidden ones for admins).
 func (am *AchievementManager) GetAllAchievements(includeHidden bool) []*Achievement {
 	am.mu.RLock()
 	defer am.mu.RUnlock()

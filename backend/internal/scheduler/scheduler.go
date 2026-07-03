@@ -8,45 +8,46 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
+
 	"github.com/sanskarpan/db-backup/internal/backup"
 	"github.com/sanskarpan/db-backup/internal/logger"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// Scheduler manages scheduled backup jobs
+// Scheduler manages scheduled backup jobs.
 type Scheduler struct {
-	cron     *cron.Cron
-	jobs     map[string]*ScheduledJob
-	jobsMux  sync.RWMutex
-	engine   *backup.Engine
-	logger   *logger.Logger
-	ctx      context.Context
-	cancel   context.CancelFunc
-	running  bool
-	runMux   sync.Mutex
+	cron    *cron.Cron
+	jobs    map[string]*ScheduledJob
+	jobsMux sync.RWMutex
+	engine  *backup.Engine
+	logger  *logger.Logger
+	ctx     context.Context
+	cancel  context.CancelFunc
+	running bool
+	runMux  sync.Mutex
 }
 
-// ScheduledJob represents a scheduled backup job
+// ScheduledJob represents a scheduled backup job.
 type ScheduledJob struct {
-	ID          string
-	Name        string
-	Schedule    string // Cron expression
-	BackupOpts  *backup.CreateOptions
-	Enabled     bool
-	LastRun     time.Time
-	NextRun     time.Time
-	RunCount    int64
-	FailCount   int64
-	EntryID     cron.EntryID
-	Retries     int
-	RetryDelay  time.Duration
-	Timeout     time.Duration
-	Tags        map[string]string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID         string
+	Name       string
+	Schedule   string // Cron expression
+	BackupOpts *backup.CreateOptions
+	Enabled    bool
+	LastRun    time.Time
+	NextRun    time.Time
+	RunCount   int64
+	FailCount  int64
+	EntryID    cron.EntryID
+	Retries    int
+	RetryDelay time.Duration
+	Timeout    time.Duration
+	Tags       map[string]string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
-// JobResult represents the result of a scheduled job execution
+// JobResult represents the result of a scheduled job execution.
 type JobResult struct {
 	JobID      string
 	Success    bool
@@ -58,7 +59,7 @@ type JobResult struct {
 	RetryCount int
 }
 
-// Config holds scheduler configuration
+// Config holds scheduler configuration.
 type Config struct {
 	MaxConcurrentJobs int
 	JobTimeout        time.Duration
@@ -68,7 +69,7 @@ type Config struct {
 	PersistencePath   string
 }
 
-// NewScheduler creates a new scheduler instance
+// NewScheduler creates a new scheduler instance.
 func NewScheduler(engine *backup.Engine, log *logger.Logger, cfg *Config) (*Scheduler, error) {
 	if engine == nil {
 		return nil, pkgErrors.New(pkgErrors.ErrorTypeConfiguration, "backup engine is required")
@@ -102,7 +103,7 @@ func NewScheduler(engine *backup.Engine, log *logger.Logger, cfg *Config) (*Sche
 	}, nil
 }
 
-// Start starts the scheduler
+// Start starts the scheduler.
 func (s *Scheduler) Start() error {
 	s.runMux.Lock()
 	defer s.runMux.Unlock()
@@ -118,7 +119,7 @@ func (s *Scheduler) Start() error {
 	return nil
 }
 
-// Stop stops the scheduler
+// Stop stops the scheduler.
 func (s *Scheduler) Stop() error {
 	s.runMux.Lock()
 	defer s.runMux.Unlock()
@@ -147,7 +148,7 @@ func (s *Scheduler) Stop() error {
 	return nil
 }
 
-// AddJob adds a new scheduled job
+// AddJob adds a new scheduled job.
 func (s *Scheduler) AddJob(job *ScheduledJob) error {
 	if job.ID == "" {
 		return pkgErrors.New(pkgErrors.ErrorTypeValidation, "job ID is required")
@@ -207,7 +208,7 @@ func (s *Scheduler) AddJob(job *ScheduledJob) error {
 	return nil
 }
 
-// RemoveJob removes a scheduled job
+// RemoveJob removes a scheduled job.
 func (s *Scheduler) RemoveJob(jobID string) error {
 	s.jobsMux.Lock()
 	defer s.jobsMux.Unlock()
@@ -228,7 +229,7 @@ func (s *Scheduler) RemoveJob(jobID string) error {
 	return nil
 }
 
-// GetJob retrieves a scheduled job by ID
+// GetJob retrieves a scheduled job by ID.
 func (s *Scheduler) GetJob(jobID string) (*ScheduledJob, error) {
 	s.jobsMux.RLock()
 	defer s.jobsMux.RUnlock()
@@ -241,7 +242,7 @@ func (s *Scheduler) GetJob(jobID string) (*ScheduledJob, error) {
 	return job, nil
 }
 
-// ListJobs returns all scheduled jobs
+// ListJobs returns all scheduled jobs.
 func (s *Scheduler) ListJobs() []*ScheduledJob {
 	s.jobsMux.RLock()
 	defer s.jobsMux.RUnlock()
@@ -254,7 +255,7 @@ func (s *Scheduler) ListJobs() []*ScheduledJob {
 	return jobs
 }
 
-// UpdateJob updates an existing scheduled job
+// UpdateJob updates an existing scheduled job.
 func (s *Scheduler) UpdateJob(jobID string, updates *ScheduledJob) error {
 	s.jobsMux.Lock()
 	defer s.jobsMux.Unlock()
@@ -313,17 +314,17 @@ func (s *Scheduler) UpdateJob(jobID string, updates *ScheduledJob) error {
 	return nil
 }
 
-// EnableJob enables a scheduled job
+// EnableJob enables a scheduled job.
 func (s *Scheduler) EnableJob(jobID string) error {
 	return s.UpdateJob(jobID, &ScheduledJob{Enabled: true})
 }
 
-// DisableJob disables a scheduled job
+// DisableJob disables a scheduled job.
 func (s *Scheduler) DisableJob(jobID string) error {
 	return s.UpdateJob(jobID, &ScheduledJob{Enabled: false})
 }
 
-// RunJobNow executes a job immediately (outside its schedule)
+// RunJobNow executes a job immediately (outside its schedule).
 func (s *Scheduler) RunJobNow(jobID string) (*JobResult, error) {
 	job, err := s.GetJob(jobID)
 	if err != nil {
@@ -333,7 +334,7 @@ func (s *Scheduler) RunJobNow(jobID string) (*JobResult, error) {
 	return s.executeJob(job), nil
 }
 
-// createJobFunc creates a function to be executed by cron
+// createJobFunc creates a function to be executed by cron.
 func (s *Scheduler) createJobFunc(job *ScheduledJob) func() {
 	return func() {
 		result := s.executeJob(job)
@@ -397,7 +398,7 @@ func (s *Scheduler) executeJob(job *ScheduledJob) *JobResult {
 
 		lastErr = err
 
-		// Check if context was cancelled
+		// Check if context was canceled
 		if ctx.Err() != nil {
 			break
 		}
@@ -411,21 +412,21 @@ func (s *Scheduler) executeJob(job *ScheduledJob) *JobResult {
 	return result
 }
 
-// IsRunning returns whether the scheduler is running
+// IsRunning returns whether the scheduler is running.
 func (s *Scheduler) IsRunning() bool {
 	s.runMux.Lock()
 	defer s.runMux.Unlock()
 	return s.running
 }
 
-// GetJobCount returns the number of scheduled jobs
+// GetJobCount returns the number of scheduled jobs.
 func (s *Scheduler) GetJobCount() int {
 	s.jobsMux.RLock()
 	defer s.jobsMux.RUnlock()
 	return len(s.jobs)
 }
 
-// cronLogger adapts our logger to cron's logger interface
+// cronLogger adapts our logger to cron's logger interface.
 type cronLogger struct {
 	log *logger.Logger
 }
@@ -438,7 +439,7 @@ func (l *cronLogger) Error(err error, msg string, keysAndValues ...interface{}) 
 	l.log.Error(msg, err)
 }
 
-// Printf implements the Printf interface for VerbosePrintfLogger
+// Printf implements the Printf interface for VerbosePrintfLogger.
 func (l *cronLogger) Printf(format string, args ...interface{}) {
 	l.log.Debug(fmt.Sprintf(format, args...))
 }

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// EscalationProcessor handles notification escalation logic
+// EscalationProcessor handles notification escalation logic.
 type EscalationProcessor struct {
 	mu              sync.RWMutex
 	engine          *Engine
@@ -19,12 +19,12 @@ type EscalationProcessor struct {
 	escalationChain map[string][]string // userID -> [escalation targets]
 }
 
-// EscalationRule defines when and how to escalate a notification
+// EscalationRule defines when and how to escalate a notification.
 type EscalationRule struct {
 	ID          string                 `json:"id"`
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
-	Priority    Priority               `json:"priority"`    // Apply to notifications with this priority
+	Priority    Priority               `json:"priority"`       // Apply to notifications with this priority
 	Type        NotificationType       `json:"type,omitempty"` // Apply to specific types
 	Category    string                 `json:"category,omitempty"`
 	Levels      []EscalationLevel      `json:"levels"`
@@ -32,49 +32,49 @@ type EscalationRule struct {
 	Metadata    map[string]interface{} `json:"metadata"`
 }
 
-// EscalationLevel represents a single escalation level
+// EscalationLevel represents a single escalation level.
 type EscalationLevel struct {
-	Level         int                 `json:"level"` // 1, 2, 3, etc.
-	DelayAfter    time.Duration       `json:"delay_after"` // Time to wait before this level
-	Channels      []DeliveryChannel   `json:"channels"` // Channels to use
-	Targets       []string            `json:"targets"` // User IDs to escalate to
-	Message       string              `json:"message"` // Custom escalation message
+	Level           int               `json:"level"`            // 1, 2, 3, etc.
+	DelayAfter      time.Duration     `json:"delay_after"`      // Time to wait before this level
+	Channels        []DeliveryChannel `json:"channels"`         // Channels to use
+	Targets         []string          `json:"targets"`          // User IDs to escalate to
+	Message         string            `json:"message"`          // Custom escalation message
 	IncludeOriginal bool              `json:"include_original"` // Include original notification details
-	StopOnRead    bool                `json:"stop_on_read"` // Stop if original is read
+	StopOnRead      bool              `json:"stop_on_read"`     // Stop if original is read
 }
 
-// EscalationState tracks the escalation state of a notification
+// EscalationState tracks the escalation state of a notification.
 type EscalationState struct {
-	NotificationID   string                 `json:"notification_id"`
-	OriginalUserID   string                 `json:"original_user_id"`
-	CurrentLevel     int                    `json:"current_level"`
-	LastEscalatedAt  time.Time              `json:"last_escalated_at"`
-	EscalationsSent  int                    `json:"escalations_sent"`
-	Status           string                 `json:"status"` // active, stopped, completed
-	Rule             *EscalationRule        `json:"rule"`
-	History          []EscalationHistoryEntry `json:"history"`
-	Metadata         map[string]interface{} `json:"metadata"`
+	NotificationID  string                   `json:"notification_id"`
+	OriginalUserID  string                   `json:"original_user_id"`
+	CurrentLevel    int                      `json:"current_level"`
+	LastEscalatedAt time.Time                `json:"last_escalated_at"`
+	EscalationsSent int                      `json:"escalations_sent"`
+	Status          string                   `json:"status"` // active, stopped, completed
+	Rule            *EscalationRule          `json:"rule"`
+	History         []EscalationHistoryEntry `json:"history"`
+	Metadata        map[string]interface{}   `json:"metadata"`
 }
 
-// EscalationHistoryEntry represents a single escalation event
+// EscalationHistoryEntry represents a single escalation event.
 type EscalationHistoryEntry struct {
-	Level       int               `json:"level"`
-	Timestamp   time.Time         `json:"timestamp"`
-	Targets     []string          `json:"targets"`
-	Channels    []DeliveryChannel `json:"channels"`
-	Success     bool              `json:"success"`
-	Error       string            `json:"error,omitempty"`
+	Level     int               `json:"level"`
+	Timestamp time.Time         `json:"timestamp"`
+	Targets   []string          `json:"targets"`
+	Channels  []DeliveryChannel `json:"channels"`
+	Success   bool              `json:"success"`
+	Error     string            `json:"error,omitempty"`
 }
 
-// SLAConfig represents SLA configuration for notifications
+// SLAConfig represents SLA configuration for notifications.
 type SLAConfig struct {
-	Priority      Priority      `json:"priority"`
-	ResponseTime  time.Duration `json:"response_time"`  // Expected time to read
+	Priority       Priority      `json:"priority"`
+	ResponseTime   time.Duration `json:"response_time"`   // Expected time to read
 	ResolutionTime time.Duration `json:"resolution_time"` // Expected time to action
-	EscalateAfter time.Duration `json:"escalate_after"`
+	EscalateAfter  time.Duration `json:"escalate_after"`
 }
 
-// NewEscalationProcessor creates a new escalation processor
+// NewEscalationProcessor creates a new escalation processor.
 func NewEscalationProcessor(engine *Engine, checkInterval time.Duration) *EscalationProcessor {
 	if checkInterval == 0 {
 		checkInterval = 1 * time.Minute
@@ -95,13 +95,13 @@ func NewEscalationProcessor(engine *Engine, checkInterval time.Duration) *Escala
 	return ep
 }
 
-// Start starts the escalation processor
+// Start starts the escalation processor.
 func (ep *EscalationProcessor) Start() {
 	ep.ticker = time.NewTicker(ep.checkInterval)
 	go ep.processEscalations()
 }
 
-// Stop stops the escalation processor
+// Stop stops the escalation processor.
 func (ep *EscalationProcessor) Stop() {
 	if ep.ticker != nil {
 		ep.ticker.Stop()
@@ -109,7 +109,7 @@ func (ep *EscalationProcessor) Stop() {
 	close(ep.stopChan)
 }
 
-// TrackNotification starts tracking a notification for escalation
+// TrackNotification starts tracking a notification for escalation.
 func (ep *EscalationProcessor) TrackNotification(notification *Notification) {
 	ep.mu.Lock()
 	defer ep.mu.Unlock()
@@ -140,7 +140,7 @@ func (ep *EscalationProcessor) TrackNotification(notification *Notification) {
 	ep.escalations[notification.ID] = state
 }
 
-// StopEscalation stops escalation for a notification
+// StopEscalation stops escalation for a notification.
 func (ep *EscalationProcessor) StopEscalation(notificationID string) {
 	ep.mu.Lock()
 	defer ep.mu.Unlock()
@@ -150,7 +150,7 @@ func (ep *EscalationProcessor) StopEscalation(notificationID string) {
 	}
 }
 
-// AddRule adds a custom escalation rule
+// AddRule adds a custom escalation rule.
 func (ep *EscalationProcessor) AddRule(rule *EscalationRule) {
 	ep.mu.Lock()
 	defer ep.mu.Unlock()
@@ -158,7 +158,7 @@ func (ep *EscalationProcessor) AddRule(rule *EscalationRule) {
 	ep.rules = append(ep.rules, rule)
 }
 
-// SetEscalationChain sets the escalation chain for a user
+// SetEscalationChain sets the escalation chain for a user.
 func (ep *EscalationProcessor) SetEscalationChain(userID string, targets []string) {
 	ep.mu.Lock()
 	defer ep.mu.Unlock()
@@ -166,7 +166,7 @@ func (ep *EscalationProcessor) SetEscalationChain(userID string, targets []strin
 	ep.escalationChain[userID] = targets
 }
 
-// processEscalations periodically checks and processes escalations
+// processEscalations periodically checks and processes escalations.
 func (ep *EscalationProcessor) processEscalations() {
 	for {
 		select {
@@ -178,7 +178,7 @@ func (ep *EscalationProcessor) processEscalations() {
 	}
 }
 
-// checkAndEscalate checks all tracked notifications and escalates if needed
+// checkAndEscalate checks all tracked notifications and escalates if needed.
 func (ep *EscalationProcessor) checkAndEscalate() {
 	ep.mu.Lock()
 
@@ -214,7 +214,7 @@ func (ep *EscalationProcessor) checkAndEscalate() {
 	}
 }
 
-// performEscalation performs the actual escalation
+// performEscalation performs the actual escalation.
 func (ep *EscalationProcessor) performEscalation(state *EscalationState) {
 	ep.mu.Lock()
 	level := state.Rule.Levels[state.CurrentLevel]
@@ -265,7 +265,7 @@ func (ep *EscalationProcessor) performEscalation(state *EscalationState) {
 	ep.mu.Unlock()
 }
 
-// createEscalationNotification creates an escalation notification
+// createEscalationNotification creates an escalation notification.
 func (ep *EscalationProcessor) createEscalationNotification(state *EscalationState, level EscalationLevel, targetUserID string) *Notification {
 	title := fmt.Sprintf("🔔 Escalation: Notification requires attention (Level %d)", level.Level)
 	message := level.Message
@@ -321,7 +321,7 @@ func (ep *EscalationProcessor) createEscalationNotification(state *EscalationSta
 	return notification
 }
 
-// findApplicableRule finds the first matching escalation rule
+// findApplicableRule finds the first matching escalation rule.
 func (ep *EscalationProcessor) findApplicableRule(notification *Notification) *EscalationRule {
 	for _, rule := range ep.rules {
 		if !rule.Enabled {
@@ -349,7 +349,7 @@ func (ep *EscalationProcessor) findApplicableRule(notification *Notification) *E
 	return nil
 }
 
-// addDefaultRules adds default escalation rules
+// addDefaultRules adds default escalation rules.
 func (ep *EscalationProcessor) addDefaultRules() {
 	// Urgent notifications - escalate quickly
 	ep.rules = append(ep.rules, &EscalationRule{
@@ -435,7 +435,7 @@ func (ep *EscalationProcessor) addDefaultRules() {
 	})
 }
 
-// GetEscalationState returns the escalation state for a notification
+// GetEscalationState returns the escalation state for a notification.
 func (ep *EscalationProcessor) GetEscalationState(notificationID string) *EscalationState {
 	ep.mu.RLock()
 	defer ep.mu.RUnlock()
@@ -446,7 +446,7 @@ func (ep *EscalationProcessor) GetEscalationState(notificationID string) *Escala
 	return nil
 }
 
-// GetActiveEscalations returns all active escalations
+// GetActiveEscalations returns all active escalations.
 func (ep *EscalationProcessor) GetActiveEscalations() []*EscalationState {
 	ep.mu.RLock()
 	defer ep.mu.RUnlock()
@@ -460,14 +460,14 @@ func (ep *EscalationProcessor) GetActiveEscalations() []*EscalationState {
 	return active
 }
 
-// SLATracker tracks SLA compliance for notifications
+// SLATracker tracks SLA compliance for notifications.
 type SLATracker struct {
-	mu      sync.RWMutex
-	configs map[Priority]SLAConfig
+	mu         sync.RWMutex
+	configs    map[Priority]SLAConfig
 	violations map[string]*SLAViolation
 }
 
-// SLAViolation represents an SLA violation
+// SLAViolation represents an SLA violation.
 type SLAViolation struct {
 	NotificationID string        `json:"notification_id"`
 	Priority       Priority      `json:"priority"`
@@ -477,7 +477,7 @@ type SLAViolation struct {
 	Timestamp      time.Time     `json:"timestamp"`
 }
 
-// NewSLATracker creates a new SLA tracker
+// NewSLATracker creates a new SLA tracker.
 func NewSLATracker() *SLATracker {
 	st := &SLATracker{
 		configs:    make(map[Priority]SLAConfig),
@@ -513,7 +513,7 @@ func NewSLATracker() *SLATracker {
 	return st
 }
 
-// CheckSLA checks if a notification violates SLA
+// CheckSLA checks if a notification violates SLA.
 func (st *SLATracker) CheckSLA(notification *Notification, actualResponseTime time.Duration) *SLAViolation {
 	st.mu.RLock()
 	defer st.mu.RUnlock()
@@ -540,7 +540,7 @@ func (st *SLATracker) CheckSLA(notification *Notification, actualResponseTime ti
 	return nil
 }
 
-// GetViolations returns all SLA violations
+// GetViolations returns all SLA violations.
 func (st *SLATracker) GetViolations() []*SLAViolation {
 	st.mu.RLock()
 	defer st.mu.RUnlock()

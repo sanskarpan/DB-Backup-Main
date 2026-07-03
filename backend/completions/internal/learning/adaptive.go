@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Pattern represents a learned command pattern
+// Pattern represents a learned command pattern.
 type Pattern struct {
 	Command   string            `json:"command"`
 	Args      []string          `json:"args"`
@@ -19,7 +19,7 @@ type Pattern struct {
 	AvgTime   float64           `json:"avg_time"` // Average time to execute
 }
 
-// AdaptiveEngine learns from user behavior
+// AdaptiveEngine learns from user behavior.
 type AdaptiveEngine struct {
 	mu          sync.RWMutex
 	stateFile   string
@@ -28,7 +28,7 @@ type AdaptiveEngine struct {
 	preferences map[string]string   // flag -> preferred value
 }
 
-// NewAdaptiveEngine creates a new adaptive learning engine
+// NewAdaptiveEngine creates a new adaptive learning engine.
 func NewAdaptiveEngine(stateFile string) *AdaptiveEngine {
 	return &AdaptiveEngine{
 		stateFile:   stateFile,
@@ -38,13 +38,13 @@ func NewAdaptiveEngine(stateFile string) *AdaptiveEngine {
 	}
 }
 
-// Load loads learned patterns from file
+// Load loads learned patterns from file.
 func (e *AdaptiveEngine) Load() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	dir := filepath.Dir(e.stateFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 
@@ -74,7 +74,7 @@ func (e *AdaptiveEngine) Load() error {
 	return nil
 }
 
-// Save saves learned patterns to file
+// Save saves learned patterns to file.
 func (e *AdaptiveEngine) Save() error {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -96,10 +96,10 @@ func (e *AdaptiveEngine) Save() error {
 		return err
 	}
 
-	return os.WriteFile(e.stateFile, data, 0644)
+	return os.WriteFile(e.stateFile, data, 0o644)
 }
 
-// Learn records a command execution for learning
+// Learn records a command execution for learning.
 func (e *AdaptiveEngine) Learn(command string, args []string, context map[string]string, execTime float64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -143,7 +143,7 @@ func (e *AdaptiveEngine) Learn(command string, args []string, context map[string
 	}
 }
 
-// LearnSequence records command sequences
+// LearnSequence records command sequences.
 func (e *AdaptiveEngine) LearnSequence(prevCommand, nextCommand string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -166,7 +166,7 @@ func (e *AdaptiveEngine) LearnSequence(prevCommand, nextCommand string) {
 	}
 }
 
-// SuggestNext suggests next command based on context
+// SuggestNext suggests next command based on context.
 func (e *AdaptiveEngine) SuggestNext(currentCommand string, context map[string]string) []string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -206,7 +206,7 @@ func (e *AdaptiveEngine) SuggestNext(currentCommand string, context map[string]s
 	return suggestions
 }
 
-// SuggestArgs suggests arguments based on learned patterns
+// SuggestArgs suggests arguments based on learned patterns.
 func (e *AdaptiveEngine) SuggestArgs(command string, context map[string]string) []string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -239,7 +239,7 @@ func (e *AdaptiveEngine) SuggestArgs(command string, context map[string]string) 
 	return result
 }
 
-// SuggestFlagValue suggests flag value based on preferences
+// SuggestFlagValue suggests flag value based on preferences.
 func (e *AdaptiveEngine) SuggestFlagValue(flag string) string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -251,7 +251,7 @@ func (e *AdaptiveEngine) SuggestFlagValue(flag string) string {
 	return ""
 }
 
-// GetTopPatterns returns most frequent patterns
+// GetTopPatterns returns most frequent patterns.
 func (e *AdaptiveEngine) GetTopPatterns(limit int) []*Pattern {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -273,7 +273,7 @@ func (e *AdaptiveEngine) GetTopPatterns(limit int) []*Pattern {
 	return patterns
 }
 
-// GetStats returns learning statistics
+// GetStats returns learning statistics.
 func (e *AdaptiveEngine) GetStats() map[string]interface{} {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -291,7 +291,7 @@ func (e *AdaptiveEngine) GetStats() map[string]interface{} {
 	}
 }
 
-// Clear clears all learned data
+// Clear clears all learned data.
 func (e *AdaptiveEngine) Clear() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -303,7 +303,7 @@ func (e *AdaptiveEngine) Clear() error {
 	return os.Remove(e.stateFile)
 }
 
-// matchesPattern checks if a pattern matches given command/args/context
+// matchesPattern checks if a pattern matches given command/args/context.
 func (e *AdaptiveEngine) matchesPattern(pattern *Pattern, command string, args []string, context map[string]string) bool {
 	if pattern.Command != command {
 		return false
@@ -322,7 +322,7 @@ func (e *AdaptiveEngine) matchesPattern(pattern *Pattern, command string, args [
 	return e.contextMatches(pattern.Context, context)
 }
 
-// contextMatches checks if contexts match (partial match allowed)
+// contextMatches checks if contexts match (partial match allowed).
 func (e *AdaptiveEngine) contextMatches(patternContext, currentContext map[string]string) bool {
 	if len(patternContext) == 0 {
 		return true

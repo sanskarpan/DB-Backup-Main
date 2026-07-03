@@ -13,7 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Styles
+// Styles.
 var (
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -40,7 +40,7 @@ var (
 	docStyle = lipgloss.NewStyle().Padding(1, 2, 1, 2)
 )
 
-// Screen types
+// Screen types.
 type screen int
 
 const (
@@ -50,17 +50,17 @@ const (
 	screenSettings
 )
 
-// Key bindings
+// Key bindings.
 type keyMap struct {
-	Up       key.Binding
-	Down     key.Binding
-	Left     key.Binding
-	Right    key.Binding
-	Enter    key.Binding
-	Back     key.Binding
-	Quit     key.Binding
-	Help     key.Binding
-	Refresh  key.Binding
+	Up        key.Binding
+	Down      key.Binding
+	Left      key.Binding
+	Right     key.Binding
+	Enter     key.Binding
+	Back      key.Binding
+	Quit      key.Binding
+	Help      key.Binding
+	Refresh   key.Binding
 	NewBackup key.Binding
 }
 
@@ -107,7 +107,7 @@ var keys = keyMap{
 	),
 }
 
-// Model
+// Model.
 type model struct {
 	currentScreen screen
 	spinner       spinner.Model
@@ -218,7 +218,7 @@ func initialModel() model {
 	}
 }
 
-// Menu item for list
+// Menu item for list.
 type menuItem struct {
 	title string
 	desc  string

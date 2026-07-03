@@ -10,38 +10,38 @@ import (
 	"time"
 )
 
-// VersionManager manages configuration versions
+// VersionManager manages configuration versions.
 type VersionManager struct {
-	mu            sync.RWMutex
-	versions      map[string][]*ConfigVersion // configName -> versions
-	versionDir    string
-	maxVersions   int
-	autoVersion   bool
+	mu          sync.RWMutex
+	versions    map[string][]*ConfigVersion // configName -> versions
+	versionDir  string
+	maxVersions int
+	autoVersion bool
 }
 
-// ConfigVersion represents a versioned configuration
+// ConfigVersion represents a versioned configuration.
 type ConfigVersion struct {
-	Version      string         `json:"version"`
-	VersionNum   int            `json:"versionNum"`
-	Config       *BackupConfig  `json:"config"`
-	CreatedAt    time.Time      `json:"createdAt"`
-	CreatedBy    string         `json:"createdBy,omitempty"`
-	ChangeNote   string         `json:"changeNote,omitempty"`
-	Tags         []string       `json:"tags,omitempty"`
-	Checksum     string         `json:"checksum"`
+	Version       string        `json:"version"`
+	VersionNum    int           `json:"versionNum"`
+	Config        *BackupConfig `json:"config"`
+	CreatedAt     time.Time     `json:"createdAt"`
+	CreatedBy     string        `json:"createdBy,omitempty"`
+	ChangeNote    string        `json:"changeNote,omitempty"`
+	Tags          []string      `json:"tags,omitempty"`
+	Checksum      string        `json:"checksum"`
 	ParentVersion string        `json:"parentVersion,omitempty"`
 }
 
-// VersionDiff represents differences between two versions
+// VersionDiff represents differences between two versions.
 type VersionDiff struct {
-	FromVersion   string                 `json:"fromVersion"`
-	ToVersion     string                 `json:"toVersion"`
-	Changes       []VersionChange        `json:"changes"`
-	Summary       string                 `json:"summary"`
-	CreatedAt     time.Time              `json:"createdAt"`
+	FromVersion string          `json:"fromVersion"`
+	ToVersion   string          `json:"toVersion"`
+	Changes     []VersionChange `json:"changes"`
+	Summary     string          `json:"summary"`
+	CreatedAt   time.Time       `json:"createdAt"`
 }
 
-// VersionChange represents a single change between versions
+// VersionChange represents a single change between versions.
 type VersionChange struct {
 	Type     string      `json:"type"` // added, removed, modified
 	Path     string      `json:"path"`
@@ -49,27 +49,27 @@ type VersionChange struct {
 	NewValue interface{} `json:"newValue,omitempty"`
 }
 
-// RollbackPlan represents a plan for rolling back to a previous version
+// RollbackPlan represents a plan for rolling back to a previous version.
 type RollbackPlan struct {
-	ConfigName    string        `json:"configName"`
-	CurrentVersion string       `json:"currentVersion"`
-	TargetVersion  string       `json:"targetVersion"`
-	Changes       []VersionChange `json:"changes"`
+	ConfigName     string          `json:"configName"`
+	CurrentVersion string          `json:"currentVersion"`
+	TargetVersion  string          `json:"targetVersion"`
+	Changes        []VersionChange `json:"changes"`
 	ImpactAnalysis *ImpactAnalysis `json:"impactAnalysis"`
-	CreatedAt     time.Time     `json:"createdAt"`
+	CreatedAt      time.Time       `json:"createdAt"`
 }
 
-// ImpactAnalysis analyzes the impact of a rollback
+// ImpactAnalysis analyzes the impact of a rollback.
 type ImpactAnalysis struct {
-	AffectedDatabases  []string `json:"affectedDatabases"`
-	AffectedSchedules  []string `json:"affectedSchedules"`
-	DisabledFeatures   []string `json:"disabledFeatures,omitempty"`
-	EnabledFeatures    []string `json:"enabledFeatures,omitempty"`
-	RiskLevel          string   `json:"riskLevel"` // low, medium, high
-	Warnings           []string `json:"warnings,omitempty"`
+	AffectedDatabases []string `json:"affectedDatabases"`
+	AffectedSchedules []string `json:"affectedSchedules"`
+	DisabledFeatures  []string `json:"disabledFeatures,omitempty"`
+	EnabledFeatures   []string `json:"enabledFeatures,omitempty"`
+	RiskLevel         string   `json:"riskLevel"` // low, medium, high
+	Warnings          []string `json:"warnings,omitempty"`
 }
 
-// NewVersionManager creates a new version manager
+// NewVersionManager creates a new version manager.
 func NewVersionManager(versionDir string, maxVersions int, autoVersion bool) *VersionManager {
 	return &VersionManager{
 		versions:    make(map[string][]*ConfigVersion),
@@ -79,7 +79,7 @@ func NewVersionManager(versionDir string, maxVersions int, autoVersion bool) *Ve
 	}
 }
 
-// CreateVersion creates a new version of a configuration
+// CreateVersion creates a new version of a configuration.
 func (vm *VersionManager) CreateVersion(config *BackupConfig, createdBy, changeNote string) (*ConfigVersion, error) {
 	vm.mu.Lock()
 	defer vm.mu.Unlock()
@@ -103,13 +103,13 @@ func (vm *VersionManager) CreateVersion(config *BackupConfig, createdBy, changeN
 
 	// Create version
 	version := &ConfigVersion{
-		Version:      fmt.Sprintf("v%d", versionNum),
-		VersionNum:   versionNum,
-		Config:       config,
-		CreatedAt:    time.Now(),
-		CreatedBy:    createdBy,
-		ChangeNote:   changeNote,
-		Tags:         make([]string, 0),
+		Version:       fmt.Sprintf("v%d", versionNum),
+		VersionNum:    versionNum,
+		Config:        config,
+		CreatedAt:     time.Now(),
+		CreatedBy:     createdBy,
+		ChangeNote:    changeNote,
+		Tags:          make([]string, 0),
 		ParentVersion: parentVersion,
 	}
 
@@ -137,7 +137,7 @@ func (vm *VersionManager) CreateVersion(config *BackupConfig, createdBy, changeN
 	return version, nil
 }
 
-// GetVersion retrieves a specific version of a configuration
+// GetVersion retrieves a specific version of a configuration.
 func (vm *VersionManager) GetVersion(configName, version string) (*ConfigVersion, error) {
 	vm.mu.RLock()
 	defer vm.mu.RUnlock()
@@ -156,7 +156,7 @@ func (vm *VersionManager) GetVersion(configName, version string) (*ConfigVersion
 	return nil, fmt.Errorf("version %s not found for config %s", version, configName)
 }
 
-// ListVersions returns all versions of a configuration
+// ListVersions returns all versions of a configuration.
 func (vm *VersionManager) ListVersions(configName string) ([]*ConfigVersion, error) {
 	vm.mu.RLock()
 	defer vm.mu.RUnlock()
@@ -173,7 +173,7 @@ func (vm *VersionManager) ListVersions(configName string) ([]*ConfigVersion, err
 	return result, nil
 }
 
-// GetLatestVersion returns the latest version of a configuration
+// GetLatestVersion returns the latest version of a configuration.
 func (vm *VersionManager) GetLatestVersion(configName string) (*ConfigVersion, error) {
 	vm.mu.RLock()
 	defer vm.mu.RUnlock()
@@ -186,7 +186,7 @@ func (vm *VersionManager) GetLatestVersion(configName string) (*ConfigVersion, e
 	return versions[len(versions)-1], nil
 }
 
-// DiffVersions computes the difference between two versions
+// DiffVersions computes the difference between two versions.
 func (vm *VersionManager) DiffVersions(configName, fromVersion, toVersion string) (*VersionDiff, error) {
 	from, err := vm.GetVersion(configName, fromVersion)
 	if err != nil {
@@ -214,7 +214,7 @@ func (vm *VersionManager) DiffVersions(configName, fromVersion, toVersion string
 	return diff, nil
 }
 
-// compareConfigs compares two configurations and returns changes
+// compareConfigs compares two configurations and returns changes.
 func (vm *VersionManager) compareConfigs(from, to *BackupConfig) []VersionChange {
 	changes := make([]VersionChange, 0)
 
@@ -243,7 +243,7 @@ func (vm *VersionManager) compareConfigs(from, to *BackupConfig) []VersionChange
 	return changes
 }
 
-// compareDatabases compares database configurations
+// compareDatabases compares database configurations.
 func (vm *VersionManager) compareDatabases(from, to []DatabaseConfig) []VersionChange {
 	changes := make([]VersionChange, 0)
 
@@ -296,7 +296,7 @@ func (vm *VersionManager) compareDatabases(from, to []DatabaseConfig) []VersionC
 	return changes
 }
 
-// compareSchedules compares schedule configurations
+// compareSchedules compares schedule configurations.
 func (vm *VersionManager) compareSchedules(from, to []ScheduleConfig) []VersionChange {
 	changes := make([]VersionChange, 0)
 
@@ -357,7 +357,7 @@ func (vm *VersionManager) compareSchedules(from, to []ScheduleConfig) []VersionC
 	return changes
 }
 
-// comparePolicies compares policy configurations
+// comparePolicies compares policy configurations.
 func (vm *VersionManager) comparePolicies(from, to []PolicyConfig) []VersionChange {
 	changes := make([]VersionChange, 0)
 
@@ -394,7 +394,7 @@ func (vm *VersionManager) comparePolicies(from, to []PolicyConfig) []VersionChan
 	return changes
 }
 
-// compareRetention compares retention configurations
+// compareRetention compares retention configurations.
 func (vm *VersionManager) compareRetention(from, to *RetentionConfig) []VersionChange {
 	changes := make([]VersionChange, 0)
 
@@ -428,7 +428,7 @@ func (vm *VersionManager) compareRetention(from, to *RetentionConfig) []VersionC
 	return changes
 }
 
-// generateDiffSummary generates a summary of changes
+// generateDiffSummary generates a summary of changes.
 func (vm *VersionManager) generateDiffSummary(changes []VersionChange) string {
 	if len(changes) == 0 {
 		return "No changes"
@@ -452,7 +452,7 @@ func (vm *VersionManager) generateDiffSummary(changes []VersionChange) string {
 	return fmt.Sprintf("%d added, %d removed, %d modified", added, removed, modified)
 }
 
-// CreateRollbackPlan creates a plan for rolling back to a previous version
+// CreateRollbackPlan creates a plan for rolling back to a previous version.
 func (vm *VersionManager) CreateRollbackPlan(configName, targetVersion string) (*RollbackPlan, error) {
 	current, err := vm.GetLatestVersion(configName)
 	if err != nil {
@@ -482,7 +482,7 @@ func (vm *VersionManager) CreateRollbackPlan(configName, targetVersion string) (
 	return plan, nil
 }
 
-// analyzeImpact analyzes the impact of rolling back
+// analyzeImpact analyzes the impact of rolling back.
 func (vm *VersionManager) analyzeImpact(current, target *BackupConfig) *ImpactAnalysis {
 	impact := &ImpactAnalysis{
 		AffectedDatabases: make([]string, 0),
@@ -533,7 +533,7 @@ func (vm *VersionManager) analyzeImpact(current, target *BackupConfig) *ImpactAn
 	return impact
 }
 
-// ExecuteRollback executes a rollback plan
+// ExecuteRollback executes a rollback plan.
 func (vm *VersionManager) ExecuteRollback(plan *RollbackPlan) (*BackupConfig, error) {
 	target, err := vm.GetVersion(plan.ConfigName, plan.TargetVersion)
 	if err != nil {
@@ -552,7 +552,7 @@ func (vm *VersionManager) ExecuteRollback(plan *RollbackPlan) (*BackupConfig, er
 	return rolledBackConfig, nil
 }
 
-// TagVersion adds tags to a version
+// TagVersion adds tags to a version.
 func (vm *VersionManager) TagVersion(configName, version string, tags []string) error {
 	vm.mu.Lock()
 	defer vm.mu.Unlock()
@@ -567,7 +567,7 @@ func (vm *VersionManager) TagVersion(configName, version string, tags []string) 
 	return vm.saveVersion(v, configName)
 }
 
-// GetVersionsByTag returns versions with a specific tag
+// GetVersionsByTag returns versions with a specific tag.
 func (vm *VersionManager) GetVersionsByTag(configName, tag string) ([]*ConfigVersion, error) {
 	versions, err := vm.ListVersions(configName)
 	if err != nil {
@@ -587,7 +587,7 @@ func (vm *VersionManager) GetVersionsByTag(configName, tag string) ([]*ConfigVer
 	return tagged, nil
 }
 
-// calculateChecksum calculates a checksum for a configuration
+// calculateChecksum calculates a checksum for a configuration.
 func (vm *VersionManager) calculateChecksum(config *BackupConfig) (string, error) {
 	data, err := json.Marshal(config)
 	if err != nil {
@@ -598,12 +598,12 @@ func (vm *VersionManager) calculateChecksum(config *BackupConfig) (string, error
 	return hash[:16], nil // Return first 16 chars
 }
 
-// saveVersion saves a version to disk
+// saveVersion saves a version to disk.
 func (vm *VersionManager) saveVersion(version *ConfigVersion, configName string) error {
 	versionPath := filepath.Join(vm.versionDir, configName)
 
 	// Create directory if not exists
-	if err := os.MkdirAll(versionPath, 0755); err != nil {
+	if err := os.MkdirAll(versionPath, 0o755); err != nil {
 		return fmt.Errorf("failed to create version directory: %w", err)
 	}
 
@@ -614,14 +614,14 @@ func (vm *VersionManager) saveVersion(version *ConfigVersion, configName string)
 		return fmt.Errorf("failed to marshal version: %w", err)
 	}
 
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
+	if err := os.WriteFile(filePath, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write version file: %w", err)
 	}
 
 	return nil
 }
 
-// loadVersions loads versions from disk
+// loadVersions loads versions from disk.
 func (vm *VersionManager) loadVersions(configName string) error {
 	versionPath := filepath.Join(vm.versionDir, configName)
 
@@ -664,7 +664,7 @@ func (vm *VersionManager) loadVersions(configName string) error {
 	return nil
 }
 
-// pruneVersions removes old versions exceeding max limit
+// pruneVersions removes old versions exceeding max limit.
 func (vm *VersionManager) pruneVersions(configName string) {
 	versions := vm.versions[configName]
 
@@ -685,7 +685,7 @@ func (vm *VersionManager) pruneVersions(configName string) {
 	vm.versions[configName] = versions[len(versions)-vm.maxVersions:]
 }
 
-// GetVersionHistory returns version history with metadata
+// GetVersionHistory returns version history with metadata.
 func (vm *VersionManager) GetVersionHistory(configName string) ([]map[string]interface{}, error) {
 	versions, err := vm.ListVersions(configName)
 	if err != nil {
@@ -696,12 +696,12 @@ func (vm *VersionManager) GetVersionHistory(configName string) ([]map[string]int
 
 	for _, v := range versions {
 		entry := map[string]interface{}{
-			"version":    v.Version,
-			"created_at": v.CreatedAt,
-			"created_by": v.CreatedBy,
+			"version":     v.Version,
+			"created_at":  v.CreatedAt,
+			"created_by":  v.CreatedBy,
 			"change_note": v.ChangeNote,
-			"tags":       v.Tags,
-			"checksum":   v.Checksum,
+			"tags":        v.Tags,
+			"checksum":    v.Checksum,
 		}
 		history = append(history, entry)
 	}

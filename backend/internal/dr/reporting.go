@@ -13,20 +13,20 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// ReportGenerator generates compliance reports for DR tests
+// ReportGenerator generates compliance reports for DR tests.
 type ReportGenerator struct {
 	mu      sync.RWMutex
 	history []TestResult
 }
 
-// NewReportGenerator creates a new report generator
+// NewReportGenerator creates a new report generator.
 func NewReportGenerator() *ReportGenerator {
 	return &ReportGenerator{
 		history: make([]TestResult, 0),
 	}
 }
 
-// AddTestResult adds a test result to the history
+// AddTestResult adds a test result to the history.
 func (rg *ReportGenerator) AddTestResult(result TestResult) {
 	rg.mu.Lock()
 	defer rg.mu.Unlock()
@@ -39,7 +39,7 @@ func (rg *ReportGenerator) AddTestResult(result TestResult) {
 	}
 }
 
-// GetTestHistory returns test results for a date range
+// GetTestHistory returns test results for a date range.
 func (rg *ReportGenerator) GetTestHistory(startDate, endDate time.Time) []TestResult {
 	rg.mu.RLock()
 	defer rg.mu.RUnlock()
@@ -54,7 +54,7 @@ func (rg *ReportGenerator) GetTestHistory(startDate, endDate time.Time) []TestRe
 	return results
 }
 
-// GetTestHistoryByDatabase returns test results for a specific database
+// GetTestHistoryByDatabase returns test results for a specific database.
 func (rg *ReportGenerator) GetTestHistoryByDatabase(dbName string, limit int) []TestResult {
 	rg.mu.RLock()
 	defer rg.mu.RUnlock()
@@ -73,7 +73,7 @@ func (rg *ReportGenerator) GetTestHistoryByDatabase(dbName string, limit int) []
 	return results
 }
 
-// ComplianceReport represents a compliance report
+// ComplianceReport represents a compliance report.
 type ComplianceReport struct {
 	ReportID         string
 	GeneratedAt      time.Time
@@ -92,14 +92,14 @@ type ComplianceReport struct {
 	ComplianceStatus ComplianceStatus
 }
 
-// ReportPeriod represents the time period for a report
+// ReportPeriod represents the time period for a report.
 type ReportPeriod struct {
 	StartDate time.Time
 	EndDate   time.Time
 	Label     string // e.g., "Q4 2025", "December 2025"
 }
 
-// ComplianceStatus represents overall compliance status
+// ComplianceStatus represents overall compliance status.
 type ComplianceStatus string
 
 const (
@@ -108,7 +108,7 @@ const (
 	ComplianceStatusFailing ComplianceStatus = "FAILING"
 )
 
-// GenerateComplianceReport generates a compliance report for a date range
+// GenerateComplianceReport generates a compliance report for a date range.
 func (rg *ReportGenerator) GenerateComplianceReport(ctx context.Context, dbName string, startDate, endDate time.Time) (*ComplianceReport, error) {
 	results := rg.GetTestHistory(startDate, endDate)
 
@@ -151,7 +151,7 @@ func (rg *ReportGenerator) GenerateComplianceReport(ctx context.Context, dbName 
 	return report, nil
 }
 
-// calculateMetrics calculates report metrics
+// calculateMetrics calculates report metrics.
 func (cr *ComplianceReport) calculateMetrics() {
 	cr.TotalTests = len(cr.TestResults)
 
@@ -186,7 +186,7 @@ func (cr *ComplianceReport) calculateMetrics() {
 	}
 }
 
-// generateRecommendations generates recommendations based on test results
+// generateRecommendations generates recommendations based on test results.
 func (cr *ComplianceReport) generateRecommendations() {
 	cr.Recommendations = make([]string, 0)
 
@@ -224,7 +224,7 @@ func (cr *ComplianceReport) generateRecommendations() {
 	}
 }
 
-// determineComplianceStatus determines overall compliance status
+// determineComplianceStatus determines overall compliance status.
 func (cr *ComplianceReport) determineComplianceStatus() {
 	// Failing if success rate < 80% or RTO/RPO compliance < 75%
 	if cr.SuccessRate < 80.0 || cr.RTOCompliance < 75.0 || cr.RPOCompliance < 75.0 {
@@ -241,7 +241,7 @@ func (cr *ComplianceReport) determineComplianceStatus() {
 	cr.ComplianceStatus = ComplianceStatusPassing
 }
 
-// ExportToCSV exports the compliance report to CSV format
+// ExportToCSV exports the compliance report to CSV format.
 func (cr *ComplianceReport) ExportToCSV() ([]byte, error) {
 	var buf bytes.Buffer
 	writer := csv.NewWriter(&buf)
@@ -342,7 +342,7 @@ func (cr *ComplianceReport) ExportToCSV() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// ExportToPDF exports the compliance report to PDF format
+// ExportToPDF exports the compliance report to PDF format.
 func (cr *ComplianceReport) ExportToPDF() ([]byte, error) {
 	// Generate PDF content as HTML-like format
 	// In production, use a proper PDF library like github.com/jung-kurt/gofpdf
@@ -460,7 +460,7 @@ func (cr *ComplianceReport) ExportToPDF() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// GetComplianceSummary returns a summary of recent compliance
+// GetComplianceSummary returns a summary of recent compliance.
 func (rg *ReportGenerator) GetComplianceSummary(days int) map[string]interface{} {
 	endDate := time.Now()
 	startDate := endDate.AddDate(0, 0, -days)

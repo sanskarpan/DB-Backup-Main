@@ -13,13 +13,14 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
 	"github.com/sanskarpan/db-backup/internal/database"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 	"github.com/sanskarpan/db-backup/pkg/utils"
 	"github.com/sanskarpan/db-backup/pkg/validation"
 )
 
-// MongoDBDriver implements the database.Driver interface for MongoDB
+// MongoDBDriver implements the database.Driver interface for MongoDB.
 type MongoDBDriver struct {
 	client      *mongo.Client
 	config      *database.ConnectionConfig
@@ -32,12 +33,12 @@ func init() {
 	})
 }
 
-// NewMongoDBDriver creates a new MongoDB driver instance
+// NewMongoDBDriver creates a new MongoDB driver instance.
 func NewMongoDBDriver() *MongoDBDriver {
 	return &MongoDBDriver{}
 }
 
-// Connect establishes a connection to the MongoDB database
+// Connect establishes a connection to the MongoDB database.
 func (d *MongoDBDriver) Connect(ctx context.Context, config *database.ConnectionConfig) error {
 	// Build connection string
 	connectionString := d.buildConnectionString(config)
@@ -65,7 +66,7 @@ func (d *MongoDBDriver) Connect(ctx context.Context, config *database.Connection
 	return nil
 }
 
-// Disconnect closes the database connection
+// Disconnect closes the database connection.
 func (d *MongoDBDriver) Disconnect() error {
 	if d.client != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -75,7 +76,7 @@ func (d *MongoDBDriver) Disconnect() error {
 	return nil
 }
 
-// Ping tests the database connection
+// Ping tests the database connection.
 func (d *MongoDBDriver) Ping(ctx context.Context) error {
 	if d.client == nil {
 		return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "not connected to database")
@@ -83,7 +84,7 @@ func (d *MongoDBDriver) Ping(ctx context.Context) error {
 	return d.client.Ping(ctx, nil)
 }
 
-// Backup creates a backup of the MongoDB database
+// Backup creates a backup of the MongoDB database.
 func (d *MongoDBDriver) Backup(ctx context.Context, opts *database.BackupOptions) (*database.BackupResult, error) {
 	result := &database.BackupResult{
 		ID:        utils.GenerateBackupID(),
@@ -149,14 +150,14 @@ func (d *MongoDBDriver) Backup(ctx context.Context, opts *database.BackupOptions
 	return result, nil
 }
 
-// StreamBackup streams a backup to the provided writer
+// StreamBackup streams a backup to the provided writer.
 func (d *MongoDBDriver) StreamBackup(ctx context.Context, opts *database.BackupOptions, writer io.Writer) error {
 	// MongoDB's mongodump doesn't support direct streaming to stdout
 	// We need to dump to a temp directory and then tar it
 	return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "MongoDB streaming backup not implemented - use file-based backup")
 }
 
-// GetBackupSize estimates the size of a backup
+// GetBackupSize estimates the size of a backup.
 func (d *MongoDBDriver) GetBackupSize(ctx context.Context, opts *database.BackupOptions) (int64, error) {
 	var totalSize int64
 
@@ -178,7 +179,7 @@ func (d *MongoDBDriver) GetBackupSize(ctx context.Context, opts *database.Backup
 	return totalSize, nil
 }
 
-// Restore restores a MongoDB database from backup
+// Restore restores a MongoDB database from backup.
 func (d *MongoDBDriver) Restore(ctx context.Context, opts *database.RestoreOptions) (*database.RestoreResult, error) {
 	result := &database.RestoreResult{
 		StartTime: time.Now(),
@@ -233,7 +234,7 @@ func (d *MongoDBDriver) Restore(ctx context.Context, opts *database.RestoreOptio
 	return result, nil
 }
 
-// restoreWithPITR performs point-in-time recovery
+// restoreWithPITR performs point-in-time recovery.
 func (d *MongoDBDriver) restoreWithPITR(ctx context.Context, opts *database.RestoreOptions) (*database.RestoreResult, error) {
 	result := &database.RestoreResult{
 		StartTime: time.Now(),
@@ -278,13 +279,13 @@ func (d *MongoDBDriver) restoreWithPITR(ctx context.Context, opts *database.Rest
 	return result, nil
 }
 
-// StreamRestore restores from a reader
+// StreamRestore restores from a reader.
 func (d *MongoDBDriver) StreamRestore(ctx context.Context, opts *database.RestoreOptions, reader io.Reader) error {
 	// MongoDB's mongorestore doesn't support streaming from stdin
 	return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "MongoDB streaming restore not implemented - use file-based restore")
 }
 
-// ValidateRestore validates that a restore can be performed
+// ValidateRestore validates that a restore can be performed.
 func (d *MongoDBDriver) ValidateRestore(ctx context.Context, opts *database.RestoreOptions) error {
 	// Check if backup directory exists
 	if _, err := os.Stat(opts.SourceBackup); os.IsNotExist(err) {
@@ -299,7 +300,7 @@ func (d *MongoDBDriver) ValidateRestore(ctx context.Context, opts *database.Rest
 	return nil
 }
 
-// GetDatabases returns list of databases
+// GetDatabases returns list of databases.
 func (d *MongoDBDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	databases, err := d.client.ListDatabaseNames(ctx, map[string]interface{}{})
 	if err != nil {
@@ -317,7 +318,7 @@ func (d *MongoDBDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	return userDatabases, nil
 }
 
-// GetTables returns list of collections in a database
+// GetTables returns list of collections in a database.
 func (d *MongoDBDriver) GetTables(ctx context.Context, database string) ([]string, error) {
 	db := d.client.Database(database)
 	collections, err := db.ListCollectionNames(ctx, map[string]interface{}{})
@@ -328,7 +329,7 @@ func (d *MongoDBDriver) GetTables(ctx context.Context, database string) ([]strin
 	return collections, nil
 }
 
-// GetTableSize returns the size of a collection
+// GetTableSize returns the size of a collection.
 func (d *MongoDBDriver) GetTableSize(ctx context.Context, database, table string) (int64, error) {
 	var result struct {
 		Size int64 `bson:"size"`
@@ -343,7 +344,7 @@ func (d *MongoDBDriver) GetTableSize(ctx context.Context, database, table string
 	return result.Size, nil
 }
 
-// GetVersion returns the MongoDB server version
+// GetVersion returns the MongoDB server version.
 func (d *MongoDBDriver) GetVersion(ctx context.Context) (string, error) {
 	var result struct {
 		Version string `bson:"version"`
@@ -357,22 +358,22 @@ func (d *MongoDBDriver) GetVersion(ctx context.Context) (string, error) {
 	return result.Version, nil
 }
 
-// GetType returns the database type
+// GetType returns the database type.
 func (d *MongoDBDriver) GetType() database.DatabaseType {
 	return database.DatabaseTypeMongoDB
 }
 
-// SupportsIncremental returns whether incremental backups are supported
+// SupportsIncremental returns whether incremental backups are supported.
 func (d *MongoDBDriver) SupportsIncremental() bool {
 	return true // MongoDB supports incremental backups via oplog
 }
 
-// SupportsPITR returns whether point-in-time recovery is supported
+// SupportsPITR returns whether point-in-time recovery is supported.
 func (d *MongoDBDriver) SupportsPITR() bool {
 	return true // MongoDB supports PITR via oplog replay
 }
 
-// buildConnectionString builds a MongoDB connection string
+// buildConnectionString builds a MongoDB connection string.
 func (d *MongoDBDriver) buildConnectionString(config *database.ConnectionConfig) string {
 	if config.ConnectionString != "" {
 		return config.ConnectionString
@@ -389,7 +390,8 @@ func (d *MongoDBDriver) buildConnectionString(config *database.ConnectionConfig)
 		database = "/" + config.Database
 	}
 
-	return fmt.Sprintf("mongodb://%s%s:%d%s",
+	return fmt.Sprintf(
+		"mongodb://%s%s:%d%s",
 		auth,
 		config.Host,
 		config.Port,
@@ -397,7 +399,7 @@ func (d *MongoDBDriver) buildConnectionString(config *database.ConnectionConfig)
 	)
 }
 
-// buildMongoDumpArgs builds mongodump command arguments
+// buildMongoDumpArgs builds mongodump command arguments.
 func (d *MongoDBDriver) buildMongoDumpArgs(opts *database.BackupOptions) ([]string, error) {
 	args := []string{
 		"--host", d.config.Host,
@@ -445,7 +447,7 @@ func (d *MongoDBDriver) buildMongoDumpArgs(opts *database.BackupOptions) ([]stri
 	return args, nil
 }
 
-// buildMongoRestoreArgs builds mongorestore command arguments
+// buildMongoRestoreArgs builds mongorestore command arguments.
 func (d *MongoDBDriver) buildMongoRestoreArgs(opts *database.RestoreOptions) ([]string, error) {
 	args := []string{
 		"--host", d.config.Host,
@@ -479,9 +481,11 @@ func (d *MongoDBDriver) buildMongoRestoreArgs(opts *database.RestoreOptions) ([]
 
 	// Restore from oplog for PITR
 	if opts.PointInTime != nil {
-		args = append(args,
+		args = append(
+			args,
 			"--oplogReplay",
-			"--oplogLimit", fmt.Sprintf("%d:%d",
+			"--oplogLimit", fmt.Sprintf(
+				"%d:%d",
 				opts.PointInTime.Unix(),
 				0,
 			),
@@ -493,7 +497,7 @@ func (d *MongoDBDriver) buildMongoRestoreArgs(opts *database.RestoreOptions) ([]
 	return args, nil
 }
 
-// dirSize calculates the total size of a directory
+// dirSize calculates the total size of a directory.
 func dirSize(path string) (int64, error) {
 	var size int64
 
@@ -510,7 +514,7 @@ func dirSize(path string) (int64, error) {
 	return size, err
 }
 
-// GetDatabaseSize returns the total size of all databases on the MongoDB server
+// GetDatabaseSize returns the total size of all databases on the MongoDB server.
 func (d *MongoDBDriver) GetDatabaseSize(ctx context.Context) (int64, error) {
 	result := d.client.Database("admin").RunCommand(ctx, bson.D{
 		{Key: "dbStats", Value: 1},

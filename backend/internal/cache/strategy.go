@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// InvalidationStrategy defines how cache entries should be invalidated
+// InvalidationStrategy defines how cache entries should be invalidated.
 type InvalidationStrategy interface {
 	// ShouldInvalidate determines if a cache entry should be invalidated
 	ShouldInvalidate(ctx context.Context, key string, metadata map[string]interface{}) (bool, error)
@@ -15,13 +15,13 @@ type InvalidationStrategy interface {
 	OnInvalidate(ctx context.Context, key string) error
 }
 
-// TTLStrategy invalidates entries based on time-to-live
+// TTLStrategy invalidates entries based on time-to-live.
 type TTLStrategy struct {
 	cache Cache
 	ttl   time.Duration
 }
 
-// NewTTLStrategy creates a new TTL-based invalidation strategy
+// NewTTLStrategy creates a new TTL-based invalidation strategy.
 func NewTTLStrategy(cache Cache, ttl time.Duration) *TTLStrategy {
 	return &TTLStrategy{
 		cache: cache,
@@ -29,7 +29,7 @@ func NewTTLStrategy(cache Cache, ttl time.Duration) *TTLStrategy {
 	}
 }
 
-// ShouldInvalidate checks if TTL has expired
+// ShouldInvalidate checks if TTL has expired.
 func (s *TTLStrategy) ShouldInvalidate(ctx context.Context, key string, metadata map[string]interface{}) (bool, error) {
 	if adv, ok := s.cache.(AdvancedCache); ok {
 		// First check if key exists
@@ -51,19 +51,19 @@ func (s *TTLStrategy) ShouldInvalidate(ctx context.Context, key string, metadata
 	return false, ErrNotSupported
 }
 
-// OnInvalidate removes the expired entry
+// OnInvalidate removes the expired entry.
 func (s *TTLStrategy) OnInvalidate(ctx context.Context, key string) error {
 	return s.cache.Delete(ctx, key)
 }
 
-// LRUStrategy implements Least Recently Used invalidation
+// LRUStrategy implements Least Recently Used invalidation.
 type LRUStrategy struct {
 	cache      Cache
 	maxEntries int
 	accessLog  map[string]time.Time
 }
 
-// NewLRUStrategy creates a new LRU invalidation strategy
+// NewLRUStrategy creates a new LRU invalidation strategy.
 func NewLRUStrategy(cache Cache, maxEntries int) *LRUStrategy {
 	return &LRUStrategy{
 		cache:      cache,
@@ -72,12 +72,12 @@ func NewLRUStrategy(cache Cache, maxEntries int) *LRUStrategy {
 	}
 }
 
-// ShouldInvalidate checks if cache size exceeds maximum
+// ShouldInvalidate checks if cache size exceeds maximum.
 func (s *LRUStrategy) ShouldInvalidate(ctx context.Context, key string, metadata map[string]interface{}) (bool, error) {
 	return len(s.accessLog) >= s.maxEntries, nil
 }
 
-// OnInvalidate removes the least recently used entry
+// OnInvalidate removes the least recently used entry.
 func (s *LRUStrategy) OnInvalidate(ctx context.Context, key string) error {
 	// Find least recently used key
 	var oldestKey string
@@ -98,13 +98,13 @@ func (s *LRUStrategy) OnInvalidate(ctx context.Context, key string) error {
 	return nil
 }
 
-// VersionStrategy invalidates based on version changes
+// VersionStrategy invalidates based on version changes.
 type VersionStrategy struct {
 	cache    Cache
 	versions map[string]int64
 }
 
-// NewVersionStrategy creates a new version-based invalidation strategy
+// NewVersionStrategy creates a new version-based invalidation strategy.
 func NewVersionStrategy(cache Cache) *VersionStrategy {
 	return &VersionStrategy{
 		cache:    cache,
@@ -112,7 +112,7 @@ func NewVersionStrategy(cache Cache) *VersionStrategy {
 	}
 }
 
-// ShouldInvalidate checks if version has changed
+// ShouldInvalidate checks if version has changed.
 func (s *VersionStrategy) ShouldInvalidate(ctx context.Context, key string, metadata map[string]interface{}) (bool, error) {
 	if version, ok := metadata["version"].(int64); ok {
 		currentVersion, exists := s.versions[key]
@@ -125,18 +125,18 @@ func (s *VersionStrategy) ShouldInvalidate(ctx context.Context, key string, meta
 	return false, nil
 }
 
-// OnInvalidate updates the version and removes old entry
+// OnInvalidate updates the version and removes old entry.
 func (s *VersionStrategy) OnInvalidate(ctx context.Context, key string) error {
 	return s.cache.Delete(ctx, key)
 }
 
-// PatternStrategy invalidates entries matching a pattern
+// PatternStrategy invalidates entries matching a pattern.
 type PatternStrategy struct {
 	cache   AdvancedCache
 	pattern string
 }
 
-// NewPatternStrategy creates a new pattern-based invalidation strategy
+// NewPatternStrategy creates a new pattern-based invalidation strategy.
 func NewPatternStrategy(cache AdvancedCache, pattern string) *PatternStrategy {
 	return &PatternStrategy{
 		cache:   cache,
@@ -144,29 +144,29 @@ func NewPatternStrategy(cache AdvancedCache, pattern string) *PatternStrategy {
 	}
 }
 
-// ShouldInvalidate always returns false (invalidation is triggered manually)
+// ShouldInvalidate always returns false (invalidation is triggered manually).
 func (s *PatternStrategy) ShouldInvalidate(ctx context.Context, key string, metadata map[string]interface{}) (bool, error) {
 	return false, nil
 }
 
-// OnInvalidate removes all entries matching the pattern
+// OnInvalidate removes all entries matching the pattern.
 func (s *PatternStrategy) OnInvalidate(ctx context.Context, key string) error {
 	return s.cache.DeletePattern(ctx, s.pattern)
 }
 
-// CompositeStrategy combines multiple invalidation strategies
+// CompositeStrategy combines multiple invalidation strategies.
 type CompositeStrategy struct {
 	strategies []InvalidationStrategy
 }
 
-// NewCompositeStrategy creates a new composite invalidation strategy
+// NewCompositeStrategy creates a new composite invalidation strategy.
 func NewCompositeStrategy(strategies ...InvalidationStrategy) *CompositeStrategy {
 	return &CompositeStrategy{
 		strategies: strategies,
 	}
 }
 
-// ShouldInvalidate returns true if any strategy requires invalidation
+// ShouldInvalidate returns true if any strategy requires invalidation.
 func (s *CompositeStrategy) ShouldInvalidate(ctx context.Context, key string, metadata map[string]interface{}) (bool, error) {
 	for _, strategy := range s.strategies {
 		shouldInvalidate, err := strategy.ShouldInvalidate(ctx, key, metadata)
@@ -180,7 +180,7 @@ func (s *CompositeStrategy) ShouldInvalidate(ctx context.Context, key string, me
 	return false, nil
 }
 
-// OnInvalidate calls all strategies' OnInvalidate methods
+// OnInvalidate calls all strategies' OnInvalidate methods.
 func (s *CompositeStrategy) OnInvalidate(ctx context.Context, key string) error {
 	for _, strategy := range s.strategies {
 		if err := strategy.OnInvalidate(ctx, key); err != nil {
@@ -190,13 +190,13 @@ func (s *CompositeStrategy) OnInvalidate(ctx context.Context, key string) error 
 	return nil
 }
 
-// InvalidationManager manages cache invalidation
+// InvalidationManager manages cache invalidation.
 type InvalidationManager struct {
 	cache    Cache
 	strategy InvalidationStrategy
 }
 
-// NewInvalidationManager creates a new invalidation manager
+// NewInvalidationManager creates a new invalidation manager.
 func NewInvalidationManager(cache Cache, strategy InvalidationStrategy) *InvalidationManager {
 	return &InvalidationManager{
 		cache:    cache,
@@ -204,7 +204,7 @@ func NewInvalidationManager(cache Cache, strategy InvalidationStrategy) *Invalid
 	}
 }
 
-// Invalidate invalidates entries based on the configured strategy
+// Invalidate invalidates entries based on the configured strategy.
 func (m *InvalidationManager) Invalidate(ctx context.Context, key string, metadata map[string]interface{}) error {
 	shouldInvalidate, err := m.strategy.ShouldInvalidate(ctx, key, metadata)
 	if err != nil {
@@ -220,7 +220,7 @@ func (m *InvalidationManager) Invalidate(ctx context.Context, key string, metada
 	return nil
 }
 
-// InvalidateAll invalidates all entries
+// InvalidateAll invalidates all entries.
 func (m *InvalidationManager) InvalidateAll(ctx context.Context) error {
 	return m.cache.Clear(ctx)
 }

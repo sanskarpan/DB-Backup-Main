@@ -9,20 +9,20 @@ import (
 )
 
 const (
-	// Time allowed to write a message to the peer
+	// Time allowed to write a message to the peer.
 	writeWait = 10 * time.Second
 
-	// Time allowed to read the next pong message from the peer
+	// Time allowed to read the next pong message from the peer.
 	pongWait = 60 * time.Second
 
-	// Send pings to peer with this period (must be less than pongWait)
+	// Send pings to peer with this period (must be less than pongWait).
 	pingPeriod = (pongWait * 9) / 10
 
-	// Maximum message size allowed from peer
+	// Maximum message size allowed from peer.
 	maxMessageSize = 512 * 1024 // 512 KB
 )
 
-// Client represents a WebSocket client connection
+// Client represents a WebSocket client connection.
 type Client struct {
 	// The WebSocket connection
 	conn *websocket.Conn
@@ -42,7 +42,7 @@ type Client struct {
 	topics map[string]bool
 }
 
-// NewClient creates a new WebSocket client
+// NewClient creates a new WebSocket client.
 func NewClient(hub *Hub, conn *websocket.Conn, userID string) *Client {
 	return &Client{
 		conn:     conn,
@@ -54,7 +54,7 @@ func NewClient(hub *Hub, conn *websocket.Conn, userID string) *Client {
 	}
 }
 
-// ReadPump pumps messages from the WebSocket connection to the hub
+// ReadPump pumps messages from the WebSocket connection to the hub.
 func (c *Client) ReadPump() {
 	defer func() {
 		c.hub.unregister <- c
@@ -82,7 +82,7 @@ func (c *Client) ReadPump() {
 	}
 }
 
-// WritePump pumps messages from the hub to the WebSocket connection
+// WritePump pumps messages from the hub to the WebSocket connection.
 func (c *Client) WritePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
@@ -122,7 +122,7 @@ func (c *Client) WritePump() {
 	}
 }
 
-// handleMessage processes incoming messages from the client
+// handleMessage processes incoming messages from the client.
 func (c *Client) handleMessage(data []byte) {
 	message, err := UnmarshalMessage(data)
 	if err != nil {
@@ -143,7 +143,7 @@ func (c *Client) handleMessage(data []byte) {
 	}
 }
 
-// handleSubscribe handles subscription requests
+// handleSubscribe handles subscription requests.
 func (c *Client) handleSubscribe(message *Message) {
 	if message.Topic == "" {
 		c.sendError("Topic is required for subscription")
@@ -161,7 +161,7 @@ func (c *Client) handleSubscribe(message *Message) {
 	}
 }
 
-// handleUnsubscribe handles unsubscription requests
+// handleUnsubscribe handles unsubscription requests.
 func (c *Client) handleUnsubscribe(message *Message) {
 	if message.Topic == "" {
 		c.sendError("Topic is required for unsubscription")
@@ -179,7 +179,7 @@ func (c *Client) handleUnsubscribe(message *Message) {
 	}
 }
 
-// sendPong sends a pong response
+// sendPong sends a pong response.
 func (c *Client) sendPong() {
 	c.send <- &Message{
 		Type:      MessageTypePong,
@@ -187,7 +187,7 @@ func (c *Client) sendPong() {
 	}
 }
 
-// sendError sends an error message to the client
+// sendError sends an error message to the client.
 func (c *Client) sendError(errorMsg string) {
 	c.send <- &Message{
 		Type:      MessageTypeError,
@@ -196,7 +196,7 @@ func (c *Client) sendError(errorMsg string) {
 	}
 }
 
-// SendMessage sends a message to the client
+// SendMessage sends a message to the client.
 func (c *Client) SendMessage(message *Message) {
 	select {
 	case c.send <- message:
@@ -205,7 +205,7 @@ func (c *Client) SendMessage(message *Message) {
 	}
 }
 
-// SendJSON sends arbitrary JSON data to the client
+// SendJSON sends arbitrary JSON data to the client.
 func (c *Client) SendJSON(messageType MessageType, data interface{}) error {
 	message := &Message{
 		Type:      messageType,
@@ -221,7 +221,7 @@ func (c *Client) SendJSON(messageType MessageType, data interface{}) error {
 	}
 }
 
-// GetSubscriptions returns the list of topics the client is subscribed to
+// GetSubscriptions returns the list of topics the client is subscribed to.
 func (c *Client) GetSubscriptions() []string {
 	topics := make([]string, 0, len(c.topics))
 	for topic := range c.topics {
@@ -230,17 +230,17 @@ func (c *Client) GetSubscriptions() []string {
 	return topics
 }
 
-// Close closes the client connection
+// Close closes the client connection.
 func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
-// IsConnected checks if the client is still connected
+// IsConnected checks if the client is still connected.
 func (c *Client) IsConnected() bool {
 	return c.conn != nil
 }
 
-// MarshalClientInfo returns client information as JSON
+// MarshalClientInfo returns client information as JSON.
 func (c *Client) MarshalClientInfo() ([]byte, error) {
 	info := map[string]interface{}{
 		"id":            c.ID,

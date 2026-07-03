@@ -306,7 +306,7 @@ func TestImmutableBackupInfo_SizeAndMetadata(t *testing.T) {
 	})
 }
 
-// Helper function to create time pointers
+// Helper function to create time pointers.
 func timePtr(t time.Time) *time.Time {
 	return &t
 }
@@ -391,7 +391,7 @@ func TestS3Provider_LegalHold_Integration(t *testing.T) {
 }
 */
 
-// Benchmark tests
+// Benchmark tests.
 func BenchmarkIsProtected(b *testing.B) {
 	info := ImmutableBackupInfo{
 		RetainUntilDate: timePtr(time.Now().AddDate(0, 0, 30)),

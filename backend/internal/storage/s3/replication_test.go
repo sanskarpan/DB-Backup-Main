@@ -177,13 +177,13 @@ func TestReplicationStatusValues(t *testing.T) {
 	}{
 		{"Enabled", false},
 		{"Disabled", false},
-		{"enabled", true},   // Case sensitive
-		{"disabled", true},  // Case sensitive
-		{"ENABLED", true},   // Case sensitive
-		{"DISABLED", true},  // Case sensitive
-		{"Active", true},    // Invalid
-		{"", true},          // Empty
-		{"Paused", true},    // Invalid
+		{"enabled", true},  // Case sensitive
+		{"disabled", true}, // Case sensitive
+		{"ENABLED", true},  // Case sensitive
+		{"DISABLED", true}, // Case sensitive
+		{"Active", true},   // Invalid
+		{"", true},         // Empty
+		{"Paused", true},   // Invalid
 	}
 
 	for _, tt := range tests {

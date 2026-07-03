@@ -12,7 +12,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/integrations"
 )
 
-// OpsgenieIntegration implements integration with Opsgenie for alert/incident management
+// OpsgenieIntegration implements integration with Opsgenie for alert/incident management.
 type OpsgenieIntegration struct {
 	*integrations.BaseIntegration
 	client     *http.Client
@@ -21,7 +21,7 @@ type OpsgenieIntegration struct {
 	tags       []string
 }
 
-// Opsgenie priority levels
+// Opsgenie priority levels.
 const (
 	PriorityP1 = "P1" // Critical
 	PriorityP2 = "P2" // High
@@ -30,17 +30,17 @@ const (
 	PriorityP5 = "P5" // Informational
 )
 
-// Alert response structures
+// Alert response structures.
 type alertResponse struct {
 	Result struct {
-		AlertID   string `json:"alertId"`
-		Alias     string `json:"alias"`
-		Status    string `json:"status"`
-		Message   string `json:"message"`
-		Priority  string `json:"priority"`
-		Source    string `json:"source"`
+		AlertID   string   `json:"alertId"`
+		Alias     string   `json:"alias"`
+		Status    string   `json:"status"`
+		Message   string   `json:"message"`
+		Priority  string   `json:"priority"`
+		Source    string   `json:"source"`
 		Tags      []string `json:"tags"`
-		CreatedAt string `json:"createdAt"`
+		CreatedAt string   `json:"createdAt"`
 	} `json:"data"`
 	RequestID string `json:"requestId"`
 }
@@ -54,23 +54,23 @@ type createAlertResponse struct {
 
 type getAlertResponse struct {
 	Data struct {
-		ID          string   `json:"id"`
-		TinyID      string   `json:"tinyId"`
-		Alias       string   `json:"alias"`
-		Message     string   `json:"message"`
-		Status      string   `json:"status"`
-		Priority    string   `json:"priority"`
-		Source      string   `json:"source"`
-		Tags        []string `json:"tags"`
-		CreatedAt   string   `json:"createdAt"`
-		UpdatedAt   string   `json:"updatedAt"`
-		AcknowledgedAt string `json:"acknowledgedAt,omitempty"`
-		ClosedAt    string   `json:"closedAt,omitempty"`
+		ID             string   `json:"id"`
+		TinyID         string   `json:"tinyId"`
+		Alias          string   `json:"alias"`
+		Message        string   `json:"message"`
+		Status         string   `json:"status"`
+		Priority       string   `json:"priority"`
+		Source         string   `json:"source"`
+		Tags           []string `json:"tags"`
+		CreatedAt      string   `json:"createdAt"`
+		UpdatedAt      string   `json:"updatedAt"`
+		AcknowledgedAt string   `json:"acknowledgedAt,omitempty"`
+		ClosedAt       string   `json:"closedAt,omitempty"`
 	} `json:"data"`
 	RequestID string `json:"requestId"`
 }
 
-// NewOpsgenieIntegration creates a new Opsgenie integration
+// NewOpsgenieIntegration creates a new Opsgenie integration.
 func NewOpsgenieIntegration(name string) *OpsgenieIntegration {
 	return &OpsgenieIntegration{
 		BaseIntegration: integrations.NewBaseIntegration(),
@@ -81,12 +81,12 @@ func NewOpsgenieIntegration(name string) *OpsgenieIntegration {
 	}
 }
 
-// GetType returns the integration type
+// GetType returns the integration type.
 func (o *OpsgenieIntegration) GetType() integrations.IntegrationType {
 	return integrations.IntegrationTypeOpsgenie
 }
 
-// GetName returns the integration name
+// GetName returns the integration name.
 func (o *OpsgenieIntegration) GetName() string {
 	config := o.GetConfig()
 	if config != nil && config.Name != "" {
@@ -95,7 +95,7 @@ func (o *OpsgenieIntegration) GetName() string {
 	return "opsgenie"
 }
 
-// Configure configures the Opsgenie integration
+// Configure configures the Opsgenie integration.
 func (o *OpsgenieIntegration) Configure(config *integrations.Config) error {
 	if err := o.BaseIntegration.Configure(config); err != nil {
 		return err
@@ -144,7 +144,7 @@ func (o *OpsgenieIntegration) Configure(config *integrations.Config) error {
 	return nil
 }
 
-// Validate validates the Opsgenie configuration
+// Validate validates the Opsgenie configuration.
 func (o *OpsgenieIntegration) Validate() error {
 	config := o.GetConfig()
 	if config == nil {
@@ -158,7 +158,7 @@ func (o *OpsgenieIntegration) Validate() error {
 	return nil
 }
 
-// HealthCheck performs a health check on the Opsgenie integration
+// HealthCheck performs a health check on the Opsgenie integration.
 func (o *OpsgenieIntegration) HealthCheck(ctx context.Context) error {
 	if err := o.Validate(); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
@@ -192,7 +192,7 @@ func (o *OpsgenieIntegration) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
-// CreateIncident creates a new alert in Opsgenie
+// CreateIncident creates a new alert in Opsgenie.
 func (o *OpsgenieIntegration) CreateIncident(ctx context.Context, incident *integrations.Incident) (*integrations.IncidentResponse, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
@@ -280,7 +280,7 @@ func (o *OpsgenieIntegration) CreateIncident(ctx context.Context, incident *inte
 	}, nil
 }
 
-// UpdateIncident updates an existing alert in Opsgenie
+// UpdateIncident updates an existing alert in Opsgenie.
 func (o *OpsgenieIntegration) UpdateIncident(ctx context.Context, incidentID string, update *integrations.IncidentUpdate) error {
 	if err := o.Validate(); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
@@ -304,7 +304,7 @@ func (o *OpsgenieIntegration) UpdateIncident(ctx context.Context, incidentID str
 	return nil
 }
 
-// GetIncident retrieves an alert from Opsgenie
+// GetIncident retrieves an alert from Opsgenie.
 func (o *OpsgenieIntegration) GetIncident(ctx context.Context, incidentID string) (*integrations.IncidentResponse, error) {
 	if err := o.Validate(); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
@@ -352,7 +352,7 @@ func (o *OpsgenieIntegration) GetIncident(ctx context.Context, incidentID string
 	}, nil
 }
 
-// CloseIncident closes an alert in Opsgenie
+// CloseIncident closes an alert in Opsgenie.
 func (o *OpsgenieIntegration) CloseIncident(ctx context.Context, incidentID string, resolution string) error {
 	if err := o.Validate(); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
@@ -396,7 +396,7 @@ func (o *OpsgenieIntegration) CloseIncident(ctx context.Context, incidentID stri
 	return nil
 }
 
-// SendNotification sends a notification via Opsgenie (creates a low-priority alert)
+// SendNotification sends a notification via Opsgenie (creates a low-priority alert).
 func (o *OpsgenieIntegration) SendNotification(ctx context.Context, notification *integrations.Notification) error {
 	// Create a low-priority alert for notifications
 	customData := notification.CustomData
@@ -421,13 +421,13 @@ func (o *OpsgenieIntegration) SendNotification(ctx context.Context, notification
 
 // Helper methods
 
-// setAuthHeaders sets authentication headers on the request
+// setAuthHeaders sets authentication headers on the request.
 func (o *OpsgenieIntegration) setAuthHeaders(req *http.Request) {
 	config := o.GetConfig()
 	req.Header.Set("Authorization", fmt.Sprintf("GenieKey %s", config.APIKey))
 }
 
-// mapPriority maps our priority to Opsgenie priority
+// mapPriority maps our priority to Opsgenie priority.
 func (o *OpsgenieIntegration) mapPriority(priority integrations.Priority) string {
 	switch priority {
 	case integrations.PriorityCritical:
@@ -443,7 +443,7 @@ func (o *OpsgenieIntegration) mapPriority(priority integrations.Priority) string
 	}
 }
 
-// acknowledgeAlert acknowledges an alert
+// acknowledgeAlert acknowledges an alert.
 func (o *OpsgenieIntegration) acknowledgeAlert(ctx context.Context, alertID string, note string) error {
 	url := fmt.Sprintf("%s/alerts/%s/acknowledge", o.apiURL, alertID)
 
@@ -483,7 +483,7 @@ func (o *OpsgenieIntegration) acknowledgeAlert(ctx context.Context, alertID stri
 	return nil
 }
 
-// addNote adds a note to an alert
+// addNote adds a note to an alert.
 func (o *OpsgenieIntegration) addNote(ctx context.Context, alertID string, note string) error {
 	url := fmt.Sprintf("%s/alerts/%s/notes", o.apiURL, alertID)
 

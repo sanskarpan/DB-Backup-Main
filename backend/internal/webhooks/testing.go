@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// MockWebhookServer provides a test server for webhook testing
+// MockWebhookServer provides a test server for webhook testing.
 type MockWebhookServer struct {
 	server        *httptest.Server
 	mu            sync.Mutex
@@ -24,7 +24,7 @@ type MockWebhookServer struct {
 	failAfter     int
 }
 
-// ReceivedRequest represents a received webhook request
+// ReceivedRequest represents a received webhook request.
 type ReceivedRequest struct {
 	Headers   http.Header            `json:"headers"`
 	Body      map[string]interface{} `json:"body"`
@@ -32,7 +32,7 @@ type ReceivedRequest struct {
 	Signature string                 `json:"signature"`
 }
 
-// NewMockWebhookServer creates a new mock webhook server
+// NewMockWebhookServer creates a new mock webhook server.
 func NewMockWebhookServer() *MockWebhookServer {
 	mock := &MockWebhookServer{
 		requests:     make([]*ReceivedRequest, 0),
@@ -44,7 +44,7 @@ func NewMockWebhookServer() *MockWebhookServer {
 	return mock
 }
 
-// handleRequest handles incoming webhook requests
+// handleRequest handles incoming webhook requests.
 func (m *MockWebhookServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -99,17 +99,17 @@ func (m *MockWebhookServer) handleRequest(w http.ResponseWriter, r *http.Request
 	w.Write([]byte(`{"status": "received"}`))
 }
 
-// URL returns the server URL
+// URL returns the server URL.
 func (m *MockWebhookServer) URL() string {
 	return m.server.URL
 }
 
-// Close closes the server
+// Close closes the server.
 func (m *MockWebhookServer) Close() {
 	m.server.Close()
 }
 
-// GetRequests returns all received requests
+// GetRequests returns all received requests.
 func (m *MockWebhookServer) GetRequests() []*ReceivedRequest {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -117,7 +117,7 @@ func (m *MockWebhookServer) GetRequests() []*ReceivedRequest {
 	return append([]*ReceivedRequest{}, m.requests...)
 }
 
-// GetRequestCount returns the number of requests received
+// GetRequestCount returns the number of requests received.
 func (m *MockWebhookServer) GetRequestCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -125,7 +125,7 @@ func (m *MockWebhookServer) GetRequestCount() int {
 	return len(m.requests)
 }
 
-// Reset resets the server state
+// Reset resets the server state.
 func (m *MockWebhookServer) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -138,7 +138,7 @@ func (m *MockWebhookServer) Reset() {
 	m.failAfter = 0
 }
 
-// SetResponseCode sets the HTTP response code
+// SetResponseCode sets the HTTP response code.
 func (m *MockWebhookServer) SetResponseCode(code int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -146,7 +146,7 @@ func (m *MockWebhookServer) SetResponseCode(code int) {
 	m.responseCode = code
 }
 
-// SetResponseDelay sets a delay before responding
+// SetResponseDelay sets a delay before responding.
 func (m *MockWebhookServer) SetResponseDelay(delay time.Duration) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -154,7 +154,7 @@ func (m *MockWebhookServer) SetResponseDelay(delay time.Duration) {
 	m.responseDelay = delay
 }
 
-// SetShouldFail sets whether requests should fail
+// SetShouldFail sets whether requests should fail.
 func (m *MockWebhookServer) SetShouldFail(shouldFail bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -162,7 +162,7 @@ func (m *MockWebhookServer) SetShouldFail(shouldFail bool) {
 	m.shouldFail = shouldFail
 }
 
-// SetFailCount sets number of requests that should fail
+// SetFailCount sets number of requests that should fail.
 func (m *MockWebhookServer) SetFailCount(count int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -173,7 +173,7 @@ func (m *MockWebhookServer) SetFailCount(count int) {
 	}
 }
 
-// SetFailAfter sets failure after N successful requests
+// SetFailAfter sets failure after N successful requests.
 func (m *MockWebhookServer) SetFailAfter(count int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -181,7 +181,7 @@ func (m *MockWebhookServer) SetFailAfter(count int) {
 	m.failAfter = count
 }
 
-// WaitForRequests waits for a specific number of requests
+// WaitForRequests waits for a specific number of requests.
 func (m *MockWebhookServer) WaitForRequests(count int, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 
@@ -200,7 +200,7 @@ func (m *MockWebhookServer) WaitForRequests(count int, timeout time.Duration) er
 	return fmt.Errorf("timeout waiting for %d requests, got %d", count, m.GetRequestCount())
 }
 
-// GetLastRequest returns the last received request
+// GetLastRequest returns the last received request.
 func (m *MockWebhookServer) GetLastRequest() *ReceivedRequest {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -212,7 +212,7 @@ func (m *MockWebhookServer) GetLastRequest() *ReceivedRequest {
 	return m.requests[len(m.requests)-1]
 }
 
-// VerifySignature verifies HMAC signature on last request
+// VerifySignature verifies HMAC signature on last request.
 func (m *MockWebhookServer) VerifySignature(secret string) bool {
 	req := m.GetLastRequest()
 	if req == nil {
@@ -233,14 +233,14 @@ func (m *MockWebhookServer) VerifySignature(secret string) bool {
 	return req.Signature == expectedSignature
 }
 
-// TestHelper provides helper functions for webhook testing
+// TestHelper provides helper functions for webhook testing.
 type TestHelper struct {
 	manager *Manager
 	servers map[string]*MockWebhookServer
 	mu      sync.Mutex
 }
 
-// NewTestHelper creates a new test helper
+// NewTestHelper creates a new test helper.
 func NewTestHelper() *TestHelper {
 	config := &ManagerConfig{
 		Workers:   2,
@@ -253,7 +253,7 @@ func NewTestHelper() *TestHelper {
 	}
 }
 
-// CreateMockServer creates a new mock server and returns its URL
+// CreateMockServer creates a new mock server and returns its URL.
 func (h *TestHelper) CreateMockServer(name string) string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -264,7 +264,7 @@ func (h *TestHelper) CreateMockServer(name string) string {
 	return server.URL()
 }
 
-// GetMockServer returns a mock server by name
+// GetMockServer returns a mock server by name.
 func (h *TestHelper) GetMockServer(name string) *MockWebhookServer {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -272,7 +272,7 @@ func (h *TestHelper) GetMockServer(name string) *MockWebhookServer {
 	return h.servers[name]
 }
 
-// CreateSubscription creates a test subscription
+// CreateSubscription creates a test subscription.
 func (h *TestHelper) CreateSubscription(name string, events []EventType, serverName string) (*Subscription, error) {
 	server := h.GetMockServer(serverName)
 	if server == nil {
@@ -294,7 +294,7 @@ func (h *TestHelper) CreateSubscription(name string, events []EventType, serverN
 	return sub, nil
 }
 
-// PublishEvent publishes a test event
+// PublishEvent publishes a test event.
 func (h *TestHelper) PublishEvent(eventType EventType, data map[string]interface{}) error {
 	event := &Event{
 		Type:   eventType,
@@ -305,12 +305,12 @@ func (h *TestHelper) PublishEvent(eventType EventType, data map[string]interface
 	return h.manager.Publish(event)
 }
 
-// GetManager returns the webhook manager
+// GetManager returns the webhook manager.
 func (h *TestHelper) GetManager() *Manager {
 	return h.manager
 }
 
-// Cleanup closes all mock servers and stops the manager
+// Cleanup closes all mock servers and stops the manager.
 func (h *TestHelper) Cleanup() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -322,7 +322,7 @@ func (h *TestHelper) Cleanup() {
 	h.manager.Stop()
 }
 
-// WaitForDelivery waits for webhook delivery to complete
+// WaitForDelivery waits for webhook delivery to complete.
 func (h *TestHelper) WaitForDelivery(serverName string, expectedCount int, timeout time.Duration) error {
 	server := h.GetMockServer(serverName)
 	if server == nil {
@@ -332,12 +332,12 @@ func (h *TestHelper) WaitForDelivery(serverName string, expectedCount int, timeo
 	return server.WaitForRequests(expectedCount, timeout)
 }
 
-// EventBuilder helps build test events
+// EventBuilder helps build test events.
 type EventBuilder struct {
 	event *Event
 }
 
-// NewEventBuilder creates a new event builder
+// NewEventBuilder creates a new event builder.
 func NewEventBuilder(eventType EventType) *EventBuilder {
 	return &EventBuilder{
 		event: &Event{
@@ -350,19 +350,19 @@ func NewEventBuilder(eventType EventType) *EventBuilder {
 	}
 }
 
-// WithSource sets the event source
+// WithSource sets the event source.
 func (b *EventBuilder) WithSource(source string) *EventBuilder {
 	b.event.Source = source
 	return b
 }
 
-// WithData sets event data
+// WithData sets event data.
 func (b *EventBuilder) WithData(key string, value interface{}) *EventBuilder {
 	b.event.Data[key] = value
 	return b
 }
 
-// WithMetadata sets event metadata
+// WithMetadata sets event metadata.
 func (b *EventBuilder) WithMetadata(key string, value interface{}) *EventBuilder {
 	if b.event.Metadata == nil {
 		b.event.Metadata = make(map[string]interface{})
@@ -371,23 +371,23 @@ func (b *EventBuilder) WithMetadata(key string, value interface{}) *EventBuilder
 	return b
 }
 
-// WithTimestamp sets the event timestamp
+// WithTimestamp sets the event timestamp.
 func (b *EventBuilder) WithTimestamp(timestamp time.Time) *EventBuilder {
 	b.event.Timestamp = timestamp
 	return b
 }
 
-// Build returns the built event
+// Build returns the built event.
 func (b *EventBuilder) Build() *Event {
 	return b.event
 }
 
-// SubscriptionBuilder helps build test subscriptions
+// SubscriptionBuilder helps build test subscriptions.
 type SubscriptionBuilder struct {
 	subscription *Subscription
 }
 
-// NewSubscriptionBuilder creates a new subscription builder
+// NewSubscriptionBuilder creates a new subscription builder.
 func NewSubscriptionBuilder(name, url string) *SubscriptionBuilder {
 	return &SubscriptionBuilder{
 		subscription: &Subscription{
@@ -403,13 +403,13 @@ func NewSubscriptionBuilder(name, url string) *SubscriptionBuilder {
 	}
 }
 
-// WithEvents sets the events to subscribe to
+// WithEvents sets the events to subscribe to.
 func (b *SubscriptionBuilder) WithEvents(events ...EventType) *SubscriptionBuilder {
 	b.subscription.Events = events
 	return b
 }
 
-// WithFilter adds an event filter
+// WithFilter adds an event filter.
 func (b *SubscriptionBuilder) WithFilter(field, operator string, value interface{}) *SubscriptionBuilder {
 	b.subscription.Filters = append(b.subscription.Filters, EventFilter{
 		Field:    field,
@@ -419,31 +419,31 @@ func (b *SubscriptionBuilder) WithFilter(field, operator string, value interface
 	return b
 }
 
-// WithTemplate sets the template name
+// WithTemplate sets the template name.
 func (b *SubscriptionBuilder) WithTemplate(template string) *SubscriptionBuilder {
 	b.subscription.Template = template
 	return b
 }
 
-// WithHeader adds a custom header
+// WithHeader adds a custom header.
 func (b *SubscriptionBuilder) WithHeader(key, value string) *SubscriptionBuilder {
 	b.subscription.Headers[key] = value
 	return b
 }
 
-// WithSecret sets the HMAC secret
+// WithSecret sets the HMAC secret.
 func (b *SubscriptionBuilder) WithSecret(secret string) *SubscriptionBuilder {
 	b.subscription.Secret = secret
 	return b
 }
 
-// WithRetryConfig sets retry configuration
+// WithRetryConfig sets retry configuration.
 func (b *SubscriptionBuilder) WithRetryConfig(config *RetryConfig) *SubscriptionBuilder {
 	b.subscription.RetryConfig = config
 	return b
 }
 
-// Build returns the built subscription
+// Build returns the built subscription.
 func (b *SubscriptionBuilder) Build() *Subscription {
 	return b.subscription
 }

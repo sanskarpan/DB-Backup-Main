@@ -185,7 +185,6 @@ func TestCheckBackupPermission(t *testing.T) {
 	allow, reason, err := pm.CheckBackupPermission(ctx, "user-123", "create", "db-1", map[string]interface{}{
 		"user_role": "admin",
 	})
-
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -220,7 +219,6 @@ func TestCheckStoragePolicy(t *testing.T) {
 	allow, reason, err := pm.CheckStoragePolicy(ctx, "s3", "eu-west", true, map[string]interface{}{
 		"data_classification": "confidential",
 	})
-
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -253,7 +251,6 @@ func TestCheckSecurityPolicy(t *testing.T) {
 	ctx := context.Background()
 
 	allow, reason, err := pm.CheckSecurityPolicy(ctx, "delete", "user_data", "user", "192.0.2.0")
-
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -286,7 +283,6 @@ func TestCheckDataResidencyPolicy(t *testing.T) {
 	ctx := context.Background()
 
 	allow, reason, err := pm.CheckDataResidencyPolicy(ctx, "backup", "eu-west", "us-east", "confidential")
-
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

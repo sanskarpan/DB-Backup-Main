@@ -11,35 +11,35 @@ import (
 	"time"
 )
 
-// ThreatIntelligenceFeed provides threat intelligence integration
+// ThreatIntelligenceFeed provides threat intelligence integration.
 type ThreatIntelligenceFeed struct {
-	mu              sync.RWMutex
-	feedURLs        []string
-	httpClient      *http.Client
-	indicators      map[string]*ThreatIndicator
-	lastUpdate      time.Time
-	updateInterval  time.Duration
-	stopChan        chan struct{}
-	running         bool
+	mu             sync.RWMutex
+	feedURLs       []string
+	httpClient     *http.Client
+	indicators     map[string]*ThreatIndicator
+	lastUpdate     time.Time
+	updateInterval time.Duration
+	stopChan       chan struct{}
+	running        bool
 }
 
-// ThreatIndicator represents a threat indicator
+// ThreatIndicator represents a threat indicator.
 type ThreatIndicator struct {
-	ID              string
-	Type            IndicatorType
-	Value           string
-	Confidence      float64 // 0-100
-	Severity        Severity
-	Description     string
-	Source          string
-	FirstSeen       time.Time
-	LastSeen        time.Time
-	Tags            []string
+	ID               string
+	Type             IndicatorType
+	Value            string
+	Confidence       float64 // 0-100
+	Severity         Severity
+	Description      string
+	Source           string
+	FirstSeen        time.Time
+	LastSeen         time.Time
+	Tags             []string
 	RansomwareFamily string // e.g., "WannaCry", "Ryuk", "LockBit"
-	Active          bool
+	Active           bool
 }
 
-// IndicatorType represents the type of threat indicator
+// IndicatorType represents the type of threat indicator.
 type IndicatorType string
 
 const (
@@ -52,7 +52,7 @@ const (
 	IndicatorTypeRansomwareNote IndicatorType = "ransom_note"
 )
 
-// Severity represents threat severity
+// Severity represents threat severity.
 type Severity string
 
 const (
@@ -62,17 +62,17 @@ const (
 	SeverityCritical Severity = "CRITICAL"
 )
 
-// ThreatIntelResponse represents a threat intelligence feed response
+// ThreatIntelResponse represents a threat intelligence feed response.
 type ThreatIntelResponse struct {
 	Indicators []ThreatIndicator `json:"indicators"`
 	UpdatedAt  time.Time         `json:"updated_at"`
 	Source     string            `json:"source"`
 }
 
-// NewThreatIntelligenceFeed creates a new threat intelligence feed
+// NewThreatIntelligenceFeed creates a new threat intelligence feed.
 func NewThreatIntelligenceFeed(feedURLs []string, updateInterval time.Duration) *ThreatIntelligenceFeed {
 	return &ThreatIntelligenceFeed{
-		feedURLs:  feedURLs,
+		feedURLs:   feedURLs,
 		indicators: make(map[string]*ThreatIndicator),
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
@@ -82,7 +82,7 @@ func NewThreatIntelligenceFeed(feedURLs []string, updateInterval time.Duration) 
 	}
 }
 
-// Start starts the threat intelligence feed updater
+// Start starts the threat intelligence feed updater.
 func (tif *ThreatIntelligenceFeed) Start(ctx context.Context) error {
 	tif.mu.Lock()
 	if tif.running {
@@ -103,7 +103,7 @@ func (tif *ThreatIntelligenceFeed) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop stops the threat intelligence feed updater
+// Stop stops the threat intelligence feed updater.
 func (tif *ThreatIntelligenceFeed) Stop() {
 	tif.mu.Lock()
 	defer tif.mu.Unlock()
@@ -114,7 +114,7 @@ func (tif *ThreatIntelligenceFeed) Stop() {
 	}
 }
 
-// backgroundUpdater periodically updates threat intelligence feeds
+// backgroundUpdater periodically updates threat intelligence feeds.
 func (tif *ThreatIntelligenceFeed) backgroundUpdater(ctx context.Context) {
 	ticker := time.NewTicker(tif.updateInterval)
 	defer ticker.Stop()
@@ -134,7 +134,7 @@ func (tif *ThreatIntelligenceFeed) backgroundUpdater(ctx context.Context) {
 	}
 }
 
-// Update updates threat intelligence from all configured feeds
+// Update updates threat intelligence from all configured feeds.
 func (tif *ThreatIntelligenceFeed) Update(ctx context.Context) error {
 	tif.mu.Lock()
 	defer tif.mu.Unlock()
@@ -170,7 +170,7 @@ func (tif *ThreatIntelligenceFeed) Update(ctx context.Context) error {
 	return nil
 }
 
-// fetchFeed fetches threat intelligence from a feed URL
+// fetchFeed fetches threat intelligence from a feed URL.
 func (tif *ThreatIntelligenceFeed) fetchFeed(ctx context.Context, feedURL string) ([]ThreatIndicator, error) {
 	// In production, this would fetch from real threat intelligence feeds:
 	// - MISP (Malware Information Sharing Platform)
@@ -206,7 +206,7 @@ func (tif *ThreatIntelligenceFeed) fetchFeed(ctx context.Context, feedURL string
 	return response.Indicators, nil
 }
 
-// CheckThreat checks if a value matches any threat indicators
+// CheckThreat checks if a value matches any threat indicators.
 func (tif *ThreatIntelligenceFeed) CheckThreat(indicatorType IndicatorType, value string) (*ThreatIndicator, bool) {
 	tif.mu.RLock()
 	defer tif.mu.RUnlock()
@@ -227,7 +227,7 @@ func (tif *ThreatIntelligenceFeed) CheckThreat(indicatorType IndicatorType, valu
 	return nil, false
 }
 
-// GetIndicatorsByType returns all indicators of a specific type
+// GetIndicatorsByType returns all indicators of a specific type.
 func (tif *ThreatIntelligenceFeed) GetIndicatorsByType(indicatorType IndicatorType) []*ThreatIndicator {
 	tif.mu.RLock()
 	defer tif.mu.RUnlock()
@@ -242,7 +242,7 @@ func (tif *ThreatIntelligenceFeed) GetIndicatorsByType(indicatorType IndicatorTy
 	return indicators
 }
 
-// GetIndicatorsByRansomwareFamily returns all indicators for a specific ransomware family
+// GetIndicatorsByRansomwareFamily returns all indicators for a specific ransomware family.
 func (tif *ThreatIntelligenceFeed) GetIndicatorsByRansomwareFamily(family string) []*ThreatIndicator {
 	tif.mu.RLock()
 	defer tif.mu.RUnlock()
@@ -257,7 +257,7 @@ func (tif *ThreatIntelligenceFeed) GetIndicatorsByRansomwareFamily(family string
 	return indicators
 }
 
-// GetRansomwareKnownExtensions returns known ransomware file extensions
+// GetRansomwareKnownExtensions returns known ransomware file extensions.
 func (tif *ThreatIntelligenceFeed) GetRansomwareKnownExtensions() []string {
 	tif.mu.RLock()
 	defer tif.mu.RUnlock()
@@ -272,17 +272,17 @@ func (tif *ThreatIntelligenceFeed) GetRansomwareKnownExtensions() []string {
 	return extensions
 }
 
-// GetStatistics returns statistics about the threat intelligence feed
+// GetStatistics returns statistics about the threat intelligence feed.
 func (tif *ThreatIntelligenceFeed) GetStatistics() map[string]interface{} {
 	tif.mu.RLock()
 	defer tif.mu.RUnlock()
 
 	stats := map[string]interface{}{
-		"total_indicators": len(tif.indicators),
-		"last_update":      tif.lastUpdate,
-		"feed_count":       len(tif.feedURLs),
-		"by_type":          make(map[IndicatorType]int),
-		"by_severity":      make(map[Severity]int),
+		"total_indicators":    len(tif.indicators),
+		"last_update":         tif.lastUpdate,
+		"feed_count":          len(tif.feedURLs),
+		"by_type":             make(map[IndicatorType]int),
+		"by_severity":         make(map[Severity]int),
 		"ransomware_families": make(map[string]int),
 	}
 
@@ -307,7 +307,7 @@ func (tif *ThreatIntelligenceFeed) GetStatistics() map[string]interface{} {
 	return stats
 }
 
-// AddCustomIndicator adds a custom threat indicator
+// AddCustomIndicator adds a custom threat indicator.
 func (tif *ThreatIntelligenceFeed) AddCustomIndicator(indicator *ThreatIndicator) {
 	tif.mu.Lock()
 	defer tif.mu.Unlock()
@@ -325,7 +325,7 @@ func (tif *ThreatIntelligenceFeed) AddCustomIndicator(indicator *ThreatIndicator
 	tif.indicators[key] = indicator
 }
 
-// RemoveIndicator removes an indicator
+// RemoveIndicator removes an indicator.
 func (tif *ThreatIntelligenceFeed) RemoveIndicator(id string) {
 	tif.mu.Lock()
 	defer tif.mu.Unlock()
@@ -333,7 +333,7 @@ func (tif *ThreatIntelligenceFeed) RemoveIndicator(id string) {
 	delete(tif.indicators, id)
 }
 
-// GetMockRansomwareIndicators returns mock ransomware indicators for testing
+// GetMockRansomwareIndicators returns mock ransomware indicators for testing.
 func GetMockRansomwareIndicators() []ThreatIndicator {
 	return []ThreatIndicator{
 		{

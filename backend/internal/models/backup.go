@@ -6,7 +6,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/database"
 )
 
-// BackupMetadata contains metadata about a backup
+// BackupMetadata contains metadata about a backup.
 type BackupMetadata struct {
 	ID              string                   `json:"id"`
 	Name            string                   `json:"name"`
@@ -35,7 +35,7 @@ type BackupMetadata struct {
 	BackupPath      string                 `json:"backup_path"`
 }
 
-// BackupStatus represents the status of a backup operation
+// BackupStatus represents the status of a backup operation.
 type BackupStatus string
 
 const (
@@ -43,5 +43,5 @@ const (
 	BackupStatusInProgress BackupStatus = "in_progress"
 	BackupStatusCompleted  BackupStatus = "completed"
 	BackupStatusFailed     BackupStatus = "failed"
-	BackupStatusCancelled  BackupStatus = "cancelled"
+	BackupStatusCancelled  BackupStatus = "canceled"
 )

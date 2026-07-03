@@ -9,18 +9,19 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/integrations"
 	"github.com/rs/zerolog/log"
+
+	"github.com/sanskarpan/db-backup/internal/integrations"
 )
 
-// TeamsIntegration implements the Integration interface for Microsoft Teams
+// TeamsIntegration implements the Integration interface for Microsoft Teams.
 type TeamsIntegration struct {
 	*integrations.BaseIntegration
 	client     *http.Client
 	webhookURL string
 }
 
-// NewTeamsIntegration creates a new Microsoft Teams integration
+// NewTeamsIntegration creates a new Microsoft Teams integration.
 func NewTeamsIntegration(name string) *TeamsIntegration {
 	return &TeamsIntegration{
 		BaseIntegration: integrations.NewBaseIntegration(),
@@ -28,12 +29,12 @@ func NewTeamsIntegration(name string) *TeamsIntegration {
 	}
 }
 
-// GetType returns the integration type
+// GetType returns the integration type.
 func (t *TeamsIntegration) GetType() integrations.IntegrationType {
 	return integrations.IntegrationTypeTeams
 }
 
-// GetName returns the integration name
+// GetName returns the integration name.
 func (t *TeamsIntegration) GetName() string {
 	config := t.GetConfig()
 	if config != nil {
@@ -42,7 +43,7 @@ func (t *TeamsIntegration) GetName() string {
 	return "teams"
 }
 
-// Configure configures the Teams integration
+// Configure configures the Teams integration.
 func (t *TeamsIntegration) Configure(config *integrations.Config) error {
 	if err := t.BaseIntegration.Configure(config); err != nil {
 		return err
@@ -69,7 +70,7 @@ func (t *TeamsIntegration) Configure(config *integrations.Config) error {
 	return nil
 }
 
-// Validate validates the Teams configuration
+// Validate validates the Teams configuration.
 func (t *TeamsIntegration) Validate() error {
 	config := t.GetConfig()
 	if config == nil {
@@ -83,7 +84,7 @@ func (t *TeamsIntegration) Validate() error {
 	return nil
 }
 
-// HealthCheck performs a health check on the Teams integration
+// HealthCheck performs a health check on the Teams integration.
 func (t *TeamsIntegration) HealthCheck(ctx context.Context) error {
 	if err := t.Validate(); err != nil {
 		return err
@@ -139,7 +140,7 @@ func (t *TeamsIntegration) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
-// CreateIncident creates an incident notification in Teams
+// CreateIncident creates an incident notification in Teams.
 func (t *TeamsIntegration) CreateIncident(ctx context.Context, incident *integrations.Incident) (*integrations.IncidentResponse, error) {
 	if err := t.Validate(); err != nil {
 		return nil, err
@@ -238,7 +239,7 @@ func (t *TeamsIntegration) CreateIncident(ctx context.Context, incident *integra
 	return response, nil
 }
 
-// UpdateIncident updates an incident (sends an update message)
+// UpdateIncident updates an incident (sends an update message).
 func (t *TeamsIntegration) UpdateIncident(ctx context.Context, incidentID string, update *integrations.IncidentUpdate) error {
 	if err := t.Validate(); err != nil {
 		return err
@@ -314,12 +315,12 @@ func (t *TeamsIntegration) UpdateIncident(ctx context.Context, incidentID string
 	return nil
 }
 
-// GetIncident retrieves an incident (not supported for Teams webhooks)
+// GetIncident retrieves an incident (not supported for Teams webhooks).
 func (t *TeamsIntegration) GetIncident(ctx context.Context, incidentID string) (*integrations.IncidentResponse, error) {
 	return nil, fmt.Errorf("get incident not supported for Teams webhooks")
 }
 
-// CloseIncident closes an incident (sends a closure message)
+// CloseIncident closes an incident (sends a closure message).
 func (t *TeamsIntegration) CloseIncident(ctx context.Context, incidentID string, resolution string) error {
 	if err := t.Validate(); err != nil {
 		return err
@@ -383,7 +384,7 @@ func (t *TeamsIntegration) CloseIncident(ctx context.Context, incidentID string,
 	return nil
 }
 
-// SendNotification sends a notification via Teams
+// SendNotification sends a notification via Teams.
 func (t *TeamsIntegration) SendNotification(ctx context.Context, notification *integrations.Notification) error {
 	if err := t.Validate(); err != nil {
 		return err

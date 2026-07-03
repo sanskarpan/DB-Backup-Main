@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package integration
@@ -8,13 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/database"
-	"github.com/sanskarpan/db-backup/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/sanskarpan/db-backup/internal/database"
+	"github.com/sanskarpan/db-backup/internal/storage"
 )
 
-// TestEndToEndBackupRestore_PostgreSQL tests full backup and restore cycle for PostgreSQL
+// TestEndToEndBackupRestore_PostgreSQL tests full backup and restore cycle for PostgreSQL.
 func TestEndToEndBackupRestore_PostgreSQL(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
@@ -49,7 +51,7 @@ func TestEndToEndBackupRestore_PostgreSQL(t *testing.T) {
 	// Verify restoration success
 }
 
-// TestEndToEndBackupRestore_MongoDB tests full backup and restore cycle for MongoDB
+// TestEndToEndBackupRestore_MongoDB tests full backup and restore cycle for MongoDB.
 func TestEndToEndBackupRestore_MongoDB(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
@@ -71,7 +73,7 @@ func TestEndToEndBackupRestore_MongoDB(t *testing.T) {
 	// Create backup, upload, restore, verify
 }
 
-// TestEndToEndBackupRestore_Redis tests full backup and restore cycle for Redis
+// TestEndToEndBackupRestore_Redis tests full backup and restore cycle for Redis.
 func TestEndToEndBackupRestore_Redis(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
@@ -83,7 +85,7 @@ func TestEndToEndBackupRestore_Redis(t *testing.T) {
 	// Restore and verify
 }
 
-// TestMultiStorageProviderBackup tests backup to multiple storage providers
+// TestMultiStorageProviderBackup tests backup to multiple storage providers.
 func TestMultiStorageProviderBackup(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
@@ -96,7 +98,7 @@ func TestMultiStorageProviderBackup(t *testing.T) {
 	// Verify all uploads successful
 }
 
-// TestStorageProvider_MinIOBackupRestore tests MinIO as storage backend
+// TestStorageProvider_MinIOBackupRestore tests MinIO as storage backend.
 func TestStorageProvider_MinIOBackupRestore(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
@@ -121,7 +123,7 @@ func TestStorageProvider_MinIOBackupRestore(t *testing.T) {
 	// Verify integrity
 }
 
-// TestStorageProvider_WasabiImmutability tests Wasabi Object Lock
+// TestStorageProvider_WasabiImmutability tests Wasabi Object Lock.
 func TestStorageProvider_WasabiImmutability(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
@@ -133,7 +135,7 @@ func TestStorageProvider_WasabiImmutability(t *testing.T) {
 	// Delete successfully
 }
 
-// TestStorageProvider_CephRADOS tests Ceph RADOS Gateway
+// TestStorageProvider_CephRADOS tests Ceph RADOS Gateway.
 func TestStorageProvider_CephRADOS(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
@@ -157,7 +159,7 @@ func TestStorageProvider_CephRADOS(t *testing.T) {
 	// Download and verify
 }
 
-// TestStorageProvider_GlusterFSDistributed tests GlusterFS distributed storage
+// TestStorageProvider_GlusterFSDistributed tests GlusterFS distributed storage.
 func TestStorageProvider_GlusterFSDistributed(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
@@ -181,7 +183,7 @@ func TestStorageProvider_GlusterFSDistributed(t *testing.T) {
 	// Download and verify
 }
 
-// TestScheduledBackup_CronExecution tests scheduled backup execution
+// TestScheduledBackup_CronExecution tests scheduled backup execution.
 func TestScheduledBackup_CronExecution(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
@@ -193,7 +195,7 @@ func TestScheduledBackup_CronExecution(t *testing.T) {
 	// Verify uploaded to storage
 }
 
-// TestRetentionPolicy_AutomaticCleanup tests automatic backup retention
+// TestRetentionPolicy_AutomaticCleanup tests automatic backup retention.
 func TestRetentionPolicy_AutomaticCleanup(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
@@ -205,7 +207,7 @@ func TestRetentionPolicy_AutomaticCleanup(t *testing.T) {
 	// Verify old backups deleted
 }
 
-// TestIncrementalBackup_DifferentialRestore tests incremental backup chain
+// TestIncrementalBackup_DifferentialRestore tests incremental backup chain.
 func TestIncrementalBackup_DifferentialRestore(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")

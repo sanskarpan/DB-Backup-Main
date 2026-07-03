@@ -11,20 +11,20 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// BackupMetric represents metrics for a single backup operation
+// BackupMetric represents metrics for a single backup operation.
 type BackupMetric struct {
-	BackupID     string
-	DatabaseName string
-	Timestamp    time.Time
-	Size         int64   // Backup size in bytes
-	Duration     float64 // Duration in seconds
-	Success      bool
-	ErrorMessage string
+	BackupID         string
+	DatabaseName     string
+	Timestamp        time.Time
+	Size             int64   // Backup size in bytes
+	Duration         float64 // Duration in seconds
+	Success          bool
+	ErrorMessage     string
 	CompressionRatio float64
-	FilesProcessed int
+	FilesProcessed   int
 }
 
-// BaselineModel represents statistical baseline for backup operations
+// BaselineModel represents statistical baseline for backup operations.
 type BaselineModel struct {
 	DatabaseName string
 
@@ -47,14 +47,14 @@ type BaselineModel struct {
 	DurationP99    float64
 
 	// Success rate
-	SuccessRate float64
-	TotalBackups int
+	SuccessRate       float64
+	TotalBackups      int
 	SuccessfulBackups int
-	FailedBackups int
+	FailedBackups     int
 
 	// Temporal patterns
-	HourlyDistribution [24]int // Distribution by hour of day
-	DayOfWeekDistribution [7]int // Distribution by day of week
+	HourlyDistribution    [24]int // Distribution by hour of day
+	DayOfWeekDistribution [7]int  // Distribution by day of week
 
 	// Training metadata
 	TrainingStartDate time.Time
@@ -63,10 +63,10 @@ type BaselineModel struct {
 	SampleCount       int
 }
 
-// BaselineTrainer trains baseline models from historical data
+// BaselineTrainer trains baseline models from historical data.
 type BaselineTrainer struct {
-	mu sync.RWMutex
-	models map[string]*BaselineModel // key: database name
+	mu      sync.RWMutex
+	models  map[string]*BaselineModel // key: database name
 	metrics []BackupMetric
 
 	// Configuration
@@ -74,7 +74,7 @@ type BaselineTrainer struct {
 	windowDays int
 }
 
-// NewBaselineTrainer creates a new baseline trainer
+// NewBaselineTrainer creates a new baseline trainer.
 func NewBaselineTrainer(windowDays int) *BaselineTrainer {
 	if windowDays <= 0 {
 		windowDays = 30 // Default to 30 days
@@ -88,7 +88,7 @@ func NewBaselineTrainer(windowDays int) *BaselineTrainer {
 	}
 }
 
-// AddMetric adds a backup metric to the training dataset
+// AddMetric adds a backup metric to the training dataset.
 func (bt *BaselineTrainer) AddMetric(metric BackupMetric) {
 	bt.mu.Lock()
 	defer bt.mu.Unlock()
@@ -96,7 +96,7 @@ func (bt *BaselineTrainer) AddMetric(metric BackupMetric) {
 	bt.metrics = append(bt.metrics, metric)
 }
 
-// AddMetrics adds multiple backup metrics
+// AddMetrics adds multiple backup metrics.
 func (bt *BaselineTrainer) AddMetrics(metrics []BackupMetric) {
 	bt.mu.Lock()
 	defer bt.mu.Unlock()
@@ -104,7 +104,7 @@ func (bt *BaselineTrainer) AddMetrics(metrics []BackupMetric) {
 	bt.metrics = append(bt.metrics, metrics...)
 }
 
-// Train trains baseline models for all databases
+// Train trains baseline models for all databases.
 func (bt *BaselineTrainer) Train(ctx context.Context) error {
 	bt.mu.Lock()
 	defer bt.mu.Unlock()
@@ -147,7 +147,7 @@ func (bt *BaselineTrainer) Train(ctx context.Context) error {
 	return nil
 }
 
-// trainDatabase trains a baseline model for a specific database
+// trainDatabase trains a baseline model for a specific database.
 func (bt *BaselineTrainer) trainDatabase(dbName string, metrics []BackupMetric) (*BaselineModel, error) {
 	if len(metrics) == 0 {
 		return nil, pkgErrors.New(pkgErrors.ErrorTypeValidation, "no metrics for database")
@@ -215,7 +215,7 @@ func (bt *BaselineTrainer) trainDatabase(dbName string, metrics []BackupMetric) 
 	return model, nil
 }
 
-// GetModel returns the baseline model for a database
+// GetModel returns the baseline model for a database.
 func (bt *BaselineTrainer) GetModel(dbName string) (*BaselineModel, error) {
 	bt.mu.RLock()
 	defer bt.mu.RUnlock()
@@ -229,7 +229,7 @@ func (bt *BaselineTrainer) GetModel(dbName string) (*BaselineModel, error) {
 	return model, nil
 }
 
-// GetAllModels returns all trained baseline models
+// GetAllModels returns all trained baseline models.
 func (bt *BaselineTrainer) GetAllModels() map[string]*BaselineModel {
 	bt.mu.RLock()
 	defer bt.mu.RUnlock()
@@ -243,7 +243,7 @@ func (bt *BaselineTrainer) GetAllModels() map[string]*BaselineModel {
 	return models
 }
 
-// IncrementalUpdate updates a baseline model with new metrics
+// IncrementalUpdate updates a baseline model with new metrics.
 func (bt *BaselineTrainer) IncrementalUpdate(dbName string, newMetrics []BackupMetric) error {
 	bt.mu.Lock()
 	defer bt.mu.Unlock()
@@ -276,7 +276,7 @@ func (bt *BaselineTrainer) IncrementalUpdate(dbName string, newMetrics []BackupM
 	return nil
 }
 
-// ClearOldMetrics removes metrics older than the training window
+// ClearOldMetrics removes metrics older than the training window.
 func (bt *BaselineTrainer) ClearOldMetrics() {
 	bt.mu.Lock()
 	defer bt.mu.Unlock()

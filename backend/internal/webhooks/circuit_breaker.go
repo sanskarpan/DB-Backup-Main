@@ -7,15 +7,15 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// CircuitState represents the state of a circuit breaker
+// CircuitState represents the state of a circuit breaker.
 type CircuitState int
 
 const (
-	// StateClosed - circuit is closed, requests are allowed
+	// StateClosed - circuit is closed, requests are allowed.
 	StateClosed CircuitState = iota
-	// StateOpen - circuit is open, requests are blocked
+	// StateOpen - circuit is open, requests are blocked.
 	StateOpen
-	// StateHalfOpen - circuit is testing if service recovered
+	// StateHalfOpen - circuit is testing if service recovered.
 	StateHalfOpen
 )
 
@@ -32,27 +32,27 @@ func (s CircuitState) String() string {
 	}
 }
 
-// CircuitBreaker implements the circuit breaker pattern for webhooks
+// CircuitBreaker implements the circuit breaker pattern for webhooks.
 type CircuitBreaker struct {
 	mu       sync.RWMutex
 	circuits map[string]*Circuit
 	config   *CircuitBreakerConfig
 }
 
-// Circuit represents a single circuit for a subscription
+// Circuit represents a single circuit for a subscription.
 type Circuit struct {
-	subscriptionID  string
-	state           CircuitState
-	failureCount    int64
-	successCount    int64
-	lastFailureTime time.Time
-	lastSuccessTime time.Time
-	lastStateChange time.Time
+	subscriptionID   string
+	state            CircuitState
+	failureCount     int64
+	successCount     int64
+	lastFailureTime  time.Time
+	lastSuccessTime  time.Time
+	lastStateChange  time.Time
 	consecutiveFails int
 	consecutiveSuccs int
 }
 
-// CircuitBreakerConfig holds configuration for circuit breaker
+// CircuitBreakerConfig holds configuration for circuit breaker.
 type CircuitBreakerConfig struct {
 	// FailureThreshold is the number of consecutive failures before opening
 	FailureThreshold int
@@ -66,7 +66,7 @@ type CircuitBreakerConfig struct {
 	MonitoringWindow time.Duration
 }
 
-// DefaultCircuitBreakerConfig returns default configuration
+// DefaultCircuitBreakerConfig returns default configuration.
 func DefaultCircuitBreakerConfig() *CircuitBreakerConfig {
 	return &CircuitBreakerConfig{
 		FailureThreshold: 5,
@@ -77,12 +77,12 @@ func DefaultCircuitBreakerConfig() *CircuitBreakerConfig {
 	}
 }
 
-// NewCircuitBreaker creates a new circuit breaker
+// NewCircuitBreaker creates a new circuit breaker.
 func NewCircuitBreaker() *CircuitBreaker {
 	return NewCircuitBreakerWithConfig(DefaultCircuitBreakerConfig())
 }
 
-// NewCircuitBreakerWithConfig creates a circuit breaker with custom config
+// NewCircuitBreakerWithConfig creates a circuit breaker with custom config.
 func NewCircuitBreakerWithConfig(config *CircuitBreakerConfig) *CircuitBreaker {
 	cb := &CircuitBreaker{
 		circuits: make(map[string]*Circuit),
@@ -95,7 +95,7 @@ func NewCircuitBreakerWithConfig(config *CircuitBreakerConfig) *CircuitBreaker {
 	return cb
 }
 
-// AllowRequest checks if a request should be allowed for a subscription
+// AllowRequest checks if a request should be allowed for a subscription.
 func (cb *CircuitBreaker) AllowRequest(subscriptionID string) bool {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
@@ -125,7 +125,7 @@ func (cb *CircuitBreaker) AllowRequest(subscriptionID string) bool {
 	}
 }
 
-// RecordSuccess records a successful request
+// RecordSuccess records a successful request.
 func (cb *CircuitBreaker) RecordSuccess(subscriptionID string) {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
@@ -158,7 +158,7 @@ func (cb *CircuitBreaker) RecordSuccess(subscriptionID string) {
 	}
 }
 
-// RecordFailure records a failed request
+// RecordFailure records a failed request.
 func (cb *CircuitBreaker) RecordFailure(subscriptionID string) {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
@@ -191,7 +191,7 @@ func (cb *CircuitBreaker) RecordFailure(subscriptionID string) {
 	}
 }
 
-// GetState returns the current state of a circuit
+// GetState returns the current state of a circuit.
 func (cb *CircuitBreaker) GetState(subscriptionID string) CircuitState {
 	cb.mu.RLock()
 	defer cb.mu.RUnlock()
@@ -204,7 +204,7 @@ func (cb *CircuitBreaker) GetState(subscriptionID string) CircuitState {
 	return circuit.state
 }
 
-// GetCircuitInfo returns detailed information about a circuit
+// GetCircuitInfo returns detailed information about a circuit.
 func (cb *CircuitBreaker) GetCircuitInfo(subscriptionID string) *CircuitInfo {
 	cb.mu.RLock()
 	defer cb.mu.RUnlock()
@@ -230,7 +230,7 @@ func (cb *CircuitBreaker) GetCircuitInfo(subscriptionID string) *CircuitInfo {
 	}
 }
 
-// CircuitInfo holds information about a circuit
+// CircuitInfo holds information about a circuit.
 type CircuitInfo struct {
 	SubscriptionID   string       `json:"subscription_id"`
 	State            CircuitState `json:"state"`
@@ -243,7 +243,7 @@ type CircuitInfo struct {
 	ConsecutiveSuccs int          `json:"consecutive_succs"`
 }
 
-// Reset resets a circuit for a subscription
+// Reset resets a circuit for a subscription.
 func (cb *CircuitBreaker) Reset(subscriptionID string) {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
@@ -263,7 +263,7 @@ func (cb *CircuitBreaker) Reset(subscriptionID string) {
 		Msg("Circuit breaker manually reset")
 }
 
-// ResetAll resets all circuits
+// ResetAll resets all circuits.
 func (cb *CircuitBreaker) ResetAll() {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
@@ -278,7 +278,7 @@ func (cb *CircuitBreaker) ResetAll() {
 	log.Info().Msg("All circuit breakers reset")
 }
 
-// GetAllCircuits returns information about all circuits
+// GetAllCircuits returns information about all circuits.
 func (cb *CircuitBreaker) GetAllCircuits() []*CircuitInfo {
 	cb.mu.RLock()
 	defer cb.mu.RUnlock()
@@ -302,7 +302,7 @@ func (cb *CircuitBreaker) GetAllCircuits() []*CircuitInfo {
 }
 
 // getOrCreateCircuit gets or creates a circuit for a subscription
-// Caller must hold lock
+// Caller must hold lock.
 func (cb *CircuitBreaker) getOrCreateCircuit(subscriptionID string) *Circuit {
 	circuit, exists := cb.circuits[subscriptionID]
 	if !exists {
@@ -317,7 +317,7 @@ func (cb *CircuitBreaker) getOrCreateCircuit(subscriptionID string) *Circuit {
 	return circuit
 }
 
-// monitor periodically checks circuits and performs maintenance
+// monitor periodically checks circuits and performs maintenance.
 func (cb *CircuitBreaker) monitor() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -327,7 +327,7 @@ func (cb *CircuitBreaker) monitor() {
 	}
 }
 
-// performMaintenance performs periodic maintenance on circuits
+// performMaintenance performs periodic maintenance on circuits.
 func (cb *CircuitBreaker) performMaintenance() {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
@@ -361,12 +361,12 @@ func (cb *CircuitBreaker) performMaintenance() {
 	}
 }
 
-// GetConfig returns the circuit breaker configuration
+// GetConfig returns the circuit breaker configuration.
 func (cb *CircuitBreaker) GetConfig() *CircuitBreakerConfig {
 	return cb.config
 }
 
-// UpdateConfig updates the circuit breaker configuration
+// UpdateConfig updates the circuit breaker configuration.
 func (cb *CircuitBreaker) UpdateConfig(config *CircuitBreakerConfig) {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()

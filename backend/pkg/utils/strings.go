@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// GenerateRandomString generates a random string of specified length
+// GenerateRandomString generates a random string of specified length.
 func GenerateRandomString(length int) (string, error) {
 	bytes := make([]byte, length)
 	if _, err := rand.Read(bytes); err != nil {
@@ -18,7 +18,7 @@ func GenerateRandomString(length int) (string, error) {
 	return base64.URLEncoding.EncodeToString(bytes)[:length], nil
 }
 
-// GenerateID generates a unique ID
+// GenerateID generates a unique ID.
 func GenerateID(prefix string) (string, error) {
 	random, err := GenerateRandomString(16)
 	if err != nil {
@@ -30,23 +30,25 @@ func GenerateID(prefix string) (string, error) {
 	return random, nil
 }
 
-// GenerateBackupID generates a unique backup ID with timestamp
+// GenerateBackupID generates a unique backup ID with timestamp.
 func GenerateBackupID() string {
-	return fmt.Sprintf("backup-%s-%d",
+	return fmt.Sprintf(
+		"backup-%s-%d",
 		time.Now().Format("20060102-150405"),
 		time.Now().UnixNano()%1000000,
 	)
 }
 
-// GenerateRestoreID generates a unique restore operation ID with timestamp
+// GenerateRestoreID generates a unique restore operation ID with timestamp.
 func GenerateRestoreID() string {
-	return fmt.Sprintf("restore-%s-%d",
+	return fmt.Sprintf(
+		"restore-%s-%d",
 		time.Now().Format("20060102-150405"),
 		time.Now().UnixNano()%1000000,
 	)
 }
 
-// Truncate truncates a string to a maximum length
+// Truncate truncates a string to a maximum length.
 func Truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
@@ -54,7 +56,7 @@ func Truncate(s string, maxLen int) string {
 	return s[:maxLen-3] + "..."
 }
 
-// Contains checks if a string slice contains a string
+// Contains checks if a string slice contains a string.
 func Contains(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {
@@ -64,7 +66,7 @@ func Contains(slice []string, item string) bool {
 	return false
 }
 
-// RemoveDuplicates removes duplicate strings from a slice
+// RemoveDuplicates removes duplicate strings from a slice.
 func RemoveDuplicates(slice []string) []string {
 	seen := make(map[string]bool)
 	result := []string{}
@@ -77,7 +79,7 @@ func RemoveDuplicates(slice []string) []string {
 	return result
 }
 
-// SplitAndTrim splits a string by separator and trims whitespace
+// SplitAndTrim splits a string by separator and trims whitespace.
 func SplitAndTrim(s, sep string) []string {
 	parts := strings.Split(s, sep)
 	result := make([]string, 0, len(parts))
@@ -90,7 +92,7 @@ func SplitAndTrim(s, sep string) []string {
 	return result
 }
 
-// MaskSensitive masks sensitive information (like passwords, tokens)
+// MaskSensitive masks sensitive information (like passwords, tokens).
 func MaskSensitive(s string) string {
 	if len(s) <= 8 {
 		return "****"

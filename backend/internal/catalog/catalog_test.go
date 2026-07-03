@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Mock Elasticsearch client for testing
+// Mock Elasticsearch client for testing.
 type mockESClient struct {
 	documents map[string]map[string]interface{}
 	indices   map[string]bool
@@ -77,7 +77,7 @@ func TestBackupDocument(t *testing.T) {
 		Status:          "success",
 		SizeBytes:       1024 * 1024 * 1024, // 1GB
 		CompressedSize:  500 * 1024 * 1024,  // 500MB
-		Duration:        120.5,               // 120.5 seconds
+		Duration:        120.5,              // 120.5 seconds
 		StorageProvider: "s3",
 		StoragePath:     "s3://backup-bucket/test-db/backup-001.tar.gz",
 		CreatedAt:       now,
@@ -156,7 +156,7 @@ func TestConvertMapToStruct(t *testing.T) {
 
 func TestSearchQuery(t *testing.T) {
 	now := time.Now()
-	minSize := int64(1024 * 1024) // 1MB
+	minSize := int64(1024 * 1024)        // 1MB
 	maxSize := int64(1024 * 1024 * 1024) // 1GB
 
 	query := &SearchQuery{
@@ -415,11 +415,11 @@ func TestBackupRelationship(t *testing.T) {
 
 func TestBackupDependency(t *testing.T) {
 	dependency := &BackupDependency{
-		BackupID:        "backup-003",
-		DependsOn:       []string{"backup-002", "backup-001"},
-		RequiredBy:      []string{},
-		IsRestoreable:   true,
-		MissingBackups:  []string{},
+		BackupID:       "backup-003",
+		DependsOn:      []string{"backup-002", "backup-001"},
+		RequiredBy:     []string{},
+		IsRestoreable:  true,
+		MissingBackups: []string{},
 	}
 
 	if dependency.BackupID != "backup-003" {
@@ -441,11 +441,11 @@ func TestBackupDependency(t *testing.T) {
 
 func TestBackupDependencyWithMissing(t *testing.T) {
 	dependency := &BackupDependency{
-		BackupID:        "backup-003",
-		DependsOn:       []string{"backup-002", "backup-001"},
-		RequiredBy:      []string{},
-		IsRestoreable:   false,
-		MissingBackups:  []string{"backup-002"},
+		BackupID:       "backup-003",
+		DependsOn:      []string{"backup-002", "backup-001"},
+		RequiredBy:     []string{},
+		IsRestoreable:  false,
+		MissingBackups: []string{"backup-002"},
 	}
 
 	if dependency.IsRestoreable {

@@ -243,10 +243,10 @@ func TestAzureImmutableBlobInfo_ProtectionScenarios(t *testing.T) {
 		// Day 0: Create blob with 30-day retention
 		expiryDate := time.Now().AddDate(0, 0, 30)
 		info := AzureImmutableBlobInfo{
-			BlobName:              "backup-2025-01-01.sql",
-			ImmutabilityExpiresOn: &expiryDate,
+			BlobName:               "backup-2025-01-01.sql",
+			ImmutabilityExpiresOn:  &expiryDate,
 			ImmutabilityPolicyMode: "Unlocked",
-			LegalHold:             false,
+			LegalHold:              false,
 		}
 
 		// Should be protected
@@ -445,12 +445,12 @@ func TestAzureImmutableBlobInfo_EdgeCases(t *testing.T) {
 	})
 }
 
-// Helper function to create time pointers
+// Helper function to create time pointers.
 func timePtr(t time.Time) *time.Time {
 	return &t
 }
 
-// Benchmark tests
+// Benchmark tests.
 func BenchmarkAzureIsProtected(b *testing.B) {
 	info := AzureImmutableBlobInfo{
 		ImmutabilityExpiresOn: timePtr(time.Now().AddDate(0, 0, 30)),

@@ -8,37 +8,37 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// SLALevel represents the criticality level of an SLA
+// SLALevel represents the criticality level of an SLA.
 type SLALevel string
 
 const (
-	SLALevelCritical SLALevel = "critical"  // Mission-critical, 99.99% uptime
-	SLALevelHigh     SLALevel = "high"      // High priority, 99.9% uptime
-	SLALevelMedium   SLALevel = "medium"    // Medium priority, 99.5% uptime
-	SLALevelLow      SLALevel = "low"       // Low priority, 99% uptime
+	SLALevelCritical SLALevel = "critical" // Mission-critical, 99.99% uptime
+	SLALevelHigh     SLALevel = "high"     // High priority, 99.9% uptime
+	SLALevelMedium   SLALevel = "medium"   // Medium priority, 99.5% uptime
+	SLALevelLow      SLALevel = "low"      // Low priority, 99% uptime
 )
 
-// SLADefinition defines the SLA requirements for a database
+// SLADefinition defines the SLA requirements for a database.
 type SLADefinition struct {
-	ID                    string
-	DatabaseID            string
-	DatabaseName          string
-	Level                 SLALevel
-	SuccessRateTarget     float64       // Target success rate (e.g., 99.9%)
-	MaxBackupDuration     time.Duration // Maximum acceptable backup duration
-	RTOTarget             time.Duration // Recovery Time Objective
-	RPOTarget             time.Duration // Recovery Point Objective
-	BackupFrequency       time.Duration // Expected backup frequency
-	RetentionPeriod       time.Duration // Data retention requirement
-	ComplianceStandards   []string      // e.g., ["SOC2", "HIPAA", "GDPR"]
-	AlertOnViolation      bool
-	AlertThreshold        int     // Number of violations before alerting
-	ViolationGracePeriod  time.Duration
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
+	ID                   string
+	DatabaseID           string
+	DatabaseName         string
+	Level                SLALevel
+	SuccessRateTarget    float64       // Target success rate (e.g., 99.9%)
+	MaxBackupDuration    time.Duration // Maximum acceptable backup duration
+	RTOTarget            time.Duration // Recovery Time Objective
+	RPOTarget            time.Duration // Recovery Point Objective
+	BackupFrequency      time.Duration // Expected backup frequency
+	RetentionPeriod      time.Duration // Data retention requirement
+	ComplianceStandards  []string      // e.g., ["SOC2", "HIPAA", "GDPR"]
+	AlertOnViolation     bool
+	AlertThreshold       int // Number of violations before alerting
+	ViolationGracePeriod time.Duration
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
 }
 
-// SLAMetrics represents the actual metrics for a database
+// SLAMetrics represents the actual metrics for a database.
 type SLAMetrics struct {
 	DatabaseID             string
 	DatabaseName           string
@@ -57,23 +57,23 @@ type SLAMetrics struct {
 	MeasurementPeriodEnd   time.Time
 }
 
-// RTOMetrics represents RTO compliance metrics
+// RTOMetrics represents RTO compliance metrics.
 type RTOMetrics struct {
-	DatabaseID           string
-	TargetRTO            time.Duration
-	ActualRTO            time.Duration
-	LastRestoreTime      time.Time
-	RestoreSuccessRate   float64
-	AverageRestoreTime   time.Duration
-	FastestRestore       time.Duration
-	SlowestRestore       time.Duration
-	TotalRestoreTests    int
-	PassedRestoreTests   int
-	FailedRestoreTests   int
-	IsCompliant          bool
+	DatabaseID         string
+	TargetRTO          time.Duration
+	ActualRTO          time.Duration
+	LastRestoreTime    time.Time
+	RestoreSuccessRate float64
+	AverageRestoreTime time.Duration
+	FastestRestore     time.Duration
+	SlowestRestore     time.Duration
+	TotalRestoreTests  int
+	PassedRestoreTests int
+	FailedRestoreTests int
+	IsCompliant        bool
 }
 
-// RPOMetrics represents RPO compliance metrics
+// RPOMetrics represents RPO compliance metrics.
 type RPOMetrics struct {
 	DatabaseID            string
 	TargetRPO             time.Duration
@@ -85,25 +85,25 @@ type RPOMetrics struct {
 	IsCompliant           bool
 }
 
-// SLAViolation represents an SLA violation event
+// SLAViolation represents an SLA violation event.
 type SLAViolation struct {
-	ID             string
-	DatabaseID     string
-	DatabaseName   string
-	ViolationType  string // "success_rate", "duration", "rto", "rpo", "frequency"
-	Severity       string // "critical", "high", "medium", "low"
-	DetectedAt     time.Time
-	ResolvedAt     *time.Time
-	IsResolved     bool
-	Description    string
-	ActualValue    interface{}
-	ExpectedValue  interface{}
-	Impact         string
+	ID                string
+	DatabaseID        string
+	DatabaseName      string
+	ViolationType     string // "success_rate", "duration", "rto", "rpo", "frequency"
+	Severity          string // "critical", "high", "medium", "low"
+	DetectedAt        time.Time
+	ResolvedAt        *time.Time
+	IsResolved        bool
+	Description       string
+	ActualValue       interface{}
+	ExpectedValue     interface{}
+	Impact            string
 	RecommendedAction string
-	Metadata       map[string]interface{}
+	Metadata          map[string]interface{}
 }
 
-// SLAMonitor monitors and tracks SLA compliance
+// SLAMonitor monitors and tracks SLA compliance.
 type SLAMonitor struct {
 	mu               sync.RWMutex
 	definitions      map[string]*SLADefinition
@@ -115,10 +115,10 @@ type SLAMonitor struct {
 	violationCounter int64
 }
 
-// AlertHandler is a function that handles SLA violations
+// AlertHandler is a function that handles SLA violations.
 type AlertHandler func(*SLAViolation) error
 
-// NewSLAMonitor creates a new SLA monitor
+// NewSLAMonitor creates a new SLA monitor.
 func NewSLAMonitor() *SLAMonitor {
 	return &SLAMonitor{
 		definitions:   make(map[string]*SLADefinition),
@@ -130,7 +130,7 @@ func NewSLAMonitor() *SLAMonitor {
 	}
 }
 
-// AddSLADefinition adds or updates an SLA definition
+// AddSLADefinition adds or updates an SLA definition.
 func (sm *SLAMonitor) AddSLADefinition(def *SLADefinition) error {
 	if def == nil {
 		return fmt.Errorf("SLA definition cannot be nil")
@@ -169,7 +169,7 @@ func (sm *SLAMonitor) AddSLADefinition(def *SLADefinition) error {
 	return nil
 }
 
-// RecordBackup records a backup event and updates metrics
+// RecordBackup records a backup event and updates metrics.
 func (sm *SLAMonitor) RecordBackup(databaseID string, success bool, duration time.Duration, dataSize int64) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -224,7 +224,7 @@ func (sm *SLAMonitor) RecordBackup(databaseID string, success bool, duration tim
 	return nil
 }
 
-// RecordRestoreTest records a restore test for RTO tracking
+// RecordRestoreTest records a restore test for RTO tracking.
 func (sm *SLAMonitor) RecordRestoreTest(databaseID string, success bool, duration time.Duration) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -233,8 +233,8 @@ func (sm *SLAMonitor) RecordRestoreTest(databaseID string, success bool, duratio
 	if !exists {
 		def := sm.definitions[databaseID]
 		rto = &RTOMetrics{
-			DatabaseID:  databaseID,
-			TargetRTO:   def.RTOTarget,
+			DatabaseID:     databaseID,
+			TargetRTO:      def.RTOTarget,
 			FastestRestore: duration,
 			SlowestRestore: duration,
 		}
@@ -275,7 +275,7 @@ func (sm *SLAMonitor) RecordRestoreTest(databaseID string, success bool, duratio
 	return nil
 }
 
-// UpdateRPOMetrics updates RPO metrics based on backup frequency
+// UpdateRPOMetrics updates RPO metrics based on backup frequency.
 func (sm *SLAMonitor) UpdateRPOMetrics(databaseID string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -290,8 +290,8 @@ func (sm *SLAMonitor) UpdateRPOMetrics(databaseID string) error {
 	rpo, exists := sm.rpoMetrics[databaseID]
 	if !exists {
 		rpo = &RPOMetrics{
-			DatabaseID:  databaseID,
-			TargetRPO:   def.RPOTarget,
+			DatabaseID: databaseID,
+			TargetRPO:  def.RPOTarget,
 		}
 		sm.rpoMetrics[databaseID] = rpo
 	}
@@ -315,7 +315,7 @@ func (sm *SLAMonitor) UpdateRPOMetrics(databaseID string) error {
 	return nil
 }
 
-// checkViolations checks for SLA violations
+// checkViolations checks for SLA violations.
 func (sm *SLAMonitor) checkViolations(databaseID string) {
 	def, defExists := sm.definitions[databaseID]
 	metrics, metricsExist := sm.metrics[databaseID]
@@ -347,7 +347,7 @@ func (sm *SLAMonitor) checkViolations(databaseID string) {
 	}
 }
 
-// recordViolation records an SLA violation
+// recordViolation records an SLA violation.
 func (sm *SLAMonitor) recordViolation(databaseID, violationType, severity, description string) {
 	def := sm.definitions[databaseID]
 
@@ -374,7 +374,7 @@ func (sm *SLAMonitor) recordViolation(databaseID, violationType, severity, descr
 	}
 }
 
-// GetMetrics returns the SLA metrics for a database
+// GetMetrics returns the SLA metrics for a database.
 func (sm *SLAMonitor) GetMetrics(databaseID string) (*SLAMetrics, bool) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
@@ -383,7 +383,7 @@ func (sm *SLAMonitor) GetMetrics(databaseID string) (*SLAMetrics, bool) {
 	return metrics, exists
 }
 
-// GetRTOMetrics returns the RTO metrics for a database
+// GetRTOMetrics returns the RTO metrics for a database.
 func (sm *SLAMonitor) GetRTOMetrics(databaseID string) (*RTOMetrics, bool) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
@@ -392,7 +392,7 @@ func (sm *SLAMonitor) GetRTOMetrics(databaseID string) (*RTOMetrics, bool) {
 	return rto, exists
 }
 
-// GetRPOMetrics returns the RPO metrics for a database
+// GetRPOMetrics returns the RPO metrics for a database.
 func (sm *SLAMonitor) GetRPOMetrics(databaseID string) (*RPOMetrics, bool) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
@@ -401,7 +401,7 @@ func (sm *SLAMonitor) GetRPOMetrics(databaseID string) (*RPOMetrics, bool) {
 	return rpo, exists
 }
 
-// GetViolations returns all violations, optionally filtered
+// GetViolations returns all violations, optionally filtered.
 func (sm *SLAMonitor) GetViolations(databaseID string, unresolvedOnly bool) []*SLAViolation {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
@@ -421,7 +421,7 @@ func (sm *SLAMonitor) GetViolations(databaseID string, unresolvedOnly bool) []*S
 	return violations
 }
 
-// ResolveViolation marks a violation as resolved
+// ResolveViolation marks a violation as resolved.
 func (sm *SLAMonitor) ResolveViolation(violationID string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -438,7 +438,7 @@ func (sm *SLAMonitor) ResolveViolation(violationID string) error {
 	return fmt.Errorf("violation %s not found", violationID)
 }
 
-// RegisterAlertHandler registers an alert handler
+// RegisterAlertHandler registers an alert handler.
 func (sm *SLAMonitor) RegisterAlertHandler(handler AlertHandler) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -446,7 +446,7 @@ func (sm *SLAMonitor) RegisterAlertHandler(handler AlertHandler) {
 	sm.alertHandlers = append(sm.alertHandlers, handler)
 }
 
-// getDefaultSuccessRate returns the default success rate for an SLA level
+// getDefaultSuccessRate returns the default success rate for an SLA level.
 func (sm *SLAMonitor) getDefaultSuccessRate(level SLALevel) float64 {
 	switch level {
 	case SLALevelCritical:
@@ -462,22 +462,22 @@ func (sm *SLAMonitor) getDefaultSuccessRate(level SLALevel) float64 {
 	}
 }
 
-// getSeverity returns the severity string for an SLA level
+// getSeverity returns the severity string for an SLA level.
 func (sm *SLAMonitor) getSeverity(level SLALevel) string {
 	return string(level)
 }
 
-// GetComplianceSummary returns a compliance summary for all databases
+// GetComplianceSummary returns a compliance summary for all databases.
 func (sm *SLAMonitor) GetComplianceSummary() map[string]interface{} {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
 	summary := map[string]interface{}{
-		"total_databases":      len(sm.definitions),
-		"compliant_databases":  0,
-		"violations_count":     len(sm.violations),
+		"total_databases":       len(sm.definitions),
+		"compliant_databases":   0,
+		"violations_count":      len(sm.violations),
 		"unresolved_violations": 0,
-		"average_success_rate": 0.0,
+		"average_success_rate":  0.0,
 	}
 
 	totalSuccessRate := 0.0

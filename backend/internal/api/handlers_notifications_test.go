@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/sanskarpan/db-backup/internal/auth"
 	"github.com/sanskarpan/db-backup/internal/websocket"
 )

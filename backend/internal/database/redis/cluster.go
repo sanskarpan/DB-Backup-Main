@@ -9,21 +9,22 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+
 	"github.com/sanskarpan/db-backup/internal/database"
 )
 
-// ClusterDriver handles Redis Cluster backups
+// ClusterDriver handles Redis Cluster backups.
 type ClusterDriver struct {
 	clusterClient *redis.ClusterClient
 	config        *database.ConnectionConfig
 }
 
-// NewClusterDriver creates a new Redis Cluster driver
+// NewClusterDriver creates a new Redis Cluster driver.
 func NewClusterDriver() *ClusterDriver {
 	return &ClusterDriver{}
 }
 
-// Connect establishes connection to Redis Cluster
+// Connect establishes connection to Redis Cluster.
 func (c *ClusterDriver) Connect(ctx context.Context, config *database.ConnectionConfig) error {
 	// Parse cluster nodes from config
 	nodes := strings.Split(config.Host, ",")
@@ -45,7 +46,7 @@ func (c *ClusterDriver) Connect(ctx context.Context, config *database.Connection
 	return nil
 }
 
-// Disconnect closes cluster connections
+// Disconnect closes cluster connections.
 func (c *ClusterDriver) Disconnect() error {
 	if c.clusterClient != nil {
 		return c.clusterClient.Close()
@@ -53,7 +54,7 @@ func (c *ClusterDriver) Disconnect() error {
 	return nil
 }
 
-// BackupCluster backs up all nodes in the Redis cluster
+// BackupCluster backs up all nodes in the Redis cluster.
 func (c *ClusterDriver) BackupCluster(ctx context.Context, opts *database.BackupOptions) (*database.BackupResult, error) {
 	result := &database.BackupResult{
 		ID:        fmt.Sprintf("cluster_%s", time.Now().Format("20060102_150405")),
@@ -133,7 +134,7 @@ func (c *ClusterDriver) BackupCluster(ctx context.Context, opts *database.Backup
 	return result, nil
 }
 
-// RestoreCluster restores all nodes in the Redis cluster
+// RestoreCluster restores all nodes in the Redis cluster.
 func (c *ClusterDriver) RestoreCluster(ctx context.Context, opts *database.RestoreOptions) (*database.RestoreResult, error) {
 	result := &database.RestoreResult{
 		ID:        fmt.Sprintf("cluster_restore_%s", time.Now().Format("20060102_150405")),
@@ -204,7 +205,7 @@ func (c *ClusterDriver) RestoreCluster(ctx context.Context, opts *database.Resto
 	return result, nil
 }
 
-// getClusterNodes returns a map of node IDs to addresses
+// getClusterNodes returns a map of node IDs to addresses.
 func (c *ClusterDriver) getClusterNodes(ctx context.Context) (map[string]string, error) {
 	nodesInfo, err := c.clusterClient.ClusterNodes(ctx).Result()
 	if err != nil {
@@ -235,18 +236,18 @@ func (c *ClusterDriver) getClusterNodes(ctx context.Context) (map[string]string,
 	return nodes, nil
 }
 
-// SentinelDriver handles Redis Sentinel configuration backups
+// SentinelDriver handles Redis Sentinel configuration backups.
 type SentinelDriver struct {
 	sentinelClient *redis.SentinelClient
 	config         *database.ConnectionConfig
 }
 
-// NewSentinelDriver creates a new Redis Sentinel driver
+// NewSentinelDriver creates a new Redis Sentinel driver.
 func NewSentinelDriver() *SentinelDriver {
 	return &SentinelDriver{}
 }
 
-// Connect establishes connection to Redis Sentinel
+// Connect establishes connection to Redis Sentinel.
 func (s *SentinelDriver) Connect(ctx context.Context, config *database.ConnectionConfig) error {
 	opts := &redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", config.Host, config.Port),
@@ -261,7 +262,7 @@ func (s *SentinelDriver) Connect(ctx context.Context, config *database.Connectio
 	return nil
 }
 
-// BackupSentinelConfig backs up Sentinel configuration
+// BackupSentinelConfig backs up Sentinel configuration.
 func (s *SentinelDriver) BackupSentinelConfig(ctx context.Context, outputPath string) error {
 	// Get Sentinel configuration
 	// In practice, this would use SENTINEL commands to get:

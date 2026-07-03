@@ -18,7 +18,7 @@ import (
 // snapshotFileSuffix is the on-disk suffix used for persisted snapshots.
 const snapshotFileSuffix = ".snapshot.json"
 
-// BlockSize represents different block sizes for change tracking
+// BlockSize represents different block sizes for change tracking.
 type BlockSize int
 
 const (
@@ -29,7 +29,7 @@ const (
 	BlockSize1MB  BlockSize = 1048576 // 1 MB blocks
 )
 
-// BlockMetadata represents metadata for a single block
+// BlockMetadata represents metadata for a single block.
 type BlockMetadata struct {
 	ID         string    // Unique block identifier
 	Offset     int64     // Byte offset in the file
@@ -41,7 +41,7 @@ type BlockMetadata struct {
 	ModifiedAt time.Time // When this block was last modified
 }
 
-// FileSnapshot represents a snapshot of a file at a point in time
+// FileSnapshot represents a snapshot of a file at a point in time.
 type FileSnapshot struct {
 	ID           string
 	FilePath     string
@@ -54,7 +54,7 @@ type FileSnapshot struct {
 	ModifiedTime time.Time
 }
 
-// ChangeSet represents the set of changes between two snapshots
+// ChangeSet represents the set of changes between two snapshots.
 type ChangeSet struct {
 	ID            string
 	BaseSnapshot  string // ID of the base snapshot
@@ -69,7 +69,7 @@ type ChangeSet struct {
 	CreatedAt     time.Time
 }
 
-// ChangeTracker tracks block-level changes for incremental backups
+// ChangeTracker tracks block-level changes for incremental backups.
 type ChangeTracker struct {
 	mu          sync.RWMutex
 	snapshots   map[string]*FileSnapshot
@@ -185,7 +185,7 @@ func (ct *ChangeTracker) RemoveSnapshot(snapshotID string) error {
 	return nil
 }
 
-// CreateSnapshot creates a snapshot of a file's blocks
+// CreateSnapshot creates a snapshot of a file's blocks.
 func (ct *ChangeTracker) CreateSnapshot(filePath string) (*FileSnapshot, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -270,7 +270,7 @@ func (ct *ChangeTracker) CreateSnapshot(filePath string) (*FileSnapshot, error) 
 	return snapshot, nil
 }
 
-// CompareSnapshots compares two snapshots and creates a change set
+// CompareSnapshots compares two snapshots and creates a change set.
 func (ct *ChangeTracker) CompareSnapshots(baseSnapshotID, newSnapshotID string) (*ChangeSet, error) {
 	ct.mu.RLock()
 	baseSnapshot, baseExists := ct.snapshots[baseSnapshotID]
@@ -343,7 +343,7 @@ func (ct *ChangeTracker) CompareSnapshots(baseSnapshotID, newSnapshotID string) 
 	return changeSet, nil
 }
 
-// DetectChanges detects changes in a file compared to its last snapshot
+// DetectChanges detects changes in a file compared to its last snapshot.
 func (ct *ChangeTracker) DetectChanges(filePath string, lastSnapshotID string) (*ChangeSet, error) {
 	// Create new snapshot
 	newSnapshot, err := ct.CreateSnapshot(filePath)
@@ -355,7 +355,7 @@ func (ct *ChangeTracker) DetectChanges(filePath string, lastSnapshotID string) (
 	return ct.CompareSnapshots(lastSnapshotID, newSnapshot.ID)
 }
 
-// GetSnapshot retrieves a snapshot by ID
+// GetSnapshot retrieves a snapshot by ID.
 func (ct *ChangeTracker) GetSnapshot(snapshotID string) (*FileSnapshot, bool) {
 	ct.mu.RLock()
 	defer ct.mu.RUnlock()
@@ -364,7 +364,7 @@ func (ct *ChangeTracker) GetSnapshot(snapshotID string) (*FileSnapshot, bool) {
 	return snapshot, exists
 }
 
-// GetChangeSet retrieves a change set by ID
+// GetChangeSet retrieves a change set by ID.
 func (ct *ChangeTracker) GetChangeSet(changeSetID string) (*ChangeSet, bool) {
 	ct.mu.RLock()
 	defer ct.mu.RUnlock()
@@ -373,7 +373,7 @@ func (ct *ChangeTracker) GetChangeSet(changeSetID string) (*ChangeSet, bool) {
 	return changeSet, exists
 }
 
-// GetLatestSnapshot returns the most recent snapshot for a file
+// GetLatestSnapshot returns the most recent snapshot for a file.
 func (ct *ChangeTracker) GetLatestSnapshot(filePath string) (*FileSnapshot, bool) {
 	ct.mu.RLock()
 	defer ct.mu.RUnlock()
@@ -390,7 +390,7 @@ func (ct *ChangeTracker) GetLatestSnapshot(filePath string) (*FileSnapshot, bool
 	return latest, latest != nil
 }
 
-// ListSnapshots returns all snapshots for a file
+// ListSnapshots returns all snapshots for a file.
 func (ct *ChangeTracker) ListSnapshots(filePath string) []*FileSnapshot {
 	ct.mu.RLock()
 	defer ct.mu.RUnlock()
@@ -405,7 +405,7 @@ func (ct *ChangeTracker) ListSnapshots(filePath string) []*FileSnapshot {
 	return snapshots
 }
 
-// GetStatistics returns statistics about the change tracker
+// GetStatistics returns statistics about the change tracker.
 func (ct *ChangeTracker) GetStatistics() map[string]interface{} {
 	ct.mu.RLock()
 	defer ct.mu.RUnlock()
@@ -508,7 +508,7 @@ func writeJSONAtomic(path string, v interface{}) error {
 	return nil
 }
 
-// GetChangedBlockData extracts data for changed blocks from a file
+// GetChangedBlockData extracts data for changed blocks from a file.
 func (ct *ChangeTracker) GetChangedBlockData(filePath string, changeSet *ChangeSet) (map[int64][]byte, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -555,7 +555,7 @@ func (ct *ChangeTracker) GetChangedBlockData(filePath string, changeSet *ChangeS
 	return blockData, nil
 }
 
-// VerifyBlockChecksum verifies the checksum of a block
+// VerifyBlockChecksum verifies the checksum of a block.
 func VerifyBlockChecksum(data []byte, expectedChecksum string) bool {
 	hasher := sha256.New()
 	hasher.Write(data)
@@ -563,14 +563,14 @@ func VerifyBlockChecksum(data []byte, expectedChecksum string) bool {
 	return actualChecksum == expectedChecksum
 }
 
-// ComputeBlockChecksum computes the SHA-256 checksum of a block
+// ComputeBlockChecksum computes the SHA-256 checksum of a block.
 func ComputeBlockChecksum(data []byte) string {
 	hasher := sha256.New()
 	hasher.Write(data)
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-// EstimateIncrementalSize estimates the size of an incremental backup
+// EstimateIncrementalSize estimates the size of an incremental backup.
 func (ct *ChangeTracker) EstimateIncrementalSize(changeSet *ChangeSet) int64 {
 	size := int64(0)
 
@@ -588,17 +588,17 @@ func (ct *ChangeTracker) EstimateIncrementalSize(changeSet *ChangeSet) int64 {
 	return size + metadataOverhead
 }
 
-// IsFullBackupNeeded determines if a full backup is needed based on change ratio
+// IsFullBackupNeeded determines if a full backup is needed based on change ratio.
 func (ct *ChangeTracker) IsFullBackupNeeded(changeSet *ChangeSet, threshold float64) bool {
 	return changeSet.ChangeRatio >= threshold
 }
 
-// GetBlockSize returns the current block size
+// GetBlockSize returns the current block size.
 func (ct *ChangeTracker) GetBlockSize() BlockSize {
 	return ct.blockSize
 }
 
-// SetBlockSize updates the block size for future snapshots
+// SetBlockSize updates the block size for future snapshots.
 func (ct *ChangeTracker) SetBlockSize(blockSize BlockSize) {
 	ct.mu.Lock()
 	defer ct.mu.Unlock()

@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// ExportFormat represents the format for data export
+// ExportFormat represents the format for data export.
 type ExportFormat string
 
 const (
@@ -23,22 +23,22 @@ const (
 	FormatZIP  ExportFormat = "zip" // Multiple formats in a zip
 )
 
-// ExportRequest represents a user's data portability request
+// ExportRequest represents a user's data portability request.
 type ExportRequest struct {
-	ID           string       `json:"id"`
-	UserID       string       `json:"user_id"`
-	RequestedAt  time.Time    `json:"requested_at"`
-	CompletedAt  *time.Time   `json:"completed_at,omitempty"`
-	Status       ExportStatus `json:"status"`
-	Format       ExportFormat `json:"format"`
-	DataTypes    []string     `json:"data_types"` // backups, logs, metadata, consents, etc.
-	DownloadURL  string       `json:"download_url,omitempty"`
-	ExpiresAt    time.Time    `json:"expires_at"`
-	FileSize     int64        `json:"file_size,omitempty"`
-	Error        string       `json:"error,omitempty"`
+	ID          string       `json:"id"`
+	UserID      string       `json:"user_id"`
+	RequestedAt time.Time    `json:"requested_at"`
+	CompletedAt *time.Time   `json:"completed_at,omitempty"`
+	Status      ExportStatus `json:"status"`
+	Format      ExportFormat `json:"format"`
+	DataTypes   []string     `json:"data_types"` // backups, logs, metadata, consents, etc.
+	DownloadURL string       `json:"download_url,omitempty"`
+	ExpiresAt   time.Time    `json:"expires_at"`
+	FileSize    int64        `json:"file_size,omitempty"`
+	Error       string       `json:"error,omitempty"`
 }
 
-// ExportStatus represents the status of an export request
+// ExportStatus represents the status of an export request.
 type ExportStatus string
 
 const (
@@ -49,7 +49,7 @@ const (
 	ExportStatusExpired    ExportStatus = "expired"
 )
 
-// UserData represents a user's data for portability
+// UserData represents a user's data for portability.
 type UserData struct {
 	UserID       string                 `json:"user_id" xml:"UserID" csv:"user_id"`
 	ExportedAt   time.Time              `json:"exported_at" xml:"ExportedAt" csv:"exported_at"`
@@ -59,46 +59,46 @@ type UserData struct {
 	ActivityLogs []ActivityLog          `json:"activity_logs,omitempty" xml:"ActivityLogs>Log,omitempty"`
 }
 
-// BackupData represents backup information in exports
+// BackupData represents backup information in exports.
 type BackupData struct {
-	BackupID    string    `json:"backup_id" xml:"BackupID" csv:"backup_id"`
-	DatabaseID  string    `json:"database_id" xml:"DatabaseID" csv:"database_id"`
-	CreatedAt   time.Time `json:"created_at" xml:"CreatedAt" csv:"created_at"`
-	Size        int64     `json:"size" xml:"Size" csv:"size"`
-	Status      string    `json:"status" xml:"Status" csv:"status"`
-	Location    string    `json:"location" xml:"Location" csv:"location"`
-	Encrypted   bool      `json:"encrypted" xml:"Encrypted" csv:"encrypted"`
+	BackupID   string    `json:"backup_id" xml:"BackupID" csv:"backup_id"`
+	DatabaseID string    `json:"database_id" xml:"DatabaseID" csv:"database_id"`
+	CreatedAt  time.Time `json:"created_at" xml:"CreatedAt" csv:"created_at"`
+	Size       int64     `json:"size" xml:"Size" csv:"size"`
+	Status     string    `json:"status" xml:"Status" csv:"status"`
+	Location   string    `json:"location" xml:"Location" csv:"location"`
+	Encrypted  bool      `json:"encrypted" xml:"Encrypted" csv:"encrypted"`
 }
 
-// ConsentData represents consent information in exports
+// ConsentData represents consent information in exports.
 type ConsentData struct {
-	ConsentID   string    `json:"consent_id" xml:"ConsentID" csv:"consent_id"`
-	Purpose     string    `json:"purpose" xml:"Purpose" csv:"purpose"`
-	GrantedAt   time.Time `json:"granted_at" xml:"GrantedAt" csv:"granted_at"`
-	RevokedAt   *time.Time `json:"revoked_at,omitempty" xml:"RevokedAt,omitempty" csv:"revoked_at"`
-	Status      string    `json:"status" xml:"Status" csv:"status"`
-	LegalBasis  string    `json:"legal_basis" xml:"LegalBasis" csv:"legal_basis"`
+	ConsentID  string     `json:"consent_id" xml:"ConsentID" csv:"consent_id"`
+	Purpose    string     `json:"purpose" xml:"Purpose" csv:"purpose"`
+	GrantedAt  time.Time  `json:"granted_at" xml:"GrantedAt" csv:"granted_at"`
+	RevokedAt  *time.Time `json:"revoked_at,omitempty" xml:"RevokedAt,omitempty" csv:"revoked_at"`
+	Status     string     `json:"status" xml:"Status" csv:"status"`
+	LegalBasis string     `json:"legal_basis" xml:"LegalBasis" csv:"legal_basis"`
 }
 
-// ActivityLog represents user activity information
+// ActivityLog represents user activity information.
 type ActivityLog struct {
-	LogID      string                 `json:"log_id" xml:"LogID" csv:"log_id"`
-	Timestamp  time.Time              `json:"timestamp" xml:"Timestamp" csv:"timestamp"`
-	Action     string                 `json:"action" xml:"Action" csv:"action"`
-	Resource   string                 `json:"resource" xml:"Resource" csv:"resource"`
-	IPAddress  string                 `json:"ip_address" xml:"IPAddress" csv:"ip_address"`
-	UserAgent  string                 `json:"user_agent" xml:"UserAgent" csv:"user_agent"`
-	Metadata   map[string]interface{} `json:"metadata,omitempty" xml:"-"` // XML can't handle map[string]interface{}
+	LogID     string                 `json:"log_id" xml:"LogID" csv:"log_id"`
+	Timestamp time.Time              `json:"timestamp" xml:"Timestamp" csv:"timestamp"`
+	Action    string                 `json:"action" xml:"Action" csv:"action"`
+	Resource  string                 `json:"resource" xml:"Resource" csv:"resource"`
+	IPAddress string                 `json:"ip_address" xml:"IPAddress" csv:"ip_address"`
+	UserAgent string                 `json:"user_agent" xml:"UserAgent" csv:"user_agent"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty" xml:"-"` // XML can't handle map[string]interface{}
 }
 
-// PortabilityManager manages data portability requests
+// PortabilityManager manages data portability requests.
 type PortabilityManager struct {
 	exportStore  ExportStore
 	dataProvider DataProvider
 	storage      ExportStorage
 }
 
-// ExportStore defines the interface for storing export requests
+// ExportStore defines the interface for storing export requests.
 type ExportStore interface {
 	Save(ctx context.Context, request *ExportRequest) error
 	Get(ctx context.Context, requestID string) (*ExportRequest, error)
@@ -106,19 +106,19 @@ type ExportStore interface {
 	Update(ctx context.Context, request *ExportRequest) error
 }
 
-// DataProvider defines the interface for retrieving user data
+// DataProvider defines the interface for retrieving user data.
 type DataProvider interface {
 	GetUserData(ctx context.Context, userID string, dataTypes []string) (*UserData, error)
 }
 
-// ExportStorage defines the interface for storing export files
+// ExportStorage defines the interface for storing export files.
 type ExportStorage interface {
 	Store(ctx context.Context, userID, requestID string, data []byte) (string, error)
 	Get(ctx context.Context, downloadURL string) ([]byte, error)
 	Delete(ctx context.Context, downloadURL string) error
 }
 
-// NewPortabilityManager creates a new portability manager
+// NewPortabilityManager creates a new portability manager.
 func NewPortabilityManager(store ExportStore, provider DataProvider, storage ExportStorage) *PortabilityManager {
 	return &PortabilityManager{
 		exportStore:  store,
@@ -127,7 +127,7 @@ func NewPortabilityManager(store ExportStore, provider DataProvider, storage Exp
 	}
 }
 
-// CreateExportRequest creates a new data portability request
+// CreateExportRequest creates a new data portability request.
 func (pm *PortabilityManager) CreateExportRequest(ctx context.Context, userID string, format ExportFormat, dataTypes []string) (*ExportRequest, error) {
 	if userID == "" {
 		return nil, errors.New("user ID is required")
@@ -168,7 +168,7 @@ func (pm *PortabilityManager) CreateExportRequest(ctx context.Context, userID st
 	return request, nil
 }
 
-// ProcessExportRequest processes a data portability request
+// ProcessExportRequest processes a data portability request.
 func (pm *PortabilityManager) ProcessExportRequest(ctx context.Context, requestID string) error {
 	request, err := pm.exportStore.Get(ctx, requestID)
 	if err != nil {
@@ -235,17 +235,17 @@ func (pm *PortabilityManager) ProcessExportRequest(ctx context.Context, requestI
 	return pm.exportStore.Update(ctx, request)
 }
 
-// GetExportRequest retrieves an export request
+// GetExportRequest retrieves an export request.
 func (pm *PortabilityManager) GetExportRequest(ctx context.Context, requestID string) (*ExportRequest, error) {
 	return pm.exportStore.Get(ctx, requestID)
 }
 
-// GetUserExportRequests retrieves all export requests for a user
+// GetUserExportRequests retrieves all export requests for a user.
 func (pm *PortabilityManager) GetUserExportRequests(ctx context.Context, userID string) ([]*ExportRequest, error) {
 	return pm.exportStore.GetByUserID(ctx, userID)
 }
 
-// DownloadExport downloads an export file
+// DownloadExport downloads an export file.
 func (pm *PortabilityManager) DownloadExport(ctx context.Context, requestID string) ([]byte, error) {
 	request, err := pm.exportStore.Get(ctx, requestID)
 	if err != nil {
@@ -265,19 +265,19 @@ func (pm *PortabilityManager) DownloadExport(ctx context.Context, requestID stri
 	return pm.storage.Get(ctx, request.DownloadURL)
 }
 
-// CleanupExpiredExports removes expired export files
+// CleanupExpiredExports removes expired export files.
 func (pm *PortabilityManager) CleanupExpiredExports(ctx context.Context) error {
 	// This would typically be run as a cron job
 	// Implementation would query for expired exports and delete them
 	return nil
 }
 
-// exportJSON exports user data as JSON
+// exportJSON exports user data as JSON.
 func (pm *PortabilityManager) exportJSON(data *UserData) ([]byte, error) {
 	return json.MarshalIndent(data, "", "  ")
 }
 
-// exportXML exports user data as XML
+// exportXML exports user data as XML.
 func (pm *PortabilityManager) exportXML(data *UserData) ([]byte, error) {
 	output, err := xml.MarshalIndent(data, "", "  ")
 	if err != nil {
@@ -286,7 +286,7 @@ func (pm *PortabilityManager) exportXML(data *UserData) ([]byte, error) {
 	return append([]byte(xml.Header), output...), nil
 }
 
-// exportCSV exports user data as CSV (multiple files for different data types)
+// exportCSV exports user data as CSV (multiple files for different data types).
 func (pm *PortabilityManager) exportCSV(data *UserData) ([]byte, error) {
 	var buf bytes.Buffer
 
@@ -357,7 +357,7 @@ func (pm *PortabilityManager) exportCSV(data *UserData) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// exportZIP exports user data as a ZIP archive with multiple formats
+// exportZIP exports user data as a ZIP archive with multiple formats.
 func (pm *PortabilityManager) exportZIP(data *UserData) ([]byte, error) {
 	var buf bytes.Buffer
 	zipWriter := zip.NewWriter(&buf)

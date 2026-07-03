@@ -28,19 +28,19 @@ func TestTrackBackupOperation(t *testing.T) {
 	ctx := context.Background()
 
 	op := &BackupOperation{
-		DatabaseName:   "testdb",
-		Provider:       ProviderAWS,
-		Region:         "us-east-1",
-		Tier:           TierHot,
-		SizeGB:         100.0,
-		Duration:       30 * time.Minute,
-		IngressGB:      100.0,
-		EgressGB:       0.0,
-		CrossRegionGB:  0.0,
-		CPUHours:       0.5,
-		MemoryGBHours:  2.0,
-		Timestamp:      time.Now(),
-		Tags:           map[string]string{"env": "production"},
+		DatabaseName:  "testdb",
+		Provider:      ProviderAWS,
+		Region:        "us-east-1",
+		Tier:          TierHot,
+		SizeGB:        100.0,
+		Duration:      30 * time.Minute,
+		IngressGB:     100.0,
+		EgressGB:      0.0,
+		CrossRegionGB: 0.0,
+		CPUHours:      0.5,
+		MemoryGBHours: 2.0,
+		Timestamp:     time.Now(),
+		Tags:          map[string]string{"env": "production"},
 	}
 
 	err := ct.TrackBackupOperation(ctx, op)
@@ -241,11 +241,11 @@ func TestGetCostProjection(t *testing.T) {
 	// Create historical data
 	for i := 0; i < 30; i++ {
 		snapshot := &CostSnapshot{
-			Timestamp:   time.Now().AddDate(0, 0, -i),
-			TotalCost:   100.0,
-			ByProvider:  make(map[StorageProvider]float64),
-			ByDatabase:  make(map[string]float64),
-			ByTag:       make(map[string]float64),
+			Timestamp:  time.Now().AddDate(0, 0, -i),
+			TotalCost:  100.0,
+			ByProvider: make(map[StorageProvider]float64),
+			ByDatabase: make(map[string]float64),
+			ByTag:      make(map[string]float64),
 		}
 		ct.costHistory = append(ct.costHistory, snapshot)
 	}

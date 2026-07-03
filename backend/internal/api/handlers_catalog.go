@@ -7,10 +7,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/sanskarpan/db-backup/internal/catalog"
 )
 
-// SearchRequest represents a catalog search request
+// SearchRequest represents a catalog search request.
 type SearchRequest struct {
 	// Text search query
 	Text string `json:"text" form:"text"`
@@ -54,7 +55,7 @@ type SearchRequest struct {
 	SortOrder string `json:"sort_order" form:"sort_order"` // asc, desc
 }
 
-// SearchResponse represents a search response
+// SearchResponse represents a search response.
 type SearchResponse struct {
 	Results    []*SearchResultItem `json:"results"`
 	Total      int64               `json:"total"`
@@ -65,23 +66,23 @@ type SearchResponse struct {
 	NextOffset *int                `json:"next_offset,omitempty"`
 }
 
-// SearchResultItem represents a single search result
+// SearchResultItem represents a single search result.
 type SearchResultItem struct {
-	BackupID      string            `json:"backup_id"`
-	DatabaseName  string            `json:"database_name"`
-	DatabaseType  string            `json:"database_type"`
-	BackupType    string            `json:"backup_type"`
-	Status        string            `json:"status"`
-	SizeBytes     int64             `json:"size_bytes"`
-	Duration      float64           `json:"duration"`
-	StoragePath   string            `json:"storage_path"`
-	StorageProvider string          `json:"storage_provider"`
-	CreatedAt     time.Time         `json:"created_at"`
-	ExpiresAt     *time.Time        `json:"expires_at,omitempty"`
-	Tags          map[string]string `json:"tags,omitempty"`
-	Tables        []string          `json:"tables,omitempty"`
-	Schemas       []string          `json:"schemas,omitempty"`
-	Score         float64           `json:"score,omitempty"`
+	BackupID        string            `json:"backup_id"`
+	DatabaseName    string            `json:"database_name"`
+	DatabaseType    string            `json:"database_type"`
+	BackupType      string            `json:"backup_type"`
+	Status          string            `json:"status"`
+	SizeBytes       int64             `json:"size_bytes"`
+	Duration        float64           `json:"duration"`
+	StoragePath     string            `json:"storage_path"`
+	StorageProvider string            `json:"storage_provider"`
+	CreatedAt       time.Time         `json:"created_at"`
+	ExpiresAt       *time.Time        `json:"expires_at,omitempty"`
+	Tags            map[string]string `json:"tags,omitempty"`
+	Tables          []string          `json:"tables,omitempty"`
+	Schemas         []string          `json:"schemas,omitempty"`
+	Score           float64           `json:"score,omitempty"`
 }
 
 // handleSearchCatalog handles POST /api/v1/catalog/search
@@ -94,7 +95,7 @@ type SearchResultItem struct {
 // @Success 200 {object} SearchResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /api/v1/catalog/search [post]
+// @Router /api/v1/catalog/search [post].
 func (s *Server) handleSearchCatalog(c *gin.Context) {
 	var req SearchRequest
 
@@ -227,7 +228,7 @@ func (s *Server) handleSearchCatalog(c *gin.Context) {
 // @Success 200 {object} SearchResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /api/v1/catalog/search [get]
+// @Router /api/v1/catalog/search [get].
 func (s *Server) handleSearchCatalogSimple(c *gin.Context) {
 	// Check if search engine is available
 	if s.searchEngine == nil || !s.searchEngine.IsAvailable() {
@@ -274,7 +275,7 @@ func (s *Server) handleSearchCatalogSimple(c *gin.Context) {
 // @Success 200 {object} SuggestResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /api/v1/catalog/suggest [get]
+// @Router /api/v1/catalog/suggest [get].
 func (s *Server) handleSuggestCatalog(c *gin.Context) {
 	field := c.Query("field")
 	prefix := c.Query("prefix")
@@ -343,7 +344,7 @@ func (s *Server) handleSuggestCatalog(c *gin.Context) {
 // @Produce json
 // @Success 200 {object} catalog.CatalogStats
 // @Failure 500 {object} ErrorResponse
-// @Router /api/v1/catalog/stats [get]
+// @Router /api/v1/catalog/stats [get].
 func (s *Server) handleGetCatalogStats(c *gin.Context) {
 	// Check if search engine is available
 	if s.searchEngine == nil || !s.searchEngine.IsAvailable() {
@@ -369,7 +370,7 @@ func (s *Server) handleGetCatalogStats(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Success 200 {object} QueryExamplesResponse
-// @Router /api/v1/catalog/query-examples [get]
+// @Router /api/v1/catalog/query-examples [get].
 func (s *Server) handleQueryExamples(c *gin.Context) {
 	examples := &QueryExamplesResponse{
 		Examples: []QueryExample{
@@ -426,7 +427,7 @@ func (s *Server) handleQueryExamples(c *gin.Context) {
 	c.JSON(http.StatusOK, examples)
 }
 
-// Helper method to convert search results
+// Helper method to convert search results.
 func (s *Server) convertAndReturnSearchResults(c *gin.Context, results *catalog.SearchResults, query *catalog.SearchQuery) {
 	items := make([]*SearchResultItem, len(results.Results))
 	for i, result := range results.Results {
@@ -470,7 +471,7 @@ func (s *Server) convertAndReturnSearchResults(c *gin.Context, results *catalog.
 	c.JSON(http.StatusOK, response)
 }
 
-// SuggestResponse represents autocomplete suggestion response
+// SuggestResponse represents autocomplete suggestion response.
 type SuggestResponse struct {
 	Field       string   `json:"field"`
 	Prefix      string   `json:"prefix"`
@@ -478,12 +479,12 @@ type SuggestResponse struct {
 	Count       int      `json:"count"`
 }
 
-// QueryExamplesResponse contains example queries
+// QueryExamplesResponse contains example queries.
 type QueryExamplesResponse struct {
 	Examples []QueryExample `json:"examples"`
 }
 
-// QueryExample represents a single query example
+// QueryExample represents a single query example.
 type QueryExample struct {
 	Description string                 `json:"description"`
 	Query       string                 `json:"query"`

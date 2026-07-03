@@ -8,12 +8,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/sanskarpan/db-backup/internal/repository"
 	"github.com/sanskarpan/db-backup/internal/restore"
-	"github.com/spf13/cobra"
 )
 
-// RestoreOptions holds options for the restore command
+// RestoreOptions holds options for the restore command.
 type RestoreOptions struct {
 	BackupID string
 
@@ -43,7 +44,7 @@ type RestoreOptions struct {
 	Force          bool
 }
 
-// restoreCmd represents the restore command
+// restoreCmd represents the restore command.
 var restoreCmd = &cobra.Command{
 	Use:   "restore [backup-id]",
 	Short: "Restore from a backup",
@@ -194,7 +195,7 @@ func runRestore(cmd *cobra.Command, args []string) error {
 		response = strings.TrimSpace(strings.ToLower(response))
 
 		if response != "yes" && response != "y" {
-			fmt.Println("Restore cancelled.")
+			fmt.Println("Restore canceled.")
 			return nil
 		}
 	}
@@ -280,5 +281,5 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(dst, input, 0644)
+	return os.WriteFile(dst, input, 0o644)
 }

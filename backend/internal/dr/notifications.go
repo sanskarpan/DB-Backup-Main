@@ -13,14 +13,14 @@ import (
 	"time"
 )
 
-// NotificationService handles sending notifications for DR test results
+// NotificationService handles sending notifications for DR test results.
 type NotificationService struct {
 	slackWebhook string
 	emailConfig  *EmailConfig
 	httpClient   *http.Client
 }
 
-// EmailConfig contains SMTP configuration for email notifications
+// EmailConfig contains SMTP configuration for email notifications.
 type EmailConfig struct {
 	SMTPHost     string
 	SMTPPort     int
@@ -30,7 +30,7 @@ type EmailConfig struct {
 	FromName     string
 }
 
-// NewNotificationService creates a new notification service
+// NewNotificationService creates a new notification service.
 func NewNotificationService(slackWebhook string, emailConfig *EmailConfig) *NotificationService {
 	return &NotificationService{
 		slackWebhook: slackWebhook,
@@ -41,7 +41,7 @@ func NewNotificationService(slackWebhook string, emailConfig *EmailConfig) *Noti
 	}
 }
 
-// NotifyTestResult sends notifications for a test result
+// NotifyTestResult sends notifications for a test result.
 func (ns *NotificationService) NotifyTestResult(ctx context.Context, schedule *TestSchedule, result *TestResult) error {
 	// Determine if we should notify based on result and schedule settings
 	shouldNotify := (result.Success && schedule.NotifyOnSuccess) ||
@@ -74,7 +74,7 @@ func (ns *NotificationService) NotifyTestResult(ctx context.Context, schedule *T
 	return nil
 }
 
-// SendSlackNotification sends a Slack notification
+// SendSlackNotification sends a Slack notification.
 func (ns *NotificationService) SendSlackNotification(ctx context.Context, schedule *TestSchedule, result *TestResult) error {
 	webhook := schedule.NotificationSlackWebhook
 	if webhook == "" {
@@ -113,7 +113,7 @@ func (ns *NotificationService) SendSlackNotification(ctx context.Context, schedu
 	return nil
 }
 
-// buildSlackMessage builds a Slack message payload
+// buildSlackMessage builds a Slack message payload.
 func (ns *NotificationService) buildSlackMessage(schedule *TestSchedule, result *TestResult) map[string]interface{} {
 	// Determine color based on result
 	color := "#36a64f" // Green for success
@@ -209,7 +209,7 @@ func (ns *NotificationService) buildSlackMessage(schedule *TestSchedule, result 
 	}
 }
 
-// SendEmailNotification sends an email notification
+// SendEmailNotification sends an email notification.
 func (ns *NotificationService) SendEmailNotification(ctx context.Context, schedule *TestSchedule, result *TestResult) error {
 	if ns.emailConfig == nil {
 		return fmt.Errorf("email configuration not set")
@@ -225,7 +225,7 @@ func (ns *NotificationService) SendEmailNotification(ctx context.Context, schedu
 	return ns.sendEmail(schedule.NotificationEmails, subject, body)
 }
 
-// buildEmailSubject builds the email subject line
+// buildEmailSubject builds the email subject line.
 func (ns *NotificationService) buildEmailSubject(schedule *TestSchedule, result *TestResult) string {
 	status := "PASSED"
 	if !result.Success {
@@ -240,7 +240,7 @@ func (ns *NotificationService) buildEmailSubject(schedule *TestSchedule, result 
 		result.DatabaseName)
 }
 
-// buildEmailBody builds the email body (HTML)
+// buildEmailBody builds the email body (HTML).
 func (ns *NotificationService) buildEmailBody(schedule *TestSchedule, result *TestResult) string {
 	statusColor := "#28a745" // Green
 	statusText := "PASSED"
@@ -435,7 +435,7 @@ func (ns *NotificationService) buildEmailBody(schedule *TestSchedule, result *Te
 	return html.String()
 }
 
-// sendEmail sends an email using SMTP
+// sendEmail sends an email using SMTP.
 func (ns *NotificationService) sendEmail(to []string, subject, body string) error {
 	if ns.emailConfig == nil {
 		return fmt.Errorf("email configuration not set")

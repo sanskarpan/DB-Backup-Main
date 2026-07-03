@@ -16,10 +16,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+
 	"github.com/sanskarpan/db-backup/internal/storage"
 )
 
-// WasabiProvider implements the storage.Provider interface for Wasabi
+// WasabiProvider implements the storage.Provider interface for Wasabi.
 type WasabiProvider struct {
 	client     *s3.Client
 	uploader   *manager.Uploader
@@ -28,7 +29,7 @@ type WasabiProvider struct {
 	bucket     string
 }
 
-// Regional endpoints for Wasabi
+// Regional endpoints for Wasabi.
 var wasabiEndpoints = map[string]string{
 	"us-east-1":      "s3.wasabisys.com",
 	"us-east-2":      "s3.us-east-2.wasabisys.com",
@@ -42,7 +43,7 @@ var wasabiEndpoints = map[string]string{
 	"ap-southeast-2": "s3.ap-southeast-2.wasabisys.com",
 }
 
-// NewWasabiProvider creates a new Wasabi storage provider
+// NewWasabiProvider creates a new Wasabi storage provider.
 func NewWasabiProvider(cfg *storage.WasabiConfig) (*WasabiProvider, error) {
 	if err := validateConfig(cfg); err != nil {
 		return nil, err
@@ -75,7 +76,8 @@ func NewWasabiProvider(cfg *storage.WasabiConfig) (*WasabiProvider, error) {
 	})
 
 	// Build AWS config for Wasabi
-	awsCfg, err := config.LoadDefaultConfig(context.Background(),
+	awsCfg, err := config.LoadDefaultConfig(
+		context.Background(),
 		config.WithRegion(cfg.Region),
 		config.WithEndpointResolverWithOptions(customResolver),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
@@ -104,7 +106,7 @@ func NewWasabiProvider(cfg *storage.WasabiConfig) (*WasabiProvider, error) {
 	}, nil
 }
 
-// validateConfig validates the Wasabi configuration
+// validateConfig validates the Wasabi configuration.
 func validateConfig(cfg *storage.WasabiConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("Wasabi config is required")
@@ -124,7 +126,7 @@ func validateConfig(cfg *storage.WasabiConfig) error {
 	return nil
 }
 
-// Upload uploads a file to Wasabi
+// Upload uploads a file to Wasabi.
 func (p *WasabiProvider) Upload(ctx context.Context, localPath, remotePath string, opts *storage.UploadOptions) error {
 	file, err := os.Open(localPath)
 	if err != nil {
@@ -135,7 +137,7 @@ func (p *WasabiProvider) Upload(ctx context.Context, localPath, remotePath strin
 	return p.UploadStream(ctx, file, remotePath, opts)
 }
 
-// UploadStream uploads data from a reader to Wasabi
+// UploadStream uploads data from a reader to Wasabi.
 func (p *WasabiProvider) UploadStream(ctx context.Context, reader io.Reader, remotePath string, opts *storage.UploadOptions) error {
 	if opts == nil {
 		opts = &storage.UploadOptions{}
@@ -183,11 +185,11 @@ func (p *WasabiProvider) UploadStream(ctx context.Context, reader io.Reader, rem
 	return nil
 }
 
-// Download downloads a file from Wasabi
+// Download downloads a file from Wasabi.
 func (p *WasabiProvider) Download(ctx context.Context, remotePath, localPath string) error {
 	// Create local directory if it doesn't exist
 	dir := filepath.Dir(localPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
@@ -210,7 +212,7 @@ func (p *WasabiProvider) Download(ctx context.Context, remotePath, localPath str
 	return nil
 }
 
-// DownloadStream downloads data to a reader
+// DownloadStream downloads data to a reader.
 func (p *WasabiProvider) DownloadStream(ctx context.Context, remotePath string) (io.ReadCloser, error) {
 	output, err := p.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(p.bucket),
@@ -223,7 +225,7 @@ func (p *WasabiProvider) DownloadStream(ctx context.Context, remotePath string) 
 	return output.Body, nil
 }
 
-// Delete deletes a file from Wasabi
+// Delete deletes a file from Wasabi.
 func (p *WasabiProvider) Delete(ctx context.Context, remotePath string) error {
 	_, err := p.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(p.bucket),
@@ -236,7 +238,7 @@ func (p *WasabiProvider) Delete(ctx context.Context, remotePath string) error {
 	return nil
 }
 
-// Exists checks if a file exists in Wasabi
+// Exists checks if a file exists in Wasabi.
 func (p *WasabiProvider) Exists(ctx context.Context, remotePath string) (bool, error) {
 	_, err := p.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(p.bucket),
@@ -253,7 +255,7 @@ func (p *WasabiProvider) Exists(ctx context.Context, remotePath string) (bool, e
 	return true, nil
 }
 
-// GetMetadata retrieves file metadata from Wasabi
+// GetMetadata retrieves file metadata from Wasabi.
 func (p *WasabiProvider) GetMetadata(ctx context.Context, remotePath string) (*storage.FileMetadata, error) {
 	output, err := p.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(p.bucket),
@@ -264,10 +266,10 @@ func (p *WasabiProvider) GetMetadata(ctx context.Context, remotePath string) (*s
 	}
 
 	metadata := &storage.FileMetadata{
-		Path:         remotePath,
-		Size:         *output.ContentLength,
-		ContentType:  aws.ToString(output.ContentType),
-		Metadata:     output.Metadata,
+		Path:        remotePath,
+		Size:        *output.ContentLength,
+		ContentType: aws.ToString(output.ContentType),
+		Metadata:    output.Metadata,
 	}
 
 	if output.LastModified != nil {
@@ -281,7 +283,7 @@ func (p *WasabiProvider) GetMetadata(ctx context.Context, remotePath string) (*s
 	return metadata, nil
 }
 
-// List lists files with a given prefix in Wasabi
+// List lists files with a given prefix in Wasabi.
 func (p *WasabiProvider) List(ctx context.Context, prefix string) ([]*storage.FileMetadata, error) {
 	var files []*storage.FileMetadata
 
@@ -318,17 +320,17 @@ func (p *WasabiProvider) List(ctx context.Context, prefix string) ([]*storage.Fi
 	return files, nil
 }
 
-// GetType returns the provider type
+// GetType returns the provider type.
 func (p *WasabiProvider) GetType() storage.ProviderType {
 	return storage.ProviderTypeWasabi
 }
 
-// ValidateConfig validates the provider configuration
+// ValidateConfig validates the provider configuration.
 func (p *WasabiProvider) ValidateConfig() error {
 	return validateConfig(p.config)
 }
 
-// CreateBucket creates a bucket in Wasabi
+// CreateBucket creates a bucket in Wasabi.
 func (p *WasabiProvider) CreateBucket(ctx context.Context) error {
 	input := &s3.CreateBucketInput{
 		Bucket: aws.String(p.bucket),
@@ -358,7 +360,7 @@ func (p *WasabiProvider) CreateBucket(ctx context.Context) error {
 	return nil
 }
 
-// setObjectLockConfiguration sets the default object lock configuration
+// setObjectLockConfiguration sets the default object lock configuration.
 func (p *WasabiProvider) setObjectLockConfiguration(ctx context.Context) error {
 	_, err := p.client.PutObjectLockConfiguration(ctx, &s3.PutObjectLockConfigurationInput{
 		Bucket: aws.String(p.bucket),
@@ -379,7 +381,7 @@ func (p *WasabiProvider) setObjectLockConfiguration(ctx context.Context) error {
 	return nil
 }
 
-// GetObjectLockConfiguration retrieves the object lock configuration
+// GetObjectLockConfiguration retrieves the object lock configuration.
 func (p *WasabiProvider) GetObjectLockConfiguration(ctx context.Context) (*types.ObjectLockConfiguration, error) {
 	output, err := p.client.GetObjectLockConfiguration(ctx, &s3.GetObjectLockConfigurationInput{
 		Bucket: aws.String(p.bucket),
@@ -391,7 +393,7 @@ func (p *WasabiProvider) GetObjectLockConfiguration(ctx context.Context) (*types
 	return output.ObjectLockConfiguration, nil
 }
 
-// SetLifecyclePolicy sets a lifecycle policy for the bucket
+// SetLifecyclePolicy sets a lifecycle policy for the bucket.
 func (p *WasabiProvider) SetLifecyclePolicy(ctx context.Context, rules []types.LifecycleRule) error {
 	_, err := p.client.PutBucketLifecycleConfiguration(ctx, &s3.PutBucketLifecycleConfigurationInput{
 		Bucket: aws.String(p.bucket),
@@ -406,7 +408,7 @@ func (p *WasabiProvider) SetLifecyclePolicy(ctx context.Context, rules []types.L
 	return nil
 }
 
-// GetLifecyclePolicy returns the lifecycle policy of the bucket
+// GetLifecyclePolicy returns the lifecycle policy of the bucket.
 func (p *WasabiProvider) GetLifecyclePolicy(ctx context.Context) ([]types.LifecycleRule, error) {
 	output, err := p.client.GetBucketLifecycleConfiguration(ctx, &s3.GetBucketLifecycleConfigurationInput{
 		Bucket: aws.String(p.bucket),

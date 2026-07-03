@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// GitOpsController manages GitOps workflow for backup configurations
+// GitOpsController manages GitOps workflow for backup configurations.
 type GitOpsController struct {
 	mu              sync.RWMutex
 	configManager   *ConfigManager
@@ -28,45 +28,45 @@ type GitOpsController struct {
 	conflictHandler ConflictHandler
 }
 
-// ReconcileRequest represents a request to reconcile configuration
+// ReconcileRequest represents a request to reconcile configuration.
 type ReconcileRequest struct {
 	ConfigName string
 	Source     string // "git" or "local"
 	Timestamp  time.Time
 }
 
-// SyncRecord tracks synchronization history
+// SyncRecord tracks synchronization history.
 type SyncRecord struct {
-	Timestamp    time.Time         `json:"timestamp"`
-	CommitHash   string            `json:"commitHash"`
-	Status       string            `json:"status"` // success, failure, conflict
-	ConfigsAdded int               `json:"configsAdded"`
-	ConfigsUpdated int             `json:"configsUpdated"`
-	ConfigsDeleted int             `json:"configsDeleted"`
-	Errors       []string          `json:"errors,omitempty"`
-	Duration     time.Duration     `json:"duration"`
+	Timestamp      time.Time     `json:"timestamp"`
+	CommitHash     string        `json:"commitHash"`
+	Status         string        `json:"status"` // success, failure, conflict
+	ConfigsAdded   int           `json:"configsAdded"`
+	ConfigsUpdated int           `json:"configsUpdated"`
+	ConfigsDeleted int           `json:"configsDeleted"`
+	Errors         []string      `json:"errors,omitempty"`
+	Duration       time.Duration `json:"duration"`
 }
 
-// ConflictHandler handles conflicts between Git and local configurations
+// ConflictHandler handles conflicts between Git and local configurations.
 type ConflictHandler interface {
 	ResolveConflict(gitConfig, localConfig *BackupConfig) (*BackupConfig, error)
 }
 
-// GitSourcePriorityHandler always prefers Git source
+// GitSourcePriorityHandler always prefers Git source.
 type GitSourcePriorityHandler struct{}
 
 func (h *GitSourcePriorityHandler) ResolveConflict(gitConfig, localConfig *BackupConfig) (*BackupConfig, error) {
 	return gitConfig, nil
 }
 
-// LocalSourcePriorityHandler always prefers local source
+// LocalSourcePriorityHandler always prefers local source.
 type LocalSourcePriorityHandler struct{}
 
 func (h *LocalSourcePriorityHandler) ResolveConflict(gitConfig, localConfig *BackupConfig) (*BackupConfig, error) {
 	return localConfig, nil
 }
 
-// NewestWinsHandler prefers the most recently updated configuration
+// NewestWinsHandler prefers the most recently updated configuration.
 type NewestWinsHandler struct{}
 
 func (h *NewestWinsHandler) ResolveConflict(gitConfig, localConfig *BackupConfig) (*BackupConfig, error) {
@@ -76,7 +76,7 @@ func (h *NewestWinsHandler) ResolveConflict(gitConfig, localConfig *BackupConfig
 	return localConfig, nil
 }
 
-// NewGitOpsController creates a new GitOps controller
+// NewGitOpsController creates a new GitOps controller.
 func NewGitOpsController(
 	configManager *ConfigManager,
 	validator *Validator,
@@ -101,14 +101,14 @@ func NewGitOpsController(
 	}
 }
 
-// SetConflictHandler sets the conflict resolution handler
+// SetConflictHandler sets the conflict resolution handler.
 func (gc *GitOpsController) SetConflictHandler(handler ConflictHandler) {
 	gc.mu.Lock()
 	defer gc.mu.Unlock()
 	gc.conflictHandler = handler
 }
 
-// Start starts the GitOps controller
+// Start starts the GitOps controller.
 func (gc *GitOpsController) Start() error {
 	gc.mu.Lock()
 	if gc.running {
@@ -132,7 +132,7 @@ func (gc *GitOpsController) Start() error {
 	return nil
 }
 
-// Stop stops the GitOps controller
+// Stop stops the GitOps controller.
 func (gc *GitOpsController) Stop() error {
 	gc.mu.Lock()
 	defer gc.mu.Unlock()
@@ -147,7 +147,7 @@ func (gc *GitOpsController) Stop() error {
 	return nil
 }
 
-// initializeRepository clones or pulls the Git repository
+// initializeRepository clones or pulls the Git repository.
 func (gc *GitOpsController) initializeRepository() error {
 	// Check if repository exists
 	if _, err := os.Stat(filepath.Join(gc.localRepoPath, ".git")); os.IsNotExist(err) {
@@ -159,7 +159,7 @@ func (gc *GitOpsController) initializeRepository() error {
 	return gc.pullRepository()
 }
 
-// cloneRepository clones the Git repository
+// cloneRepository clones the Git repository.
 func (gc *GitOpsController) cloneRepository() error {
 	args := []string{"clone", "--branch", gc.gitConfig.Branch}
 
@@ -180,7 +180,7 @@ func (gc *GitOpsController) cloneRepository() error {
 	return nil
 }
 
-// pullRepository pulls latest changes from Git
+// pullRepository pulls latest changes from Git.
 func (gc *GitOpsController) pullRepository() error {
 	cmd := exec.Command("git", "-C", gc.localRepoPath, "pull", "origin", gc.gitConfig.Branch)
 	output, err := cmd.CombinedOutput()
@@ -191,7 +191,7 @@ func (gc *GitOpsController) pullRepository() error {
 	return nil
 }
 
-// syncLoop periodically syncs with Git repository
+// syncLoop periodically syncs with Git repository.
 func (gc *GitOpsController) syncLoop() {
 	ticker := time.NewTicker(gc.syncInterval)
 	defer ticker.Stop()
@@ -209,7 +209,7 @@ func (gc *GitOpsController) syncLoop() {
 	}
 }
 
-// Sync synchronizes configurations from Git repository
+// Sync synchronizes configurations from Git repository.
 func (gc *GitOpsController) Sync() error {
 	startTime := time.Now()
 	record := &SyncRecord{
@@ -277,7 +277,7 @@ func (gc *GitOpsController) Sync() error {
 	return nil
 }
 
-// loadGitConfigs loads configurations from Git repository
+// loadGitConfigs loads configurations from Git repository.
 func (gc *GitOpsController) loadGitConfigs(path string, configs map[string]*BackupConfig) error {
 	entries, err := os.ReadDir(path)
 	if err != nil {
@@ -311,7 +311,7 @@ func (gc *GitOpsController) loadGitConfigs(path string, configs map[string]*Back
 	return nil
 }
 
-// reconcileConfigs reconciles Git and local configurations
+// reconcileConfigs reconciles Git and local configurations.
 func (gc *GitOpsController) reconcileConfigs(
 	gitConfigs map[string]*BackupConfig,
 	localConfigs map[string]*BackupConfig,
@@ -381,7 +381,7 @@ func (gc *GitOpsController) reconcileConfigs(
 	return
 }
 
-// configChanged checks if a configuration has changed
+// configChanged checks if a configuration has changed.
 func (gc *GitOpsController) configChanged(gitConfig, localConfig *BackupConfig) bool {
 	// Compare checksums of serialized configs
 	gitHash := gc.computeConfigHash(gitConfig)
@@ -390,7 +390,7 @@ func (gc *GitOpsController) configChanged(gitConfig, localConfig *BackupConfig) 
 	return gitHash != localHash
 }
 
-// computeConfigHash computes a hash of the configuration
+// computeConfigHash computes a hash of the configuration.
 func (gc *GitOpsController) computeConfigHash(config *BackupConfig) string {
 	// Create a copy without status and metadata timestamps
 	configCopy := *config
@@ -406,13 +406,13 @@ func (gc *GitOpsController) computeConfigHash(config *BackupConfig) string {
 	return hex.EncodeToString(hash[:])
 }
 
-// marshalYAML is a helper to marshal configuration
+// marshalYAML is a helper to marshal configuration.
 func marshalYAML(config *BackupConfig) ([]byte, error) {
 	// Import yaml at the top of the file
 	return []byte(fmt.Sprintf("%+v", config)), nil
 }
 
-// getCurrentCommitHash gets the current Git commit hash
+// getCurrentCommitHash gets the current Git commit hash.
 func (gc *GitOpsController) getCurrentCommitHash() (string, error) {
 	cmd := exec.Command("git", "-C", gc.localRepoPath, "rev-parse", "HEAD")
 	output, err := cmd.CombinedOutput()
@@ -423,7 +423,7 @@ func (gc *GitOpsController) getCurrentCommitHash() (string, error) {
 	return string(bytes.TrimSpace(output)), nil
 }
 
-// reconcileWorker processes reconciliation requests
+// reconcileWorker processes reconciliation requests.
 func (gc *GitOpsController) reconcileWorker() {
 	for {
 		select {
@@ -435,13 +435,13 @@ func (gc *GitOpsController) reconcileWorker() {
 	}
 }
 
-// processReconcileRequest processes a reconciliation request
+// processReconcileRequest processes a reconciliation request.
 func (gc *GitOpsController) processReconcileRequest(req *ReconcileRequest) {
 	// Implementation for processing reconciliation requests
 	fmt.Printf("Processing reconcile request for %s from %s\n", req.ConfigName, req.Source)
 }
 
-// addSyncRecord adds a sync record to history
+// addSyncRecord adds a sync record to history.
 func (gc *GitOpsController) addSyncRecord(record *SyncRecord) {
 	gc.mu.Lock()
 	defer gc.mu.Unlock()
@@ -454,7 +454,7 @@ func (gc *GitOpsController) addSyncRecord(record *SyncRecord) {
 	}
 }
 
-// GetSyncHistory returns sync history
+// GetSyncHistory returns sync history.
 func (gc *GitOpsController) GetSyncHistory() []*SyncRecord {
 	gc.mu.RLock()
 	defer gc.mu.RUnlock()
@@ -465,7 +465,7 @@ func (gc *GitOpsController) GetSyncHistory() []*SyncRecord {
 	return history
 }
 
-// GetLastSync returns the timestamp of the last sync
+// GetLastSync returns the timestamp of the last sync.
 func (gc *GitOpsController) GetLastSync() time.Time {
 	gc.mu.RLock()
 	defer gc.mu.RUnlock()
@@ -473,12 +473,12 @@ func (gc *GitOpsController) GetLastSync() time.Time {
 	return gc.lastSync
 }
 
-// TriggerSync manually triggers a sync
+// TriggerSync manually triggers a sync.
 func (gc *GitOpsController) TriggerSync() error {
 	return gc.Sync()
 }
 
-// PushConfig pushes a local configuration to Git
+// PushConfig pushes a local configuration to Git.
 func (gc *GitOpsController) PushConfig(config *BackupConfig, commitMessage string) error {
 	// Save config to repository
 	configPath := filepath.Join(gc.localRepoPath, gc.gitConfig.Path, config.Metadata.Name+".yaml")
@@ -508,7 +508,7 @@ func (gc *GitOpsController) PushConfig(config *BackupConfig, commitMessage strin
 	return nil
 }
 
-// ValidateRepository validates the Git repository configuration
+// ValidateRepository validates the Git repository configuration.
 func (gc *GitOpsController) ValidateRepository() error {
 	// Check if Git is installed
 	cmd := exec.Command("git", "--version")
@@ -524,7 +524,7 @@ func (gc *GitOpsController) ValidateRepository() error {
 	return nil
 }
 
-// testRepositoryAccess tests if the repository is accessible
+// testRepositoryAccess tests if the repository is accessible.
 func (gc *GitOpsController) testRepositoryAccess() error {
 	cmd := exec.Command("git", "ls-remote", gc.gitConfig.Repository)
 
@@ -540,7 +540,7 @@ func (gc *GitOpsController) testRepositoryAccess() error {
 	return nil
 }
 
-// GetStatus returns the current GitOps status
+// GetStatus returns the current GitOps status.
 func (gc *GitOpsController) GetStatus() map[string]interface{} {
 	gc.mu.RLock()
 	defer gc.mu.RUnlock()
@@ -566,12 +566,12 @@ func (gc *GitOpsController) GetStatus() map[string]interface{} {
 	return status
 }
 
-// ExportConfig exports a configuration to a file
+// ExportConfig exports a configuration to a file.
 func (gc *GitOpsController) ExportConfig(config *BackupConfig, outputPath string) error {
 	return gc.configManager.SaveConfig(config, outputPath)
 }
 
-// ImportConfig imports a configuration from a file
+// ImportConfig imports a configuration from a file.
 func (gc *GitOpsController) ImportConfig(inputPath string) (*BackupConfig, error) {
 	config, err := gc.configManager.LoadConfig(inputPath)
 	if err != nil {

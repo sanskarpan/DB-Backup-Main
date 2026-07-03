@@ -14,7 +14,7 @@ import (
 // +kubebuilder:printcolumn:name="Last Backup",type=date,JSONPath=`.status.lastBackupTime`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
-// BackupPolicy defines a backup policy for database backups
+// BackupPolicy defines a backup policy for database backups.
 type BackupPolicy struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -23,7 +23,7 @@ type BackupPolicy struct {
 	Status BackupPolicyStatus `json:"status,omitempty"`
 }
 
-// BackupPolicySpec defines the desired state of BackupPolicy
+// BackupPolicySpec defines the desired state of BackupPolicy.
 type BackupPolicySpec struct {
 	// Type of database (postgres, mysql, mongodb, sqlite)
 	// +kubebuilder:validation:Required
@@ -110,7 +110,7 @@ type BackupPolicySpec struct {
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 }
 
-// DatabaseReference references database credentials
+// DatabaseReference references database credentials.
 type DatabaseReference struct {
 	// Name of secret containing database credentials
 	SecretName string `json:"secretName"`
@@ -119,7 +119,7 @@ type DatabaseReference struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
-// RetentionPolicy defines backup retention
+// RetentionPolicy defines backup retention.
 type RetentionPolicy struct {
 	// Number of daily backups to retain
 	// +kubebuilder:validation:Required
@@ -143,7 +143,7 @@ type RetentionPolicy struct {
 	Yearly int `json:"yearly,omitempty"`
 }
 
-// StorageConfig defines storage configuration
+// StorageConfig defines storage configuration.
 type StorageConfig struct {
 	// Storage provider (s3, azure, gcp, local)
 	// +kubebuilder:validation:Required
@@ -167,7 +167,7 @@ type StorageConfig struct {
 	CredentialsSecret string `json:"credentialsSecret,omitempty"`
 }
 
-// CompressionConfig defines compression settings
+// CompressionConfig defines compression settings.
 type CompressionConfig struct {
 	// +kubebuilder:default=true
 	Enabled bool `json:"enabled,omitempty"`
@@ -184,7 +184,7 @@ type CompressionConfig struct {
 	Level int `json:"level,omitempty"`
 }
 
-// EncryptionConfig defines encryption settings
+// EncryptionConfig defines encryption settings.
 type EncryptionConfig struct {
 	// +kubebuilder:default=true
 	Enabled bool `json:"enabled,omitempty"`
@@ -198,7 +198,7 @@ type EncryptionConfig struct {
 	KeySecretName string `json:"keySecretName,omitempty"`
 }
 
-// VerificationConfig defines verification settings
+// VerificationConfig defines verification settings.
 type VerificationConfig struct {
 	// +kubebuilder:default=true
 	Enabled bool `json:"enabled,omitempty"`
@@ -209,7 +209,7 @@ type VerificationConfig struct {
 	Method string `json:"method,omitempty"`
 }
 
-// NotificationConfig defines notification settings
+// NotificationConfig defines notification settings.
 type NotificationConfig struct {
 	// +kubebuilder:default=false
 	Enabled bool `json:"enabled,omitempty"`
@@ -224,7 +224,7 @@ type NotificationConfig struct {
 	OnFailure bool `json:"onFailure,omitempty"`
 }
 
-// BackupPolicyStatus defines the observed state of BackupPolicy
+// BackupPolicyStatus defines the observed state of BackupPolicy.
 type BackupPolicyStatus struct {
 	// Current phase of the policy
 	// +kubebuilder:validation:Enum=Active;Suspended;Failed
@@ -257,7 +257,7 @@ type BackupPolicyStatus struct {
 
 // +kubebuilder:object:root=true
 
-// BackupPolicyList contains a list of BackupPolicy
+// BackupPolicyList contains a list of BackupPolicy.
 type BackupPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
@@ -272,7 +272,7 @@ type BackupPolicyList struct {
 // +kubebuilder:printcolumn:name="Progress",type=integer,JSONPath=`.status.progress`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
-// RestoreJob defines a database restore operation
+// RestoreJob defines a database restore operation.
 type RestoreJob struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -281,7 +281,7 @@ type RestoreJob struct {
 	Status RestoreJobStatus `json:"status,omitempty"`
 }
 
-// RestoreJobSpec defines the desired state of RestoreJob
+// RestoreJobSpec defines the desired state of RestoreJob.
 type RestoreJobSpec struct {
 	// ID of backup to restore
 	// +kubebuilder:validation:Required
@@ -341,7 +341,7 @@ type RestoreJobSpec struct {
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
 }
 
-// BackupLocation defines backup file location
+// BackupLocation defines backup file location.
 type BackupLocation struct {
 	// Storage provider (s3, azure, gcp, local)
 	// +kubebuilder:validation:Required
@@ -366,7 +366,7 @@ type BackupLocation struct {
 	CredentialsSecret string `json:"credentialsSecret,omitempty"`
 }
 
-// TargetDatabase defines target database configuration
+// TargetDatabase defines target database configuration.
 type TargetDatabase struct {
 	// Database type (postgres, mysql, mongodb, sqlite)
 	// +kubebuilder:validation:Required
@@ -384,7 +384,7 @@ type TargetDatabase struct {
 	DatabaseName string `json:"databaseName,omitempty"`
 }
 
-// RestoreOptions defines restore options
+// RestoreOptions defines restore options.
 type RestoreOptions struct {
 	// Point-in-time for PITR restore
 	PointInTime *metav1.Time `json:"pointInTime,omitempty"`
@@ -422,7 +422,7 @@ type RestoreOptions struct {
 	SchemaOnly bool `json:"schemaOnly,omitempty"`
 }
 
-// RestoreVerification defines post-restore verification
+// RestoreVerification defines post-restore verification.
 type RestoreVerification struct {
 	// +kubebuilder:default=true
 	Enabled bool `json:"enabled,omitempty"`
@@ -437,7 +437,7 @@ type RestoreVerification struct {
 	CustomQuery string `json:"customQuery,omitempty"`
 }
 
-// RetryPolicy defines retry policy
+// RetryPolicy defines retry policy.
 type RetryPolicy struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=10
@@ -450,7 +450,7 @@ type RetryPolicy struct {
 	BackoffSeconds int `json:"backoffSeconds,omitempty"`
 }
 
-// RestoreJobStatus defines the observed state of RestoreJob
+// RestoreJobStatus defines the observed state of RestoreJob.
 type RestoreJobStatus struct {
 	// Current phase of restore
 	// +kubebuilder:validation:Enum=Pending;Downloading;Decompressing;Decrypting;Restoring;Verifying;Completed;Failed
@@ -492,17 +492,17 @@ type RestoreJobStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-// VerificationResult defines verification result
+// VerificationResult defines verification result.
 type VerificationResult struct {
-	Passed         bool   `json:"passed"`
-	ChecksumValid  bool   `json:"checksumValid"`
-	RowCountMatch  bool   `json:"rowCountMatch"`
-	Message        string `json:"message,omitempty"`
+	Passed        bool   `json:"passed"`
+	ChecksumValid bool   `json:"checksumValid"`
+	RowCountMatch bool   `json:"rowCountMatch"`
+	Message       string `json:"message,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// RestoreJobList contains a list of RestoreJob
+// RestoreJobList contains a list of RestoreJob.
 type RestoreJobList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
@@ -518,7 +518,7 @@ type RestoreJobList struct {
 // +kubebuilder:printcolumn:name="Last Run",type=date,JSONPath=`.status.lastScheduleTime`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
-// BackupSchedule defines a scheduled backup job
+// BackupSchedule defines a scheduled backup job.
 type BackupSchedule struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -527,7 +527,7 @@ type BackupSchedule struct {
 	Status BackupScheduleStatus `json:"status,omitempty"`
 }
 
-// BackupScheduleSpec defines the desired state of BackupSchedule
+// BackupScheduleSpec defines the desired state of BackupSchedule.
 type BackupScheduleSpec struct {
 	// Cron schedule expression
 	// +kubebuilder:validation:Required
@@ -582,7 +582,7 @@ type BackupScheduleSpec struct {
 	CleanupOnDelete bool `json:"cleanupOnDelete,omitempty"`
 }
 
-// BackupPolicyReference references a BackupPolicy
+// BackupPolicyReference references a BackupPolicy.
 type BackupPolicyReference struct {
 	// Name of BackupPolicy
 	// +kubebuilder:validation:Required
@@ -592,7 +592,7 @@ type BackupPolicyReference struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
-// BackupTemplate defines backup job template
+// BackupTemplate defines backup job template.
 type BackupTemplate struct {
 	// Metadata for backup job
 	Metadata *BackupTemplateMetadata `json:"metadata,omitempty"`
@@ -601,13 +601,13 @@ type BackupTemplate struct {
 	Spec *BackupTemplateSpec `json:"spec,omitempty"`
 }
 
-// BackupTemplateMetadata defines metadata for backup job
+// BackupTemplateMetadata defines metadata for backup job.
 type BackupTemplateMetadata struct {
 	Labels      map[string]string `json:"labels,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-// BackupTemplateSpec defines spec overrides
+// BackupTemplateSpec defines spec overrides.
 type BackupTemplateSpec struct {
 	// +kubebuilder:validation:Enum=full;incremental;differential
 	BackupType string `json:"backupType,omitempty"`
@@ -619,7 +619,7 @@ type BackupTemplateSpec struct {
 	TimeoutSeconds int `json:"timeoutSeconds,omitempty"`
 }
 
-// MaintenanceWindow defines allowed time window
+// MaintenanceWindow defines allowed time window.
 type MaintenanceWindow struct {
 	// Start time (HH:MM format)
 	// +kubebuilder:validation:Pattern=`^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$`
@@ -635,7 +635,7 @@ type MaintenanceWindow struct {
 	Days []int `json:"days,omitempty"`
 }
 
-// ScheduleNotificationConfig defines schedule notification settings
+// ScheduleNotificationConfig defines schedule notification settings.
 type ScheduleNotificationConfig struct {
 	// +kubebuilder:default=false
 	Enabled bool `json:"enabled,omitempty"`
@@ -652,7 +652,7 @@ type ScheduleNotificationConfig struct {
 	OnMissedSchedule bool `json:"onMissedSchedule,omitempty"`
 }
 
-// BackupScheduleStatus defines the observed state
+// BackupScheduleStatus defines the observed state.
 type BackupScheduleStatus struct {
 	// Current phase
 	// +kubebuilder:validation:Enum=Active;Suspended;Failed
@@ -689,7 +689,7 @@ type BackupScheduleStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-// ActiveJob defines an active backup job
+// ActiveJob defines an active backup job.
 type ActiveJob struct {
 	Name      string       `json:"name"`
 	Namespace string       `json:"namespace"`
@@ -699,7 +699,7 @@ type ActiveJob struct {
 
 // +kubebuilder:object:root=true
 
-// BackupScheduleList contains a list of BackupSchedule
+// BackupScheduleList contains a list of BackupSchedule.
 type BackupScheduleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// QueryOptimizer provides query optimization capabilities
+// QueryOptimizer provides query optimization capabilities.
 type QueryOptimizer struct {
 	analyzer          QueryAnalyzer
 	indexRecommender  IndexRecommender
@@ -20,7 +20,7 @@ type QueryOptimizer struct {
 	mu                sync.RWMutex
 }
 
-// OptimizerConfig holds optimizer configuration
+// OptimizerConfig holds optimizer configuration.
 type OptimizerConfig struct {
 	// Slow query threshold
 	SlowQueryThreshold time.Duration
@@ -50,7 +50,7 @@ type OptimizerConfig struct {
 	AnalysisTimeout time.Duration
 }
 
-// QueryAnalyzer analyzes query execution plans
+// QueryAnalyzer analyzes query execution plans.
 type QueryAnalyzer interface {
 	// AnalyzeQueryPlan analyzes the execution plan for a query
 	AnalyzeQueryPlan(ctx context.Context, query string) (*QueryPlan, error)
@@ -65,7 +65,7 @@ type QueryAnalyzer interface {
 	GetTableStatistics(ctx context.Context, table string) (*TableStatistics, error)
 }
 
-// IndexRecommender recommends indexes for query optimization
+// IndexRecommender recommends indexes for query optimization.
 type IndexRecommender interface {
 	// RecommendIndexes recommends indexes based on query patterns
 	RecommendIndexes(ctx context.Context, queries []string) ([]*IndexRecommendation, error)
@@ -77,7 +77,7 @@ type IndexRecommender interface {
 	ValidateIndex(ctx context.Context, table string, columns []string) (*IndexValidation, error)
 }
 
-// QueryRewriter rewrites queries for better performance
+// QueryRewriter rewrites queries for better performance.
 type QueryRewriter interface {
 	// RewriteQuery rewrites a query for optimization
 	RewriteQuery(ctx context.Context, query string) (*RewrittenQuery, error)
@@ -89,7 +89,7 @@ type QueryRewriter interface {
 	ApplyRule(ctx context.Context, query string, rule RewriteRule) (string, error)
 }
 
-// DatabaseType represents the type of database
+// DatabaseType represents the type of database.
 type DatabaseType string
 
 const (
@@ -99,39 +99,39 @@ const (
 	DatabaseTypeSQLite     DatabaseType = "sqlite"
 )
 
-// QueryPlan represents a query execution plan
+// QueryPlan represents a query execution plan.
 type QueryPlan struct {
-	Query            string
-	DatabaseType     DatabaseType
-	EstimatedCost    float64
-	EstimatedRows    int64
-	ActualCost       float64
-	ActualRows       int64
-	ExecutionTime    time.Duration
-	PlanNodes        []*PlanNode
-	UsedIndexes      []string
-	MissingIndexes   []string
-	Warnings         []string
-	Recommendations  []string
-	AnalyzedAt       time.Time
+	Query           string
+	DatabaseType    DatabaseType
+	EstimatedCost   float64
+	EstimatedRows   int64
+	ActualCost      float64
+	ActualRows      int64
+	ExecutionTime   time.Duration
+	PlanNodes       []*PlanNode
+	UsedIndexes     []string
+	MissingIndexes  []string
+	Warnings        []string
+	Recommendations []string
+	AnalyzedAt      time.Time
 }
 
-// PlanNode represents a node in the query execution plan
+// PlanNode represents a node in the query execution plan.
 type PlanNode struct {
-	NodeType        string
-	Operation       string
-	Table           string
-	Index           string
-	Rows            int64
-	Cost            float64
-	Width           int
-	Filters         []string
-	JoinType        string
-	Children        []*PlanNode
-	ExtraInfo       map[string]interface{}
+	NodeType  string
+	Operation string
+	Table     string
+	Index     string
+	Rows      int64
+	Cost      float64
+	Width     int
+	Filters   []string
+	JoinType  string
+	Children  []*PlanNode
+	ExtraInfo map[string]interface{}
 }
 
-// IndexRecommendation represents a recommended index
+// IndexRecommendation represents a recommended index.
 type IndexRecommendation struct {
 	Table           string
 	Columns         []string
@@ -144,19 +144,19 @@ type IndexRecommendation struct {
 	CreatedAt       time.Time
 }
 
-// IndexType represents the type of index
+// IndexType represents the type of index.
 type IndexType string
 
 const (
-	IndexTypeBTree   IndexType = "btree"
-	IndexTypeHash    IndexType = "hash"
-	IndexTypeGIN     IndexType = "gin"
-	IndexTypeGiST    IndexType = "gist"
-	IndexTypeBRIN    IndexType = "brin"
+	IndexTypeBTree    IndexType = "btree"
+	IndexTypeHash     IndexType = "hash"
+	IndexTypeGIN      IndexType = "gin"
+	IndexTypeGiST     IndexType = "gist"
+	IndexTypeBRIN     IndexType = "brin"
 	IndexTypeFullText IndexType = "fulltext"
 )
 
-// Priority represents recommendation priority
+// Priority represents recommendation priority.
 type Priority string
 
 const (
@@ -166,7 +166,7 @@ const (
 	PriorityLow      Priority = "low"
 )
 
-// IndexUsage represents index usage statistics
+// IndexUsage represents index usage statistics.
 type IndexUsage struct {
 	SchemaName     string
 	TableName      string
@@ -182,28 +182,28 @@ type IndexUsage struct {
 	Recommendation string
 }
 
-// IndexValidation represents index validation result
+// IndexValidation represents index validation result.
 type IndexValidation struct {
-	Table          string
-	Columns        []string
-	IsValid        bool
-	IsBeneficial   bool
-	ExpectedGain   float64
-	Warnings       []string
-	Alternatives   []*IndexRecommendation
+	Table        string
+	Columns      []string
+	IsValid      bool
+	IsBeneficial bool
+	ExpectedGain float64
+	Warnings     []string
+	Alternatives []*IndexRecommendation
 }
 
-// RewrittenQuery represents a rewritten query
+// RewrittenQuery represents a rewritten query.
 type RewrittenQuery struct {
-	OriginalQuery string
+	OriginalQuery  string
 	RewrittenQuery string
-	AppliedRules  []string
-	EstimatedGain float64
-	Explanation   string
-	RewrittenAt   time.Time
+	AppliedRules   []string
+	EstimatedGain  float64
+	Explanation    string
+	RewrittenAt    time.Time
 }
 
-// RewriteRule represents a query rewrite rule
+// RewriteRule represents a query rewrite rule.
 type RewriteRule struct {
 	Name        string
 	Description string
@@ -214,55 +214,55 @@ type RewriteRule struct {
 	Enabled     bool
 }
 
-// TableStatistics represents table statistics
+// TableStatistics represents table statistics.
 type TableStatistics struct {
-	SchemaName      string
-	TableName       string
-	RowCount        int64
-	TableSize       int64
-	IndexSize       int64
-	DeadTuples      int64
-	LastVacuum      *time.Time
-	LastAnalyze     *time.Time
-	EstimatedRows   int64
-	AvgRowSize      int
-	Bloat           float64
+	SchemaName    string
+	TableName     string
+	RowCount      int64
+	TableSize     int64
+	IndexSize     int64
+	DeadTuples    int64
+	LastVacuum    *time.Time
+	LastAnalyze   *time.Time
+	EstimatedRows int64
+	AvgRowSize    int
+	Bloat         float64
 }
 
-// QueryStatistics represents query execution statistics
+// QueryStatistics represents query execution statistics.
 type QueryStatistics struct {
-	Query            string
-	QueryHash        string
-	DatabaseType     DatabaseType
-	ExecutionCount   int64
-	TotalTime        time.Duration
-	MinTime          time.Duration
-	MaxTime          time.Duration
-	MeanTime         time.Duration
-	StdDevTime       time.Duration
-	RowsReturned     int64
-	RowsAffected     int64
-	CacheHitRatio    float64
-	IndexHitRatio    float64
-	LastExecuted     time.Time
-	FirstExecuted    time.Time
+	Query          string
+	QueryHash      string
+	DatabaseType   DatabaseType
+	ExecutionCount int64
+	TotalTime      time.Duration
+	MinTime        time.Duration
+	MaxTime        time.Duration
+	MeanTime       time.Duration
+	StdDevTime     time.Duration
+	RowsReturned   int64
+	RowsAffected   int64
+	CacheHitRatio  float64
+	IndexHitRatio  float64
+	LastExecuted   time.Time
+	FirstExecuted  time.Time
 }
 
-// SlowQuery represents a slow query entry
+// SlowQuery represents a slow query entry.
 type SlowQuery struct {
-	Query         string
-	QueryHash     string
-	DatabaseType  DatabaseType
-	ExecutionTime time.Duration
-	Timestamp     time.Time
-	User          string
-	Database      string
-	Plan          *QueryPlan
+	Query           string
+	QueryHash       string
+	DatabaseType    DatabaseType
+	ExecutionTime   time.Duration
+	Timestamp       time.Time
+	User            string
+	Database        string
+	Plan            *QueryPlan
 	Recommendations []string
-	Severity      Severity
+	Severity        Severity
 }
 
-// Severity represents query issue severity
+// Severity represents query issue severity.
 type Severity string
 
 const (
@@ -272,7 +272,7 @@ const (
 	SeverityLow      Severity = "low"
 )
 
-// NewQueryOptimizer creates a new query optimizer
+// NewQueryOptimizer creates a new query optimizer.
 func NewQueryOptimizer(config *OptimizerConfig, analyzer QueryAnalyzer) *QueryOptimizer {
 	if config == nil {
 		config = DefaultOptimizerConfig()
@@ -288,7 +288,7 @@ func NewQueryOptimizer(config *OptimizerConfig, analyzer QueryAnalyzer) *QueryOp
 	return optimizer
 }
 
-// DefaultOptimizerConfig returns default optimizer configuration
+// DefaultOptimizerConfig returns default optimizer configuration.
 func DefaultOptimizerConfig() *OptimizerConfig {
 	return &OptimizerConfig{
 		SlowQueryThreshold:         1 * time.Second,
@@ -303,15 +303,15 @@ func DefaultOptimizerConfig() *OptimizerConfig {
 	}
 }
 
-// AnalyzeQuery analyzes a query and returns optimization recommendations
+// AnalyzeQuery analyzes a query and returns optimization recommendations.
 func (qo *QueryOptimizer) AnalyzeQuery(ctx context.Context, query string) (*QueryAnalysis, error) {
 	qo.mu.RLock()
 	defer qo.mu.RUnlock()
 
 	start := time.Now()
 	analysis := &QueryAnalysis{
-		Query:       query,
-		AnalyzedAt:  start,
+		Query:      query,
+		AnalyzedAt: start,
 	}
 
 	// Analyze query plan
@@ -345,7 +345,7 @@ func (qo *QueryOptimizer) AnalyzeQuery(ctx context.Context, query string) (*Quer
 	return analysis, nil
 }
 
-// RecommendIndexes recommends indexes for a set of queries
+// RecommendIndexes recommends indexes for a set of queries.
 func (qo *QueryOptimizer) RecommendIndexes(ctx context.Context, queries []string) ([]*IndexRecommendation, error) {
 	if !qo.config.EnableIndexRecommendations || qo.indexRecommender == nil {
 		return nil, fmt.Errorf("index recommendations are disabled")
@@ -376,7 +376,7 @@ func (qo *QueryOptimizer) RecommendIndexes(ctx context.Context, queries []string
 	return filtered, nil
 }
 
-// DetectSlowQuery detects and records slow queries
+// DetectSlowQuery detects and records slow queries.
 func (qo *QueryOptimizer) DetectSlowQuery(query string, executionTime time.Duration) *SlowQuery {
 	if qo.slowQueryDetector == nil {
 		return nil
@@ -394,7 +394,7 @@ func (qo *QueryOptimizer) DetectSlowQuery(query string, executionTime time.Durat
 	return slowQuery
 }
 
-// RewriteQuery rewrites a query for optimization
+// RewriteQuery rewrites a query for optimization.
 func (qo *QueryOptimizer) RewriteQuery(ctx context.Context, query string) (*RewrittenQuery, error) {
 	if !qo.config.EnableQueryRewriting || qo.rewriter == nil {
 		return nil, fmt.Errorf("query rewriting is disabled")
@@ -420,7 +420,7 @@ func (qo *QueryOptimizer) RewriteQuery(ctx context.Context, query string) (*Rewr
 	return rewritten, nil
 }
 
-// GetStatistics returns query statistics
+// GetStatistics returns query statistics.
 func (qo *QueryOptimizer) GetStatistics() map[string]*QueryStatistics {
 	if qo.statsCollector == nil {
 		return make(map[string]*QueryStatistics)
@@ -429,7 +429,7 @@ func (qo *QueryOptimizer) GetStatistics() map[string]*QueryStatistics {
 	return qo.statsCollector.GetStatistics()
 }
 
-// GetSlowQueries returns detected slow queries
+// GetSlowQueries returns detected slow queries.
 func (qo *QueryOptimizer) GetSlowQueries(limit int) []*SlowQuery {
 	if qo.slowQueryDetector == nil {
 		return []*SlowQuery{}
@@ -438,7 +438,7 @@ func (qo *QueryOptimizer) GetSlowQueries(limit int) []*SlowQuery {
 	return qo.slowQueryDetector.GetSlowQueries(limit)
 }
 
-// ClearStatistics clears collected statistics
+// ClearStatistics clears collected statistics.
 func (qo *QueryOptimizer) ClearStatistics() {
 	if qo.statsCollector != nil {
 		qo.statsCollector.Clear()
@@ -450,21 +450,21 @@ func (qo *QueryOptimizer) ClearStatistics() {
 	log.Info().Msg("Optimizer statistics cleared")
 }
 
-// SetIndexRecommender sets the index recommender
+// SetIndexRecommender sets the index recommender.
 func (qo *QueryOptimizer) SetIndexRecommender(recommender IndexRecommender) {
 	qo.mu.Lock()
 	defer qo.mu.Unlock()
 	qo.indexRecommender = recommender
 }
 
-// SetQueryRewriter sets the query rewriter
+// SetQueryRewriter sets the query rewriter.
 func (qo *QueryOptimizer) SetQueryRewriter(rewriter QueryRewriter) {
 	qo.mu.Lock()
 	defer qo.mu.Unlock()
 	qo.rewriter = rewriter
 }
 
-// QueryAnalysis represents the result of query analysis
+// QueryAnalysis represents the result of query analysis.
 type QueryAnalysis struct {
 	Query            string
 	Plan             *QueryPlan
@@ -476,7 +476,7 @@ type QueryAnalysis struct {
 	AnalysisDuration time.Duration
 }
 
-// Helper function to truncate query for logging
+// Helper function to truncate query for logging.
 func truncateQuery(query string, maxLen int) string {
 	if len(query) <= maxLen {
 		return query

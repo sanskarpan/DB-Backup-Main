@@ -283,7 +283,7 @@ func TestHourlyStats(t *testing.T) {
 	t.Log("✓ Hourly stats work correctly")
 }
 
-// WebhookError is a simple error type for testing
+// WebhookError is a simple error type for testing.
 type WebhookError struct {
 	Message string
 }

@@ -1,3 +1,4 @@
+//go:build e2e
 // +build e2e
 
 package e2e
@@ -16,9 +17,9 @@ import (
 
 type CLIEndToEndSuite struct {
 	suite.Suite
-	binaryPath  string
-	tempDir     string
-	configPath  string
+	binaryPath string
+	tempDir    string
+	configPath string
 }
 
 func (s *CLIEndToEndSuite) SetupSuite() {
@@ -204,11 +205,11 @@ func TestCLIEndToEndSuite(t *testing.T) {
 	suite.Run(t, new(CLIEndToEndSuite))
 }
 
-// Helper function
+// Helper function.
 func copyFile(src, dst string) error {
 	data, err := os.ReadFile(src)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(dst, data, 0644)
+	return os.WriteFile(dst, data, 0o644)
 }

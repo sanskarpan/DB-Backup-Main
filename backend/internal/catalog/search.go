@@ -16,24 +16,24 @@ type SearchEngineInterface interface {
 	GetStats(ctx context.Context) (*CatalogStats, error)
 }
 
-// SearchEngine provides full-text search capabilities for backups
+// SearchEngine provides full-text search capabilities for backups.
 type SearchEngine struct {
 	indexer *CatalogIndexer
 }
 
-// NewSearchEngine creates a new search engine
+// NewSearchEngine creates a new search engine.
 func NewSearchEngine(indexer *CatalogIndexer) *SearchEngine {
 	return &SearchEngine{
 		indexer: indexer,
 	}
 }
 
-// IsAvailable returns true if the search engine is properly configured
+// IsAvailable returns true if the search engine is properly configured.
 func (se *SearchEngine) IsAvailable() bool {
 	return se != nil && se.indexer != nil
 }
 
-// SearchQuery represents a search query with various filters
+// SearchQuery represents a search query with various filters.
 type SearchQuery struct {
 	// Text is the free-text search query
 	Text string
@@ -99,20 +99,20 @@ type SearchQuery struct {
 	SortOrder string
 }
 
-// SearchResult represents a search result
+// SearchResult represents a search result.
 type SearchResult struct {
 	Backup *BackupDocument
 	Score  float64
 }
 
-// SearchResults represents search results with metadata
+// SearchResults represents search results with metadata.
 type SearchResults struct {
 	Results []*SearchResult
 	Total   int64
 	Took    int
 }
 
-// Search performs a search query
+// Search performs a search query.
 func (se *SearchEngine) Search(ctx context.Context, query *SearchQuery) (*SearchResults, error) {
 	if query == nil {
 		query = &SearchQuery{}
@@ -164,7 +164,7 @@ func (se *SearchEngine) Search(ctx context.Context, query *SearchQuery) (*Search
 	}, nil
 }
 
-// buildElasticsearchQuery builds an Elasticsearch query from SearchQuery
+// buildElasticsearchQuery builds an Elasticsearch query from SearchQuery.
 func (se *SearchEngine) buildElasticsearchQuery(query *SearchQuery) map[string]interface{} {
 	// Build the bool query
 	mustClauses := []map[string]interface{}{}
@@ -378,7 +378,7 @@ func (se *SearchEngine) buildElasticsearchQuery(query *SearchQuery) map[string]i
 }
 
 // ParseQueryString parses a simple query string into a SearchQuery
-// Format: "database:mydb type:mysql status:success size:>1GB date:2024-01-01..2024-12-31 searchtext"
+// Format: "database:mydb type:mysql status:success size:>1GB date:2024-01-01..2024-12-31 searchtext".
 func (se *SearchEngine) ParseQueryString(queryString string) (*SearchQuery, error) {
 	query := &SearchQuery{}
 
@@ -454,7 +454,7 @@ func (se *SearchEngine) ParseQueryString(queryString string) (*SearchQuery, erro
 	return query, nil
 }
 
-// Suggest provides search suggestions based on partial input
+// Suggest provides search suggestions based on partial input.
 func (se *SearchEngine) Suggest(ctx context.Context, prefix string, field string, limit int) ([]string, error) {
 	if limit <= 0 {
 		limit = 10
@@ -502,7 +502,7 @@ func (se *SearchEngine) Suggest(ctx context.Context, prefix string, field string
 	return suggestions, nil
 }
 
-// GetStats returns statistics about the catalog
+// GetStats returns statistics about the catalog.
 func (se *SearchEngine) GetStats(ctx context.Context) (*CatalogStats, error) {
 	// Use aggregations to get statistics
 	aggQuery := map[string]interface{}{
@@ -582,7 +582,7 @@ func (se *SearchEngine) GetStats(ctx context.Context) (*CatalogStats, error) {
 	return stats, nil
 }
 
-// parseTermsAggregation parses a terms aggregation from Elasticsearch response
+// parseTermsAggregation parses a terms aggregation from Elasticsearch response.
 func parseTermsAggregation(aggs map[string]interface{}, name string) map[string]int64 {
 	result := make(map[string]int64)
 
@@ -604,14 +604,14 @@ func parseTermsAggregation(aggs map[string]interface{}, name string) map[string]
 	return result
 }
 
-// CatalogStats represents statistics about the backup catalog
+// CatalogStats represents statistics about the backup catalog.
 type CatalogStats struct {
-	TotalBackups    int64             `json:"total_backups"`
-	TotalSize       int64             `json:"total_size"`
-	AverageSize     int64             `json:"average_size"`
-	AverageDuration float64           `json:"average_duration"`
-	ByStatus        map[string]int64  `json:"by_status"`
-	ByType          map[string]int64  `json:"by_type"`
-	ByDatabaseType  map[string]int64  `json:"by_database_type"`
-	ByProvider      map[string]int64  `json:"by_provider"`
+	TotalBackups    int64            `json:"total_backups"`
+	TotalSize       int64            `json:"total_size"`
+	AverageSize     int64            `json:"average_size"`
+	AverageDuration float64          `json:"average_duration"`
+	ByStatus        map[string]int64 `json:"by_status"`
+	ByType          map[string]int64 `json:"by_type"`
+	ByDatabaseType  map[string]int64 `json:"by_database_type"`
+	ByProvider      map[string]int64 `json:"by_provider"`
 }

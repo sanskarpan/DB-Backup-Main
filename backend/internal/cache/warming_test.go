@@ -80,7 +80,7 @@ func TestMetadataWarmer(t *testing.T) {
 	ctx := context.Background()
 
 	metadata := map[string]interface{}{
-		"version": "1.0.0",
+		"version":   "1.0.0",
 		"buildTime": "2024-01-01",
 	}
 

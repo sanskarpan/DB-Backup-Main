@@ -11,7 +11,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// loggingMiddleware logs HTTP requests
+// loggingMiddleware logs HTTP requests.
 func (s *Server) loggingMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
@@ -31,7 +31,7 @@ func (s *Server) loggingMiddleware() gin.HandlerFunc {
 	}
 }
 
-// corsMiddleware handles CORS headers
+// corsMiddleware handles CORS headers.
 func (s *Server) corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// See CORS fix in middleware.go for whitelist-based origin validation
@@ -48,7 +48,7 @@ func (s *Server) corsMiddleware() gin.HandlerFunc {
 	}
 }
 
-// rateLimiter implements token bucket rate limiting
+// rateLimiter implements token bucket rate limiting.
 type rateLimiter struct {
 	visitors map[string]*visitor
 	mu       sync.RWMutex
@@ -123,7 +123,7 @@ func (rl *rateLimiter) cleanup() {
 	}
 }
 
-// rateLimitMiddleware implements rate limiting
+// rateLimitMiddleware implements rate limiting.
 func (s *Server) rateLimitMiddleware() gin.HandlerFunc {
 	// Default: 100 requests per minute per IP
 	rate := 100
@@ -138,7 +138,7 @@ func (s *Server) rateLimitMiddleware() gin.HandlerFunc {
 
 		if !limiter.allow(ip) {
 			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error": "rate limit exceeded",
+				"error":   "rate limit exceeded",
 				"message": fmt.Sprintf("Maximum %d requests per minute allowed", rate),
 			})
 			c.Abort()
@@ -149,14 +149,14 @@ func (s *Server) rateLimitMiddleware() gin.HandlerFunc {
 	}
 }
 
-// JWT Claims structure
+// JWT Claims structure.
 type Claims struct {
 	Username string   `json:"username"`
 	Roles    []string `json:"roles"`
 	jwt.RegisteredClaims
 }
 
-// authMiddleware handles JWT authentication
+// authMiddleware handles JWT authentication.
 func (s *Server) authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get authorization header
@@ -195,10 +195,9 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 			}
 			return []byte(secret), nil
 		})
-
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "invalid token",
+				"error":   "invalid token",
 				"details": err.Error(),
 			})
 			c.Abort()
@@ -220,7 +219,7 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 	}
 }
 
-// optionalAuthMiddleware allows requests with or without authentication
+// optionalAuthMiddleware allows requests with or without authentication.
 func (s *Server) optionalAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -259,7 +258,7 @@ func (s *Server) optionalAuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-// roleMiddleware checks if user has required role
+// roleMiddleware checks if user has required role.
 func (s *Server) roleMiddleware(requiredRole string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		roles, exists := c.Get("roles")

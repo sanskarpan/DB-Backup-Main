@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// APICall represents an API call to be executed
+// APICall represents an API call to be executed.
 type APICall struct {
 	Method     string                 `json:"method"`
 	Endpoint   string                 `json:"endpoint"`
@@ -15,29 +15,29 @@ type APICall struct {
 	Headers    map[string]string      `json:"headers"`
 }
 
-// TranslationResult represents the result of translating a query to API calls
+// TranslationResult represents the result of translating a query to API calls.
 type TranslationResult struct {
-	Query        string     `json:"query"`
-	Intent       Intent     `json:"intent"`
-	APICalls     []APICall  `json:"api_calls"`
-	Explanation  string     `json:"explanation"`
-	RequiresConfirmation bool       `json:"requires_confirmation"`
-	ConfirmationMessage  string     `json:"confirmation_message,omitempty"`
+	Query                string    `json:"query"`
+	Intent               Intent    `json:"intent"`
+	APICalls             []APICall `json:"api_calls"`
+	Explanation          string    `json:"explanation"`
+	RequiresConfirmation bool      `json:"requires_confirmation"`
+	ConfirmationMessage  string    `json:"confirmation_message,omitempty"`
 }
 
-// Translator translates natural language to API calls
+// Translator translates natural language to API calls.
 type Translator struct {
 	baseURL string
 }
 
-// NewTranslator creates a new translator
+// NewTranslator creates a new translator.
 func NewTranslator(baseURL string) *Translator {
 	return &Translator{
 		baseURL: baseURL,
 	}
 }
 
-// Translate converts a parsed query into API calls
+// Translate converts a parsed query into API calls.
 func (t *Translator) Translate(parsed *ParsedQuery) (*TranslationResult, error) {
 	result := &TranslationResult{
 		Query:    parsed.OriginalQuery,
@@ -74,7 +74,7 @@ func (t *Translator) Translate(parsed *ParsedQuery) (*TranslationResult, error) 
 	return result, nil
 }
 
-// translateListBackups translates list backups intent
+// translateListBackups translates list backups intent.
 func (t *Translator) translateListBackups(parsed *ParsedQuery, result *TranslationResult) {
 	params := make(map[string]interface{})
 
@@ -130,7 +130,7 @@ func (t *Translator) translateListBackups(parsed *ParsedQuery, result *Translati
 	result.Explanation = t.generateExplanation("list backups", params)
 }
 
-// translateCreateBackup translates create backup intent
+// translateCreateBackup translates create backup intent.
 func (t *Translator) translateCreateBackup(parsed *ParsedQuery, result *TranslationResult) {
 	params := make(map[string]interface{})
 
@@ -168,7 +168,7 @@ func (t *Translator) translateCreateBackup(parsed *ParsedQuery, result *Translat
 	result.Explanation = fmt.Sprintf("This will create a new %s backup for the specified database.", backupType)
 }
 
-// translateRestoreBackup translates restore backup intent
+// translateRestoreBackup translates restore backup intent.
 func (t *Translator) translateRestoreBackup(parsed *ParsedQuery, result *TranslationResult) {
 	params := make(map[string]interface{})
 
@@ -203,7 +203,7 @@ func (t *Translator) translateRestoreBackup(parsed *ParsedQuery, result *Transla
 	result.Explanation = "This will restore data from the specified backup. Current data will be replaced."
 }
 
-// translateDeleteBackup translates delete backup intent
+// translateDeleteBackup translates delete backup intent.
 func (t *Translator) translateDeleteBackup(parsed *ParsedQuery, result *TranslationResult) {
 	params := make(map[string]interface{})
 
@@ -225,31 +225,31 @@ func (t *Translator) translateDeleteBackup(parsed *ParsedQuery, result *Translat
 	result.Explanation = "This will delete the specified backups. This operation cannot be undone."
 }
 
-// translateGetStatus translates get status intent
+// translateGetStatus translates get status intent.
 func (t *Translator) translateGetStatus(parsed *ParsedQuery, result *TranslationResult) {
 	params := make(map[string]interface{})
 
 	// Get specific database status or overall status
 	if dbID, exists := parsed.GetEntityValue("database_id"); exists {
 		result.APICalls = append(result.APICalls, APICall{
-			Method:   "GET",
-			Endpoint: fmt.Sprintf("%s/api/v1/databases/%s/status", t.baseURL, dbID),
+			Method:     "GET",
+			Endpoint:   fmt.Sprintf("%s/api/v1/databases/%s/status", t.baseURL, dbID),
 			Parameters: params,
-			Headers: map[string]string{"Accept": "application/json"},
+			Headers:    map[string]string{"Accept": "application/json"},
 		})
 		result.Explanation = fmt.Sprintf("Getting status for database: %s", dbID)
 	} else {
 		result.APICalls = append(result.APICalls, APICall{
-			Method:   "GET",
-			Endpoint: t.baseURL + "/api/v1/status",
+			Method:     "GET",
+			Endpoint:   t.baseURL + "/api/v1/status",
 			Parameters: params,
-			Headers: map[string]string{"Accept": "application/json"},
+			Headers:    map[string]string{"Accept": "application/json"},
 		})
 		result.Explanation = "Getting overall backup system status"
 	}
 }
 
-// translateSearchBackups translates search backups intent
+// translateSearchBackups translates search backups intent.
 func (t *Translator) translateSearchBackups(parsed *ParsedQuery, result *TranslationResult) {
 	params := make(map[string]interface{})
 
@@ -278,7 +278,7 @@ func (t *Translator) translateSearchBackups(parsed *ParsedQuery, result *Transla
 	result.Explanation = "Searching for backups matching your criteria"
 }
 
-// translateGetStatistics translates get statistics intent
+// translateGetStatistics translates get statistics intent.
 func (t *Translator) translateGetStatistics(parsed *ParsedQuery, result *TranslationResult) {
 	params := make(map[string]interface{})
 
@@ -299,7 +299,7 @@ func (t *Translator) translateGetStatistics(parsed *ParsedQuery, result *Transla
 	result.Explanation = "Retrieving backup statistics"
 }
 
-// translateTroubleshoot translates troubleshoot intent
+// translateTroubleshoot translates troubleshoot intent.
 func (t *Translator) translateTroubleshoot(parsed *ParsedQuery, result *TranslationResult) {
 	params := make(map[string]interface{})
 
@@ -316,16 +316,16 @@ func (t *Translator) translateTroubleshoot(parsed *ParsedQuery, result *Translat
 
 	// Also get system health
 	result.APICalls = append(result.APICalls, APICall{
-		Method:   "GET",
-		Endpoint: t.baseURL + "/api/v1/health",
+		Method:     "GET",
+		Endpoint:   t.baseURL + "/api/v1/health",
 		Parameters: map[string]interface{}{},
-		Headers: map[string]string{"Accept": "application/json"},
+		Headers:    map[string]string{"Accept": "application/json"},
 	})
 
 	result.Explanation = "Analyzing system for issues and gathering diagnostic information"
 }
 
-// translateConfigureSchedule translates configure schedule intent
+// translateConfigureSchedule translates configure schedule intent.
 func (t *Translator) translateConfigureSchedule(parsed *ParsedQuery, result *TranslationResult) {
 	params := make(map[string]interface{})
 
@@ -358,7 +358,7 @@ func (t *Translator) translateConfigureSchedule(parsed *ParsedQuery, result *Tra
 	result.Explanation = "This will create a new backup schedule with the specified settings"
 }
 
-// translateGetHelp translates get help intent
+// translateGetHelp translates get help intent.
 func (t *Translator) translateGetHelp(parsed *ParsedQuery, result *TranslationResult) {
 	result.Explanation = `Available commands:
 - "List all backups" - Show all available backups
@@ -374,7 +374,7 @@ You can also ask questions in natural language!`
 
 // Helper methods
 
-// addDateRangeParams adds date range parameters
+// addDateRangeParams adds date range parameters.
 func (t *Translator) addDateRangeParams(dateRange string, params map[string]interface{}) {
 	now := time.Now()
 
@@ -402,7 +402,7 @@ func (t *Translator) addDateRangeParams(dateRange string, params map[string]inte
 	}
 }
 
-// addDateParams adds date parameters
+// addDateParams adds date parameters.
 func (t *Translator) addDateParams(date string, params map[string]interface{}) {
 	now := time.Now()
 
@@ -416,7 +416,7 @@ func (t *Translator) addDateParams(date string, params map[string]interface{}) {
 	}
 }
 
-// addTimeRangeParams adds time range parameters
+// addTimeRangeParams adds time range parameters.
 func (t *Translator) addTimeRangeParams(timeRange interface{}, params map[string]interface{}) {
 	if tr, ok := timeRange.(map[string]string); ok {
 		amount := tr["amount"]
@@ -443,7 +443,7 @@ func (t *Translator) addTimeRangeParams(timeRange interface{}, params map[string
 	}
 }
 
-// generateExplanation generates a human-readable explanation
+// generateExplanation generates a human-readable explanation.
 func (t *Translator) generateExplanation(action string, params map[string]interface{}) string {
 	parts := []string{fmt.Sprintf("This will %s", action)}
 
@@ -464,7 +464,7 @@ func (t *Translator) generateExplanation(action string, params map[string]interf
 	return strings.Join(parts, " ")
 }
 
-// ValidateAPICall checks if an API call is valid
+// ValidateAPICall checks if an API call is valid.
 func (t *Translator) ValidateAPICall(call *APICall) error {
 	if call.Method == "" {
 		return fmt.Errorf("API method is required")
@@ -483,7 +483,7 @@ func (t *Translator) ValidateAPICall(call *APICall) error {
 	return nil
 }
 
-// FormatAPICallAsCommand formats an API call as a CLI command
+// FormatAPICallAsCommand formats an API call as a CLI command.
 func (t *Translator) FormatAPICallAsCommand(call *APICall) string {
 	cmd := fmt.Sprintf("curl -X %s %s", call.Method, call.Endpoint)
 

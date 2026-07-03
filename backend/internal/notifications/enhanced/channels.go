@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// Channel is the interface that all delivery channels must implement
+// Channel is the interface that all delivery channels must implement.
 type Channel interface {
 	Send(ctx context.Context, notification *Notification) error
 	Name() string
@@ -22,7 +22,7 @@ type Channel interface {
 // Email Channel
 // =============================================================================
 
-// EmailChannel delivers notifications via email
+// EmailChannel delivers notifications via email.
 type EmailChannel struct {
 	SMTPHost     string
 	SMTPPort     int
@@ -147,7 +147,7 @@ func (c *EmailChannel) composeMIMEMessage(to, subject, htmlBody string) string {
 // Slack Channel
 // =============================================================================
 
-// SlackChannel delivers notifications to Slack
+// SlackChannel delivers notifications to Slack.
 type SlackChannel struct {
 	WebhookURL string
 }
@@ -268,7 +268,7 @@ func (c *SlackChannel) getPriorityColor(priority Priority) string {
 // Microsoft Teams Channel
 // =============================================================================
 
-// TeamsChannel delivers notifications to Microsoft Teams
+// TeamsChannel delivers notifications to Microsoft Teams.
 type TeamsChannel struct {
 	WebhookURL string
 }
@@ -360,7 +360,7 @@ func (c *TeamsChannel) getPriorityColor(priority Priority) string {
 // Discord Channel
 // =============================================================================
 
-// DiscordChannel delivers notifications to Discord
+// DiscordChannel delivers notifications to Discord.
 type DiscordChannel struct {
 	WebhookURL string
 }
@@ -439,7 +439,7 @@ func (c *DiscordChannel) getPriorityColorInt(priority Priority) int {
 // Webhook Channel
 // =============================================================================
 
-// WebhookChannel delivers notifications to custom webhooks
+// WebhookChannel delivers notifications to custom webhooks.
 type WebhookChannel struct {
 	URL string
 }
@@ -489,7 +489,7 @@ func (c *WebhookChannel) Send(ctx context.Context, notification *Notification) e
 // Push Notification Channel (FCM/APNS)
 // =============================================================================
 
-// PushChannel delivers push notifications (simplified - would need FCM/APNS integration)
+// PushChannel delivers push notifications (simplified - would need FCM/APNS integration).
 type PushChannel struct {
 	FCMServerKey string
 	APNSKeyID    string
@@ -530,7 +530,7 @@ func (c *PushChannel) sendFCM(ctx context.Context, deviceToken string, notificat
 			"icon":  "notification_icon",
 			"sound": "default",
 		},
-		"data": notification.Metadata,
+		"data":     notification.Metadata,
 		"priority": "high",
 	}
 
@@ -565,7 +565,7 @@ func (c *PushChannel) sendFCM(ctx context.Context, deviceToken string, notificat
 // In-App Channel (WebSocket)
 // =============================================================================
 
-// InAppChannel delivers in-app notifications via WebSocket
+// InAppChannel delivers in-app notifications via WebSocket.
 type InAppChannel struct {
 	broadcaster *WebSocketBroadcaster
 }
@@ -586,7 +586,7 @@ func (c *InAppChannel) Send(ctx context.Context, notification *Notification) err
 	return c.broadcaster.Broadcast(notification.UserID, notification)
 }
 
-// WebSocketBroadcaster handles WebSocket broadcasting (simplified)
+// WebSocketBroadcaster handles WebSocket broadcasting (simplified).
 type WebSocketBroadcaster struct {
 	// Would contain WebSocket connection pool
 }

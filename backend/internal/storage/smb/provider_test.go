@@ -349,7 +349,7 @@ func TestSMBProvider_UploadDownload(t *testing.T) {
 		// Create a test file
 		testFile := filepath.Join(tempDir, "source.txt")
 		testContent := []byte("test content for SMB upload")
-		if err := os.WriteFile(testFile, testContent, 0644); err != nil {
+		if err := os.WriteFile(testFile, testContent, 0o644); err != nil {
 			t.Fatalf("Failed to create test file: %v", err)
 		}
 
@@ -383,11 +383,11 @@ func TestSMBProvider_UploadDownload(t *testing.T) {
 		remoteFile := filepath.Join(tempDir, remotePath)
 		testContent := []byte("test content for SMB download")
 
-		if err := os.MkdirAll(filepath.Dir(remoteFile), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(remoteFile), 0o755); err != nil {
 			t.Fatalf("Failed to create directory: %v", err)
 		}
 
-		if err := os.WriteFile(remoteFile, testContent, 0644); err != nil {
+		if err := os.WriteFile(remoteFile, testContent, 0o644); err != nil {
 			t.Fatalf("Failed to create remote file: %v", err)
 		}
 
@@ -439,7 +439,7 @@ func TestSMBProvider_UploadDownload(t *testing.T) {
 		remoteFile := filepath.Join(tempDir, remotePath)
 		testContent := []byte("test content for deletion")
 
-		if err := os.WriteFile(remoteFile, testContent, 0644); err != nil {
+		if err := os.WriteFile(remoteFile, testContent, 0o644); err != nil {
 			t.Fatalf("Failed to create file: %v", err)
 		}
 
@@ -460,7 +460,7 @@ func TestSMBProvider_UploadDownload(t *testing.T) {
 		remoteFile := filepath.Join(tempDir, remotePath)
 		testContent := []byte("test content for metadata")
 
-		if err := os.WriteFile(remoteFile, testContent, 0644); err != nil {
+		if err := os.WriteFile(remoteFile, testContent, 0o644); err != nil {
 			t.Fatalf("Failed to create file: %v", err)
 		}
 
@@ -494,10 +494,10 @@ func TestSMBProvider_UploadDownload(t *testing.T) {
 
 		for _, file := range testFiles {
 			fullPath := filepath.Join(tempDir, prefix, file)
-			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
 				t.Fatalf("Failed to create directory: %v", err)
 			}
-			if err := os.WriteFile(fullPath, []byte("content"), 0644); err != nil {
+			if err := os.WriteFile(fullPath, []byte("content"), 0o644); err != nil {
 				t.Fatalf("Failed to create file: %v", err)
 			}
 		}
@@ -535,7 +535,7 @@ func TestSMBProvider_UploadWithProgress(t *testing.T) {
 	// Create a test file
 	testFile := filepath.Join(tempDir, "source.txt")
 	testContent := []byte("test content with progress tracking")
-	if err := os.WriteFile(testFile, testContent, 0644); err != nil {
+	if err := os.WriteFile(testFile, testContent, 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -673,7 +673,7 @@ func TestSMBProvider_CredentialsFile(t *testing.T) {
 	}
 
 	mode := info.Mode().Perm()
-	if mode != 0600 {
+	if mode != 0o600 {
 		t.Errorf("Expected file mode 0600, got %04o", mode)
 	}
 

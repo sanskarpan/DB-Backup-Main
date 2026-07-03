@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
 	"github.com/sanskarpan/db-backup/internal/backup"
 	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/sanskarpan/db-backup/internal/scheduler"
@@ -71,23 +72,23 @@ var scheduleRunCmd = &cobra.Command{
 }
 
 type ScheduleAddOptions struct {
-	ID              string
-	Name            string
-	Cron            string
-	Type            string
-	Host            string
-	Port            int
-	User            string
-	Database        string
-	Databases       []string
-	AllDatabases    bool
-	Compression     string
-	Encrypt         bool
-	Storage         string
-	Retries         int
-	RetryDelay      time.Duration
-	Timeout         time.Duration
-	Tags            map[string]string
+	ID           string
+	Name         string
+	Cron         string
+	Type         string
+	Host         string
+	Port         int
+	User         string
+	Database     string
+	Databases    []string
+	AllDatabases bool
+	Compression  string
+	Encrypt      bool
+	Storage      string
+	Retries      int
+	RetryDelay   time.Duration
+	Timeout      time.Duration
+	Tags         map[string]string
 }
 
 type ScheduleListOptions struct {
@@ -131,15 +132,15 @@ func init() {
 func runScheduleAdd(cmd *cobra.Command, args []string) error {
 	// Parse options
 	opts := &ScheduleAddOptions{
-		ID:           cmd.Flag("id").Value.String(),
-		Name:         cmd.Flag("name").Value.String(),
-		Cron:         cmd.Flag("cron").Value.String(),
-		Type:         cmd.Flag("type").Value.String(),
-		Host:         cmd.Flag("host").Value.String(),
-		User:         cmd.Flag("user").Value.String(),
-		Database:     cmd.Flag("database").Value.String(),
-		Compression:  cmd.Flag("compression").Value.String(),
-		Storage:      cmd.Flag("storage").Value.String(),
+		ID:          cmd.Flag("id").Value.String(),
+		Name:        cmd.Flag("name").Value.String(),
+		Cron:        cmd.Flag("cron").Value.String(),
+		Type:        cmd.Flag("type").Value.String(),
+		Host:        cmd.Flag("host").Value.String(),
+		User:        cmd.Flag("user").Value.String(),
+		Database:    cmd.Flag("database").Value.String(),
+		Compression: cmd.Flag("compression").Value.String(),
+		Storage:     cmd.Flag("storage").Value.String(),
 	}
 
 	port, _ := cmd.Flags().GetInt("port")
@@ -191,15 +192,15 @@ func runScheduleAdd(cmd *cobra.Command, args []string) error {
 
 	// Create scheduled job
 	job := &scheduler.ScheduledJob{
-		ID:          opts.ID,
-		Name:        opts.Name,
-		Schedule:    opts.Cron,
-		BackupOpts:  backupOpts,
-		Enabled:     true,
-		Retries:     opts.Retries,
-		RetryDelay:  opts.RetryDelay,
-		Timeout:     opts.Timeout,
-		Tags:        opts.Tags,
+		ID:         opts.ID,
+		Name:       opts.Name,
+		Schedule:   opts.Cron,
+		BackupOpts: backupOpts,
+		Enabled:    true,
+		Retries:    opts.Retries,
+		RetryDelay: opts.RetryDelay,
+		Timeout:    opts.Timeout,
+		Tags:       opts.Tags,
 	}
 
 	// Initialize scheduler
@@ -407,4 +408,3 @@ func runScheduleRun(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
-

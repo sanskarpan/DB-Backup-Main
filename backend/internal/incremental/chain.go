@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// ChainPolicy defines policies for backup chain management
+// ChainPolicy defines policies for backup chain management.
 type ChainPolicy struct {
 	MaxChainLength          int           // Maximum number of incrementals before synthetic
 	MaxChainAge             time.Duration // Maximum age of base backup before synthetic
@@ -18,7 +18,7 @@ type ChainPolicy struct {
 	ChainHealthCheckEnabled bool          // Enable chain health monitoring
 }
 
-// DefaultChainPolicy returns default chain management policies
+// DefaultChainPolicy returns default chain management policies.
 func DefaultChainPolicy() *ChainPolicy {
 	return &ChainPolicy{
 		MaxChainLength:          10,
@@ -31,7 +31,7 @@ func DefaultChainPolicy() *ChainPolicy {
 	}
 }
 
-// ChainHealth represents the health status of a backup chain
+// ChainHealth represents the health status of a backup chain.
 type ChainHealth struct {
 	ChainID         string
 	Status          string // "healthy", "warning", "critical"
@@ -42,7 +42,7 @@ type ChainHealth struct {
 	LastChecked     time.Time
 }
 
-// BackupChainManager manages backup chains
+// BackupChainManager manages backup chains.
 type BackupChainManager struct {
 	mu              sync.RWMutex
 	strategy        *IncrementalForeverStrategy
@@ -52,7 +52,7 @@ type BackupChainManager struct {
 	lastFullBackups map[string]time.Time // Track last full backup per database
 }
 
-// NewBackupChainManager creates a new backup chain manager
+// NewBackupChainManager creates a new backup chain manager.
 func NewBackupChainManager(strategy *IncrementalForeverStrategy, syntheticGen *SyntheticBackupGenerator, policy *ChainPolicy) *BackupChainManager {
 	if policy == nil {
 		policy = DefaultChainPolicy()
@@ -67,7 +67,7 @@ func NewBackupChainManager(strategy *IncrementalForeverStrategy, syntheticGen *S
 	}
 }
 
-// DetermineBackupType determines what type of backup should be performed
+// DetermineBackupType determines what type of backup should be performed.
 func (bcm *BackupChainManager) DetermineBackupType(databaseID string) (BackupType, string, error) {
 	bcm.mu.RLock()
 	defer bcm.mu.RUnlock()
@@ -118,7 +118,7 @@ func (bcm *BackupChainManager) DetermineBackupType(databaseID string) (BackupTyp
 	return BackupTypeIncremental, "Normal incremental backup", nil
 }
 
-// ValidateChain validates the integrity of a backup chain
+// ValidateChain validates the integrity of a backup chain.
 func (bcm *BackupChainManager) ValidateChain(backupID string) (*ChainHealth, error) {
 	chain, err := bcm.strategy.GetBackupChain(backupID)
 	if err != nil {
@@ -207,7 +207,7 @@ func (bcm *BackupChainManager) ValidateChain(backupID string) (*ChainHealth, err
 	return health, nil
 }
 
-// MonitorChains monitors all backup chains and reports health
+// MonitorChains monitors all backup chains and reports health.
 func (bcm *BackupChainManager) MonitorChains() ([]*ChainHealth, error) {
 	manifests := bcm.strategy.ListBackups()
 
@@ -232,7 +232,7 @@ func (bcm *BackupChainManager) MonitorChains() ([]*ChainHealth, error) {
 	return healthReports, nil
 }
 
-// ApplyRetentionPolicy applies retention policy to backups
+// ApplyRetentionPolicy applies retention policy to backups.
 func (bcm *BackupChainManager) ApplyRetentionPolicy() ([]string, error) {
 	if !bcm.policy.AutoCleanupEnabled {
 		return nil, fmt.Errorf("auto cleanup is disabled")
@@ -299,7 +299,7 @@ func (bcm *BackupChainManager) ApplyRetentionPolicy() ([]string, error) {
 	return removed, nil
 }
 
-// OptimizeChain optimizes a backup chain by creating synthetic fulls if needed
+// OptimizeChain optimizes a backup chain by creating synthetic fulls if needed.
 func (bcm *BackupChainManager) OptimizeChain(backupID string) (*BackupManifest, error) {
 	if !bcm.policy.AutoSyntheticEnabled {
 		return nil, fmt.Errorf("auto synthetic generation is disabled")
@@ -339,7 +339,7 @@ func (bcm *BackupChainManager) OptimizeChain(backupID string) (*BackupManifest, 
 	return synthetic, nil
 }
 
-// getBackupsForDatabase returns all backups for a database sorted by creation time (newest first)
+// getBackupsForDatabase returns all backups for a database sorted by creation time (newest first).
 func (bcm *BackupChainManager) getBackupsForDatabase(databaseID string) []*BackupManifest {
 	allBackups := bcm.strategy.ListBackups()
 
@@ -368,7 +368,7 @@ func (bcm *BackupChainManager) removeBackup(manifest *BackupManifest) error {
 	return bcm.strategy.RemoveBackup(manifest.ID)
 }
 
-// RecordFullBackup records when a full backup was performed
+// RecordFullBackup records when a full backup was performed.
 func (bcm *BackupChainManager) RecordFullBackup(databaseID string, timestamp time.Time) {
 	bcm.mu.Lock()
 	defer bcm.mu.Unlock()
@@ -376,7 +376,7 @@ func (bcm *BackupChainManager) RecordFullBackup(databaseID string, timestamp tim
 	bcm.lastFullBackups[databaseID] = timestamp
 }
 
-// GetChainHealth returns the health status of a chain
+// GetChainHealth returns the health status of a chain.
 func (bcm *BackupChainManager) GetChainHealth(chainID string) (*ChainHealth, bool) {
 	bcm.mu.RLock()
 	defer bcm.mu.RUnlock()
@@ -385,12 +385,12 @@ func (bcm *BackupChainManager) GetChainHealth(chainID string) (*ChainHealth, boo
 	return health, exists
 }
 
-// GetPolicy returns the current chain policy
+// GetPolicy returns the current chain policy.
 func (bcm *BackupChainManager) GetPolicy() *ChainPolicy {
 	return bcm.policy
 }
 
-// UpdatePolicy updates the chain management policy
+// UpdatePolicy updates the chain management policy.
 func (bcm *BackupChainManager) UpdatePolicy(policy *ChainPolicy) {
 	bcm.mu.Lock()
 	defer bcm.mu.Unlock()
@@ -398,7 +398,7 @@ func (bcm *BackupChainManager) UpdatePolicy(policy *ChainPolicy) {
 	bcm.policy = policy
 }
 
-// GetStatistics returns statistics about chain management
+// GetStatistics returns statistics about chain management.
 func (bcm *BackupChainManager) GetStatistics() map[string]interface{} {
 	bcm.mu.RLock()
 	defer bcm.mu.RUnlock()
@@ -435,7 +435,7 @@ func (bcm *BackupChainManager) GetStatistics() map[string]interface{} {
 	return stats
 }
 
-// PerformHealthCheck performs a comprehensive health check on all chains
+// PerformHealthCheck performs a comprehensive health check on all chains.
 func (bcm *BackupChainManager) PerformHealthCheck() (map[string]interface{}, error) {
 	if !bcm.policy.ChainHealthCheckEnabled {
 		return nil, fmt.Errorf("health check is disabled")
@@ -469,7 +469,7 @@ func (bcm *BackupChainManager) PerformHealthCheck() (map[string]interface{}, err
 	return result, nil
 }
 
-// GetOptimizationRecommendations returns optimization recommendations for all chains
+// GetOptimizationRecommendations returns optimization recommendations for all chains.
 func (bcm *BackupChainManager) GetOptimizationRecommendations() ([]map[string]interface{}, error) {
 	manifests := bcm.strategy.ListBackups()
 

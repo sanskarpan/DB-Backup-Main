@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Mock ExportStore for testing
+// Mock ExportStore for testing.
 type mockExportStore struct {
 	exports map[string]*ExportRequest
 }
@@ -50,7 +50,7 @@ func (m *mockExportStore) Update(ctx context.Context, request *ExportRequest) er
 	return nil
 }
 
-// Mock DataProvider for testing
+// Mock DataProvider for testing.
 type mockDataProvider struct {
 	userData *UserData
 }
@@ -104,7 +104,7 @@ func (m *mockDataProvider) GetUserData(ctx context.Context, userID string, dataT
 	return m.userData, nil
 }
 
-// Mock ExportStorage for testing
+// Mock ExportStorage for testing.
 type mockExportStorage struct {
 	files map[string][]byte
 }

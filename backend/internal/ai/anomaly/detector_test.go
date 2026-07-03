@@ -23,7 +23,7 @@ func setupTestDetector(t *testing.T) (*Detector, *BaselineTrainer) {
 			DatabaseName: "test-db",
 			Timestamp:    now.Add(-time.Duration(i) * time.Hour),
 			Size:         1000000 + int64(variance*10000), // ±50k variance
-			Duration:     60.0 + variance,                   // ±5 seconds variance
+			Duration:     60.0 + variance,                 // ±5 seconds variance
 			Success:      true,
 		})
 	}

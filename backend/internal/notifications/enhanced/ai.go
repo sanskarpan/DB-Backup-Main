@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// AIEngine provides AI-powered notification intelligence
+// AIEngine provides AI-powered notification intelligence.
 type AIEngine struct {
 	mu           sync.RWMutex
 	modelFile    string
@@ -16,49 +16,49 @@ type AIEngine struct {
 	globalStats  *GlobalStats
 }
 
-// UserPattern represents learned user notification patterns
+// UserPattern represents learned user notification patterns.
 type UserPattern struct {
-	UserID                string                       `json:"user_id"`
-	PreferredChannels     map[DeliveryChannel]float64  `json:"preferred_channels"` // Channel preference scores
-	PreferredTimes        []TimeWindow                 `json:"preferred_times"` // When user typically engages
-	TypeEngagement        map[NotificationType]float64 `json:"type_engagement"` // Engagement by type
-	PriorityResponse      map[Priority]float64         `json:"priority_response"` // Response rate by priority
-	ReadTimeByType        map[NotificationType]float64 `json:"read_time_by_type"` // Avg seconds to read
-	ActionRate            float64                      `json:"action_rate"` // % of notifications acted upon
-	DismissRate           float64                      `json:"dismiss_rate"` // % of notifications dismissed
-	TotalNotifications    int                          `json:"total_notifications"`
-	LastUpdated           time.Time                    `json:"last_updated"`
+	UserID             string                       `json:"user_id"`
+	PreferredChannels  map[DeliveryChannel]float64  `json:"preferred_channels"` // Channel preference scores
+	PreferredTimes     []TimeWindow                 `json:"preferred_times"`    // When user typically engages
+	TypeEngagement     map[NotificationType]float64 `json:"type_engagement"`    // Engagement by type
+	PriorityResponse   map[Priority]float64         `json:"priority_response"`  // Response rate by priority
+	ReadTimeByType     map[NotificationType]float64 `json:"read_time_by_type"`  // Avg seconds to read
+	ActionRate         float64                      `json:"action_rate"`        // % of notifications acted upon
+	DismissRate        float64                      `json:"dismiss_rate"`       // % of notifications dismissed
+	TotalNotifications int                          `json:"total_notifications"`
+	LastUpdated        time.Time                    `json:"last_updated"`
 }
 
-// TimeWindow represents a time window when user is active
+// TimeWindow represents a time window when user is active.
 type TimeWindow struct {
 	StartHour int     `json:"start_hour"` // 0-23
 	EndHour   int     `json:"end_hour"`
 	Weight    float64 `json:"weight"` // How likely to engage (0-1)
 }
 
-// GlobalStats represents global notification statistics
+// GlobalStats represents global notification statistics.
 type GlobalStats struct {
-	AverageReadTime      float64                      `json:"average_read_time"`
-	AverageActionRate    float64                      `json:"average_action_rate"`
-	TypePopularity       map[NotificationType]int     `json:"type_popularity"`
-	ChannelEffectiveness map[DeliveryChannel]float64  `json:"channel_effectiveness"`
-	OptimalTimes         []TimeWindow                 `json:"optimal_times"`
+	AverageReadTime      float64                     `json:"average_read_time"`
+	AverageActionRate    float64                     `json:"average_action_rate"`
+	TypePopularity       map[NotificationType]int    `json:"type_popularity"`
+	ChannelEffectiveness map[DeliveryChannel]float64 `json:"channel_effectiveness"`
+	OptimalTimes         []TimeWindow                `json:"optimal_times"`
 }
 
-// NewAIEngine creates a new AI engine
+// NewAIEngine creates a new AI engine.
 func NewAIEngine(modelFile string) *AIEngine {
 	return &AIEngine{
 		modelFile:    modelFile,
 		userPatterns: make(map[string]*UserPattern),
-		globalStats:  &GlobalStats{
+		globalStats: &GlobalStats{
 			TypePopularity:       make(map[NotificationType]int),
 			ChannelEffectiveness: make(map[DeliveryChannel]float64),
 		},
 	}
 }
 
-// Load loads AI model from file
+// Load loads AI model from file.
 func (ai *AIEngine) Load() error {
 	ai.mu.Lock()
 	defer ai.mu.Unlock()
@@ -87,7 +87,7 @@ func (ai *AIEngine) Load() error {
 	return nil
 }
 
-// Save saves AI model to file
+// Save saves AI model to file.
 func (ai *AIEngine) Save() error {
 	ai.mu.RLock()
 	defer ai.mu.RUnlock()
@@ -107,10 +107,10 @@ func (ai *AIEngine) Save() error {
 		return err
 	}
 
-	return os.WriteFile(ai.modelFile, data, 0644)
+	return os.WriteFile(ai.modelFile, data, 0o644)
 }
 
-// CalculateRelevance calculates how relevant a notification is to a user (0-1)
+// CalculateRelevance calculates how relevant a notification is to a user (0-1).
 func (ai *AIEngine) CalculateRelevance(notification *Notification, prefs *NotificationPreferences) float64 {
 	ai.mu.RLock()
 	defer ai.mu.RUnlock()
@@ -157,7 +157,7 @@ func (ai *AIEngine) CalculateRelevance(notification *Notification, prefs *Notifi
 	return score
 }
 
-// PredictOptimalDeliveryTime predicts the best time to deliver a notification
+// PredictOptimalDeliveryTime predicts the best time to deliver a notification.
 func (ai *AIEngine) PredictOptimalDeliveryTime(userID string) *time.Time {
 	ai.mu.RLock()
 	defer ai.mu.RUnlock()
@@ -196,7 +196,7 @@ func (ai *AIEngine) PredictOptimalDeliveryTime(userID string) *time.Time {
 	return &nextTime
 }
 
-// LearnFromDelivery learns from notification delivery results
+// LearnFromDelivery learns from notification delivery results.
 func (ai *AIEngine) LearnFromDelivery(notification *Notification, results []DeliveryResult) {
 	ai.mu.Lock()
 	defer ai.mu.Unlock()
@@ -242,7 +242,7 @@ func (ai *AIEngine) LearnFromDelivery(notification *Notification, results []Deli
 	}
 }
 
-// LearnFromEngagement learns from user engagement with notification
+// LearnFromEngagement learns from user engagement with notification.
 func (ai *AIEngine) LearnFromEngagement(userID string, notification *Notification, action string, timeToAction time.Duration) {
 	ai.mu.Lock()
 	defer ai.mu.Unlock()
@@ -298,7 +298,7 @@ func (ai *AIEngine) LearnFromEngagement(userID string, notification *Notificatio
 	go ai.Save()
 }
 
-// SuggestQuietHours suggests optimal quiet hours based on user patterns
+// SuggestQuietHours suggests optimal quiet hours based on user patterns.
 func (ai *AIEngine) SuggestQuietHours(userID string) []QuietHoursPeriod {
 	ai.mu.RLock()
 	defer ai.mu.RUnlock()
@@ -433,7 +433,7 @@ func (ai *AIEngine) predictFromGlobalTimes() *time.Time {
 	return &nextTime
 }
 
-// lerp performs linear interpolation
+// lerp performs linear interpolation.
 func (ai *AIEngine) lerp(current, target, alpha float64) float64 {
 	return current + alpha*(target-current)
 }

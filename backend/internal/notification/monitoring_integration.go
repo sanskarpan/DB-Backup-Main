@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// MonitoringIntegration integrates push notifications with the monitoring system
+// MonitoringIntegration integrates push notifications with the monitoring system.
 type MonitoringIntegration struct {
 	pushService *PushService
 	mu          sync.RWMutex
@@ -15,7 +15,7 @@ type MonitoringIntegration struct {
 	thresholds  map[string]float64  // metric -> threshold value
 }
 
-// NewMonitoringIntegration creates a new monitoring integration
+// NewMonitoringIntegration creates a new monitoring integration.
 func NewMonitoringIntegration(pushService *PushService) *MonitoringIntegration {
 	return &MonitoringIntegration{
 		pushService: pushService,
@@ -24,7 +24,7 @@ func NewMonitoringIntegration(pushService *PushService) *MonitoringIntegration {
 	}
 }
 
-// SubscribeToMetric subscribes a user to notifications for a specific metric
+// SubscribeToMetric subscribes a user to notifications for a specific metric.
 func (m *MonitoringIntegration) SubscribeToMetric(userID, metric string, threshold float64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -44,7 +44,7 @@ func (m *MonitoringIntegration) SubscribeToMetric(userID, metric string, thresho
 	m.thresholds[metric] = threshold
 }
 
-// UnsubscribeFromMetric unsubscribes a user from a metric
+// UnsubscribeFromMetric unsubscribes a user from a metric.
 func (m *MonitoringIntegration) UnsubscribeFromMetric(userID, metric string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -60,7 +60,7 @@ func (m *MonitoringIntegration) UnsubscribeFromMetric(userID, metric string) {
 	}
 }
 
-// NotifyBackupCompleted sends notification when backup completes
+// NotifyBackupCompleted sends notification when backup completes.
 func (m *MonitoringIntegration) NotifyBackupCompleted(ctx context.Context, userID, backupID, databaseName string, success bool, duration time.Duration, size int64) error {
 	var notification *PushNotification
 
@@ -74,12 +74,12 @@ func (m *MonitoringIntegration) NotifyBackupCompleted(ctx context.Context, userI
 			Type:     PushNotificationBackupSuccess,
 			Priority: "normal",
 			Data: map[string]interface{}{
-				"type":         "backup_success",
-				"backup_id":    backupID,
-				"database":     databaseName,
-				"duration":     duration.Seconds(),
-				"size":         size,
-				"timestamp":    time.Now().Unix(),
+				"type":      "backup_success",
+				"backup_id": backupID,
+				"database":  databaseName,
+				"duration":  duration.Seconds(),
+				"size":      size,
+				"timestamp": time.Now().Unix(),
 			},
 			Actions: []NotificationAction{
 				{
@@ -125,7 +125,7 @@ func (m *MonitoringIntegration) NotifyBackupCompleted(ctx context.Context, userI
 	return m.pushService.SendToUser(ctx, userID, notification)
 }
 
-// NotifyMetricThresholdExceeded sends notification when a metric exceeds threshold
+// NotifyMetricThresholdExceeded sends notification when a metric exceeds threshold.
 func (m *MonitoringIntegration) NotifyMetricThresholdExceeded(ctx context.Context, metric string, value float64, threshold float64) error {
 	m.mu.RLock()
 	userIDs := m.subscribers[metric]
@@ -172,7 +172,7 @@ func (m *MonitoringIntegration) NotifyMetricThresholdExceeded(ctx context.Contex
 	return lastErr
 }
 
-// NotifyComplianceViolation sends notification for compliance violations
+// NotifyComplianceViolation sends notification for compliance violations.
 func (m *MonitoringIntegration) NotifyComplianceViolation(ctx context.Context, userID, violationType, description string, severity string) error {
 	priority := "normal"
 	requireInteraction := false
@@ -211,7 +211,7 @@ func (m *MonitoringIntegration) NotifyComplianceViolation(ctx context.Context, u
 	return m.pushService.SendToUser(ctx, userID, notification)
 }
 
-// NotifySystemCritical sends critical system notifications
+// NotifySystemCritical sends critical system notifications.
 func (m *MonitoringIntegration) NotifySystemCritical(ctx context.Context, title, message string, data map[string]interface{}) error {
 	notification := &PushNotification{
 		Title:              title,
@@ -236,7 +236,7 @@ func (m *MonitoringIntegration) NotifySystemCritical(ctx context.Context, title,
 	return m.pushService.BroadcastNotification(ctx, notification)
 }
 
-// NotifyScheduledBackup sends notification for scheduled backup
+// NotifyScheduledBackup sends notification for scheduled backup.
 func (m *MonitoringIntegration) NotifyScheduledBackup(ctx context.Context, userID, scheduleName, databaseName string, scheduledTime time.Time) error {
 	notification := &PushNotification{
 		Title:    "Scheduled Backup Starting",
@@ -259,7 +259,7 @@ func (m *MonitoringIntegration) NotifyScheduledBackup(ctx context.Context, userI
 	return m.pushService.SendToUser(ctx, userID, notification)
 }
 
-// NotifyStorageWarning sends notification when storage is running low
+// NotifyStorageWarning sends notification when storage is running low.
 func (m *MonitoringIntegration) NotifyStorageWarning(ctx context.Context, userID, provider string, usedPercent float64, available int64) error {
 	priority := "normal"
 	requireInteraction := false
@@ -298,7 +298,7 @@ func (m *MonitoringIntegration) NotifyStorageWarning(ctx context.Context, userID
 	return m.pushService.SendToUser(ctx, userID, notification)
 }
 
-// NotifyDatabaseConnectionFailed sends notification when database connection fails
+// NotifyDatabaseConnectionFailed sends notification when database connection fails.
 func (m *MonitoringIntegration) NotifyDatabaseConnectionFailed(ctx context.Context, userID, databaseName, errorMsg string, retrying bool) error {
 	body := fmt.Sprintf("Failed to connect to database '%s': %s", databaseName, errorMsg)
 	if retrying {
@@ -334,7 +334,7 @@ func (m *MonitoringIntegration) NotifyDatabaseConnectionFailed(ctx context.Conte
 	return m.pushService.SendToUser(ctx, userID, notification)
 }
 
-// GetSubscriberCount returns the number of subscribers for a metric
+// GetSubscriberCount returns the number of subscribers for a metric.
 func (m *MonitoringIntegration) GetSubscriberCount(metric string) int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -342,7 +342,7 @@ func (m *MonitoringIntegration) GetSubscriberCount(metric string) int {
 	return len(m.subscribers[metric])
 }
 
-// GetAllMetrics returns all metrics being monitored
+// GetAllMetrics returns all metrics being monitored.
 func (m *MonitoringIntegration) GetAllMetrics() []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

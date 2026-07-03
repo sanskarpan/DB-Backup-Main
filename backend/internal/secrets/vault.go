@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/vault/api/auth/kubernetes"
 )
 
-// VaultConfig contains configuration for HashiCorp Vault
+// VaultConfig contains configuration for HashiCorp Vault.
 type VaultConfig struct {
 	Address    string        `mapstructure:"address"`
 	Token      string        `mapstructure:"token"`
@@ -37,14 +37,14 @@ type VaultConfig struct {
 	ClientKey     string `mapstructure:"client_key"`
 }
 
-// VaultClient is a wrapper around the Vault API client
+// VaultClient is a wrapper around the Vault API client.
 type VaultClient struct {
 	client    *vault.Client
 	config    *VaultConfig
 	mountPath string
 }
 
-// NewVaultClient creates a new Vault client
+// NewVaultClient creates a new Vault client.
 func NewVaultClient(config *VaultConfig) (*VaultClient, error) {
 	if config.Address == "" {
 		return nil, fmt.Errorf("vault address is required")
@@ -101,7 +101,7 @@ func NewVaultClient(config *VaultConfig) (*VaultClient, error) {
 	return vc, nil
 }
 
-// authenticate authenticates with Vault using the configured method
+// authenticate authenticates with Vault using the configured method.
 func (v *VaultClient) authenticate() error {
 	switch v.config.AuthMethod {
 	case "token":
@@ -124,7 +124,7 @@ func (v *VaultClient) authenticate() error {
 	}
 }
 
-// authenticateAppRole authenticates using AppRole
+// authenticateAppRole authenticates using AppRole.
 func (v *VaultClient) authenticateAppRole() error {
 	if v.config.RoleID == "" || v.config.SecretID == "" {
 		return fmt.Errorf("role_id and secret_id are required for approle auth")
@@ -150,7 +150,7 @@ func (v *VaultClient) authenticateAppRole() error {
 	return nil
 }
 
-// authenticateKubernetes authenticates using Kubernetes service account
+// authenticateKubernetes authenticates using Kubernetes service account.
 func (v *VaultClient) authenticateKubernetes() error {
 	if v.config.K8sRole == "" {
 		return fmt.Errorf("k8s_role is required for kubernetes auth")
@@ -176,7 +176,7 @@ func (v *VaultClient) authenticateKubernetes() error {
 	return nil
 }
 
-// GetSecret retrieves a secret from Vault
+// GetSecret retrieves a secret from Vault.
 func (v *VaultClient) GetSecret(ctx context.Context, path string) (map[string]interface{}, error) {
 	fullPath := v.getFullPath(path)
 
@@ -192,7 +192,7 @@ func (v *VaultClient) GetSecret(ctx context.Context, path string) (map[string]in
 	return secret.Data, nil
 }
 
-// PutSecret stores a secret in Vault
+// PutSecret stores a secret in Vault.
 func (v *VaultClient) PutSecret(ctx context.Context, path string, data map[string]interface{}) error {
 	fullPath := v.getFullPath(path)
 
@@ -204,7 +204,7 @@ func (v *VaultClient) PutSecret(ctx context.Context, path string, data map[strin
 	return nil
 }
 
-// DeleteSecret deletes a secret from Vault
+// DeleteSecret deletes a secret from Vault.
 func (v *VaultClient) DeleteSecret(ctx context.Context, path string) error {
 	fullPath := v.getFullPath(path)
 
@@ -216,7 +216,7 @@ func (v *VaultClient) DeleteSecret(ctx context.Context, path string) error {
 	return nil
 }
 
-// GetSecretString retrieves a string value from a secret
+// GetSecretString retrieves a string value from a secret.
 func (v *VaultClient) GetSecretString(ctx context.Context, path, key string) (string, error) {
 	data, err := v.GetSecret(ctx, path)
 	if err != nil {
@@ -236,7 +236,7 @@ func (v *VaultClient) GetSecretString(ctx context.Context, path, key string) (st
 	return strValue, nil
 }
 
-// PutSecretString stores a string value in a secret
+// PutSecretString stores a string value in a secret.
 func (v *VaultClient) PutSecretString(ctx context.Context, path, key, value string) error {
 	// Get existing secret if any
 	existing, err := v.GetSecret(ctx, path)
@@ -251,7 +251,7 @@ func (v *VaultClient) PutSecretString(ctx context.Context, path, key, value stri
 	return v.PutSecret(ctx, path, existing)
 }
 
-// ListSecrets lists secrets at a given path
+// ListSecrets lists secrets at a given path.
 func (v *VaultClient) ListSecrets(ctx context.Context, path string) ([]string, error) {
 	fullPath := v.getFullPath(path)
 
@@ -279,7 +279,7 @@ func (v *VaultClient) ListSecrets(ctx context.Context, path string) ([]string, e
 	return result, nil
 }
 
-// RenewToken renews the Vault token
+// RenewToken renews the Vault token.
 func (v *VaultClient) RenewToken(ctx context.Context) error {
 	secret, err := v.client.Auth().Token().RenewSelf(0)
 	if err != nil {
@@ -293,7 +293,7 @@ func (v *VaultClient) RenewToken(ctx context.Context) error {
 	return nil
 }
 
-// GetTokenTTL returns the TTL of the current token
+// GetTokenTTL returns the TTL of the current token.
 func (v *VaultClient) GetTokenTTL(ctx context.Context) (time.Duration, error) {
 	secret, err := v.client.Auth().Token().LookupSelf()
 	if err != nil {
@@ -317,7 +317,7 @@ func (v *VaultClient) GetTokenTTL(ctx context.Context) (time.Duration, error) {
 	return time.Duration(ttlInt) * time.Second, nil
 }
 
-// StartTokenRenewal starts automatic token renewal
+// StartTokenRenewal starts automatic token renewal.
 func (v *VaultClient) StartTokenRenewal(ctx context.Context) error {
 	// Get token TTL
 	ttl, err := v.GetTokenTTL(ctx)
@@ -348,7 +348,7 @@ func (v *VaultClient) StartTokenRenewal(ctx context.Context) error {
 	return nil
 }
 
-// CreateDatabaseCredentials creates dynamic database credentials
+// CreateDatabaseCredentials creates dynamic database credentials.
 func (v *VaultClient) CreateDatabaseCredentials(ctx context.Context, role string) (*DatabaseCredentials, error) {
 	path := fmt.Sprintf("database/creds/%s", role)
 
@@ -382,7 +382,7 @@ func (v *VaultClient) CreateDatabaseCredentials(ctx context.Context, role string
 	}, nil
 }
 
-// RevokeLease revokes a lease
+// RevokeLease revokes a lease.
 func (v *VaultClient) RevokeLease(ctx context.Context, leaseID string) error {
 	err := v.client.Sys().Revoke(leaseID)
 	if err != nil {
@@ -392,7 +392,7 @@ func (v *VaultClient) RevokeLease(ctx context.Context, leaseID string) error {
 	return nil
 }
 
-// RenewLease renews a lease
+// RenewLease renews a lease.
 func (v *VaultClient) RenewLease(ctx context.Context, leaseID string, increment int) error {
 	_, err := v.client.Sys().Renew(leaseID, increment)
 	if err != nil {
@@ -402,7 +402,7 @@ func (v *VaultClient) RenewLease(ctx context.Context, leaseID string, increment 
 	return nil
 }
 
-// DatabaseCredentials represents dynamic database credentials
+// DatabaseCredentials represents dynamic database credentials.
 type DatabaseCredentials struct {
 	Username      string
 	Password      string
@@ -483,7 +483,7 @@ func (v *VaultClient) DecryptData(ctx context.Context, key string, ciphertext st
 	return decodeTransitPlaintext(encoded)
 }
 
-// getFullPath constructs the full path for a secret
+// getFullPath constructs the full path for a secret.
 func (v *VaultClient) getFullPath(path string) string {
 	// Remove leading/trailing slashes
 	if len(path) > 0 && path[0] == '/' {
@@ -492,7 +492,7 @@ func (v *VaultClient) getFullPath(path string) string {
 	return path
 }
 
-// Close closes the Vault client
+// Close closes the Vault client.
 func (v *VaultClient) Close() error {
 	// Vault client doesn't need explicit closing
 	return nil

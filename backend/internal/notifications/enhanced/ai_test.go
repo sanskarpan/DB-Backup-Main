@@ -234,11 +234,11 @@ func TestAIEngineLearnFromEngagement(t *testing.T) {
 
 	// Create initial pattern
 	pattern := &UserPattern{
-		UserID:         "user-001",
-		TypeEngagement: make(map[NotificationType]float64),
+		UserID:           "user-001",
+		TypeEngagement:   make(map[NotificationType]float64),
 		PriorityResponse: make(map[Priority]float64),
-		ActionRate:     0.5,
-		DismissRate:    0.3,
+		ActionRate:       0.5,
+		DismissRate:      0.3,
 	}
 
 	ai.mu.Lock()

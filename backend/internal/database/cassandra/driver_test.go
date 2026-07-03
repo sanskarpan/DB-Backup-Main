@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/sanskarpan/db-backup/internal/database"
 )
 
 func TestCassandraDriver_Connect(t *testing.T) {
@@ -288,7 +289,6 @@ func TestScyllaDB_AutoDetection(t *testing.T) {
 
 	ctx := context.Background()
 	err := driver.Connect(ctx, config)
-
 	if err != nil {
 		t.Skip("ScyllaDB not available")
 	}

@@ -11,38 +11,38 @@ import (
 // Streak Manager
 // ============================================================================
 
-// StreakManager manages backup streaks
+// StreakManager manages backup streaks.
 type StreakManager struct {
 	streaks map[string]*StreakData
 	mu      sync.RWMutex
 }
 
-// StreakData holds streak information for a user
+// StreakData holds streak information for a user.
 type StreakData struct {
-	Current       int
-	Longest       int
+	Current        int
+	Longest        int
 	LastBackupDate time.Time
-	StartDate     time.Time
+	StartDate      time.Time
 }
 
-// NewStreakManager creates a new streak manager
+// NewStreakManager creates a new streak manager.
 func NewStreakManager() *StreakManager {
 	return &StreakManager{
 		streaks: make(map[string]*StreakData),
 	}
 }
 
-// UpdateStreak updates a user's streak
+// UpdateStreak updates a user's streak.
 func (sm *StreakManager) UpdateStreak(userID string, backupTime time.Time) int {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
 	if sm.streaks[userID] == nil {
 		sm.streaks[userID] = &StreakData{
-			Current:       1,
-			Longest:       1,
+			Current:        1,
+			Longest:        1,
 			LastBackupDate: backupTime,
-			StartDate:     backupTime,
+			StartDate:      backupTime,
 		}
 		return 1
 	}
@@ -71,7 +71,7 @@ func (sm *StreakManager) UpdateStreak(userID string, backupTime time.Time) int {
 	return streak.Current
 }
 
-// GetStreak returns the current streak
+// GetStreak returns the current streak.
 func (sm *StreakManager) GetStreak(userID string) int {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
@@ -86,7 +86,7 @@ func (sm *StreakManager) GetStreak(userID string) int {
 	return 0
 }
 
-// GetLongestStreak returns the longest streak achieved
+// GetLongestStreak returns the longest streak achieved.
 func (sm *StreakManager) GetLongestStreak(userID string) int {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
@@ -97,7 +97,7 @@ func (sm *StreakManager) GetLongestStreak(userID string) int {
 	return 0
 }
 
-// Helper functions for date comparison
+// Helper functions for date comparison.
 func isSameDay(t1, t2 time.Time) bool {
 	y1, m1, d1 := t1.Date()
 	y2, m2, d2 := t2.Date()
@@ -113,33 +113,33 @@ func isNextDay(t1, t2 time.Time) bool {
 // XP and Level Manager
 // ============================================================================
 
-// XPManager manages experience points and levels
+// XPManager manages experience points and levels.
 type XPManager struct {
 	userXP map[string]*XPData
 	mu     sync.RWMutex
 }
 
-// XPData holds XP information for a user
+// XPData holds XP information for a user.
 type XPData struct {
 	TotalXP      int
 	CurrentLevel int
 }
 
-// LevelUpResult contains level up information
+// LevelUpResult contains level up information.
 type LevelUpResult struct {
 	CurrentLevel int
 	LevelsGained int
 	TotalXP      int
 }
 
-// NewXPManager creates a new XP manager
+// NewXPManager creates a new XP manager.
 func NewXPManager() *XPManager {
 	return &XPManager{
 		userXP: make(map[string]*XPData),
 	}
 }
 
-// AddXP adds XP to a user and handles level ups
+// AddXP adds XP to a user and handles level ups.
 func (xm *XPManager) AddXP(userID string, xp int) *LevelUpResult {
 	xm.mu.Lock()
 	defer xm.mu.Unlock()
@@ -167,7 +167,7 @@ func (xm *XPManager) AddXP(userID string, xp int) *LevelUpResult {
 }
 
 // calculateLevel calculates level from total XP
-// Uses exponential curve: XP = 100 * (level^1.5)
+// Uses exponential curve: XP = 100 * (level^1.5).
 func (xm *XPManager) calculateLevel(totalXP int) int {
 	if totalXP < 100 {
 		return 1
@@ -187,7 +187,7 @@ func (xm *XPManager) calculateLevel(totalXP int) int {
 	}
 }
 
-// getXPForLevel returns XP required to reach a level
+// getXPForLevel returns XP required to reach a level.
 func (xm *XPManager) getXPForLevel(level int) int {
 	if level <= 1 {
 		return 0
@@ -195,7 +195,7 @@ func (xm *XPManager) getXPForLevel(level int) int {
 	return int(100 * math.Pow(float64(level), 1.5))
 }
 
-// GetLevel returns current level
+// GetLevel returns current level.
 func (xm *XPManager) GetLevel(userID string) int {
 	xm.mu.RLock()
 	defer xm.mu.RUnlock()
@@ -206,7 +206,7 @@ func (xm *XPManager) GetLevel(userID string) int {
 	return 1
 }
 
-// GetXP returns total XP
+// GetXP returns total XP.
 func (xm *XPManager) GetXP(userID string) int {
 	xm.mu.RLock()
 	defer xm.mu.RUnlock()
@@ -217,7 +217,7 @@ func (xm *XPManager) GetXP(userID string) int {
 	return 0
 }
 
-// GetXPToNextLevel returns XP needed to reach next level
+// GetXPToNextLevel returns XP needed to reach next level.
 func (xm *XPManager) GetXPToNextLevel(userID string) int {
 	xm.mu.RLock()
 	defer xm.mu.RUnlock()
@@ -233,13 +233,13 @@ func (xm *XPManager) GetXPToNextLevel(userID string) int {
 // Stats Manager
 // ============================================================================
 
-// StatsManager tracks user statistics
+// StatsManager tracks user statistics.
 type StatsManager struct {
 	stats map[string]*UserStats
 	mu    sync.RWMutex
 }
 
-// UserStats contains detailed user statistics
+// UserStats contains detailed user statistics.
 type UserStats struct {
 	TotalBackups      int
 	SuccessfulBackups int
@@ -259,14 +259,14 @@ type UserStats struct {
 	FirstBackupTime   time.Time
 }
 
-// NewStatsManager creates a new stats manager
+// NewStatsManager creates a new stats manager.
 func NewStatsManager() *StatsManager {
 	return &StatsManager{
 		stats: make(map[string]*UserStats),
 	}
 }
 
-// RecordBackup records a backup in statistics
+// RecordBackup records a backup in statistics.
 func (sm *StatsManager) RecordBackup(userID string, data *BackupData) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -308,7 +308,7 @@ func (sm *StatsManager) RecordBackup(userID string, data *BackupData) {
 	stats.AverageDuration = stats.TotalDuration / int64(stats.TotalBackups)
 }
 
-// GetStats returns user statistics
+// GetStats returns user statistics.
 func (sm *StatsManager) GetStats(userID string) *UserStats {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
@@ -322,7 +322,7 @@ func (sm *StatsManager) GetStats(userID string) *UserStats {
 	}
 }
 
-// GetTotalBackups returns total backups count
+// GetTotalBackups returns total backups count.
 func (sm *StatsManager) GetTotalBackups(userID string) int {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
@@ -333,7 +333,7 @@ func (sm *StatsManager) GetTotalBackups(userID string) int {
 	return 0
 }
 
-// GetTotalSize returns total size backed up
+// GetTotalSize returns total size backed up.
 func (sm *StatsManager) GetTotalSize(userID string) int64 {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
@@ -344,7 +344,7 @@ func (sm *StatsManager) GetTotalSize(userID string) int64 {
 	return 0
 }
 
-// GetPersonalInsights generates personalized insights
+// GetPersonalInsights generates personalized insights.
 func (sm *StatsManager) GetPersonalInsights(userID string) *PersonalInsights {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
@@ -392,7 +392,7 @@ func (sm *StatsManager) GetPersonalInsights(userID string) *PersonalInsights {
 	return insights
 }
 
-// PersonalInsights contains personalized insights for a user
+// PersonalInsights contains personalized insights for a user.
 type PersonalInsights struct {
 	Insights []string
 	Tips     []string

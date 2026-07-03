@@ -25,7 +25,7 @@ func GetDirectorySize(path string) (int64, error) {
 	return total, err
 }
 
-// GenerateRestoreID generates a unique ID for restore operations
+// GenerateRestoreID generates a unique ID for restore operations.
 func GenerateRestoreID() string {
 	timestamp := time.Now().Unix()
 	randomBytes := make([]byte, 8)
@@ -38,7 +38,7 @@ func GenerateRestoreID() string {
 	return fmt.Sprintf("restore-%d-%s", timestamp, randomHex[:8])
 }
 
-// GenerateBackupID generates a unique ID for backup operations
+// GenerateBackupID generates a unique ID for backup operations.
 func GenerateBackupID() string {
 	timestamp := time.Now().Unix()
 	randomBytes := make([]byte, 8)
@@ -50,7 +50,7 @@ func GenerateBackupID() string {
 	return fmt.Sprintf("backup-%d-%s", timestamp, randomHex[:8])
 }
 
-// GenerateID generates a generic unique ID
+// GenerateID generates a generic unique ID.
 func GenerateID(prefix string) string {
 	timestamp := time.Now().Unix()
 	randomBytes := make([]byte, 8)

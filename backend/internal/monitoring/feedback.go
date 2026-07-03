@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// UserFeedback represents user feedback
+// UserFeedback represents user feedback.
 type UserFeedback struct {
 	ID        string                 `json:"id"`
 	UserID    string                 `json:"user_id"`
@@ -16,7 +16,7 @@ type UserFeedback struct {
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// FeedbackCollector collects user feedback
+// FeedbackCollector collects user feedback.
 type FeedbackCollector struct {
 	mu            sync.RWMutex
 	feedback      []*UserFeedback
@@ -24,7 +24,7 @@ type FeedbackCollector struct {
 	averageRating float64
 }
 
-// NewFeedbackCollector creates a new feedback collector
+// NewFeedbackCollector creates a new feedback collector.
 func NewFeedbackCollector() *FeedbackCollector {
 	return &FeedbackCollector{
 		feedback:    make([]*UserFeedback, 0),
@@ -32,7 +32,7 @@ func NewFeedbackCollector() *FeedbackCollector {
 	}
 }
 
-// Collect collects user feedback
+// Collect collects user feedback.
 func (fc *FeedbackCollector) Collect(feedback *UserFeedback) error {
 	fc.mu.Lock()
 	defer fc.mu.Unlock()
@@ -53,14 +53,14 @@ func (fc *FeedbackCollector) Collect(feedback *UserFeedback) error {
 	return nil
 }
 
-// GetAverageRating returns the average user rating
+// GetAverageRating returns the average user rating.
 func (fc *FeedbackCollector) GetAverageRating() float64 {
 	fc.mu.RLock()
 	defer fc.mu.RUnlock()
 	return fc.averageRating
 }
 
-// GetRecentFeedback returns recent feedback
+// GetRecentFeedback returns recent feedback.
 func (fc *FeedbackCollector) GetRecentFeedback(limit int) []*UserFeedback {
 	fc.mu.RLock()
 	defer fc.mu.RUnlock()
@@ -73,7 +73,7 @@ func (fc *FeedbackCollector) GetRecentFeedback(limit int) []*UserFeedback {
 	return fc.feedback[start:]
 }
 
-// updateAverageRating updates the average rating
+// updateAverageRating updates the average rating.
 func (fc *FeedbackCollector) updateAverageRating() {
 	if len(fc.feedback) == 0 {
 		fc.averageRating = 0
@@ -88,12 +88,12 @@ func (fc *FeedbackCollector) updateAverageRating() {
 	fc.averageRating = float64(total) / float64(len(fc.feedback))
 }
 
-// generateFeedbackID generates a unique feedback ID
+// generateFeedbackID generates a unique feedback ID.
 func generateFeedbackID() string {
 	return time.Now().Format("20060102150405") + "-fb-" + generateRandomString(6)
 }
 
-// generateRandomString generates a random alphanumeric string of given length
+// generateRandomString generates a random alphanumeric string of given length.
 func generateRandomString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, length)

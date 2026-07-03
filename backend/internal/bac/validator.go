@@ -8,33 +8,33 @@ import (
 	"time"
 )
 
-// ValidationResult represents the result of a validation
+// ValidationResult represents the result of a validation.
 type ValidationResult struct {
 	Valid    bool              `json:"valid"`
 	Errors   []ValidationError `json:"errors,omitempty"`
 	Warnings []string          `json:"warnings,omitempty"`
 }
 
-// ValidationError represents a validation error
+// ValidationError represents a validation error.
 type ValidationError struct {
 	Field   string `json:"field"`
 	Message string `json:"message"`
 	Code    string `json:"code"`
 }
 
-// Validator validates backup configurations
+// Validator validates backup configurations.
 type Validator struct {
 	strictMode bool
 }
 
-// NewValidator creates a new configuration validator
+// NewValidator creates a new configuration validator.
 func NewValidator(strictMode bool) *Validator {
 	return &Validator{
 		strictMode: strictMode,
 	}
 }
 
-// Validate validates a backup configuration
+// Validate validates a backup configuration.
 func (v *Validator) Validate(config *BackupConfig) *ValidationResult {
 	result := &ValidationResult{
 		Valid:    true,
@@ -57,7 +57,7 @@ func (v *Validator) Validate(config *BackupConfig) *ValidationResult {
 	return result
 }
 
-// validateAPIVersion validates the API version
+// validateAPIVersion validates the API version.
 func (v *Validator) validateAPIVersion(config *BackupConfig, result *ValidationResult) {
 	if config.APIVersion == "" {
 		result.Errors = append(result.Errors, ValidationError{
@@ -79,7 +79,7 @@ func (v *Validator) validateAPIVersion(config *BackupConfig, result *ValidationR
 	}
 }
 
-// validateMetadata validates configuration metadata
+// validateMetadata validates configuration metadata.
 func (v *Validator) validateMetadata(metadata *ConfigMetadata, result *ValidationResult) {
 	if metadata.Name == "" {
 		result.Errors = append(result.Errors, ValidationError{
@@ -109,7 +109,7 @@ func (v *Validator) validateMetadata(metadata *ConfigMetadata, result *Validatio
 	}
 }
 
-// validateSpec validates the backup specification
+// validateSpec validates the backup specification.
 func (v *Validator) validateSpec(spec *BackupSpec, result *ValidationResult) {
 	// Validate databases
 	if len(spec.Databases) == 0 {
@@ -149,7 +149,7 @@ func (v *Validator) validateSpec(spec *BackupSpec, result *ValidationResult) {
 	}
 }
 
-// validateDatabases validates database configurations
+// validateDatabases validates database configurations.
 func (v *Validator) validateDatabases(databases []DatabaseConfig, result *ValidationResult) {
 	dbIDs := make(map[string]bool)
 
@@ -202,7 +202,7 @@ func (v *Validator) validateDatabases(databases []DatabaseConfig, result *Valida
 	}
 }
 
-// validateConnection validates connection configuration
+// validateConnection validates connection configuration.
 func (v *Validator) validateConnection(conn *ConnectionConfig, prefix string, result *ValidationResult) {
 	if conn.Host == "" {
 		result.Errors = append(result.Errors, ValidationError{
@@ -233,7 +233,7 @@ func (v *Validator) validateConnection(conn *ConnectionConfig, prefix string, re
 	}
 }
 
-// validateSchedules validates schedule configurations
+// validateSchedules validates schedule configurations.
 func (v *Validator) validateSchedules(schedules []ScheduleConfig, databases []DatabaseConfig, result *ValidationResult) {
 	dbIDs := make(map[string]bool)
 	for _, db := range databases {
@@ -294,7 +294,7 @@ func (v *Validator) validateSchedules(schedules []ScheduleConfig, databases []Da
 	}
 }
 
-// validateWindow validates a time window
+// validateWindow validates a time window.
 func (v *Validator) validateWindow(window *Window, prefix string, result *ValidationResult) {
 	timePattern := regexp.MustCompile(`^([01]\d|2[0-3]):([0-5]\d)$`)
 
@@ -327,7 +327,7 @@ func (v *Validator) validateWindow(window *Window, prefix string, result *Valida
 	}
 }
 
-// validatePolicies validates policy configurations
+// validatePolicies validates policy configurations.
 func (v *Validator) validatePolicies(policies []PolicyConfig, result *ValidationResult) {
 	for i, policy := range policies {
 		prefix := fmt.Sprintf("spec.policies[%d]", i)
@@ -382,7 +382,7 @@ func (v *Validator) validatePolicies(policies []PolicyConfig, result *Validation
 	}
 }
 
-// validateEncryption validates encryption configuration
+// validateEncryption validates encryption configuration.
 func (v *Validator) validateEncryption(enc *EncryptionConfig, prefix string, result *ValidationResult) {
 	if enc.Algorithm == "" {
 		result.Errors = append(result.Errors, ValidationError{
@@ -406,7 +406,7 @@ func (v *Validator) validateEncryption(enc *EncryptionConfig, prefix string, res
 	}
 }
 
-// validateRetryPolicy validates retry policy
+// validateRetryPolicy validates retry policy.
 func (v *Validator) validateRetryPolicy(retry *RetryPolicy, prefix string, result *ValidationResult) {
 	if retry.MaxAttempts <= 0 {
 		result.Errors = append(result.Errors, ValidationError{
@@ -437,7 +437,7 @@ func (v *Validator) validateRetryPolicy(retry *RetryPolicy, prefix string, resul
 	}
 }
 
-// validateNotification validates notification configuration
+// validateNotification validates notification configuration.
 func (v *Validator) validateNotification(notif *NotificationConfig, prefix string, result *ValidationResult) {
 	validTypes := []string{"email", "slack", "webhook", "pagerduty", "teams", "discord"}
 	if !contains(validTypes, notif.Type) {
@@ -472,7 +472,7 @@ func (v *Validator) validateNotification(notif *NotificationConfig, prefix strin
 	}
 }
 
-// validateSyntheticFull validates synthetic full backup configuration
+// validateSyntheticFull validates synthetic full backup configuration.
 func (v *Validator) validateSyntheticFull(synth *SyntheticFullConfig, prefix string, result *ValidationResult) {
 	if synth.MaxChainLength <= 0 {
 		result.Errors = append(result.Errors, ValidationError{
@@ -504,7 +504,7 @@ func (v *Validator) validateSyntheticFull(synth *SyntheticFullConfig, prefix str
 	}
 }
 
-// validateRetention validates retention configuration
+// validateRetention validates retention configuration.
 func (v *Validator) validateRetention(retention *RetentionConfig, result *ValidationResult) {
 	prefix := "spec.retention"
 
@@ -529,7 +529,7 @@ func (v *Validator) validateRetention(retention *RetentionConfig, result *Valida
 	}
 }
 
-// validateStorage validates storage configuration
+// validateStorage validates storage configuration.
 func (v *Validator) validateStorage(storage *StorageConfig, result *ValidationResult) {
 	prefix := "spec.storage"
 
@@ -558,7 +558,7 @@ func (v *Validator) validateStorage(storage *StorageConfig, result *ValidationRe
 	}
 }
 
-// validateCompliance validates compliance configuration
+// validateCompliance validates compliance configuration.
 func (v *Validator) validateCompliance(compliance *ComplianceConfig, result *ValidationResult) {
 	prefix := "spec.compliance"
 
@@ -632,7 +632,7 @@ func (v *Validator) validateCompliance(compliance *ComplianceConfig, result *Val
 	}
 }
 
-// validateGitOps validates GitOps configuration
+// validateGitOps validates GitOps configuration.
 func (v *Validator) validateGitOps(gitops *GitOpsConfig, result *ValidationResult) {
 	prefix := "spec.gitOps"
 
@@ -671,7 +671,7 @@ func (v *Validator) validateGitOps(gitops *GitOpsConfig, result *ValidationResul
 	}
 }
 
-// isValidCronExpression validates a cron expression
+// isValidCronExpression validates a cron expression.
 func (v *Validator) isValidCronExpression(expr string) bool {
 	// Simple validation: cron should have 5 or 6 fields
 	fields := strings.Fields(expr)
@@ -683,7 +683,7 @@ func (v *Validator) isValidCronExpression(expr string) bool {
 	return true
 }
 
-// contains checks if a slice contains a value
+// contains checks if a slice contains a value.
 func contains(slice []string, value string) bool {
 	for _, item := range slice {
 		if item == value {
@@ -693,7 +693,7 @@ func contains(slice []string, value string) bool {
 	return false
 }
 
-// ValidateScheduleConflicts checks for conflicting schedules
+// ValidateScheduleConflicts checks for conflicting schedules.
 func (v *Validator) ValidateScheduleConflicts(schedules []ScheduleConfig) []string {
 	conflicts := make([]string, 0)
 
@@ -720,7 +720,7 @@ func (v *Validator) ValidateScheduleConflicts(schedules []ScheduleConfig) []stri
 	return conflicts
 }
 
-// schedulesOverlap checks if two schedules might overlap
+// schedulesOverlap checks if two schedules might overlap.
 func (v *Validator) schedulesOverlap(s1, s2 ScheduleConfig) bool {
 	// If both have windows, check for time overlap
 	if s1.Window != nil && s2.Window != nil {
@@ -731,7 +731,7 @@ func (v *Validator) schedulesOverlap(s1, s2 ScheduleConfig) bool {
 	return false
 }
 
-// windowsOverlap checks if two time windows overlap
+// windowsOverlap checks if two time windows overlap.
 func (v *Validator) windowsOverlap(w1, w2 *Window) bool {
 	// Parse times
 	start1, err1 := parseTimeWindow(w1.Start)
@@ -747,7 +747,7 @@ func (v *Validator) windowsOverlap(w1, w2 *Window) bool {
 	return start1 < end2 && start2 < end1
 }
 
-// parseTimeWindow parses a time string (HH:MM) to minutes since midnight
+// parseTimeWindow parses a time string (HH:MM) to minutes since midnight.
 func parseTimeWindow(timeStr string) (int, error) {
 	parts := strings.Split(timeStr, ":")
 	if len(parts) != 2 {

@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sanskarpan/db-backup/internal/auth"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/sanskarpan/db-backup/internal/auth"
 )
 
 func init() {
@@ -23,9 +24,9 @@ func TestCORS(t *testing.T) {
 	})
 
 	tests := []struct {
-		name           string
-		origin         string
-		expectAllowed  bool
+		name          string
+		origin        string
+		expectAllowed bool
 	}{
 		{"Allowed origin 1", "http://localhost:3000", true},
 		{"Allowed origin 2", "https://example.com", true},

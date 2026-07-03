@@ -9,7 +9,7 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// ConsistencyLevel defines the level of consistency required
+// ConsistencyLevel defines the level of consistency required.
 type ConsistencyLevel string
 
 const (
@@ -21,7 +21,7 @@ const (
 	ConsistencyTransactional ConsistencyLevel = "transactional" // Transaction-consistent
 )
 
-// DatabaseDependency represents a dependency between databases
+// DatabaseDependency represents a dependency between databases.
 type DatabaseDependency struct {
 	SourceDatabase string
 	TargetDatabase string
@@ -29,7 +29,7 @@ type DatabaseDependency struct {
 	Description    string
 }
 
-// ConsistencyGroup represents a group of databases that must be backed up together
+// ConsistencyGroup represents a group of databases that must be backed up together.
 type ConsistencyGroup struct {
 	ID           string
 	Name         string
@@ -42,14 +42,14 @@ type ConsistencyGroup struct {
 	UpdatedAt    time.Time
 }
 
-// BackupOrder represents the order in which databases should be backed up
+// BackupOrder represents the order in which databases should be backed up.
 type BackupOrder struct {
 	Sequence   [][]string // Each inner slice represents databases that can be backed up in parallel
 	TotalSteps int
 	Metadata   map[string]interface{}
 }
 
-// TransactionLogEntry represents a transaction log entry
+// TransactionLogEntry represents a transaction log entry.
 type TransactionLogEntry struct {
 	ID            string
 	DatabaseID    string
@@ -63,7 +63,7 @@ type TransactionLogEntry struct {
 	Metadata      map[string]interface{}
 }
 
-// ConsistencyPoint represents a point in time for consistency
+// ConsistencyPoint represents a point in time for consistency.
 type ConsistencyPoint struct {
 	ID        string
 	Timestamp time.Time
@@ -72,7 +72,7 @@ type ConsistencyPoint struct {
 	Metadata  map[string]interface{}
 }
 
-// ConsistencyCoordinator coordinates application-consistent backups
+// ConsistencyCoordinator coordinates application-consistent backups.
 type ConsistencyCoordinator struct {
 	mu                sync.RWMutex
 	groups            map[string]*ConsistencyGroup
@@ -83,7 +83,7 @@ type ConsistencyCoordinator struct {
 	quiescers         map[string]Quiescer
 }
 
-// NewConsistencyCoordinator creates a new consistency coordinator
+// NewConsistencyCoordinator creates a new consistency coordinator.
 func NewConsistencyCoordinator(hookManager *HookManager, quiesceManager *QuiesceManager) *ConsistencyCoordinator {
 	return &ConsistencyCoordinator{
 		groups:            make(map[string]*ConsistencyGroup),
@@ -151,7 +151,7 @@ func transactionLogEntryFromOperation(database string, op *QuiesceOperation) *Tr
 	return entry
 }
 
-// CreateConsistencyGroup creates a new consistency group
+// CreateConsistencyGroup creates a new consistency group.
 func (cc *ConsistencyCoordinator) CreateConsistencyGroup(group *ConsistencyGroup) error {
 	if group == nil {
 		return fmt.Errorf("consistency group cannot be nil")
@@ -186,7 +186,7 @@ func (cc *ConsistencyCoordinator) CreateConsistencyGroup(group *ConsistencyGroup
 	return nil
 }
 
-// AddDependency adds a database dependency
+// AddDependency adds a database dependency.
 func (cc *ConsistencyCoordinator) AddDependency(dep *DatabaseDependency) error {
 	if dep == nil {
 		return fmt.Errorf("dependency cannot be nil")
@@ -203,7 +203,7 @@ func (cc *ConsistencyCoordinator) AddDependency(dep *DatabaseDependency) error {
 	return nil
 }
 
-// CalculateBackupOrder calculates the optimal backup order based on dependencies
+// CalculateBackupOrder calculates the optimal backup order based on dependencies.
 func (cc *ConsistencyCoordinator) CalculateBackupOrder(databases []string) (*BackupOrder, error) {
 	cc.mu.RLock()
 	defer cc.mu.RUnlock()
@@ -270,7 +270,7 @@ func (cc *ConsistencyCoordinator) CalculateBackupOrder(databases []string) (*Bac
 	return order, nil
 }
 
-// CreateConsistencyPoint creates a consistency point across multiple databases
+// CreateConsistencyPoint creates a consistency point across multiple databases.
 func (cc *ConsistencyCoordinator) CreateConsistencyPoint(ctx context.Context, groupID string) (*ConsistencyPoint, error) {
 	cc.mu.RLock()
 	group, exists := cc.groups[groupID]
@@ -312,7 +312,7 @@ func (cc *ConsistencyCoordinator) CreateConsistencyPoint(ctx context.Context, gr
 	return point, nil
 }
 
-// RecordTransactionLog records transaction log information for a database
+// RecordTransactionLog records transaction log information for a database.
 func (cc *ConsistencyCoordinator) RecordTransactionLog(pointID string, entry *TransactionLogEntry) error {
 	if entry == nil {
 		return fmt.Errorf("transaction log entry cannot be nil")
@@ -333,7 +333,7 @@ func (cc *ConsistencyCoordinator) RecordTransactionLog(pointID string, entry *Tr
 	return nil
 }
 
-// ExecuteConsistentBackup performs an application-consistent backup for a consistency group
+// ExecuteConsistentBackup performs an application-consistent backup for a consistency group.
 func (cc *ConsistencyCoordinator) ExecuteConsistentBackup(ctx context.Context, groupID string, backupFunc func(ctx context.Context, database string) error) error {
 	cc.mu.RLock()
 	group, exists := cc.groups[groupID]
@@ -501,7 +501,7 @@ func (cc *ConsistencyCoordinator) ExecuteConsistentBackup(ctx context.Context, g
 	return backupErr
 }
 
-// GetConsistencyGroup returns a consistency group by ID
+// GetConsistencyGroup returns a consistency group by ID.
 func (cc *ConsistencyCoordinator) GetConsistencyGroup(groupID string) (*ConsistencyGroup, bool) {
 	cc.mu.RLock()
 	defer cc.mu.RUnlock()
@@ -510,7 +510,7 @@ func (cc *ConsistencyCoordinator) GetConsistencyGroup(groupID string) (*Consiste
 	return group, exists
 }
 
-// ListConsistencyGroups returns all consistency groups
+// ListConsistencyGroups returns all consistency groups.
 func (cc *ConsistencyCoordinator) ListConsistencyGroups() []*ConsistencyGroup {
 	cc.mu.RLock()
 	defer cc.mu.RUnlock()
@@ -522,7 +522,7 @@ func (cc *ConsistencyCoordinator) ListConsistencyGroups() []*ConsistencyGroup {
 	return groups
 }
 
-// GetConsistencyPoint returns a consistency point by ID
+// GetConsistencyPoint returns a consistency point by ID.
 func (cc *ConsistencyCoordinator) GetConsistencyPoint(pointID string) (*ConsistencyPoint, bool) {
 	cc.mu.RLock()
 	defer cc.mu.RUnlock()
@@ -531,7 +531,7 @@ func (cc *ConsistencyCoordinator) GetConsistencyPoint(pointID string) (*Consiste
 	return point, exists
 }
 
-// ListConsistencyPoints returns all consistency points for a group
+// ListConsistencyPoints returns all consistency points for a group.
 func (cc *ConsistencyCoordinator) ListConsistencyPoints(groupID string) []*ConsistencyPoint {
 	cc.mu.RLock()
 	defer cc.mu.RUnlock()
@@ -545,7 +545,7 @@ func (cc *ConsistencyCoordinator) ListConsistencyPoints(groupID string) []*Consi
 	return points
 }
 
-// DeleteConsistencyGroup deletes a consistency group
+// DeleteConsistencyGroup deletes a consistency group.
 func (cc *ConsistencyCoordinator) DeleteConsistencyGroup(groupID string) error {
 	cc.mu.Lock()
 	defer cc.mu.Unlock()
@@ -558,7 +558,7 @@ func (cc *ConsistencyCoordinator) DeleteConsistencyGroup(groupID string) error {
 	return nil
 }
 
-// UpdateConsistencyGroup updates a consistency group
+// UpdateConsistencyGroup updates a consistency group.
 func (cc *ConsistencyCoordinator) UpdateConsistencyGroup(group *ConsistencyGroup) error {
 	if group == nil || group.ID == "" {
 		return fmt.Errorf("invalid consistency group")
@@ -576,7 +576,7 @@ func (cc *ConsistencyCoordinator) UpdateConsistencyGroup(group *ConsistencyGroup
 	return nil
 }
 
-// ValidateConsistencyGroup validates a consistency group configuration
+// ValidateConsistencyGroup validates a consistency group configuration.
 func (cc *ConsistencyCoordinator) ValidateConsistencyGroup(group *ConsistencyGroup) error {
 	if group == nil {
 		return fmt.Errorf("consistency group cannot be nil")
@@ -599,7 +599,7 @@ func (cc *ConsistencyCoordinator) ValidateConsistencyGroup(group *ConsistencyGro
 	return nil
 }
 
-// GetDependencies returns all dependencies for a database
+// GetDependencies returns all dependencies for a database.
 func (cc *ConsistencyCoordinator) GetDependencies(database string) []*DatabaseDependency {
 	cc.mu.RLock()
 	defer cc.mu.RUnlock()
@@ -613,7 +613,7 @@ func (cc *ConsistencyCoordinator) GetDependencies(database string) []*DatabaseDe
 	return deps
 }
 
-// Helper function to check if a slice contains a value
+// Helper function to check if a slice contains a value.
 func contains(slice []string, value string) bool {
 	for _, item := range slice {
 		if item == value {
@@ -623,7 +623,7 @@ func contains(slice []string, value string) bool {
 	return false
 }
 
-// CleanupOldConsistencyPoints removes consistency points older than the specified duration
+// CleanupOldConsistencyPoints removes consistency points older than the specified duration.
 func (cc *ConsistencyCoordinator) CleanupOldConsistencyPoints(maxAge time.Duration) int {
 	cc.mu.Lock()
 	defer cc.mu.Unlock()
@@ -641,7 +641,7 @@ func (cc *ConsistencyCoordinator) CleanupOldConsistencyPoints(maxAge time.Durati
 	return removed
 }
 
-// GetStatistics returns statistics about the consistency coordinator
+// GetStatistics returns statistics about the consistency coordinator.
 func (cc *ConsistencyCoordinator) GetStatistics() map[string]interface{} {
 	cc.mu.RLock()
 	defer cc.mu.RUnlock()

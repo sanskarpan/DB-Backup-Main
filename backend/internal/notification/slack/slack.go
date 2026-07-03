@@ -13,7 +13,7 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// SlackNotifier implements Slack webhook notifications
+// SlackNotifier implements Slack webhook notifications.
 type SlackNotifier struct {
 	webhookURL string
 	channel    string
@@ -23,7 +23,7 @@ type SlackNotifier struct {
 	client     *http.Client
 }
 
-// Config holds Slack notifier configuration
+// Config holds Slack notifier configuration.
 type Config struct {
 	WebhookURL string
 	Channel    string
@@ -32,7 +32,7 @@ type Config struct {
 	Timeout    time.Duration
 }
 
-// NewSlackNotifier creates a new Slack notifier
+// NewSlackNotifier creates a new Slack notifier.
 func NewSlackNotifier(cfg *Config) (*SlackNotifier, error) {
 	if cfg.WebhookURL == "" {
 		return nil, pkgErrors.New(pkgErrors.ErrorTypeConfiguration, "Slack webhook URL is required")
@@ -65,7 +65,7 @@ func NewSlackNotifier(cfg *Config) (*SlackNotifier, error) {
 	}, nil
 }
 
-// Send sends a notification to Slack
+// Send sends a notification to Slack.
 func (s *SlackNotifier) Send(ctx context.Context, notif *notification.Notification) error {
 	message := s.buildMessage(notif)
 
@@ -95,12 +95,12 @@ func (s *SlackNotifier) Send(ctx context.Context, notif *notification.Notificati
 	return nil
 }
 
-// GetType returns the provider type
+// GetType returns the provider type.
 func (s *SlackNotifier) GetType() notification.ProviderType {
 	return notification.ProviderTypeSlack
 }
 
-// ValidateConfig validates the configuration
+// ValidateConfig validates the configuration.
 func (s *SlackNotifier) ValidateConfig() error {
 	if s.webhookURL == "" {
 		return pkgErrors.New(pkgErrors.ErrorTypeConfiguration, "webhook URL is required")
@@ -108,7 +108,7 @@ func (s *SlackNotifier) ValidateConfig() error {
 	return nil
 }
 
-// SlackMessage represents a Slack message payload
+// SlackMessage represents a Slack message payload.
 type SlackMessage struct {
 	Channel     string            `json:"channel,omitempty"`
 	Username    string            `json:"username,omitempty"`
@@ -117,7 +117,7 @@ type SlackMessage struct {
 	Attachments []SlackAttachment `json:"attachments,omitempty"`
 }
 
-// SlackAttachment represents a Slack message attachment
+// SlackAttachment represents a Slack message attachment.
 type SlackAttachment struct {
 	Fallback   string       `json:"fallback"`
 	Color      string       `json:"color"`
@@ -130,14 +130,14 @@ type SlackAttachment struct {
 	ImageURL   string       `json:"image_url,omitempty"`
 }
 
-// SlackField represents a field in a Slack attachment
+// SlackField represents a field in a Slack attachment.
 type SlackField struct {
 	Title string `json:"title"`
 	Value string `json:"value"`
 	Short bool   `json:"short"`
 }
 
-// buildMessage builds a Slack message from a notification
+// buildMessage builds a Slack message from a notification.
 func (s *SlackNotifier) buildMessage(notif *notification.Notification) *SlackMessage {
 	msg := &SlackMessage{
 		Channel:   s.channel,
@@ -148,13 +148,13 @@ func (s *SlackNotifier) buildMessage(notif *notification.Notification) *SlackMes
 
 	// Build attachments
 	attachment := SlackAttachment{
-		Fallback:  notif.Message,
-		Color:     s.getLevelColor(notif.Level),
-		Title:     notif.Title,
-		Text:      notif.Message,
-		Footer:    "DB Backup Utility",
+		Fallback:   notif.Message,
+		Color:      s.getLevelColor(notif.Level),
+		Title:      notif.Title,
+		Text:       notif.Message,
+		Footer:     "DB Backup Utility",
 		FooterIcon: "https://i.imgur.com/wWzX9uB.png",
-		Timestamp: notif.Timestamp.Unix(),
+		Timestamp:  notif.Timestamp.Unix(),
 	}
 
 	// Add metadata fields
@@ -194,7 +194,7 @@ func (s *SlackNotifier) buildMessage(notif *notification.Notification) *SlackMes
 	return msg
 }
 
-// getLevelColor returns the color for a notification level
+// getLevelColor returns the color for a notification level.
 func (s *SlackNotifier) getLevelColor(level notification.NotificationLevel) string {
 	switch level {
 	case notification.LevelSuccess:

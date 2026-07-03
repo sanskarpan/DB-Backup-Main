@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/kurin/blazer/b2"
-	"github.com/sanskarpan/db-backup/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/sanskarpan/db-backup/internal/storage"
 )
 
 func TestBackblazeB2Provider_NewProvider(t *testing.T) {
@@ -518,7 +519,7 @@ func TestBackblazeB2Provider_SetLifecycleRules(t *testing.T) {
 		{
 			DaysNewUntilHidden:     30,
 			DaysHiddenUntilDeleted: 7,
-			Prefix:                    "test-lifecycle/",
+			Prefix:                 "test-lifecycle/",
 		},
 	}
 

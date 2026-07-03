@@ -4,10 +4,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/sanskarpan/db-backup/internal/logger"
 )
 
-// Logger returns a gin middleware for logging requests
+// Logger returns a gin middleware for logging requests.
 func Logger(log *logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Start timer

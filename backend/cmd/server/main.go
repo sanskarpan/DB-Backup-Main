@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/sanskarpan/db-backup/internal/api"
 	"github.com/sanskarpan/db-backup/internal/approvals"
 	"github.com/sanskarpan/db-backup/internal/auth"
@@ -33,7 +34,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/storageregistry"
 	"github.com/sanskarpan/db-backup/internal/websocket"
 
-	// Register database drivers
+	// Register database drivers.
 	_ "github.com/sanskarpan/db-backup/internal/database/mongodb"
 	_ "github.com/sanskarpan/db-backup/internal/database/mysql"
 	_ "github.com/sanskarpan/db-backup/internal/database/postgres"

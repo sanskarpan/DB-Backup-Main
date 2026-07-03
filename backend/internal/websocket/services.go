@@ -7,24 +7,24 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// BackupProgressTracker tracks and broadcasts backup progress
+// BackupProgressTracker tracks and broadcasts backup progress.
 type BackupProgressTracker struct {
 	hub *Hub
 }
 
-// NewBackupProgressTracker creates a new backup progress tracker
+// NewBackupProgressTracker creates a new backup progress tracker.
 func NewBackupProgressTracker(hub *Hub) *BackupProgressTracker {
 	return &BackupProgressTracker{
 		hub: hub,
 	}
 }
 
-// UpdateProgress updates and broadcasts backup progress
+// UpdateProgress updates and broadcasts backup progress.
 func (t *BackupProgressTracker) UpdateProgress(progress *BackupProgress) {
 	t.hub.BroadcastBackupProgress(progress)
 }
 
-// StartBackup notifies about backup start
+// StartBackup notifies about backup start.
 func (t *BackupProgressTracker) StartBackup(backupID, databaseID string) {
 	progress := &BackupProgress{
 		BackupID:    backupID,
@@ -36,7 +36,7 @@ func (t *BackupProgressTracker) StartBackup(backupID, databaseID string) {
 	t.UpdateProgress(progress)
 }
 
-// CompleteBackup notifies about backup completion
+// CompleteBackup notifies about backup completion.
 func (t *BackupProgressTracker) CompleteBackup(backupID, databaseID string, bytesProcessed int64, elapsedTime int64) {
 	progress := &BackupProgress{
 		BackupID:       backupID,
@@ -63,7 +63,7 @@ func (t *BackupProgressTracker) CompleteBackup(backupID, databaseID string, byte
 	})
 }
 
-// FailBackup notifies about backup failure
+// FailBackup notifies about backup failure.
 func (t *BackupProgressTracker) FailBackup(backupID, databaseID, errorMsg string) {
 	progress := &BackupProgress{
 		BackupID:    backupID,
@@ -85,19 +85,19 @@ func (t *BackupProgressTracker) FailBackup(backupID, databaseID, errorMsg string
 	})
 }
 
-// LogStreamer streams logs in real-time
+// LogStreamer streams logs in real-time.
 type LogStreamer struct {
 	hub *Hub
 }
 
-// NewLogStreamer creates a new log streamer
+// NewLogStreamer creates a new log streamer.
 func NewLogStreamer(hub *Hub) *LogStreamer {
 	return &LogStreamer{
 		hub: hub,
 	}
 }
 
-// StreamLog streams a log message
+// StreamLog streams a log message.
 func (s *LogStreamer) StreamLog(level, message, source string, fields map[string]interface{}) {
 	logMsg := &LogMessage{
 		Level:     level,
@@ -109,39 +109,39 @@ func (s *LogStreamer) StreamLog(level, message, source string, fields map[string
 	s.hub.BroadcastLog(logMsg)
 }
 
-// Debug streams a debug log
+// Debug streams a debug log.
 func (s *LogStreamer) Debug(source, message string, fields map[string]interface{}) {
 	s.StreamLog("debug", message, source, fields)
 }
 
-// Info streams an info log
+// Info streams an info log.
 func (s *LogStreamer) Info(source, message string, fields map[string]interface{}) {
 	s.StreamLog("info", message, source, fields)
 }
 
-// Warn streams a warning log
+// Warn streams a warning log.
 func (s *LogStreamer) Warn(source, message string, fields map[string]interface{}) {
 	s.StreamLog("warn", message, source, fields)
 }
 
-// Error streams an error log
+// Error streams an error log.
 func (s *LogStreamer) Error(source, message string, fields map[string]interface{}) {
 	s.StreamLog("error", message, source, fields)
 }
 
-// NotificationBroadcaster broadcasts notifications to users
+// NotificationBroadcaster broadcasts notifications to users.
 type NotificationBroadcaster struct {
 	hub *Hub
 }
 
-// NewNotificationBroadcaster creates a new notification broadcaster
+// NewNotificationBroadcaster creates a new notification broadcaster.
 func NewNotificationBroadcaster(hub *Hub) *NotificationBroadcaster {
 	return &NotificationBroadcaster{
 		hub: hub,
 	}
 }
 
-// Broadcast broadcasts a notification
+// Broadcast broadcasts a notification.
 func (n *NotificationBroadcaster) Broadcast(notification *Notification) {
 	notification.Time = time.Now()
 	if notification.ID == "" {
@@ -150,7 +150,7 @@ func (n *NotificationBroadcaster) Broadcast(notification *Notification) {
 	n.hub.BroadcastNotification(notification)
 }
 
-// Info sends an info notification
+// Info sends an info notification.
 func (n *NotificationBroadcaster) Info(title, message string) {
 	n.Broadcast(&Notification{
 		Type:     "info",
@@ -160,7 +160,7 @@ func (n *NotificationBroadcaster) Info(title, message string) {
 	})
 }
 
-// Success sends a success notification
+// Success sends a success notification.
 func (n *NotificationBroadcaster) Success(title, message string) {
 	n.Broadcast(&Notification{
 		Type:     "success",
@@ -170,7 +170,7 @@ func (n *NotificationBroadcaster) Success(title, message string) {
 	})
 }
 
-// Warning sends a warning notification
+// Warning sends a warning notification.
 func (n *NotificationBroadcaster) Warning(title, message string) {
 	n.Broadcast(&Notification{
 		Type:     "warning",
@@ -180,7 +180,7 @@ func (n *NotificationBroadcaster) Warning(title, message string) {
 	})
 }
 
-// Error sends an error notification
+// Error sends an error notification.
 func (n *NotificationBroadcaster) Error(title, message string) {
 	n.Broadcast(&Notification{
 		Type:     "error",
@@ -190,7 +190,7 @@ func (n *NotificationBroadcaster) Error(title, message string) {
 	})
 }
 
-// BackupNotification sends a backup-related notification
+// BackupNotification sends a backup-related notification.
 func (n *NotificationBroadcaster) BackupNotification(backupID, status, message string) {
 	var notifType string
 	var priority int
@@ -219,7 +219,7 @@ func (n *NotificationBroadcaster) BackupNotification(backupID, status, message s
 	})
 }
 
-// RestoreNotification sends a restore-related notification
+// RestoreNotification sends a restore-related notification.
 func (n *NotificationBroadcaster) RestoreNotification(restoreID, status, message string) {
 	var notifType string
 	var priority int
@@ -248,24 +248,24 @@ func (n *NotificationBroadcaster) RestoreNotification(restoreID, status, message
 	})
 }
 
-// generateNotificationID generates a unique notification ID
+// generateNotificationID generates a unique notification ID.
 func generateNotificationID() string {
 	return uid.New("notif")
 }
 
-// RestoreProgressTracker tracks and broadcasts restore progress
+// RestoreProgressTracker tracks and broadcasts restore progress.
 type RestoreProgressTracker struct {
 	hub *Hub
 }
 
-// NewRestoreProgressTracker creates a new restore progress tracker
+// NewRestoreProgressTracker creates a new restore progress tracker.
 func NewRestoreProgressTracker(hub *Hub) *RestoreProgressTracker {
 	return &RestoreProgressTracker{
 		hub: hub,
 	}
 }
 
-// UpdateProgress updates and broadcasts restore progress
+// UpdateProgress updates and broadcasts restore progress.
 func (t *RestoreProgressTracker) UpdateProgress(restoreID, databaseID, status string, progress float64) {
 	t.hub.Broadcast(&Message{
 		Type:  MessageTypeRestoreProgress,
@@ -279,7 +279,7 @@ func (t *RestoreProgressTracker) UpdateProgress(restoreID, databaseID, status st
 	})
 }
 
-// CompleteRestore notifies about restore completion
+// CompleteRestore notifies about restore completion.
 func (t *RestoreProgressTracker) CompleteRestore(restoreID, databaseID string) {
 	t.hub.Broadcast(&Message{
 		Type:  MessageTypeRestoreComplete,
@@ -292,7 +292,7 @@ func (t *RestoreProgressTracker) CompleteRestore(restoreID, databaseID string) {
 	})
 }
 
-// FailRestore notifies about restore failure
+// FailRestore notifies about restore failure.
 func (t *RestoreProgressTracker) FailRestore(restoreID, databaseID, errorMsg string) {
 	t.hub.Broadcast(&Message{
 		Type:  MessageTypeRestoreFailed,

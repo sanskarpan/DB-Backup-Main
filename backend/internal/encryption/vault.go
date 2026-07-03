@@ -10,10 +10,11 @@ import (
 	"time"
 
 	vault "github.com/hashicorp/vault/api"
+
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// VaultKeyStore implements KeyStore using HashiCorp Vault
+// VaultKeyStore implements KeyStore using HashiCorp Vault.
 type VaultKeyStore struct {
 	client     *vault.Client
 	mountPath  string
@@ -21,7 +22,7 @@ type VaultKeyStore struct {
 	currentKey string
 }
 
-// VaultConfig holds Vault configuration
+// VaultConfig holds Vault configuration.
 type VaultConfig struct {
 	Address    string
 	Token      string
@@ -31,7 +32,7 @@ type VaultConfig struct {
 	CurrentKey string // Current key ID to use
 }
 
-// NewVaultKeyStore creates a new Vault-backed key store
+// NewVaultKeyStore creates a new Vault-backed key store.
 func NewVaultKeyStore(ctx context.Context, config *VaultConfig) (*VaultKeyStore, error) {
 	if config.Address == "" {
 		return nil, pkgErrors.New(pkgErrors.ErrorTypeConfiguration, "Vault address is required")
@@ -88,7 +89,7 @@ func NewVaultKeyStore(ctx context.Context, config *VaultConfig) (*VaultKeyStore,
 	return store, nil
 }
 
-// GetKey retrieves an encryption key by ID from Vault
+// GetKey retrieves an encryption key by ID from Vault.
 func (v *VaultKeyStore) GetKey(ctx context.Context, keyID string) ([]byte, error) {
 	secretPath := v.buildPath(keyID)
 
@@ -111,7 +112,7 @@ func (v *VaultKeyStore) GetKey(ctx context.Context, keyID string) ([]byte, error
 	return []byte(keyData), nil
 }
 
-// StoreKey stores an encryption key in Vault
+// StoreKey stores an encryption key in Vault.
 func (v *VaultKeyStore) StoreKey(ctx context.Context, keyID string, key []byte) error {
 	secretPath := v.buildPath(keyID)
 
@@ -131,7 +132,7 @@ func (v *VaultKeyStore) StoreKey(ctx context.Context, keyID string, key []byte) 
 	return nil
 }
 
-// RotateKey creates a new key version
+// RotateKey creates a new key version.
 func (v *VaultKeyStore) RotateKey(ctx context.Context, keyID string) (newKeyID string, newKey []byte, err error) {
 	// Get current versions
 	versions, err := v.ListKeyVersions(ctx, keyID)
@@ -181,7 +182,7 @@ func (v *VaultKeyStore) RotateKey(ctx context.Context, keyID string) (newKeyID s
 	return newKeyID, newKey, nil
 }
 
-// ListKeyVersions returns all versions of a key
+// ListKeyVersions returns all versions of a key.
 func (v *VaultKeyStore) ListKeyVersions(ctx context.Context, keyID string) ([]KeyVersion, error) {
 	// List secrets under the key prefix
 	basePath := path.Join(v.keyPrefix, keyID)
@@ -222,7 +223,7 @@ func (v *VaultKeyStore) ListKeyVersions(ctx context.Context, keyID string) ([]Ke
 	return versions, nil
 }
 
-// DeleteKey deletes a key from Vault
+// DeleteKey deletes a key from Vault.
 func (v *VaultKeyStore) DeleteKey(ctx context.Context, keyID string) error {
 	secretPath := v.buildPath(keyID)
 
@@ -235,7 +236,7 @@ func (v *VaultKeyStore) DeleteKey(ctx context.Context, keyID string) error {
 	return nil
 }
 
-// GetCurrentKeyID returns the ID of the current active key
+// GetCurrentKeyID returns the ID of the current active key.
 func (v *VaultKeyStore) GetCurrentKeyID(ctx context.Context) (string, error) {
 	metadataPath := path.Join(v.keyPrefix, "_metadata", "current")
 
@@ -257,7 +258,7 @@ func (v *VaultKeyStore) GetCurrentKeyID(ctx context.Context) (string, error) {
 	return currentKeyID, nil
 }
 
-// Close closes the Vault client connection
+// Close closes the Vault client connection.
 func (v *VaultKeyStore) Close() error {
 	// Vault client doesn't require explicit closing
 	return nil
@@ -319,7 +320,7 @@ func isNotFoundError(err error) bool {
 	return false
 }
 
-// FileKeyStore implements a simple file-based key store for testing/development
+// FileKeyStore implements a simple file-based key store for testing/development.
 type FileKeyStore struct {
 	basePath    string
 	currentKey  string
@@ -327,7 +328,7 @@ type FileKeyStore struct {
 	keyVersions map[string][]KeyVersion
 }
 
-// NewFileKeyStore creates a file-based key store
+// NewFileKeyStore creates a file-based key store.
 func NewFileKeyStore(basePath string, currentKey string) *FileKeyStore {
 	if currentKey == "" {
 		currentKey = "master"
@@ -341,7 +342,7 @@ func NewFileKeyStore(basePath string, currentKey string) *FileKeyStore {
 	}
 }
 
-// GetKey retrieves a key from memory/file
+// GetKey retrieves a key from memory/file.
 func (f *FileKeyStore) GetKey(ctx context.Context, keyID string) ([]byte, error) {
 	key, exists := f.keys[keyID]
 	if !exists {
@@ -350,7 +351,7 @@ func (f *FileKeyStore) GetKey(ctx context.Context, keyID string) ([]byte, error)
 	return key, nil
 }
 
-// StoreKey stores a key in memory/file
+// StoreKey stores a key in memory/file.
 func (f *FileKeyStore) StoreKey(ctx context.Context, keyID string, key []byte) error {
 	f.keys[keyID] = key
 
@@ -397,7 +398,7 @@ func (f *FileKeyStore) StoreKey(ctx context.Context, keyID string, key []byte) e
 	return nil
 }
 
-// RotateKey creates a new key version
+// RotateKey creates a new key version.
 func (f *FileKeyStore) RotateKey(ctx context.Context, keyID string) (newKeyID string, newKey []byte, err error) {
 	versions := f.keyVersions[keyID]
 	nextVersion := len(versions) + 1
@@ -415,7 +416,7 @@ func (f *FileKeyStore) RotateKey(ctx context.Context, keyID string) (newKeyID st
 	return newKeyID, newKey, nil
 }
 
-// ListKeyVersions returns all versions
+// ListKeyVersions returns all versions.
 func (f *FileKeyStore) ListKeyVersions(ctx context.Context, keyID string) ([]KeyVersion, error) {
 	versions, exists := f.keyVersions[keyID]
 	if !exists {
@@ -424,18 +425,18 @@ func (f *FileKeyStore) ListKeyVersions(ctx context.Context, keyID string) ([]Key
 	return versions, nil
 }
 
-// DeleteKey removes a key
+// DeleteKey removes a key.
 func (f *FileKeyStore) DeleteKey(ctx context.Context, keyID string) error {
 	delete(f.keys, keyID)
 	return nil
 }
 
-// GetCurrentKeyID returns current key ID
+// GetCurrentKeyID returns current key ID.
 func (f *FileKeyStore) GetCurrentKeyID(ctx context.Context) (string, error) {
 	return f.currentKey, nil
 }
 
-// Close closes the store
+// Close closes the store.
 func (f *FileKeyStore) Close() error {
 	return nil
 }

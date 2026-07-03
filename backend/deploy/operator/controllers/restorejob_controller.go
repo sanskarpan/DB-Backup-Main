@@ -20,7 +20,7 @@ import (
 
 const restoreJobFinalizer = "backup.db.sanskarpan.com/finalizer"
 
-// RestoreJobReconciler reconciles a RestoreJob object
+// RestoreJobReconciler reconciles a RestoreJob object.
 type RestoreJobReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
@@ -35,7 +35,7 @@ type RestoreJobReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;delete
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 
-// Reconcile is the main reconciliation loop
+// Reconcile is the main reconciliation loop.
 func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
@@ -151,7 +151,7 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 }
 
-// reconcileDelete handles restore job deletion
+// reconcileDelete handles restore job deletion.
 func (r *RestoreJobReconciler) reconcileDelete(ctx context.Context, restoreJob *backupv1.RestoreJob) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
@@ -217,7 +217,7 @@ func (r *RestoreJobReconciler) reconcileDelete(ctx context.Context, restoreJob *
 	return ctrl.Result{}, nil
 }
 
-// validateRestoreJob validates the restore job configuration
+// validateRestoreJob validates the restore job configuration.
 func (r *RestoreJobReconciler) validateRestoreJob(restoreJob *backupv1.RestoreJob) error {
 	// Validate backup ID
 	if restoreJob.Spec.BackupID == "" {
@@ -260,7 +260,7 @@ func (r *RestoreJobReconciler) validateRestoreJob(restoreJob *backupv1.RestoreJo
 	return nil
 }
 
-// createRestoreJob creates a Kubernetes Job to perform the restore
+// createRestoreJob creates a Kubernetes Job to perform the restore.
 func (r *RestoreJobReconciler) createRestoreJob(ctx context.Context, restoreJob *backupv1.RestoreJob) (*batchv1.Job, error) {
 	log := log.FromContext(ctx)
 
@@ -273,7 +273,8 @@ func (r *RestoreJobReconciler) createRestoreJob(ctx context.Context, restoreJob 
 
 	// Add backup location if specified
 	if restoreJob.Spec.BackupLocation != nil {
-		args = append(args,
+		args = append(
+			args,
 			"--storage-provider", restoreJob.Spec.BackupLocation.Provider,
 			"--storage-path", restoreJob.Spec.BackupLocation.Path,
 		)
@@ -320,9 +321,9 @@ func (r *RestoreJobReconciler) createRestoreJob(ctx context.Context, restoreJob 
 
 	// Build pod labels
 	labels := map[string]string{
-		"app":                       "db-backup",
-		"component":                 "restore",
-		"restore-job":               restoreJob.Name,
+		"app":                                 "db-backup",
+		"component":                           "restore",
+		"restore-job":                         restoreJob.Name,
 		"backup.db.sanskarpan.com/managed-by": "restore-operator",
 	}
 
@@ -432,7 +433,7 @@ func (r *RestoreJobReconciler) createRestoreJob(ctx context.Context, restoreJob 
 	return job, nil
 }
 
-// checkJobStatus checks the status of the Kubernetes Job
+// checkJobStatus checks the status of the Kubernetes Job.
 func (r *RestoreJobReconciler) checkJobStatus(ctx context.Context, restoreJob *backupv1.RestoreJob, job *batchv1.Job) error {
 	// Get current job status
 	currentJob := &batchv1.Job{}
@@ -468,7 +469,7 @@ func (r *RestoreJobReconciler) checkJobStatus(ctx context.Context, restoreJob *b
 	return nil
 }
 
-// shouldRetry determines if the restore should be retried
+// shouldRetry determines if the restore should be retried.
 func (r *RestoreJobReconciler) shouldRetry(restoreJob *backupv1.RestoreJob) bool {
 	if restoreJob.Spec.RetryPolicy == nil {
 		return false
@@ -477,7 +478,7 @@ func (r *RestoreJobReconciler) shouldRetry(restoreJob *backupv1.RestoreJob) bool
 	return restoreJob.Status.Attempts < restoreJob.Spec.RetryPolicy.MaxAttempts
 }
 
-// updateCondition updates a condition in the restore job status
+// updateCondition updates a condition in the restore job status.
 func (r *RestoreJobReconciler) updateCondition(restoreJob *backupv1.RestoreJob, conditionType string, status metav1.ConditionStatus, reason, message string) {
 	condition := metav1.Condition{
 		Type:               conditionType,
@@ -505,7 +506,7 @@ func (r *RestoreJobReconciler) updateCondition(restoreJob *backupv1.RestoreJob, 
 	}
 }
 
-// SetupWithManager sets up the controller with the Manager
+// SetupWithManager sets up the controller with the Manager.
 func (r *RestoreJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&backupv1.RestoreJob{}).

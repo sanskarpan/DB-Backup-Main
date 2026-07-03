@@ -15,12 +15,12 @@ import (
 // restored test target.
 type Validator struct{}
 
-// NewValidator creates a new validator
+// NewValidator creates a new validator.
 func NewValidator() *Validator {
 	return &Validator{}
 }
 
-// SchemaObject represents a database schema object
+// SchemaObject represents a database schema object.
 type SchemaObject struct {
 	Type       string // table, index, constraint, etc.
 	Name       string
@@ -28,7 +28,7 @@ type SchemaObject struct {
 	Database   string
 }
 
-// TableRowCount represents row count for a table
+// TableRowCount represents row count for a table.
 type TableRowCount struct {
 	TableName   string
 	RowCount    int64
@@ -36,7 +36,7 @@ type TableRowCount struct {
 	LastUpdated time.Time
 }
 
-// SampleDataRecord represents a sample data record
+// SampleDataRecord represents a sample data record.
 type SampleDataRecord struct {
 	TableName string
 	RecordID  string

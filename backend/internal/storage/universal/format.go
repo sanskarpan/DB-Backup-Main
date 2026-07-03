@@ -15,37 +15,37 @@ import (
 )
 
 // UniversalBackupFormat defines the cloud-agnostic backup format
-// This format can be used across AWS, Azure, GCP, and local storage
+// This format can be used across AWS, Azure, GCP, and local storage.
 const (
 	FormatVersion = "1.0.0"
 	ManifestFile  = "backup.manifest.json"
 	MetadataFile  = "backup.metadata.json"
 )
 
-// UniversalBackup represents a cloud-agnostic backup
+// UniversalBackup represents a cloud-agnostic backup.
 type UniversalBackup struct {
 	Manifest *BackupManifest
 	Metadata *BackupMetadata
 	Chunks   []*BackupChunk
 }
 
-// BackupManifest contains the backup structure
+// BackupManifest contains the backup structure.
 type BackupManifest struct {
-	Version     string              `json:"version"`
-	BackupID    string              `json:"backup_id"`
-	DatabaseType string             `json:"database_type"`
-	DatabaseName string             `json:"database_name"`
-	CreatedAt   time.Time           `json:"created_at"`
-	Format      string              `json:"format"` // "universal-v1"
-	Compression string              `json:"compression"`
-	Encryption  *EncryptionInfo     `json:"encryption,omitempty"`
-	Chunks      []ChunkReference    `json:"chunks"`
-	TotalSize   int64               `json:"total_size"`
-	Checksum    string              `json:"checksum"` // Overall backup checksum
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	Version      string                 `json:"version"`
+	BackupID     string                 `json:"backup_id"`
+	DatabaseType string                 `json:"database_type"`
+	DatabaseName string                 `json:"database_name"`
+	CreatedAt    time.Time              `json:"created_at"`
+	Format       string                 `json:"format"` // "universal-v1"
+	Compression  string                 `json:"compression"`
+	Encryption   *EncryptionInfo        `json:"encryption,omitempty"`
+	Chunks       []ChunkReference       `json:"chunks"`
+	TotalSize    int64                  `json:"total_size"`
+	Checksum     string                 `json:"checksum"` // Overall backup checksum
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// BackupMetadata contains database-specific metadata
+// BackupMetadata contains database-specific metadata.
 type BackupMetadata struct {
 	DatabaseType    string                 `json:"database_type"`
 	DatabaseVersion string                 `json:"database_version"`
@@ -57,14 +57,14 @@ type BackupMetadata struct {
 	Tags            map[string]string      `json:"tags,omitempty"`
 }
 
-// EncryptionInfo contains encryption details
+// EncryptionInfo contains encryption details.
 type EncryptionInfo struct {
 	Algorithm string `json:"algorithm"` // aes-256-gcm
 	KeyID     string `json:"key_id"`
 	IV        string `json:"iv"` // Initialization vector
 }
 
-// ChunkReference references a backup chunk
+// ChunkReference references a backup chunk.
 type ChunkReference struct {
 	ChunkID   string `json:"chunk_id"`
 	Sequence  int    `json:"sequence"`
@@ -74,7 +74,7 @@ type ChunkReference struct {
 	Encrypted bool   `json:"encrypted"`
 }
 
-// BackupChunk represents a data chunk
+// BackupChunk represents a data chunk.
 type BackupChunk struct {
 	ID       string
 	Sequence int
@@ -82,7 +82,7 @@ type BackupChunk struct {
 	Checksum string
 }
 
-// SchemaInfo contains database schema information
+// SchemaInfo contains database schema information.
 type SchemaInfo struct {
 	Tables      []TableInfo            `json:"tables"`
 	Views       []string               `json:"views,omitempty"`
@@ -94,7 +94,7 @@ type SchemaInfo struct {
 	Extensions  map[string]interface{} `json:"extensions,omitempty"`
 }
 
-// TableInfo contains table metadata
+// TableInfo contains table metadata.
 type TableInfo struct {
 	Name       string   `json:"name"`
 	Schema     string   `json:"schema,omitempty"`
@@ -104,7 +104,7 @@ type TableInfo struct {
 	PrimaryKey []string `json:"primary_key,omitempty"`
 }
 
-// BackupStatistics contains backup statistics
+// BackupStatistics contains backup statistics.
 type BackupStatistics struct {
 	OriginalSize   int64         `json:"original_size"`
 	CompressedSize int64         `json:"compressed_size"`
@@ -114,7 +114,7 @@ type BackupStatistics struct {
 	Throughput     float64       `json:"throughput_mbps"`
 }
 
-// UniversalBackupWriter writes backups in universal format
+// UniversalBackupWriter writes backups in universal format.
 type UniversalBackupWriter struct {
 	outputDir   string
 	manifest    *BackupManifest
@@ -124,7 +124,7 @@ type UniversalBackupWriter struct {
 	currentSize int64
 }
 
-// NewUniversalBackupWriter creates a new universal backup writer
+// NewUniversalBackupWriter creates a new universal backup writer.
 func NewUniversalBackupWriter(outputDir string, databaseType, databaseName string, chunkSize int64) *UniversalBackupWriter {
 	return &UniversalBackupWriter{
 		outputDir: outputDir,
@@ -139,9 +139,9 @@ func NewUniversalBackupWriter(outputDir string, databaseType, databaseName strin
 			Metadata:     make(map[string]interface{}),
 		},
 		metadata: &BackupMetadata{
-			DatabaseType: databaseType,
-			Statistics:   &BackupStatistics{},
-			Tags:         make(map[string]string),
+			DatabaseType:  databaseType,
+			Statistics:    &BackupStatistics{},
+			Tags:          make(map[string]string),
 			Configuration: make(map[string]interface{}),
 		},
 		chunks:    make([]*BackupChunk, 0),
@@ -149,7 +149,7 @@ func NewUniversalBackupWriter(outputDir string, databaseType, databaseName strin
 	}
 }
 
-// WriteData writes data to the backup
+// WriteData writes data to the backup.
 func (w *UniversalBackupWriter) WriteData(reader io.Reader) error {
 	buffer := make([]byte, w.chunkSize)
 	sequence := 0
@@ -200,12 +200,12 @@ func (w *UniversalBackupWriter) WriteData(reader io.Reader) error {
 	return nil
 }
 
-// SetCompression sets compression algorithm
+// SetCompression sets compression algorithm.
 func (w *UniversalBackupWriter) SetCompression(algorithm string) {
 	w.manifest.Compression = algorithm
 }
 
-// SetEncryption sets encryption details
+// SetEncryption sets encryption details.
 func (w *UniversalBackupWriter) SetEncryption(algorithm, keyID, iv string) {
 	w.manifest.Encryption = &EncryptionInfo{
 		Algorithm: algorithm,
@@ -214,43 +214,43 @@ func (w *UniversalBackupWriter) SetEncryption(algorithm, keyID, iv string) {
 	}
 }
 
-// SetMetadata sets backup metadata
+// SetMetadata sets backup metadata.
 func (w *UniversalBackupWriter) SetMetadata(key string, value interface{}) {
 	w.manifest.Metadata[key] = value
 }
 
-// SetSchema sets schema information
+// SetSchema sets schema information.
 func (w *UniversalBackupWriter) SetSchema(schema *SchemaInfo) {
 	w.metadata.Schema = schema
 }
 
-// SetBackupType sets the backup type
+// SetBackupType sets the backup type.
 func (w *UniversalBackupWriter) SetBackupType(backupType string) {
 	w.metadata.BackupType = backupType
 }
 
-// AddTag adds a tag to the backup
+// AddTag adds a tag to the backup.
 func (w *UniversalBackupWriter) AddTag(key, value string) {
 	w.metadata.Tags[key] = value
 }
 
-// Finalize finalizes the backup and writes all files
+// Finalize finalizes the backup and writes all files.
 func (w *UniversalBackupWriter) Finalize() error {
 	// Create output directory
-	if err := os.MkdirAll(w.outputDir, 0755); err != nil {
+	if err := os.MkdirAll(w.outputDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
 	// Create chunks directory
 	chunksDir := filepath.Join(w.outputDir, "chunks")
-	if err := os.MkdirAll(chunksDir, 0755); err != nil {
+	if err := os.MkdirAll(chunksDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create chunks directory: %w", err)
 	}
 
 	// Write chunks
 	for _, chunk := range w.chunks {
 		chunkPath := filepath.Join(chunksDir, fmt.Sprintf("chunk-%04d.dat", chunk.Sequence))
-		if err := os.WriteFile(chunkPath, chunk.Data, 0644); err != nil {
+		if err := os.WriteFile(chunkPath, chunk.Data, 0o644); err != nil {
 			return fmt.Errorf("failed to write chunk %s: %w", chunk.ID, err)
 		}
 	}
@@ -264,7 +264,7 @@ func (w *UniversalBackupWriter) Finalize() error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal manifest: %w", err)
 	}
-	if err := os.WriteFile(manifestPath, manifestData, 0644); err != nil {
+	if err := os.WriteFile(manifestPath, manifestData, 0o644); err != nil {
 		return fmt.Errorf("failed to write manifest: %w", err)
 	}
 
@@ -274,14 +274,14 @@ func (w *UniversalBackupWriter) Finalize() error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal metadata: %w", err)
 	}
-	if err := os.WriteFile(metadataPath, metadataData, 0644); err != nil {
+	if err := os.WriteFile(metadataPath, metadataData, 0o644); err != nil {
 		return fmt.Errorf("failed to write metadata: %w", err)
 	}
 
 	return nil
 }
 
-// calculateOverallChecksum calculates checksum of all chunks
+// calculateOverallChecksum calculates checksum of all chunks.
 func (w *UniversalBackupWriter) calculateOverallChecksum() string {
 	hash := sha256.New()
 	for _, chunk := range w.chunks {
@@ -290,14 +290,14 @@ func (w *UniversalBackupWriter) calculateOverallChecksum() string {
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
-// UniversalBackupReader reads backups in universal format
+// UniversalBackupReader reads backups in universal format.
 type UniversalBackupReader struct {
 	inputDir string
 	manifest *BackupManifest
 	metadata *BackupMetadata
 }
 
-// NewUniversalBackupReader creates a new universal backup reader
+// NewUniversalBackupReader creates a new universal backup reader.
 func NewUniversalBackupReader(inputDir string) (*UniversalBackupReader, error) {
 	reader := &UniversalBackupReader{
 		inputDir: inputDir,
@@ -328,17 +328,17 @@ func NewUniversalBackupReader(inputDir string) (*UniversalBackupReader, error) {
 	return reader, nil
 }
 
-// GetManifest returns the backup manifest
+// GetManifest returns the backup manifest.
 func (r *UniversalBackupReader) GetManifest() *BackupManifest {
 	return r.manifest
 }
 
-// GetMetadata returns the backup metadata
+// GetMetadata returns the backup metadata.
 func (r *UniversalBackupReader) GetMetadata() *BackupMetadata {
 	return r.metadata
 }
 
-// ReadData reads all backup data
+// ReadData reads all backup data.
 func (r *UniversalBackupReader) ReadData() ([]byte, error) {
 	var allData []byte
 
@@ -362,7 +362,7 @@ func (r *UniversalBackupReader) ReadData() ([]byte, error) {
 	return allData, nil
 }
 
-// VerifyIntegrity verifies backup integrity
+// VerifyIntegrity verifies backup integrity.
 func (r *UniversalBackupReader) VerifyIntegrity() error {
 	hash := sha256.New()
 	for _, chunkRef := range r.manifest.Chunks {
@@ -391,7 +391,7 @@ func (r *UniversalBackupReader) VerifyIntegrity() error {
 	return nil
 }
 
-// generateBackupID generates a unique backup ID
+// generateBackupID generates a unique backup ID.
 func generateBackupID() string {
 	return uid.New("ubf")
 }

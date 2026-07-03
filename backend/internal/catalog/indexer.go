@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// BackupDocument represents a backup document in the catalog
+// BackupDocument represents a backup document in the catalog.
 type BackupDocument struct {
 	// ID is the unique backup identifier
 	ID string `json:"id"`
@@ -85,13 +85,13 @@ type BackupDocument struct {
 	LastAccessAt *time.Time `json:"last_access_at,omitempty"`
 }
 
-// CatalogIndexer indexes backup metadata into Elasticsearch
+// CatalogIndexer indexes backup metadata into Elasticsearch.
 type CatalogIndexer struct {
 	client    *ElasticsearchClient
 	indexName string
 }
 
-// NewCatalogIndexer creates a new catalog indexer
+// NewCatalogIndexer creates a new catalog indexer.
 func NewCatalogIndexer(client *ElasticsearchClient) (*CatalogIndexer, error) {
 	if client == nil {
 		return nil, fmt.Errorf("elasticsearch client cannot be nil")
@@ -105,7 +105,7 @@ func NewCatalogIndexer(client *ElasticsearchClient) (*CatalogIndexer, error) {
 	return indexer, nil
 }
 
-// Initialize creates the backups index with proper mapping
+// Initialize creates the backups index with proper mapping.
 func (ci *CatalogIndexer) Initialize(ctx context.Context) error {
 	// Define mapping for backup documents
 	mapping := map[string]interface{}{
@@ -157,7 +157,7 @@ func (ci *CatalogIndexer) Initialize(ctx context.Context) error {
 				"type": "date",
 			},
 			"tags": map[string]interface{}{
-				"type": "object",
+				"type":    "object",
 				"enabled": true,
 			},
 			"metadata": map[string]interface{}{
@@ -218,7 +218,7 @@ func (ci *CatalogIndexer) Initialize(ctx context.Context) error {
 	return nil
 }
 
-// IndexBackup indexes a single backup document
+// IndexBackup indexes a single backup document.
 func (ci *CatalogIndexer) IndexBackup(ctx context.Context, backup *BackupDocument) error {
 	if backup == nil {
 		return fmt.Errorf("backup document cannot be nil")
@@ -231,7 +231,7 @@ func (ci *CatalogIndexer) IndexBackup(ctx context.Context, backup *BackupDocumen
 	return ci.client.IndexDocument(ctx, ci.indexName, backup.ID, backup)
 }
 
-// IndexBackups indexes multiple backup documents in bulk
+// IndexBackups indexes multiple backup documents in bulk.
 func (ci *CatalogIndexer) IndexBackups(ctx context.Context, backups []*BackupDocument) error {
 	if len(backups) == 0 {
 		return nil
@@ -251,7 +251,7 @@ func (ci *CatalogIndexer) IndexBackups(ctx context.Context, backups []*BackupDoc
 	return ci.client.BulkIndex(ctx, ci.indexName, bulkDocs)
 }
 
-// GetBackup retrieves a backup document by ID
+// GetBackup retrieves a backup document by ID.
 func (ci *CatalogIndexer) GetBackup(ctx context.Context, backupID string) (*BackupDocument, error) {
 	if backupID == "" {
 		return nil, fmt.Errorf("backup ID cannot be empty")
@@ -271,7 +271,7 @@ func (ci *CatalogIndexer) GetBackup(ctx context.Context, backupID string) (*Back
 	return backup, nil
 }
 
-// DeleteBackup deletes a backup document by ID
+// DeleteBackup deletes a backup document by ID.
 func (ci *CatalogIndexer) DeleteBackup(ctx context.Context, backupID string) error {
 	if backupID == "" {
 		return fmt.Errorf("backup ID cannot be empty")
@@ -280,7 +280,7 @@ func (ci *CatalogIndexer) DeleteBackup(ctx context.Context, backupID string) err
 	return ci.client.DeleteDocument(ctx, ci.indexName, backupID)
 }
 
-// UpdateBackupStatus updates the status of a backup
+// UpdateBackupStatus updates the status of a backup.
 func (ci *CatalogIndexer) UpdateBackupStatus(ctx context.Context, backupID, status string) error {
 	backup, err := ci.GetBackup(ctx, backupID)
 	if err != nil {
@@ -291,7 +291,7 @@ func (ci *CatalogIndexer) UpdateBackupStatus(ctx context.Context, backupID, stat
 	return ci.IndexBackup(ctx, backup)
 }
 
-// IncrementRestoreCount increments the restore count for a backup
+// IncrementRestoreCount increments the restore count for a backup.
 func (ci *CatalogIndexer) IncrementRestoreCount(ctx context.Context, backupID string) error {
 	backup, err := ci.GetBackup(ctx, backupID)
 	if err != nil {
@@ -305,7 +305,7 @@ func (ci *CatalogIndexer) IncrementRestoreCount(ctx context.Context, backupID st
 	return ci.IndexBackup(ctx, backup)
 }
 
-// IncrementAccessCount increments the access count for a backup
+// IncrementAccessCount increments the access count for a backup.
 func (ci *CatalogIndexer) IncrementAccessCount(ctx context.Context, backupID string) error {
 	backup, err := ci.GetBackup(ctx, backupID)
 	if err != nil {
@@ -319,7 +319,7 @@ func (ci *CatalogIndexer) IncrementAccessCount(ctx context.Context, backupID str
 	return ci.IndexBackup(ctx, backup)
 }
 
-// AddChildBackup adds a child backup ID to a parent backup
+// AddChildBackup adds a child backup ID to a parent backup.
 func (ci *CatalogIndexer) AddChildBackup(ctx context.Context, parentID, childID string) error {
 	backup, err := ci.GetBackup(ctx, parentID)
 	if err != nil {
@@ -337,7 +337,7 @@ func (ci *CatalogIndexer) AddChildBackup(ctx context.Context, parentID, childID 
 	return ci.IndexBackup(ctx, backup)
 }
 
-// CountBackups returns the total number of backups in the catalog
+// CountBackups returns the total number of backups in the catalog.
 func (ci *CatalogIndexer) CountBackups(ctx context.Context) (int64, error) {
 	query := map[string]interface{}{
 		"match_all": map[string]interface{}{},
@@ -346,7 +346,7 @@ func (ci *CatalogIndexer) CountBackups(ctx context.Context) (int64, error) {
 	return ci.client.Count(ctx, ci.indexName, query)
 }
 
-// CountBackupsByStatus returns the number of backups with a given status
+// CountBackupsByStatus returns the number of backups with a given status.
 func (ci *CatalogIndexer) CountBackupsByStatus(ctx context.Context, status string) (int64, error) {
 	query := map[string]interface{}{
 		"term": map[string]interface{}{
@@ -357,7 +357,7 @@ func (ci *CatalogIndexer) CountBackupsByStatus(ctx context.Context, status strin
 	return ci.client.Count(ctx, ci.indexName, query)
 }
 
-// CountBackupsByDatabase returns the number of backups for a given database
+// CountBackupsByDatabase returns the number of backups for a given database.
 func (ci *CatalogIndexer) CountBackupsByDatabase(ctx context.Context, databaseName string) (int64, error) {
 	query := map[string]interface{}{
 		"match": map[string]interface{}{
@@ -368,7 +368,7 @@ func (ci *CatalogIndexer) CountBackupsByDatabase(ctx context.Context, databaseNa
 	return ci.client.Count(ctx, ci.indexName, query)
 }
 
-// GetExpiredBackups returns backups that have expired
+// GetExpiredBackups returns backups that have expired.
 func (ci *CatalogIndexer) GetExpiredBackups(ctx context.Context, limit int) ([]*BackupDocument, error) {
 	if limit <= 0 {
 		limit = 100
@@ -409,7 +409,7 @@ func (ci *CatalogIndexer) GetExpiredBackups(ctx context.Context, limit int) ([]*
 	return backups, nil
 }
 
-// convertMapToStruct converts a map to a struct using JSON marshaling
+// convertMapToStruct converts a map to a struct using JSON marshaling.
 func convertMapToStruct(m map[string]interface{}, v interface{}) error {
 	// This is a simple conversion using JSON encoding/decoding
 	// In production, you might want to use a more efficient method

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Notifier defines the interface for notification providers
+// Notifier defines the interface for notification providers.
 type Notifier interface {
 	// Send sends a notification
 	Send(ctx context.Context, notification *Notification) error
@@ -18,7 +18,7 @@ type Notifier interface {
 	ValidateConfig() error
 }
 
-// ProviderType represents the type of notification provider
+// ProviderType represents the type of notification provider.
 type ProviderType string
 
 const (
@@ -27,18 +27,18 @@ const (
 	ProviderTypeWebhook ProviderType = "webhook"
 )
 
-// Notification represents a notification message
+// Notification represents a notification message.
 type Notification struct {
-	Title      string
-	Message    string
-	Level      NotificationLevel
-	Timestamp  time.Time
-	Metadata   map[string]interface{}
-	Tags       []string
+	Title       string
+	Message     string
+	Level       NotificationLevel
+	Timestamp   time.Time
+	Metadata    map[string]interface{}
+	Tags        []string
 	Attachments []*Attachment
 }
 
-// NotificationLevel represents the severity level
+// NotificationLevel represents the severity level.
 type NotificationLevel string
 
 const (
@@ -48,7 +48,7 @@ const (
 	LevelSuccess NotificationLevel = "success"
 )
 
-// Attachment represents a file or data attachment
+// Attachment represents a file or data attachment.
 type Attachment struct {
 	Title    string
 	Text     string
@@ -58,25 +58,25 @@ type Attachment struct {
 	FileURL  string
 }
 
-// Field represents a key-value field in an attachment
+// Field represents a key-value field in an attachment.
 type Field struct {
 	Title string
 	Value string
 	Short bool
 }
 
-// Router manages multiple notifiers and routes notifications
+// Router manages multiple notifiers and routes notifications.
 type Router struct {
 	notifiers []Notifier
 	filters   []NotificationFilter
 }
 
-// NotificationFilter filters which notifications should be sent
+// NotificationFilter filters which notifications should be sent.
 type NotificationFilter interface {
 	ShouldSend(notification *Notification) bool
 }
 
-// NewRouter creates a new notification router
+// NewRouter creates a new notification router.
 func NewRouter() *Router {
 	return &Router{
 		notifiers: make([]Notifier, 0),
@@ -84,17 +84,17 @@ func NewRouter() *Router {
 	}
 }
 
-// AddNotifier adds a notifier to the router
+// AddNotifier adds a notifier to the router.
 func (r *Router) AddNotifier(notifier Notifier) {
 	r.notifiers = append(r.notifiers, notifier)
 }
 
-// AddFilter adds a notification filter
+// AddFilter adds a notification filter.
 func (r *Router) AddFilter(filter NotificationFilter) {
 	r.filters = append(r.filters, filter)
 }
 
-// Send sends a notification to all registered notifiers
+// Send sends a notification to all registered notifiers.
 func (r *Router) Send(ctx context.Context, notification *Notification) error {
 	// Apply filters
 	for _, filter := range r.filters {
@@ -120,7 +120,7 @@ func (r *Router) Send(ctx context.Context, notification *Notification) error {
 	return lastErr
 }
 
-// LevelFilter filters notifications by level
+// LevelFilter filters notifications by level.
 type LevelFilter struct {
 	MinLevel NotificationLevel
 }
@@ -143,7 +143,7 @@ func (f *LevelFilter) ShouldSend(notification *Notification) bool {
 	return notifLevel >= minLevel
 }
 
-// TagFilter filters notifications by tags
+// TagFilter filters notifications by tags.
 type TagFilter struct {
 	RequiredTags []string
 }

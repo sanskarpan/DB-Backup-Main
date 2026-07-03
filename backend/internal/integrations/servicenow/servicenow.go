@@ -12,7 +12,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/integrations"
 )
 
-// ServiceNowIntegration implements integration with ServiceNow for incident management
+// ServiceNowIntegration implements integration with ServiceNow for incident management.
 type ServiceNowIntegration struct {
 	*integrations.BaseIntegration
 	client          *http.Client
@@ -21,7 +21,7 @@ type ServiceNowIntegration struct {
 	subcategory     string
 }
 
-// ServiceNow incident states
+// ServiceNow incident states.
 const (
 	StateNew        = "1"
 	StateInProgress = "2"
@@ -31,39 +31,39 @@ const (
 	StateCanceled   = "8"
 )
 
-// ServiceNow incident response
+// ServiceNow incident response.
 type incidentResponse struct {
 	Result struct {
-		SysID          string `json:"sys_id"`
-		Number         string `json:"number"`
-		State          string `json:"state"`
-		ShortDesc      string `json:"short_description"`
-		Description    string `json:"description"`
-		Priority       string `json:"priority"`
-		Urgency        string `json:"urgency"`
-		Impact         string `json:"impact"`
-		AssignedTo     string `json:"assigned_to"`
-		AssignmentGrp  string `json:"assignment_group"`
-		OpenedAt       string `json:"opened_at"`
-		ResolvedAt     string `json:"resolved_at"`
-		ClosedAt       string `json:"closed_at"`
-		CloseNotes     string `json:"close_notes"`
+		SysID         string `json:"sys_id"`
+		Number        string `json:"number"`
+		State         string `json:"state"`
+		ShortDesc     string `json:"short_description"`
+		Description   string `json:"description"`
+		Priority      string `json:"priority"`
+		Urgency       string `json:"urgency"`
+		Impact        string `json:"impact"`
+		AssignedTo    string `json:"assigned_to"`
+		AssignmentGrp string `json:"assignment_group"`
+		OpenedAt      string `json:"opened_at"`
+		ResolvedAt    string `json:"resolved_at"`
+		ClosedAt      string `json:"closed_at"`
+		CloseNotes    string `json:"close_notes"`
 	} `json:"result"`
 }
 
-// ServiceNow incidents list response
+// ServiceNow incidents list response.
 type incidentsListResponse struct {
 	Result []struct {
-		SysID       string `json:"sys_id"`
-		Number      string `json:"number"`
-		State       string `json:"state"`
-		ShortDesc   string `json:"short_description"`
-		Priority    string `json:"priority"`
-		OpenedAt    string `json:"opened_at"`
+		SysID     string `json:"sys_id"`
+		Number    string `json:"number"`
+		State     string `json:"state"`
+		ShortDesc string `json:"short_description"`
+		Priority  string `json:"priority"`
+		OpenedAt  string `json:"opened_at"`
 	} `json:"result"`
 }
 
-// NewServiceNowIntegration creates a new ServiceNow integration
+// NewServiceNowIntegration creates a new ServiceNow integration.
 func NewServiceNowIntegration(name string) *ServiceNowIntegration {
 	return &ServiceNowIntegration{
 		BaseIntegration: integrations.NewBaseIntegration(),
@@ -73,12 +73,12 @@ func NewServiceNowIntegration(name string) *ServiceNowIntegration {
 	}
 }
 
-// GetType returns the integration type
+// GetType returns the integration type.
 func (s *ServiceNowIntegration) GetType() integrations.IntegrationType {
 	return integrations.IntegrationTypeServiceNow
 }
 
-// GetName returns the integration name
+// GetName returns the integration name.
 func (s *ServiceNowIntegration) GetName() string {
 	config := s.GetConfig()
 	if config != nil && config.Name != "" {
@@ -87,7 +87,7 @@ func (s *ServiceNowIntegration) GetName() string {
 	return "servicenow"
 }
 
-// Configure configures the ServiceNow integration
+// Configure configures the ServiceNow integration.
 func (s *ServiceNowIntegration) Configure(config *integrations.Config) error {
 	if err := s.BaseIntegration.Configure(config); err != nil {
 		return err
@@ -115,7 +115,7 @@ func (s *ServiceNowIntegration) Configure(config *integrations.Config) error {
 	return nil
 }
 
-// Validate validates the ServiceNow configuration
+// Validate validates the ServiceNow configuration.
 func (s *ServiceNowIntegration) Validate() error {
 	config := s.GetConfig()
 	if config == nil {
@@ -137,7 +137,7 @@ func (s *ServiceNowIntegration) Validate() error {
 	return nil
 }
 
-// HealthCheck performs a health check on the ServiceNow integration
+// HealthCheck performs a health check on the ServiceNow integration.
 func (s *ServiceNowIntegration) HealthCheck(ctx context.Context) error {
 	if err := s.Validate(); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
@@ -174,7 +174,7 @@ func (s *ServiceNowIntegration) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
-// CreateIncident creates a new incident in ServiceNow
+// CreateIncident creates a new incident in ServiceNow.
 func (s *ServiceNowIntegration) CreateIncident(ctx context.Context, incident *integrations.Incident) (*integrations.IncidentResponse, error) {
 	if err := s.Validate(); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
@@ -263,7 +263,7 @@ func (s *ServiceNowIntegration) CreateIncident(ctx context.Context, incident *in
 	}, nil
 }
 
-// UpdateIncident updates an existing incident in ServiceNow
+// UpdateIncident updates an existing incident in ServiceNow.
 func (s *ServiceNowIntegration) UpdateIncident(ctx context.Context, incidentID string, update *integrations.IncidentUpdate) error {
 	if err := s.Validate(); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
@@ -323,7 +323,7 @@ func (s *ServiceNowIntegration) UpdateIncident(ctx context.Context, incidentID s
 	return nil
 }
 
-// GetIncident retrieves an incident from ServiceNow
+// GetIncident retrieves an incident from ServiceNow.
 func (s *ServiceNowIntegration) GetIncident(ctx context.Context, incidentID string) (*integrations.IncidentResponse, error) {
 	if err := s.Validate(); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
@@ -374,7 +374,7 @@ func (s *ServiceNowIntegration) GetIncident(ctx context.Context, incidentID stri
 	}, nil
 }
 
-// CloseIncident closes an incident in ServiceNow
+// CloseIncident closes an incident in ServiceNow.
 func (s *ServiceNowIntegration) CloseIncident(ctx context.Context, incidentID string, resolution string) error {
 	if err := s.Validate(); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
@@ -421,7 +421,7 @@ func (s *ServiceNowIntegration) CloseIncident(ctx context.Context, incidentID st
 	return nil
 }
 
-// SendNotification sends a notification via ServiceNow (creates an event)
+// SendNotification sends a notification via ServiceNow (creates an event).
 func (s *ServiceNowIntegration) SendNotification(ctx context.Context, notification *integrations.Notification) error {
 	// ServiceNow doesn't have a direct notification API
 	// We create a low-priority incident for notifications
@@ -447,7 +447,7 @@ func (s *ServiceNowIntegration) SendNotification(ctx context.Context, notificati
 
 // Helper methods
 
-// setAuthHeaders sets authentication headers on the request
+// setAuthHeaders sets authentication headers on the request.
 func (s *ServiceNowIntegration) setAuthHeaders(req *http.Request) {
 	config := s.GetConfig()
 
@@ -464,7 +464,7 @@ func (s *ServiceNowIntegration) setAuthHeaders(req *http.Request) {
 }
 
 // mapPriority maps our priority to ServiceNow priority, urgency, and impact
-// ServiceNow uses a matrix: Priority = function(Impact, Urgency)
+// ServiceNow uses a matrix: Priority = function(Impact, Urgency).
 func (s *ServiceNowIntegration) mapPriority(priority integrations.Priority) (priorityVal, urgency, impact string) {
 	switch priority {
 	case integrations.PriorityCritical:
@@ -480,7 +480,7 @@ func (s *ServiceNowIntegration) mapPriority(priority integrations.Priority) (pri
 	}
 }
 
-// mapStateToStatus maps ServiceNow state to our status
+// mapStateToStatus maps ServiceNow state to our status.
 func (s *ServiceNowIntegration) mapStateToStatus(state string) string {
 	switch state {
 	case StateNew:
@@ -500,7 +500,7 @@ func (s *ServiceNowIntegration) mapStateToStatus(state string) string {
 	}
 }
 
-// mapStatusToState maps our status to ServiceNow state
+// mapStatusToState maps our status to ServiceNow state.
 func (s *ServiceNowIntegration) mapStatusToState(status string) string {
 	switch status {
 	case "new":

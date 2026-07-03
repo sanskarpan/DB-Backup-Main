@@ -11,20 +11,20 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// RestoreStats holds metrics for a restore operation within a DR test
+// RestoreStats holds metrics for a restore operation within a DR test.
 type RestoreStats struct {
 	Duration  time.Duration
 	SizeBytes int64
 }
 
-// ValidationResult holds the outcome of a single validation step
+// ValidationResult holds the outcome of a single validation step.
 type ValidationResult struct {
 	Name    string
 	Success bool
 	Error   string
 }
 
-// TestResult represents the result of a DR test
+// TestResult represents the result of a DR test.
 type TestResult struct {
 	TestID       string
 	DatabaseName string
@@ -70,7 +70,7 @@ type TestResult struct {
 	CleanedUp         bool
 }
 
-// TestExecutor executes DR tests
+// TestExecutor executes DR tests.
 type TestExecutor struct {
 	provisioner     *EnvironmentProvisioner
 	validator       *Validator
@@ -79,7 +79,7 @@ type TestExecutor struct {
 	autoRollback    bool
 }
 
-// NewTestExecutor creates a new test executor
+// NewTestExecutor creates a new test executor.
 func NewTestExecutor(provisioner *EnvironmentProvisioner, validator *Validator) *TestExecutor {
 	return &TestExecutor{
 		provisioner:     provisioner,
@@ -89,22 +89,22 @@ func NewTestExecutor(provisioner *EnvironmentProvisioner, validator *Validator) 
 	}
 }
 
-// SetNotificationService sets the notification service
+// SetNotificationService sets the notification service.
 func (te *TestExecutor) SetNotificationService(notifier *NotificationService) {
 	te.notifier = notifier
 }
 
-// SetAutoRollback enables or disables automatic rollback on test failure
+// SetAutoRollback enables or disables automatic rollback on test failure.
 func (te *TestExecutor) SetAutoRollback(enabled bool) {
 	te.autoRollback = enabled
 }
 
-// GetReportGenerator returns the report generator
+// GetReportGenerator returns the report generator.
 func (te *TestExecutor) GetReportGenerator() *ReportGenerator {
 	return te.reportGenerator
 }
 
-// ExecuteTest executes a complete DR test
+// ExecuteTest executes a complete DR test.
 func (te *TestExecutor) ExecuteTest(ctx context.Context, databaseName string, config *TestConfig) (*TestResult, error) {
 	result := &TestResult{
 		TestID:       generateTestID(),
@@ -341,24 +341,24 @@ func (te *TestExecutor) executeQuery(ctx context.Context, env *TestEnvironment, 
 	return rows.Err()
 }
 
-// generateTestID generates a unique test ID
+// generateTestID generates a unique test ID.
 func generateTestID() string {
 	return uid.New("dr-test")
 }
 
-// EnvironmentProvisioner provisions test environments
+// EnvironmentProvisioner provisions test environments.
 type EnvironmentProvisioner struct {
 	environments map[string]*TestEnvironment
 }
 
-// NewEnvironmentProvisioner creates a new environment provisioner
+// NewEnvironmentProvisioner creates a new environment provisioner.
 func NewEnvironmentProvisioner() *EnvironmentProvisioner {
 	return &EnvironmentProvisioner{
 		environments: make(map[string]*TestEnvironment),
 	}
 }
 
-// TestEnvironment represents a test environment
+// TestEnvironment represents a test environment.
 type TestEnvironment struct {
 	ID                string
 	DatabaseName      string
@@ -375,7 +375,7 @@ type TestEnvironment struct {
 	target *TargetConfig
 }
 
-// ProvisionConfig represents environment provisioning configuration
+// ProvisionConfig represents environment provisioning configuration.
 type ProvisionConfig struct {
 	DatabaseName      string
 	IsolatedNetwork   bool
@@ -456,7 +456,7 @@ func (ep *EnvironmentProvisioner) CleanupEnvironment(ctx context.Context, envID 
 	return nil
 }
 
-// generateEnvironmentID generates a unique environment ID
+// generateEnvironmentID generates a unique environment ID.
 func generateEnvironmentID() string {
 	return uid.New("env")
 }

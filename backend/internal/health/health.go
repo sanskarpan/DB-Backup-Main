@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Status represents the health status
+// Status represents the health status.
 type Status string
 
 const (
@@ -17,7 +17,7 @@ const (
 	StatusUnhealthy Status = "unhealthy"
 )
 
-// CheckResult represents the result of a health check
+// CheckResult represents the result of a health check.
 type CheckResult struct {
 	Name      string                 `json:"name"`
 	Status    Status                 `json:"status"`
@@ -28,26 +28,26 @@ type CheckResult struct {
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// Check represents a health check function
+// Check represents a health check function.
 type Check interface {
 	Name() string
 	Check(ctx context.Context) *CheckResult
 }
 
-// Checker manages health checks
+// Checker manages health checks.
 type Checker struct {
 	checks []Check
 	mu     sync.RWMutex
 }
 
-// NewChecker creates a new health checker
+// NewChecker creates a new health checker.
 func NewChecker() *Checker {
 	return &Checker{
 		checks: make([]Check, 0),
 	}
 }
 
-// Register registers a new health check
+// Register registers a new health check.
 func (c *Checker) Register(check Check) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -55,7 +55,7 @@ func (c *Checker) Register(check Check) {
 	c.checks = append(c.checks, check)
 }
 
-// CheckAll runs all registered health checks
+// CheckAll runs all registered health checks.
 func (c *Checker) CheckAll(ctx context.Context) *HealthReport {
 	c.mu.RLock()
 	checks := make([]Check, len(c.checks))
@@ -86,7 +86,7 @@ func (c *Checker) CheckAll(ctx context.Context) *HealthReport {
 	return newHealthReport(results)
 }
 
-// CheckByName runs a specific health check by name
+// CheckByName runs a specific health check by name.
 func (c *Checker) CheckByName(ctx context.Context, name string) *CheckResult {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -105,15 +105,15 @@ func (c *Checker) CheckByName(ctx context.Context, name string) *CheckResult {
 	}
 }
 
-// HealthReport represents the overall health status
+// HealthReport represents the overall health status.
 type HealthReport struct {
-	Status    Status          `json:"status"`
-	Timestamp time.Time       `json:"timestamp"`
-	Checks    []*CheckResult  `json:"checks"`
-	Summary   *HealthSummary  `json:"summary"`
+	Status    Status         `json:"status"`
+	Timestamp time.Time      `json:"timestamp"`
+	Checks    []*CheckResult `json:"checks"`
+	Summary   *HealthSummary `json:"summary"`
 }
 
-// HealthSummary provides a summary of health checks
+// HealthSummary provides a summary of health checks.
 type HealthSummary struct {
 	Total     int `json:"total"`
 	Healthy   int `json:"healthy"`
@@ -121,7 +121,7 @@ type HealthSummary struct {
 	Unhealthy int `json:"unhealthy"`
 }
 
-// newHealthReport creates a new health report from check results
+// newHealthReport creates a new health report from check results.
 func newHealthReport(results []*CheckResult) *HealthReport {
 	summary := &HealthSummary{
 		Total: len(results),
@@ -152,14 +152,14 @@ func newHealthReport(results []*CheckResult) *HealthReport {
 	}
 }
 
-// DatabaseCheck checks database connectivity
+// DatabaseCheck checks database connectivity.
 type DatabaseCheck struct {
-	name       string
-	pingFunc   func(context.Context) error
-	timeout    time.Duration
+	name     string
+	pingFunc func(context.Context) error
+	timeout  time.Duration
 }
 
-// NewDatabaseCheck creates a new database health check
+// NewDatabaseCheck creates a new database health check.
 func NewDatabaseCheck(name string, pingFunc func(context.Context) error, timeout time.Duration) *DatabaseCheck {
 	if timeout == 0 {
 		timeout = 5 * time.Second
@@ -172,12 +172,12 @@ func NewDatabaseCheck(name string, pingFunc func(context.Context) error, timeout
 	}
 }
 
-// Name returns the check name
+// Name returns the check name.
 func (d *DatabaseCheck) Name() string {
 	return d.name
 }
 
-// Check performs the health check
+// Check performs the health check.
 func (d *DatabaseCheck) Check(ctx context.Context) *CheckResult {
 	start := time.Now()
 
@@ -203,32 +203,32 @@ func (d *DatabaseCheck) Check(ctx context.Context) *CheckResult {
 	return result
 }
 
-// StorageCheck checks storage accessibility
+// StorageCheck checks storage accessibility.
 type StorageCheck struct {
-	name     string
+	name      string
 	checkFunc func(context.Context) error
-	timeout  time.Duration
+	timeout   time.Duration
 }
 
-// NewStorageCheck creates a new storage health check
+// NewStorageCheck creates a new storage health check.
 func NewStorageCheck(name string, checkFunc func(context.Context) error, timeout time.Duration) *StorageCheck {
 	if timeout == 0 {
 		timeout = 5 * time.Second
 	}
 
 	return &StorageCheck{
-		name:     name,
+		name:      name,
 		checkFunc: checkFunc,
-		timeout:  timeout,
+		timeout:   timeout,
 	}
 }
 
-// Name returns the check name
+// Name returns the check name.
 func (s *StorageCheck) Name() string {
 	return s.name
 }
 
-// Check performs the health check
+// Check performs the health check.
 func (s *StorageCheck) Check(ctx context.Context) *CheckResult {
 	start := time.Now()
 
@@ -254,7 +254,7 @@ func (s *StorageCheck) Check(ctx context.Context) *CheckResult {
 	return result
 }
 
-// DiskSpaceCheck checks available disk space
+// DiskSpaceCheck checks available disk space.
 type DiskSpaceCheck struct {
 	name           string
 	path           string
@@ -262,7 +262,7 @@ type DiskSpaceCheck struct {
 	checkFunc      func(string) (int64, error)
 }
 
-// NewDiskSpaceCheck creates a new disk space health check
+// NewDiskSpaceCheck creates a new disk space health check.
 func NewDiskSpaceCheck(name, path string, thresholdBytes int64, checkFunc func(string) (int64, error)) *DiskSpaceCheck {
 	return &DiskSpaceCheck{
 		name:           name,
@@ -272,12 +272,12 @@ func NewDiskSpaceCheck(name, path string, thresholdBytes int64, checkFunc func(s
 	}
 }
 
-// Name returns the check name
+// Name returns the check name.
 func (d *DiskSpaceCheck) Name() string {
 	return d.name
 }
 
-// Check performs the health check
+// Check performs the health check.
 func (d *DiskSpaceCheck) Check(ctx context.Context) *CheckResult {
 	start := time.Now()
 
@@ -298,7 +298,7 @@ func (d *DiskSpaceCheck) Check(ctx context.Context) *CheckResult {
 	result.Metadata = map[string]interface{}{
 		"available_bytes": available,
 		"threshold_bytes": d.thresholdBytes,
-		"path":           d.path,
+		"path":            d.path,
 	}
 
 	if available >= d.thresholdBytes {
@@ -315,13 +315,13 @@ func (d *DiskSpaceCheck) Check(ctx context.Context) *CheckResult {
 	return result
 }
 
-// CustomCheck allows custom health check functions
+// CustomCheck allows custom health check functions.
 type CustomCheck struct {
 	name      string
 	checkFunc func(context.Context) *CheckResult
 }
 
-// NewCustomCheck creates a new custom health check
+// NewCustomCheck creates a new custom health check.
 func NewCustomCheck(name string, checkFunc func(context.Context) *CheckResult) *CustomCheck {
 	return &CustomCheck{
 		name:      name,
@@ -329,12 +329,12 @@ func NewCustomCheck(name string, checkFunc func(context.Context) *CheckResult) *
 	}
 }
 
-// Name returns the check name
+// Name returns the check name.
 func (c *CustomCheck) Name() string {
 	return c.name
 }
 
-// Check performs the health check
+// Check performs the health check.
 func (c *CustomCheck) Check(ctx context.Context) *CheckResult {
 	return c.checkFunc(ctx)
 }

@@ -104,9 +104,9 @@ func TestCompressionRatios(t *testing.T) {
 
 func TestCompressorSelection(t *testing.T) {
 	testCases := []struct {
-		name           string
+		name            string
 		compressionType string
-		expectError    bool
+		expectError     bool
 	}{
 		{"Gzip", "gzip", false},
 		{"Zstd", "zstd", false},
@@ -142,7 +142,7 @@ func TestCompressorSelection(t *testing.T) {
 	}
 }
 
-// Benchmark tests
+// Benchmark tests.
 func BenchmarkGzipCompress(b *testing.B) {
 	compressor := NewGzipCompressor()
 	data := bytes.Repeat(testData, 100)

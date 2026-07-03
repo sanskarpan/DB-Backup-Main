@@ -8,7 +8,7 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
-// SwaggerHandler serves the Swagger UI
+// SwaggerHandler serves the Swagger UI.
 func SwaggerHandler() http.Handler {
 	// Configure Swagger UI to load the spec from /swagger.yaml endpoint
 	return httpSwagger.Handler(
@@ -19,7 +19,7 @@ func SwaggerHandler() http.Handler {
 	)
 }
 
-// getSwaggerFilePath returns the path to the swagger.yaml file
+// getSwaggerFilePath returns the path to the swagger.yaml file.
 func getSwaggerFilePath() string {
 	// Try different possible locations
 	paths := []string{
@@ -39,7 +39,7 @@ func getSwaggerFilePath() string {
 	return "./docs/swagger.yaml"
 }
 
-// SwaggerFileHandler serves the swagger.yaml file
+// SwaggerFileHandler serves the swagger.yaml file.
 func SwaggerFileHandler(w http.ResponseWriter, r *http.Request) {
 	swaggerFile := getSwaggerFilePath()
 
@@ -53,7 +53,7 @@ func SwaggerFileHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, swaggerFile)
 }
 
-// SetupSwaggerRoutes adds Swagger routes to the router
+// SetupSwaggerRoutes adds Swagger routes to the router.
 func SetupSwaggerRoutes(mux *http.ServeMux) {
 	// Serve Swagger UI
 	mux.Handle("/swagger/", httpSwagger.Handler(
@@ -73,7 +73,7 @@ func SetupSwaggerRoutes(mux *http.ServeMux) {
 	})
 }
 
-// GetSwaggerSpec reads and returns the Swagger specification
+// GetSwaggerSpec reads and returns the Swagger specification.
 func GetSwaggerSpec() ([]byte, error) {
 	swaggerFile := getSwaggerFilePath()
 	absPath, err := filepath.Abs(swaggerFile)

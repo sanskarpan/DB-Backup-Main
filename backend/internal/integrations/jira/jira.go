@@ -9,11 +9,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/integrations"
 	"github.com/rs/zerolog/log"
+
+	"github.com/sanskarpan/db-backup/internal/integrations"
 )
 
-// JiraIntegration implements the Integration interface for Jira
+// JiraIntegration implements the Integration interface for Jira.
 type JiraIntegration struct {
 	*integrations.BaseIntegration
 	client     *http.Client
@@ -21,7 +22,7 @@ type JiraIntegration struct {
 	issueType  string
 }
 
-// NewJiraIntegration creates a new Jira integration
+// NewJiraIntegration creates a new Jira integration.
 func NewJiraIntegration(name string) *JiraIntegration {
 	return &JiraIntegration{
 		BaseIntegration: integrations.NewBaseIntegration(),
@@ -30,12 +31,12 @@ func NewJiraIntegration(name string) *JiraIntegration {
 	}
 }
 
-// GetType returns the integration type
+// GetType returns the integration type.
 func (j *JiraIntegration) GetType() integrations.IntegrationType {
 	return integrations.IntegrationTypeJira
 }
 
-// GetName returns the integration name
+// GetName returns the integration name.
 func (j *JiraIntegration) GetName() string {
 	config := j.GetConfig()
 	if config != nil {
@@ -44,7 +45,7 @@ func (j *JiraIntegration) GetName() string {
 	return "jira"
 }
 
-// Configure configures the Jira integration
+// Configure configures the Jira integration.
 func (j *JiraIntegration) Configure(config *integrations.Config) error {
 	if err := j.BaseIntegration.Configure(config); err != nil {
 		return err
@@ -76,7 +77,7 @@ func (j *JiraIntegration) Configure(config *integrations.Config) error {
 	return nil
 }
 
-// Validate validates the Jira configuration
+// Validate validates the Jira configuration.
 func (j *JiraIntegration) Validate() error {
 	config := j.GetConfig()
 	if config == nil {
@@ -98,7 +99,7 @@ func (j *JiraIntegration) Validate() error {
 	return nil
 }
 
-// HealthCheck performs a health check on the Jira integration
+// HealthCheck performs a health check on the Jira integration.
 func (j *JiraIntegration) HealthCheck(ctx context.Context) error {
 	if err := j.Validate(); err != nil {
 		return err
@@ -139,7 +140,7 @@ func (j *JiraIntegration) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
-// CreateIncident creates a Jira issue
+// CreateIncident creates a Jira issue.
 func (j *JiraIntegration) CreateIncident(ctx context.Context, incident *integrations.Incident) (*integrations.IncidentResponse, error) {
 	if err := j.Validate(); err != nil {
 		return nil, err
@@ -254,7 +255,7 @@ func (j *JiraIntegration) CreateIncident(ctx context.Context, incident *integrat
 	return response, nil
 }
 
-// UpdateIncident updates a Jira issue
+// UpdateIncident updates a Jira issue.
 func (j *JiraIntegration) UpdateIncident(ctx context.Context, issueKey string, update *integrations.IncidentUpdate) error {
 	if err := j.Validate(); err != nil {
 		return err
@@ -347,7 +348,7 @@ func (j *JiraIntegration) UpdateIncident(ctx context.Context, issueKey string, u
 	return nil
 }
 
-// GetIncident retrieves a Jira issue
+// GetIncident retrieves a Jira issue.
 func (j *JiraIntegration) GetIncident(ctx context.Context, issueKey string) (*integrations.IncidentResponse, error) {
 	if err := j.Validate(); err != nil {
 		return nil, err
@@ -421,7 +422,7 @@ func (j *JiraIntegration) GetIncident(ctx context.Context, issueKey string) (*in
 	return response, nil
 }
 
-// CloseIncident closes a Jira issue
+// CloseIncident closes a Jira issue.
 func (j *JiraIntegration) CloseIncident(ctx context.Context, issueKey string, resolution string) error {
 	if err := j.Validate(); err != nil {
 		return err
@@ -504,7 +505,7 @@ func (j *JiraIntegration) CloseIncident(ctx context.Context, issueKey string, re
 	return nil
 }
 
-// SendNotification sends a notification (as a comment on an issue)
+// SendNotification sends a notification (as a comment on an issue).
 func (j *JiraIntegration) SendNotification(ctx context.Context, notification *integrations.Notification) error {
 	// For Jira, we can't send arbitrary notifications, but we can add comments to issues
 	// The issue key should be in CustomData

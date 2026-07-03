@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/sanskarpan/db-backup/internal/api/middleware"
 	"github.com/sanskarpan/db-backup/internal/approvals"
 	"github.com/sanskarpan/db-backup/internal/auth"
@@ -21,7 +22,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/websocket"
 )
 
-// Server represents the API server
+// Server represents the API server.
 type Server struct {
 	config        *Config
 	backupEngine  *backup.Engine
@@ -42,7 +43,7 @@ type Server struct {
 	muaEnabled bool
 }
 
-// Config holds API server configuration
+// Config holds API server configuration.
 type Config struct {
 	Host          string
 	Port          int
@@ -56,7 +57,7 @@ type Config struct {
 	ScanBaseDir string
 }
 
-// NewServer creates a new API server
+// NewServer creates a new API server.
 func NewServer(
 	cfg *Config,
 	backupEngine *backup.Engine,
@@ -95,7 +96,7 @@ func NewServer(
 	}
 }
 
-// SetupRoutes configures all API routes
+// SetupRoutes configures all API routes.
 func (s *Server) SetupRoutes(router *gin.Engine) {
 	// Middleware - Order matters!
 
@@ -295,7 +296,7 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 	router.GET("/", s.handleRoot)
 }
 
-// Response helpers
+// Response helpers.
 type ErrorResponse struct {
 	Error   string                 `json:"error"`
 	Message string                 `json:"message,omitempty"`
@@ -308,7 +309,7 @@ type SuccessResponse struct {
 	Message string      `json:"message,omitempty"`
 }
 
-// Helper methods
+// Helper methods.
 func (s *Server) respondError(c *gin.Context, code int, err error, message string) {
 	if err != nil && s.logger != nil {
 		s.logger.Error("API error", err, map[string]interface{}{

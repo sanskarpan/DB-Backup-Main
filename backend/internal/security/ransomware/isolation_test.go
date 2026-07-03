@@ -27,7 +27,7 @@ func TestIsolationManager_ScanAndIsolate_NoThreat(t *testing.T) {
 	// Create temp directory and file
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "safe_backup.sql")
-	err := os.WriteFile(testFile, []byte("safe data"), 0644)
+	err := os.WriteFile(testFile, []byte("safe data"), 0o644)
 	require.NoError(t, err)
 
 	quarantineDir := filepath.Join(tmpDir, "quarantine")
@@ -60,7 +60,7 @@ func TestIsolationManager_ScanAndIsolate_HighEntropy(t *testing.T) {
 	for i := range highEntropyData {
 		highEntropyData[i] = byte(i % 256)
 	}
-	err := os.WriteFile(testFile, highEntropyData, 0644)
+	err := os.WriteFile(testFile, highEntropyData, 0o644)
 	require.NoError(t, err)
 
 	quarantineDir := filepath.Join(tmpDir, "quarantine")
@@ -85,7 +85,7 @@ func TestIsolationManager_MoveToQuarantine(t *testing.T) {
 	// Create temp directories
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test_backup.sql")
-	err := os.WriteFile(testFile, []byte("test data"), 0644)
+	err := os.WriteFile(testFile, []byte("test data"), 0o644)
 	require.NoError(t, err)
 
 	quarantineDir := filepath.Join(tmpDir, "quarantine")
@@ -114,14 +114,14 @@ func TestIsolationManager_MoveToQuarantine(t *testing.T) {
 	// Check file permissions (should be read-only)
 	info, err := os.Stat(quarantinePath)
 	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0400), info.Mode().Perm())
+	assert.Equal(t, os.FileMode(0o400), info.Mode().Perm())
 }
 
 func TestIsolationManager_BlockAccess(t *testing.T) {
 	// Create temp file
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "blocked_backup.sql")
-	err := os.WriteFile(testFile, []byte("test data"), 0644)
+	err := os.WriteFile(testFile, []byte("test data"), 0o644)
 	require.NoError(t, err)
 
 	detector := NewDetector(DefaultDetectorConfig())
@@ -135,13 +135,13 @@ func TestIsolationManager_BlockAccess(t *testing.T) {
 	// Check permissions
 	info, err := os.Stat(testFile)
 	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0000), info.Mode().Perm())
+	assert.Equal(t, os.FileMode(0o000), info.Mode().Perm())
 }
 
 func TestIsolationManager_ExecuteIsolation_Quarantine(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test_backup.sql")
-	err := os.WriteFile(testFile, []byte("test data"), 0644)
+	err := os.WriteFile(testFile, []byte("test data"), 0o644)
 	require.NoError(t, err)
 
 	quarantineDir := filepath.Join(tmpDir, "quarantine")
@@ -167,7 +167,7 @@ func TestIsolationManager_ExecuteIsolation_Quarantine(t *testing.T) {
 func TestIsolationManager_ExecuteIsolation_Block(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test_backup.sql")
-	err := os.WriteFile(testFile, []byte("test data"), 0644)
+	err := os.WriteFile(testFile, []byte("test data"), 0o644)
 	require.NoError(t, err)
 
 	detector := NewDetector(DefaultDetectorConfig())
@@ -189,13 +189,13 @@ func TestIsolationManager_ExecuteIsolation_Block(t *testing.T) {
 	// File should still exist but with no permissions
 	info, err := os.Stat(testFile)
 	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0000), info.Mode().Perm())
+	assert.Equal(t, os.FileMode(0o000), info.Mode().Perm())
 }
 
 func TestIsolationManager_ExecuteIsolation_Delete(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test_backup.sql")
-	err := os.WriteFile(testFile, []byte("test data"), 0644)
+	err := os.WriteFile(testFile, []byte("test data"), 0o644)
 	require.NoError(t, err)
 
 	detector := NewDetector(DefaultDetectorConfig())
@@ -222,7 +222,7 @@ func TestIsolationManager_ExecuteIsolation_Delete(t *testing.T) {
 func TestIsolationManager_RestoreFromQuarantine(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test_backup.sql")
-	err := os.WriteFile(testFile, []byte("test data"), 0644)
+	err := os.WriteFile(testFile, []byte("test data"), 0o644)
 	require.NoError(t, err)
 
 	quarantineDir := filepath.Join(tmpDir, "quarantine")
@@ -260,7 +260,7 @@ func TestIsolationManager_RestoreFromQuarantine(t *testing.T) {
 func TestIsolationManager_RestoreFromQuarantine_NotQuarantined(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test_backup.sql")
-	err := os.WriteFile(testFile, []byte("test data"), 0644)
+	err := os.WriteFile(testFile, []byte("test data"), 0o644)
 	require.NoError(t, err)
 
 	detector := NewDetector(DefaultDetectorConfig())
@@ -289,7 +289,7 @@ func TestIsolationManager_ListIsolatedBackups(t *testing.T) {
 	// Isolate multiple backups
 	for i := 0; i < 3; i++ {
 		testFile := filepath.Join(tmpDir, "backup"+string(rune('0'+i))+".sql")
-		err := os.WriteFile(testFile, []byte("data"), 0644)
+		err := os.WriteFile(testFile, []byte("data"), 0o644)
 		require.NoError(t, err)
 
 		report := &ThreatReport{
@@ -307,7 +307,7 @@ func TestIsolationManager_ListIsolatedBackups(t *testing.T) {
 func TestIsolationManager_GetIsolatedBackup(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test_backup.sql")
-	err := os.WriteFile(testFile, []byte("test data"), 0644)
+	err := os.WriteFile(testFile, []byte("test data"), 0o644)
 	require.NoError(t, err)
 
 	detector := NewDetector(DefaultDetectorConfig())
@@ -341,7 +341,7 @@ func TestIsolationManager_GetIsolatedBackup_NotFound(t *testing.T) {
 func TestIsolationManager_CleanupOldQuarantine(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "old_backup.sql")
-	err := os.WriteFile(testFile, []byte("test data"), 0644)
+	err := os.WriteFile(testFile, []byte("test data"), 0o644)
 	require.NoError(t, err)
 
 	quarantineDir := filepath.Join(tmpDir, "quarantine")
@@ -379,7 +379,7 @@ func TestIsolationManager_CleanupOldQuarantine(t *testing.T) {
 func TestIsolationManager_IsBackupIsolated(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test_backup.sql")
-	err := os.WriteFile(testFile, []byte("test data"), 0644)
+	err := os.WriteFile(testFile, []byte("test data"), 0o644)
 	require.NoError(t, err)
 
 	detector := NewDetector(DefaultDetectorConfig())
@@ -420,7 +420,7 @@ func TestIsolationManager_GetIsolationStats(t *testing.T) {
 
 	for i, tc := range testCases {
 		testFile := filepath.Join(tmpDir, "backup"+string(rune('0'+i))+".sql")
-		err := os.WriteFile(testFile, []byte("data"), 0644)
+		err := os.WriteFile(testFile, []byte("data"), 0o644)
 		require.NoError(t, err)
 
 		report := &ThreatReport{
@@ -467,7 +467,7 @@ func TestIsolationPolicy_Disabled(t *testing.T) {
 	for i := range highEntropyData {
 		highEntropyData[i] = byte(i % 256)
 	}
-	err := os.WriteFile(testFile, highEntropyData, 0644)
+	err := os.WriteFile(testFile, highEntropyData, 0o644)
 	require.NoError(t, err)
 
 	detector := NewDetector(DefaultDetectorConfig())

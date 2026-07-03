@@ -4,7 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// CORS returns a gin middleware for handling CORS
+// CORS returns a gin middleware for handling CORS.
 func CORS(allowedOrigins []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")

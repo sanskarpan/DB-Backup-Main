@@ -14,7 +14,7 @@ import (
 	"github.com/influxdata/influxdb-client-go/v2/domain"
 )
 
-// RetentionPolicyManager handles retention policy and continuous query backups
+// RetentionPolicyManager handles retention policy and continuous query backups.
 type RetentionPolicyManager struct {
 	driver   *InfluxDBDriver
 	URL      string
@@ -22,7 +22,7 @@ type RetentionPolicyManager struct {
 	Password string
 }
 
-// NewRetentionPolicyManager creates a new retention policy manager
+// NewRetentionPolicyManager creates a new retention policy manager.
 func NewRetentionPolicyManager(driver *InfluxDBDriver) *RetentionPolicyManager {
 	url := fmt.Sprintf("http://%s:%d", driver.config.Host, driver.config.Port)
 	if driver.config.SSLMode == "enable" || driver.config.SSLMode == "require" {
@@ -36,7 +36,7 @@ func NewRetentionPolicyManager(driver *InfluxDBDriver) *RetentionPolicyManager {
 	}
 }
 
-// RetentionPolicy represents an InfluxDB retention policy
+// RetentionPolicy represents an InfluxDB retention policy.
 type RetentionPolicy struct {
 	Name               string `json:"name"`
 	Duration           string `json:"duration"`
@@ -45,14 +45,14 @@ type RetentionPolicy struct {
 	Default            bool   `json:"default"`
 }
 
-// ContinuousQuery represents an InfluxDB continuous query
+// ContinuousQuery represents an InfluxDB continuous query.
 type ContinuousQuery struct {
 	Database string `json:"database"`
 	Name     string `json:"name"`
 	Query    string `json:"query"`
 }
 
-// Task represents an InfluxDB v2 task
+// Task represents an InfluxDB v2 task.
 type Task struct {
 	Name   string `json:"name"`
 	Flux   string `json:"flux"`
@@ -61,7 +61,7 @@ type Task struct {
 	Status string `json:"status"`
 }
 
-// BackupRetentionPolicies backs up all retention policies for a database
+// BackupRetentionPolicies backs up all retention policies for a database.
 func (m *RetentionPolicyManager) BackupRetentionPolicies(ctx context.Context, database, outputDir string) error {
 	rpFile := filepath.Join(outputDir, fmt.Sprintf("%s_retention_policies.json", database))
 	file, err := os.Create(rpFile)
@@ -81,7 +81,7 @@ func (m *RetentionPolicyManager) BackupRetentionPolicies(ctx context.Context, da
 	return json.NewEncoder(file).Encode(policies)
 }
 
-// BackupContinuousQueries backs up all continuous queries for a database
+// BackupContinuousQueries backs up all continuous queries for a database.
 func (m *RetentionPolicyManager) BackupContinuousQueries(ctx context.Context, database, outputDir string) error {
 	cqFile := filepath.Join(outputDir, fmt.Sprintf("%s_continuous_queries.json", database))
 	file, err := os.Create(cqFile)
@@ -99,7 +99,7 @@ func (m *RetentionPolicyManager) BackupContinuousQueries(ctx context.Context, da
 	return json.NewEncoder(file).Encode(cqs)
 }
 
-// BackupTasks backs up all tasks (InfluxDB v2.x)
+// BackupTasks backs up all tasks (InfluxDB v2.x).
 func (m *RetentionPolicyManager) BackupTasks(ctx context.Context, outputDir string) error {
 	// Get tasks using the management API
 	tasksAPI := m.driver.client.TasksAPI()
@@ -143,7 +143,7 @@ func (m *RetentionPolicyManager) BackupTasks(ctx context.Context, outputDir stri
 	return json.NewEncoder(file).Encode(taskList)
 }
 
-// RestoreRetentionPolicies restores retention policies from backup
+// RestoreRetentionPolicies restores retention policies from backup.
 func (m *RetentionPolicyManager) RestoreRetentionPolicies(ctx context.Context, database, backupDir string) error {
 	rpFile := filepath.Join(backupDir, fmt.Sprintf("%s_retention_policies.json", database))
 
@@ -210,7 +210,7 @@ func (m *RetentionPolicyManager) RestoreRetentionPolicies(ctx context.Context, d
 	return nil
 }
 
-// RestoreContinuousQueries restores continuous queries from backup
+// RestoreContinuousQueries restores continuous queries from backup.
 func (m *RetentionPolicyManager) RestoreContinuousQueries(ctx context.Context, database, backupDir string) error {
 	cqFile := filepath.Join(backupDir, fmt.Sprintf("%s_continuous_queries.json", database))
 
@@ -266,7 +266,7 @@ func (m *RetentionPolicyManager) RestoreContinuousQueries(ctx context.Context, d
 	return nil
 }
 
-// RestoreTasks restores tasks from backup (InfluxDB v2.x)
+// RestoreTasks restores tasks from backup (InfluxDB v2.x).
 func (m *RetentionPolicyManager) RestoreTasks(ctx context.Context, backupDir string) error {
 	taskFile := filepath.Join(backupDir, "tasks.json")
 
@@ -331,7 +331,7 @@ func (m *RetentionPolicyManager) RestoreTasks(ctx context.Context, backupDir str
 	return nil
 }
 
-// Helper function to query retention policies
+// Helper function to query retention policies.
 func (m *RetentionPolicyManager) queryRetentionPolicies(ctx context.Context, query string) ([]RetentionPolicy, error) {
 	// Use HTTP API to execute query
 	endpoint := fmt.Sprintf("%s/query", m.URL)
@@ -403,7 +403,7 @@ func (m *RetentionPolicyManager) queryRetentionPolicies(ctx context.Context, que
 	return policies, nil
 }
 
-// Helper function to query continuous queries
+// Helper function to query continuous queries.
 func (m *RetentionPolicyManager) queryContinuousQueries(ctx context.Context, database string) ([]ContinuousQuery, error) {
 	query := "SHOW CONTINUOUS QUERIES"
 	endpoint := fmt.Sprintf("%s/query", m.URL)
@@ -471,10 +471,10 @@ func (m *RetentionPolicyManager) queryContinuousQueries(ctx context.Context, dat
 	return cqs, nil
 }
 
-// Helper function to execute InfluxDB queries
+// Helper function to execute InfluxDB queries.
 func (m *RetentionPolicyManager) executeQuery(ctx context.Context, query string) error {
 	endpoint := fmt.Sprintf("%s/query", m.URL)
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, 
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint,
 		strings.NewReader(fmt.Sprintf("q=%s", url.QueryEscape(query))))
 	if err != nil {
 		return err

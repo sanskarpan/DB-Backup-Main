@@ -11,19 +11,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// CSRFToken represents a CSRF token with expiration
+// CSRFToken represents a CSRF token with expiration.
 type CSRFToken struct {
 	Token     string
 	ExpiresAt time.Time
 }
 
-// CSRFStore manages CSRF tokens
+// CSRFStore manages CSRF tokens.
 type CSRFStore struct {
 	tokens map[string]*CSRFToken
 	mu     sync.RWMutex
 }
 
-// NewCSRFStore creates a new CSRF token store
+// NewCSRFStore creates a new CSRF token store.
 func NewCSRFStore() *CSRFStore {
 	store := &CSRFStore{
 		tokens: make(map[string]*CSRFToken),
@@ -33,7 +33,7 @@ func NewCSRFStore() *CSRFStore {
 	return store
 }
 
-// generateToken creates a new random CSRF token
+// generateToken creates a new random CSRF token.
 func generateToken() (string, error) {
 	b := make([]byte, 32)
 	_, err := rand.Read(b)
@@ -43,7 +43,7 @@ func generateToken() (string, error) {
 	return base64.URLEncoding.EncodeToString(b), nil
 }
 
-// Set stores a CSRF token with expiration
+// Set stores a CSRF token with expiration.
 func (s *CSRFStore) Set(sessionID string, token string, duration time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -53,7 +53,7 @@ func (s *CSRFStore) Set(sessionID string, token string, duration time.Duration) 
 	}
 }
 
-// Get retrieves a CSRF token
+// Get retrieves a CSRF token.
 func (s *CSRFStore) Get(sessionID string) (string, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -67,14 +67,14 @@ func (s *CSRFStore) Get(sessionID string) (string, bool) {
 	return token.Token, true
 }
 
-// Delete removes a CSRF token
+// Delete removes a CSRF token.
 func (s *CSRFStore) Delete(sessionID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.tokens, sessionID)
 }
 
-// cleanup removes expired tokens periodically
+// cleanup removes expired tokens periodically.
 func (s *CSRFStore) cleanup() {
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
@@ -94,7 +94,7 @@ func (s *CSRFStore) cleanup() {
 var defaultCSRFStore = NewCSRFStore()
 
 // CSRFProtection provides CSRF protection middleware
-// This middleware generates and validates CSRF tokens for state-changing requests
+// This middleware generates and validates CSRF tokens for state-changing requests.
 func CSRFProtection() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Extract session ID from JWT or session cookie
@@ -188,7 +188,7 @@ func CSRFProtection() gin.HandlerFunc {
 	}
 }
 
-// CSRFProtectionWithExemptions allows exempting certain paths from CSRF protection
+// CSRFProtectionWithExemptions allows exempting certain paths from CSRF protection.
 func CSRFProtectionWithExemptions(exemptPaths []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Check if current path is exempted

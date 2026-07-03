@@ -21,7 +21,7 @@ import (
 
 const backupPolicyFinalizer = "backup.db.sanskarpan.com/finalizer"
 
-// BackupPolicyReconciler reconciles a BackupPolicy object
+// BackupPolicyReconciler reconciles a BackupPolicy object.
 type BackupPolicyReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
@@ -35,7 +35,7 @@ type BackupPolicyReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 
-// Reconcile is the main reconciliation loop
+// Reconcile is the main reconciliation loop.
 func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
@@ -116,7 +116,7 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 }
 
-// reconcileDelete handles policy deletion
+// reconcileDelete handles policy deletion.
 func (r *BackupPolicyReconciler) reconcileDelete(ctx context.Context, policy *backupv1.BackupPolicy) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
@@ -196,7 +196,7 @@ func (r *BackupPolicyReconciler) reconcileDelete(ctx context.Context, policy *ba
 	return ctrl.Result{}, nil
 }
 
-// validatePolicy validates the policy configuration
+// validatePolicy validates the policy configuration.
 func (r *BackupPolicyReconciler) validatePolicy(policy *backupv1.BackupPolicy) error {
 	// Validate database type
 	validDatabaseTypes := map[string]bool{
@@ -249,7 +249,7 @@ func (r *BackupPolicyReconciler) validatePolicy(policy *backupv1.BackupPolicy) e
 	return nil
 }
 
-// calculateNextBackupTime calculates the next backup time based on schedule
+// calculateNextBackupTime calculates the next backup time based on schedule.
 func (r *BackupPolicyReconciler) calculateNextBackupTime(schedule string) (time.Time, error) {
 	cronSchedule, err := cron.ParseStandard(schedule)
 	if err != nil {
@@ -262,7 +262,7 @@ func (r *BackupPolicyReconciler) calculateNextBackupTime(schedule string) (time.
 	return nextTime, nil
 }
 
-// updateCondition updates a condition in the policy status
+// updateCondition updates a condition in the policy status.
 func (r *BackupPolicyReconciler) updateCondition(policy *backupv1.BackupPolicy, conditionType string, status metav1.ConditionStatus, reason, message string) {
 	condition := metav1.Condition{
 		Type:               conditionType,
@@ -291,7 +291,7 @@ func (r *BackupPolicyReconciler) updateCondition(policy *backupv1.BackupPolicy, 
 	}
 }
 
-// SetupWithManager sets up the controller with the Manager
+// SetupWithManager sets up the controller with the Manager.
 func (r *BackupPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&backupv1.BackupPolicy{}).

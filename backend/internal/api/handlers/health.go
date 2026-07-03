@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/sanskarpan/db-backup/internal/health"
 )
 
@@ -25,7 +26,7 @@ func NewHealthHandler(checker *health.Checker) *HealthHandler {
 	}
 }
 
-// HandleRoot handles the root endpoint
+// HandleRoot handles the root endpoint.
 func (h *HealthHandler) HandleRoot(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"service": "DB Backup API",
@@ -34,7 +35,7 @@ func (h *HealthHandler) HandleRoot(c *gin.Context) {
 	})
 }
 
-// HandleHealth handles health check endpoint
+// HandleHealth handles health check endpoint.
 func (h *HealthHandler) HandleHealth(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
@@ -51,14 +52,14 @@ func (h *HealthHandler) HandleHealth(c *gin.Context) {
 	c.JSON(statusCode, report)
 }
 
-// HandleReady handles readiness probe
+// HandleReady handles readiness probe.
 func (h *HealthHandler) HandleReady(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"ready": true,
 	})
 }
 
-// HandleVersion handles version endpoint
+// HandleVersion handles version endpoint.
 func (h *HealthHandler) HandleVersion(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"version":    ServerVersion,

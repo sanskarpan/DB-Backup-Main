@@ -9,21 +9,21 @@ import (
 	"github.com/bradfitz/gomemcache/memcache"
 )
 
-// MemcachedCache implements a Memcached-based caching layer
+// MemcachedCache implements a Memcached-based caching layer.
 type MemcachedCache struct {
 	client *memcache.Client
 	prefix string
 	ttl    time.Duration
 }
 
-// MemcachedConfig holds Memcached cache configuration
+// MemcachedConfig holds Memcached cache configuration.
 type MemcachedConfig struct {
 	Servers []string
 	Prefix  string
 	TTL     time.Duration
 }
 
-// NewMemcachedCache creates a new Memcached cache instance
+// NewMemcachedCache creates a new Memcached cache instance.
 func NewMemcachedCache(config MemcachedConfig) (*MemcachedCache, error) {
 	if len(config.Servers) == 0 {
 		return nil, ErrInvalidConfig
@@ -43,7 +43,7 @@ func NewMemcachedCache(config MemcachedConfig) (*MemcachedCache, error) {
 	}, nil
 }
 
-// Get retrieves a value from cache
+// Get retrieves a value from cache.
 func (m *MemcachedCache) Get(ctx context.Context, key string, dest interface{}) error {
 	fullKey := m.makeKey(key)
 
@@ -62,7 +62,7 @@ func (m *MemcachedCache) Get(ctx context.Context, key string, dest interface{}) 
 	return nil
 }
 
-// Set stores a value in cache
+// Set stores a value in cache.
 func (m *MemcachedCache) Set(ctx context.Context, key string, value interface{}, ttl ...time.Duration) error {
 	fullKey := m.makeKey(key)
 
@@ -89,7 +89,7 @@ func (m *MemcachedCache) Set(ctx context.Context, key string, value interface{},
 	return nil
 }
 
-// Delete removes a value from cache
+// Delete removes a value from cache.
 func (m *MemcachedCache) Delete(ctx context.Context, key string) error {
 	fullKey := m.makeKey(key)
 
@@ -100,7 +100,7 @@ func (m *MemcachedCache) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-// Exists checks if a key exists in cache
+// Exists checks if a key exists in cache.
 func (m *MemcachedCache) Exists(ctx context.Context, key string) (bool, error) {
 	fullKey := m.makeKey(key)
 
@@ -115,7 +115,7 @@ func (m *MemcachedCache) Exists(ctx context.Context, key string) (bool, error) {
 	return true, nil
 }
 
-// Clear removes all cache entries (flushes all servers)
+// Clear removes all cache entries (flushes all servers).
 func (m *MemcachedCache) Clear(ctx context.Context) error {
 	if err := m.client.FlushAll(); err != nil {
 		return fmt.Errorf("failed to clear cache: %w", err)
@@ -123,13 +123,13 @@ func (m *MemcachedCache) Clear(ctx context.Context) error {
 	return nil
 }
 
-// Close closes the Memcached connection
+// Close closes the Memcached connection.
 func (m *MemcachedCache) Close() error {
 	// Memcached client doesn't need explicit closing
 	return nil
 }
 
-// Increment atomically increments a counter
+// Increment atomically increments a counter.
 func (m *MemcachedCache) Increment(ctx context.Context, key string, delta int64) (int64, error) {
 	fullKey := m.makeKey(key)
 
@@ -141,7 +141,7 @@ func (m *MemcachedCache) Increment(ctx context.Context, key string, delta int64)
 	return int64(newValue), nil
 }
 
-// Decrement atomically decrements a counter
+// Decrement atomically decrements a counter.
 func (m *MemcachedCache) Decrement(ctx context.Context, key string, delta int64) (int64, error) {
 	fullKey := m.makeKey(key)
 
@@ -153,7 +153,7 @@ func (m *MemcachedCache) Decrement(ctx context.Context, key string, delta int64)
 	return int64(newValue), nil
 }
 
-// makeKey creates a full key with prefix
+// makeKey creates a full key with prefix.
 func (m *MemcachedCache) makeKey(key string) string {
 	if m.prefix == "" {
 		return key
@@ -161,7 +161,7 @@ func (m *MemcachedCache) makeKey(key string) string {
 	return fmt.Sprintf("%s:%s", m.prefix, key)
 }
 
-// GetClient returns the underlying Memcached client for advanced operations
+// GetClient returns the underlying Memcached client for advanced operations.
 func (m *MemcachedCache) GetClient() *memcache.Client {
 	return m.client
 }

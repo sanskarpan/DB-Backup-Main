@@ -7,20 +7,21 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// RetentionMode defines the retention mode for objects
+// RetentionMode defines the retention mode for objects.
 type RetentionMode string
 
 const (
-	// RetentionModeUnlocked allows policy modification
+	// RetentionModeUnlocked allows policy modification.
 	RetentionModeUnlocked RetentionMode = "Unlocked"
-	// RetentionModeLocked prevents policy modification
+	// RetentionModeLocked prevents policy modification.
 	RetentionModeLocked RetentionMode = "Locked"
 )
 
-// RetentionPolicyConfig represents GCS retention policy configuration
+// RetentionPolicyConfig represents GCS retention policy configuration.
 type RetentionPolicyConfig struct {
 	// RetentionPeriod is the retention period in seconds
 	RetentionPeriod time.Duration
@@ -32,7 +33,7 @@ type RetentionPolicyConfig struct {
 	IsLocked bool
 }
 
-// ObjectRetentionConfig represents object-level retention configuration
+// ObjectRetentionConfig represents object-level retention configuration.
 type ObjectRetentionConfig struct {
 	// Mode is the retention mode (Unlocked/Locked)
 	Mode RetentionMode
@@ -41,7 +42,7 @@ type ObjectRetentionConfig struct {
 	RetainUntilTime time.Time
 }
 
-// ObjectHoldConfig represents object hold configuration
+// ObjectHoldConfig represents object hold configuration.
 type ObjectHoldConfig struct {
 	// EventBasedHold prevents deletion until explicitly removed
 	EventBasedHold bool
@@ -50,7 +51,7 @@ type ObjectHoldConfig struct {
 	TemporaryHold bool
 }
 
-// SetBucketRetentionPolicy sets a retention policy on the bucket
+// SetBucketRetentionPolicy sets a retention policy on the bucket.
 func (p *GCSProvider) SetBucketRetentionPolicy(ctx context.Context, retentionPeriod time.Duration) error {
 	// Get current bucket attributes
 	attrs, err := p.bucket.Attrs(ctx)
@@ -80,7 +81,7 @@ func (p *GCSProvider) SetBucketRetentionPolicy(ctx context.Context, retentionPer
 	return nil
 }
 
-// LockBucketRetentionPolicy locks the retention policy (irreversible)
+// LockBucketRetentionPolicy locks the retention policy (irreversible).
 func (p *GCSProvider) LockBucketRetentionPolicy(ctx context.Context) error {
 	// WARNING: This operation is IRREVERSIBLE
 	// Once locked, the retention policy cannot be removed or reduced
@@ -111,7 +112,7 @@ func (p *GCSProvider) LockBucketRetentionPolicy(ctx context.Context) error {
 	return nil
 }
 
-// RemoveBucketRetentionPolicy removes an unlocked retention policy
+// RemoveBucketRetentionPolicy removes an unlocked retention policy.
 func (p *GCSProvider) RemoveBucketRetentionPolicy(ctx context.Context) error {
 	// Get current attributes
 	attrs, err := p.bucket.Attrs(ctx)
@@ -141,7 +142,7 @@ func (p *GCSProvider) RemoveBucketRetentionPolicy(ctx context.Context) error {
 	return nil
 }
 
-// GetBucketRetentionPolicy retrieves the bucket retention policy
+// GetBucketRetentionPolicy retrieves the bucket retention policy.
 func (p *GCSProvider) GetBucketRetentionPolicy(ctx context.Context) (*RetentionPolicyConfig, error) {
 	attrs, err := p.bucket.Attrs(ctx)
 	if err != nil {
@@ -160,10 +161,10 @@ func (p *GCSProvider) GetBucketRetentionPolicy(ctx context.Context) (*RetentionP
 	}, nil
 }
 
-// SetObjectRetention sets retention on a specific object
+// SetObjectRetention sets retention on a specific object.
 func (p *GCSProvider) SetObjectRetention(ctx context.Context, objectName string,
-	retainUntilTime time.Time, mode RetentionMode) error {
-
+	retainUntilTime time.Time, mode RetentionMode,
+) error {
 	obj := p.bucket.Object(objectName)
 
 	// Object retention in GCS is set via ObjectAttrsToUpdate
@@ -183,7 +184,7 @@ func (p *GCSProvider) SetObjectRetention(ctx context.Context, objectName string,
 	return nil
 }
 
-// RemoveObjectRetention removes object retention (only if unlocked)
+// RemoveObjectRetention removes object retention (only if unlocked).
 func (p *GCSProvider) RemoveObjectRetention(ctx context.Context, objectName string) error {
 	obj := p.bucket.Object(objectName)
 
@@ -217,7 +218,7 @@ func (p *GCSProvider) RemoveObjectRetention(ctx context.Context, objectName stri
 	return nil
 }
 
-// SetObjectHold sets event-based hold and/or temporary hold on an object
+// SetObjectHold sets event-based hold and/or temporary hold on an object.
 func (p *GCSProvider) SetObjectHold(ctx context.Context, objectName string, holdConfig *ObjectHoldConfig) error {
 	obj := p.bucket.Object(objectName)
 
@@ -243,7 +244,7 @@ func (p *GCSProvider) SetObjectHold(ctx context.Context, objectName string, hold
 	return nil
 }
 
-// GetObjectRetention retrieves object retention and hold information
+// GetObjectRetention retrieves object retention and hold information.
 func (p *GCSProvider) GetObjectRetention(ctx context.Context, objectName string) (*GCSObjectRetentionInfo, error) {
 	obj := p.bucket.Object(objectName)
 
@@ -258,19 +259,19 @@ func (p *GCSProvider) GetObjectRetention(ctx context.Context, objectName string)
 	}
 
 	info := &GCSObjectRetentionInfo{
-		ObjectName:      objectName,
-		Size:            attrs.Size,
-		Created:         attrs.Created,
-		Updated:         attrs.Updated,
-		EventBasedHold:  attrs.EventBasedHold,
-		TemporaryHold:   attrs.TemporaryHold,
-		StorageClass:    attrs.StorageClass,
-		ContentType:     attrs.ContentType,
+		ObjectName:     objectName,
+		Size:           attrs.Size,
+		Created:        attrs.Created,
+		Updated:        attrs.Updated,
+		EventBasedHold: attrs.EventBasedHold,
+		TemporaryHold:  attrs.TemporaryHold,
+		StorageClass:   attrs.StorageClass,
+		ContentType:    attrs.ContentType,
 	}
 
 	// Set retention info if available
 	if attrs.Retention != nil {
-		info.RetentionMode = string(attrs.Retention.Mode)
+		info.RetentionMode = attrs.Retention.Mode
 		info.RetainUntilTime = &attrs.Retention.RetainUntil
 	}
 
@@ -284,7 +285,7 @@ func (p *GCSProvider) GetObjectRetention(ctx context.Context, objectName string)
 	return info, nil
 }
 
-// ListObjectsWithRetention lists all objects with retention information
+// ListObjectsWithRetention lists all objects with retention information.
 func (p *GCSProvider) ListObjectsWithRetention(ctx context.Context, prefix string) ([]GCSObjectRetentionInfo, error) {
 	var objects []GCSObjectRetentionInfo
 
@@ -319,7 +320,7 @@ func (p *GCSProvider) ListObjectsWithRetention(ctx context.Context, prefix strin
 
 		// Set retention info if available
 		if attrs.Retention != nil {
-			info.RetentionMode = string(attrs.Retention.Mode)
+			info.RetentionMode = attrs.Retention.Mode
 			info.RetainUntilTime = &attrs.Retention.RetainUntil
 		}
 
@@ -339,23 +340,23 @@ func (p *GCSProvider) ListObjectsWithRetention(ctx context.Context, prefix strin
 	return objects, nil
 }
 
-// GCSObjectRetentionInfo represents information about an object with retention
+// GCSObjectRetentionInfo represents information about an object with retention.
 type GCSObjectRetentionInfo struct {
-	ObjectName              string
-	Size                    int64
-	Created                 time.Time
-	Updated                 time.Time
-	EventBasedHold          bool
-	TemporaryHold           bool
-	RetentionMode           string
-	RetainUntilTime         *time.Time
-	BucketRetentionPeriod   time.Duration
-	BucketRetentionLocked   bool
-	StorageClass            string
-	ContentType             string
+	ObjectName            string
+	Size                  int64
+	Created               time.Time
+	Updated               time.Time
+	EventBasedHold        bool
+	TemporaryHold         bool
+	RetentionMode         string
+	RetainUntilTime       *time.Time
+	BucketRetentionPeriod time.Duration
+	BucketRetentionLocked bool
+	StorageClass          string
+	ContentType           string
 }
 
-// IsProtected returns true if the object is currently protected from deletion
+// IsProtected returns true if the object is currently protected from deletion.
 func (i *GCSObjectRetentionInfo) IsProtected() bool {
 	// Protected by event-based hold
 	if i.EventBasedHold {
@@ -384,7 +385,7 @@ func (i *GCSObjectRetentionInfo) IsProtected() bool {
 	return false
 }
 
-// DaysUntilUnlock returns the number of days until the object can be deleted
+// DaysUntilUnlock returns the number of days until the object can be deleted.
 func (i *GCSObjectRetentionInfo) DaysUntilUnlock() int {
 	// Event-based hold or temporary hold = indefinite
 	if i.EventBasedHold || i.TemporaryHold {
@@ -420,7 +421,7 @@ func (i *GCSObjectRetentionInfo) DaysUntilUnlock() int {
 	return days
 }
 
-// IsLocked returns true if the object has a locked retention policy
+// IsLocked returns true if the object has a locked retention policy.
 func (i *GCSObjectRetentionInfo) IsLocked() bool {
 	return i.RetentionMode == string(RetentionModeLocked) || i.BucketRetentionLocked
 }

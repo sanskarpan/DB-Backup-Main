@@ -870,7 +870,7 @@ func TestQueryParser_GetHelp(t *testing.T) {
 	}
 }
 
-// Helper function
+// Helper function.
 func contains(s, substr string) bool {
 	return len(s) > 0 && len(substr) > 0 && (s == substr || len(s) >= len(substr) && s[len(s)-len(substr):] == substr || len(s) > len(substr) && s[:len(substr)] == substr || len(s) > len(substr) && findSubstring(s, substr))
 }

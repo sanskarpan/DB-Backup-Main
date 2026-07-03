@@ -8,12 +8,12 @@ import (
 	"time"
 )
 
-// PostgreSQLQueryRewriter implements QueryRewriter for PostgreSQL
+// PostgreSQLQueryRewriter implements QueryRewriter for PostgreSQL.
 type PostgreSQLQueryRewriter struct {
 	rules []RewriteRule
 }
 
-// NewPostgreSQLQueryRewriter creates a new PostgreSQL query rewriter
+// NewPostgreSQLQueryRewriter creates a new PostgreSQL query rewriter.
 func NewPostgreSQLQueryRewriter() *PostgreSQLQueryRewriter {
 	rewriter := &PostgreSQLQueryRewriter{
 		rules: make([]RewriteRule, 0),
@@ -25,13 +25,13 @@ func NewPostgreSQLQueryRewriter() *PostgreSQLQueryRewriter {
 	return rewriter
 }
 
-// RewriteQuery rewrites a query for optimization
+// RewriteQuery rewrites a query for optimization.
 func (pqr *PostgreSQLQueryRewriter) RewriteQuery(ctx context.Context, query string) (*RewrittenQuery, error) {
 	result := &RewrittenQuery{
-		OriginalQuery: query,
+		OriginalQuery:  query,
 		RewrittenQuery: query,
-		AppliedRules:  make([]string, 0),
-		RewrittenAt:   time.Now(),
+		AppliedRules:   make([]string, 0),
+		RewrittenAt:    time.Now(),
 	}
 
 	// Apply each enabled rule
@@ -66,14 +66,14 @@ func (pqr *PostgreSQLQueryRewriter) RewriteQuery(ctx context.Context, query stri
 	return result, nil
 }
 
-// GetRewriteRules returns available rewrite rules
+// GetRewriteRules returns available rewrite rules.
 func (pqr *PostgreSQLQueryRewriter) GetRewriteRules() []RewriteRule {
 	rules := make([]RewriteRule, len(pqr.rules))
 	copy(rules, pqr.rules)
 	return rules
 }
 
-// ApplyRule applies a specific rewrite rule
+// ApplyRule applies a specific rewrite rule.
 func (pqr *PostgreSQLQueryRewriter) ApplyRule(ctx context.Context, query string, rule RewriteRule) (string, error) {
 	if rule.Pattern == "" {
 		return query, fmt.Errorf("empty pattern")
@@ -91,13 +91,13 @@ func (pqr *PostgreSQLQueryRewriter) ApplyRule(ctx context.Context, query string,
 	return rewritten, nil
 }
 
-// AddRule adds a custom rewrite rule
+// AddRule adds a custom rewrite rule.
 func (pqr *PostgreSQLQueryRewriter) AddRule(rule RewriteRule) {
 	pqr.rules = append(pqr.rules, rule)
 	pqr.sortRulesByPriority()
 }
 
-// RemoveRule removes a rewrite rule by name
+// RemoveRule removes a rewrite rule by name.
 func (pqr *PostgreSQLQueryRewriter) RemoveRule(name string) {
 	for i, rule := range pqr.rules {
 		if rule.Name == name {
@@ -107,7 +107,7 @@ func (pqr *PostgreSQLQueryRewriter) RemoveRule(name string) {
 	}
 }
 
-// EnableRule enables a rewrite rule
+// EnableRule enables a rewrite rule.
 func (pqr *PostgreSQLQueryRewriter) EnableRule(name string) {
 	for i := range pqr.rules {
 		if pqr.rules[i].Name == name {
@@ -117,7 +117,7 @@ func (pqr *PostgreSQLQueryRewriter) EnableRule(name string) {
 	}
 }
 
-// DisableRule disables a rewrite rule
+// DisableRule disables a rewrite rule.
 func (pqr *PostgreSQLQueryRewriter) DisableRule(name string) {
 	for i := range pqr.rules {
 		if pqr.rules[i].Name == name {

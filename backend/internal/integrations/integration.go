@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// IntegrationType represents the type of integration
+// IntegrationType represents the type of integration.
 type IntegrationType string
 
 const (
@@ -23,7 +23,7 @@ const (
 	IntegrationTypeCustom     IntegrationType = "custom"
 )
 
-// IntegrationStatus represents the status of an integration
+// IntegrationStatus represents the status of an integration.
 type IntegrationStatus string
 
 const (
@@ -33,7 +33,7 @@ const (
 	StatusConfigured IntegrationStatus = "configured"
 )
 
-// Integration defines the interface that all integrations must implement
+// Integration defines the interface that all integrations must implement.
 type Integration interface {
 	// GetType returns the integration type
 	GetType() IntegrationType
@@ -72,40 +72,40 @@ type Integration interface {
 	GetMetrics() *Metrics
 }
 
-// Config holds integration configuration
+// Config holds integration configuration.
 type Config struct {
-	Type        IntegrationType        `json:"type"`
-	Name        string                 `json:"name"`
-	Enabled     bool                   `json:"enabled"`
-	BaseURL     string                 `json:"base_url"`
-	APIKey      string                 `json:"api_key,omitempty"`
-	Username    string                 `json:"username,omitempty"`
-	Password    string                 `json:"password,omitempty"`
-	Token       string                 `json:"token,omitempty"`
-	OAuth       *OAuthConfig           `json:"oauth,omitempty"`
-	Settings    map[string]interface{} `json:"settings,omitempty"`
-	RateLimit   *RateLimitConfig       `json:"rate_limit,omitempty"`
-	Retry       *RetryConfig           `json:"retry,omitempty"`
-	Timeout     time.Duration          `json:"timeout,omitempty"`
-	MaxRetries  int                    `json:"max_retries,omitempty"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
+	Type       IntegrationType        `json:"type"`
+	Name       string                 `json:"name"`
+	Enabled    bool                   `json:"enabled"`
+	BaseURL    string                 `json:"base_url"`
+	APIKey     string                 `json:"api_key,omitempty"`
+	Username   string                 `json:"username,omitempty"`
+	Password   string                 `json:"password,omitempty"`
+	Token      string                 `json:"token,omitempty"`
+	OAuth      *OAuthConfig           `json:"oauth,omitempty"`
+	Settings   map[string]interface{} `json:"settings,omitempty"`
+	RateLimit  *RateLimitConfig       `json:"rate_limit,omitempty"`
+	Retry      *RetryConfig           `json:"retry,omitempty"`
+	Timeout    time.Duration          `json:"timeout,omitempty"`
+	MaxRetries int                    `json:"max_retries,omitempty"`
+	CreatedAt  time.Time              `json:"created_at"`
+	UpdatedAt  time.Time              `json:"updated_at"`
 }
 
-// OAuthConfig holds OAuth2 configuration
+// OAuthConfig holds OAuth2 configuration.
 type OAuthConfig struct {
-	ClientID     string   `json:"client_id"`
-	ClientSecret string   `json:"client_secret"`
-	TokenURL     string   `json:"token_url"`
-	AuthURL      string   `json:"auth_url"`
-	RedirectURL  string   `json:"redirect_url"`
-	Scopes       []string `json:"scopes"`
-	AccessToken  string   `json:"access_token,omitempty"`
-	RefreshToken string   `json:"refresh_token,omitempty"`
+	ClientID     string    `json:"client_id"`
+	ClientSecret string    `json:"client_secret"`
+	TokenURL     string    `json:"token_url"`
+	AuthURL      string    `json:"auth_url"`
+	RedirectURL  string    `json:"redirect_url"`
+	Scopes       []string  `json:"scopes"`
+	AccessToken  string    `json:"access_token,omitempty"`
+	RefreshToken string    `json:"refresh_token,omitempty"`
 	ExpiresAt    time.Time `json:"expires_at,omitempty"`
 }
 
-// RateLimitConfig holds rate limiting configuration
+// RateLimitConfig holds rate limiting configuration.
 type RateLimitConfig struct {
 	RequestsPerMinute int           `json:"requests_per_minute"`
 	RequestsPerHour   int           `json:"requests_per_hour"`
@@ -113,7 +113,7 @@ type RateLimitConfig struct {
 	RetryAfter        time.Duration `json:"retry_after"`
 }
 
-// RetryConfig holds retry configuration
+// RetryConfig holds retry configuration.
 type RetryConfig struct {
 	MaxAttempts  int           `json:"max_attempts"`
 	InitialDelay time.Duration `json:"initial_delay"`
@@ -121,21 +121,21 @@ type RetryConfig struct {
 	Multiplier   float64       `json:"multiplier"`
 }
 
-// Incident represents an incident/ticket to be created
+// Incident represents an incident/ticket to be created.
 type Incident struct {
-	Title       string                 `json:"title"`
-	Description string                 `json:"description"`
-	Priority    Priority               `json:"priority"`
-	Severity    Severity               `json:"severity"`
-	Status      string                 `json:"status,omitempty"`
-	Assignee    string                 `json:"assignee,omitempty"`
-	Tags        []string               `json:"tags,omitempty"`
+	Title        string                 `json:"title"`
+	Description  string                 `json:"description"`
+	Priority     Priority               `json:"priority"`
+	Severity     Severity               `json:"severity"`
+	Status       string                 `json:"status,omitempty"`
+	Assignee     string                 `json:"assignee,omitempty"`
+	Tags         []string               `json:"tags,omitempty"`
 	CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
-	Source      string                 `json:"source"`
-	Timestamp   time.Time              `json:"timestamp"`
+	Source       string                 `json:"source"`
+	Timestamp    time.Time              `json:"timestamp"`
 }
 
-// Priority represents incident priority
+// Priority represents incident priority.
 type Priority string
 
 const (
@@ -145,7 +145,7 @@ const (
 	PriorityLow      Priority = "low"
 )
 
-// Severity represents incident severity
+// Severity represents incident severity.
 type Severity string
 
 const (
@@ -155,18 +155,18 @@ const (
 	SeverityLow      Severity = "low"
 )
 
-// IncidentResponse represents the response after creating an incident
+// IncidentResponse represents the response after creating an incident.
 type IncidentResponse struct {
-	ID            string                 `json:"id"`
-	Key           string                 `json:"key"`
-	URL           string                 `json:"url"`
-	Status        string                 `json:"status"`
-	CreatedAt     time.Time              `json:"created_at"`
-	UpdatedAt     time.Time              `json:"updated_at"`
-	CustomFields  map[string]interface{} `json:"custom_fields,omitempty"`
+	ID           string                 `json:"id"`
+	Key          string                 `json:"key"`
+	URL          string                 `json:"url"`
+	Status       string                 `json:"status"`
+	CreatedAt    time.Time              `json:"created_at"`
+	UpdatedAt    time.Time              `json:"updated_at"`
+	CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
 }
 
-// IncidentUpdate represents an update to an incident
+// IncidentUpdate represents an update to an incident.
 type IncidentUpdate struct {
 	Title        string                 `json:"title,omitempty"`
 	Description  string                 `json:"description,omitempty"`
@@ -178,32 +178,32 @@ type IncidentUpdate struct {
 	Comment      string                 `json:"comment,omitempty"`
 }
 
-// Notification represents a notification to be sent
+// Notification represents a notification to be sent.
 type Notification struct {
-	Title       string                 `json:"title"`
-	Message     string                 `json:"message"`
-	Priority    Priority               `json:"priority"`
-	Recipients  []string               `json:"recipients,omitempty"`
-	Channel     string                 `json:"channel,omitempty"`
-	Tags        []string               `json:"tags,omitempty"`
-	CustomData  map[string]interface{} `json:"custom_data,omitempty"`
-	Timestamp   time.Time              `json:"timestamp"`
+	Title      string                 `json:"title"`
+	Message    string                 `json:"message"`
+	Priority   Priority               `json:"priority"`
+	Recipients []string               `json:"recipients,omitempty"`
+	Channel    string                 `json:"channel,omitempty"`
+	Tags       []string               `json:"tags,omitempty"`
+	CustomData map[string]interface{} `json:"custom_data,omitempty"`
+	Timestamp  time.Time              `json:"timestamp"`
 }
 
-// Metrics holds integration metrics
+// Metrics holds integration metrics.
 type Metrics struct {
-	TotalRequests    int64         `json:"total_requests"`
-	SuccessfulCalls  int64         `json:"successful_calls"`
-	FailedCalls      int64         `json:"failed_calls"`
-	AverageLatency   time.Duration `json:"average_latency"`
-	LastCallTime     time.Time     `json:"last_call_time"`
-	LastError        string        `json:"last_error,omitempty"`
-	LastErrorTime    time.Time     `json:"last_error_time,omitempty"`
-	RateLimitHits    int64         `json:"rate_limit_hits"`
-	mu               sync.RWMutex  `json:"-"`
+	TotalRequests   int64         `json:"total_requests"`
+	SuccessfulCalls int64         `json:"successful_calls"`
+	FailedCalls     int64         `json:"failed_calls"`
+	AverageLatency  time.Duration `json:"average_latency"`
+	LastCallTime    time.Time     `json:"last_call_time"`
+	LastError       string        `json:"last_error,omitempty"`
+	LastErrorTime   time.Time     `json:"last_error_time,omitempty"`
+	RateLimitHits   int64         `json:"rate_limit_hits"`
+	mu              sync.RWMutex  `json:"-"`
 }
 
-// RecordRequest records a successful request
+// RecordRequest records a successful request.
 func (m *Metrics) RecordRequest(duration time.Duration) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -223,7 +223,7 @@ func (m *Metrics) RecordRequest(duration time.Duration) {
 	}
 }
 
-// RecordError records a failed request
+// RecordError records a failed request.
 func (m *Metrics) RecordError(err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -234,7 +234,7 @@ func (m *Metrics) RecordError(err error) {
 	m.LastErrorTime = time.Now()
 }
 
-// RecordRateLimitHit records a rate limit hit
+// RecordRateLimitHit records a rate limit hit.
 func (m *Metrics) RecordRateLimitHit() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -242,7 +242,7 @@ func (m *Metrics) RecordRateLimitHit() {
 	m.RateLimitHits++
 }
 
-// GetSuccessRate returns the success rate percentage
+// GetSuccessRate returns the success rate percentage.
 func (m *Metrics) GetSuccessRate() float64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -254,14 +254,14 @@ func (m *Metrics) GetSuccessRate() float64 {
 	return float64(m.SuccessfulCalls) / float64(m.TotalRequests) * 100
 }
 
-// Registry manages all integrations
+// Registry manages all integrations.
 type Registry struct {
 	integrations map[string]Integration
 	configs      map[string]*Config
 	mu           sync.RWMutex
 }
 
-// NewRegistry creates a new integration registry
+// NewRegistry creates a new integration registry.
 func NewRegistry() *Registry {
 	return &Registry{
 		integrations: make(map[string]Integration),
@@ -269,7 +269,7 @@ func NewRegistry() *Registry {
 	}
 }
 
-// Register registers a new integration
+// Register registers a new integration.
 func (r *Registry) Register(integration Integration) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -289,7 +289,7 @@ func (r *Registry) Register(integration Integration) error {
 	return nil
 }
 
-// Unregister removes an integration
+// Unregister removes an integration.
 func (r *Registry) Unregister(name string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -306,7 +306,7 @@ func (r *Registry) Unregister(name string) error {
 	return nil
 }
 
-// Get retrieves an integration by name
+// Get retrieves an integration by name.
 func (r *Registry) Get(name string) (Integration, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -319,7 +319,7 @@ func (r *Registry) Get(name string) (Integration, error) {
 	return integration, nil
 }
 
-// List returns all registered integrations
+// List returns all registered integrations.
 func (r *Registry) List() []Integration {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -332,7 +332,7 @@ func (r *Registry) List() []Integration {
 	return integrations
 }
 
-// ListByType returns all integrations of a specific type
+// ListByType returns all integrations of a specific type.
 func (r *Registry) ListByType(integrationType IntegrationType) []Integration {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -347,7 +347,7 @@ func (r *Registry) ListByType(integrationType IntegrationType) []Integration {
 	return integrations
 }
 
-// Configure configures an integration
+// Configure configures an integration.
 func (r *Registry) Configure(name string, config *Config) error {
 	integration, err := r.Get(name)
 	if err != nil {
@@ -365,7 +365,7 @@ func (r *Registry) Configure(name string, config *Config) error {
 	return nil
 }
 
-// GetConfig retrieves the configuration for an integration
+// GetConfig retrieves the configuration for an integration.
 func (r *Registry) GetConfig(name string) (*Config, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -378,7 +378,7 @@ func (r *Registry) GetConfig(name string) (*Config, error) {
 	return config, nil
 }
 
-// HealthCheckAll performs health checks on all integrations
+// HealthCheckAll performs health checks on all integrations.
 func (r *Registry) HealthCheckAll(ctx context.Context) map[string]error {
 	integrations := r.List()
 	results := make(map[string]error)
@@ -395,7 +395,7 @@ func (r *Registry) HealthCheckAll(ctx context.Context) map[string]error {
 	return results
 }
 
-// GetMetricsAll returns metrics for all integrations
+// GetMetricsAll returns metrics for all integrations.
 func (r *Registry) GetMetricsAll() map[string]*Metrics {
 	integrations := r.List()
 	metrics := make(map[string]*Metrics)
@@ -407,7 +407,7 @@ func (r *Registry) GetMetricsAll() map[string]*Metrics {
 	return metrics
 }
 
-// BaseIntegration provides common functionality for all integrations
+// BaseIntegration provides common functionality for all integrations.
 type BaseIntegration struct {
 	config  *Config
 	metrics *Metrics
@@ -415,7 +415,7 @@ type BaseIntegration struct {
 	mu      sync.RWMutex
 }
 
-// NewBaseIntegration creates a new base integration
+// NewBaseIntegration creates a new base integration.
 func NewBaseIntegration() *BaseIntegration {
 	return &BaseIntegration{
 		metrics: &Metrics{},
@@ -423,7 +423,7 @@ func NewBaseIntegration() *BaseIntegration {
 	}
 }
 
-// Configure configures the base integration
+// Configure configures the base integration.
 func (b *BaseIntegration) Configure(config *Config) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -434,7 +434,7 @@ func (b *BaseIntegration) Configure(config *Config) error {
 	return nil
 }
 
-// GetConfig returns the configuration
+// GetConfig returns the configuration.
 func (b *BaseIntegration) GetConfig() *Config {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -442,7 +442,7 @@ func (b *BaseIntegration) GetConfig() *Config {
 	return b.config
 }
 
-// GetStatus returns the current status
+// GetStatus returns the current status.
 func (b *BaseIntegration) GetStatus() IntegrationStatus {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -450,7 +450,7 @@ func (b *BaseIntegration) GetStatus() IntegrationStatus {
 	return b.status
 }
 
-// SetStatus sets the integration status
+// SetStatus sets the integration status.
 func (b *BaseIntegration) SetStatus(status IntegrationStatus) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -458,14 +458,14 @@ func (b *BaseIntegration) SetStatus(status IntegrationStatus) {
 	b.status = status
 }
 
-// GetMetrics returns the metrics
+// GetMetrics returns the metrics.
 func (b *BaseIntegration) GetMetrics() *Metrics {
 	return b.metrics
 }
 
 // Helper functions
 
-// MarshalJSON marshals config to JSON, omitting sensitive fields
+// MarshalJSON marshals config to JSON, omitting sensitive fields.
 func (c *Config) MarshalJSON() ([]byte, error) {
 	type Alias Config
 	return json.Marshal(&struct {
@@ -491,7 +491,7 @@ func maskSensitive(value string) string {
 	return value[:2] + "****" + value[len(value)-2:]
 }
 
-// DefaultRetryConfig returns default retry configuration
+// DefaultRetryConfig returns default retry configuration.
 func DefaultRetryConfig() *RetryConfig {
 	return &RetryConfig{
 		MaxAttempts:  3,
@@ -501,7 +501,7 @@ func DefaultRetryConfig() *RetryConfig {
 	}
 }
 
-// DefaultRateLimitConfig returns default rate limit configuration
+// DefaultRateLimitConfig returns default rate limit configuration.
 func DefaultRateLimitConfig() *RateLimitConfig {
 	return &RateLimitConfig{
 		RequestsPerMinute: 60,

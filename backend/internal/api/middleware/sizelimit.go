@@ -8,7 +8,7 @@ import (
 )
 
 // MaxBodySize limits request body size to prevent memory exhaustion and DoS attacks
-// maxSize: maximum allowed request body size in bytes
+// maxSize: maximum allowed request body size in bytes.
 func MaxBodySize(maxSize int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Limit request body size using http.MaxBytesReader
@@ -36,13 +36,13 @@ func MaxBodySize(maxSize int64) gin.HandlerFunc {
 }
 
 // DefaultMaxBodySize returns a middleware with a default limit of 10MB
-// This is suitable for most API requests including JSON payloads
+// This is suitable for most API requests including JSON payloads.
 func DefaultMaxBodySize() gin.HandlerFunc {
 	return MaxBodySize(10 * 1024 * 1024) // 10MB
 }
 
 // LargeFileUploadSize returns a middleware for file upload endpoints
-// with a limit of 100MB
+// with a limit of 100MB.
 func LargeFileUploadSize() gin.HandlerFunc {
 	return MaxBodySize(100 * 1024 * 1024) // 100MB
 }

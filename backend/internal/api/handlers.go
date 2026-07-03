@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/sanskarpan/db-backup/internal/backup"
 	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/sanskarpan/db-backup/internal/restore"
@@ -22,7 +23,7 @@ var (
 	ServerGitCommit = "unknown"
 )
 
-// handleRoot handles the root endpoint
+// handleRoot handles the root endpoint.
 func (s *Server) handleRoot(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"service": "DB Backup API",
@@ -31,7 +32,7 @@ func (s *Server) handleRoot(c *gin.Context) {
 	})
 }
 
-// handleHealth handles health check endpoint
+// handleHealth handles health check endpoint.
 func (s *Server) handleHealth(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
@@ -48,14 +49,14 @@ func (s *Server) handleHealth(c *gin.Context) {
 	c.JSON(statusCode, report)
 }
 
-// handleReady handles readiness probe
+// handleReady handles readiness probe.
 func (s *Server) handleReady(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"ready": true,
 	})
 }
 
-// handleVersion handles version endpoint
+// handleVersion handles version endpoint.
 func (s *Server) handleVersion(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"version":    ServerVersion,
@@ -758,17 +759,17 @@ func (s *Server) handleGetStorageStats(c *gin.Context) {
 
 // Security handlers
 
-// ScanFileRequest represents a request to scan a file
+// ScanFileRequest represents a request to scan a file.
 type ScanFileRequest struct {
 	FilePath string `json:"file_path" binding:"required"`
 }
 
-// ScanDirectoryRequest represents a request to scan a directory
+// ScanDirectoryRequest represents a request to scan a directory.
 type ScanDirectoryRequest struct {
 	DirectoryPath string `json:"directory_path" binding:"required"`
 }
 
-// handleScanFile scans a single file for ransomware
+// handleScanFile scans a single file for ransomware.
 func (s *Server) handleScanFile(c *gin.Context) {
 	var req ScanFileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -799,7 +800,7 @@ func (s *Server) handleScanFile(c *gin.Context) {
 	s.respondSuccess(c, report)
 }
 
-// handleScanDirectory scans a directory for ransomware
+// handleScanDirectory scans a directory for ransomware.
 func (s *Server) handleScanDirectory(c *gin.Context) {
 	var req ScanDirectoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -860,7 +861,7 @@ func (s *Server) handleGetSecurityStats(c *gin.Context) {
 	s.respondSuccess(c, stats)
 }
 
-// ThreatAlert represents a threat alert for the API
+// ThreatAlert represents a threat alert for the API.
 type ThreatAlert struct {
 	ID                string   `json:"id"`
 	Timestamp         string   `json:"timestamp"`
@@ -898,7 +899,7 @@ func (s *Server) handleGetThreatAlert(c *gin.Context) {
 		"No persisted threat alerts are available")
 }
 
-// UpdateThreatAlertRequest represents a request to update an alert
+// UpdateThreatAlertRequest represents a request to update an alert.
 type UpdateThreatAlertRequest struct {
 	Status string `json:"status" binding:"required,oneof=active investigating resolved dismissed"`
 }

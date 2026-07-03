@@ -22,7 +22,7 @@ func GetDirectorySize(path string) (int64, error) {
 	return total, err
 }
 
-// FormatBytes formats bytes into human-readable size
+// FormatBytes formats bytes into human-readable size.
 func FormatBytes(bytes int64) string {
 	const unit = 1024
 	if bytes < unit {
@@ -36,7 +36,7 @@ func FormatBytes(bytes int64) string {
 	return fmt.Sprintf("%.2f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
-// ParseBytes parses human-readable size to bytes
+// ParseBytes parses human-readable size to bytes.
 func ParseBytes(s string) (int64, error) {
 	var value float64
 	var unit string
@@ -64,7 +64,7 @@ func ParseBytes(s string) (int64, error) {
 	return int64(value * float64(multiplier)), nil
 }
 
-// FormatDuration formats duration into human-readable string
+// FormatDuration formats duration into human-readable string.
 func FormatDuration(d time.Duration) string {
 	if d < time.Minute {
 		return fmt.Sprintf("%.1fs", d.Seconds())
@@ -79,12 +79,12 @@ func FormatDuration(d time.Duration) string {
 	return fmt.Sprintf("%.1fd", days)
 }
 
-// FormatTimestamp formats timestamp for display
+// FormatTimestamp formats timestamp for display.
 func FormatTimestamp(t time.Time) string {
 	return t.Format("2006-01-02 15:04:05")
 }
 
-// FormatPercentage formats a ratio as percentage
+// FormatPercentage formats a ratio as percentage.
 func FormatPercentage(numerator, denominator int64) string {
 	if denominator == 0 {
 		return "0.0%"

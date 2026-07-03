@@ -334,8 +334,8 @@ func TestHubBroadcast(t *testing.T) {
 
 	// Broadcast a message
 	hub.Broadcast(&Message{
-		Type:  MessageTypeNotification,
-		Data:  map[string]interface{}{"message": "Test broadcast"},
+		Type: MessageTypeNotification,
+		Data: map[string]interface{}{"message": "Test broadcast"},
 	})
 
 	// Wait for message

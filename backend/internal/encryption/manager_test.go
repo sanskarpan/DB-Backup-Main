@@ -141,7 +141,7 @@ func TestManager_EncryptFile(t *testing.T) {
 	decryptedPath := tmpDir + "/decrypted.txt"
 
 	testContent := []byte("This is the content of the test file")
-	err = os.WriteFile(inputPath, testContent, 0600)
+	err = os.WriteFile(inputPath, testContent, 0o600)
 	require.NoError(t, err)
 
 	// Encrypt file
@@ -282,7 +282,7 @@ func TestManager_StreamEncryptDecrypt(t *testing.T) {
 	decryptedPath := tmpDir + "/decrypted.txt"
 
 	testData := []byte("This is streaming data to encrypt and decrypt")
-	err = os.WriteFile(inputPath, testData, 0600)
+	err = os.WriteFile(inputPath, testData, 0o600)
 	require.NoError(t, err)
 
 	// Open files for streaming

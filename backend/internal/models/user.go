@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// User represents a user in the system
+// User represents a user in the system.
 type User struct {
 	ID           string    `json:"id"`
 	Email        string    `json:"email"`
@@ -17,7 +17,7 @@ type User struct {
 	IsActive     bool      `json:"is_active"`
 }
 
-// Schedule represents a backup schedule
+// Schedule represents a backup schedule.
 type Schedule struct {
 	ID           string            `json:"id"`
 	Name         string            `json:"name"`
@@ -32,7 +32,7 @@ type Schedule struct {
 	Tags         map[string]string `json:"tags,omitempty"`
 }
 
-// DatabaseConnection represents a database connection configuration
+// DatabaseConnection represents a database connection configuration.
 type DatabaseConnection struct {
 	ID        string            `json:"id"`
 	Name      string            `json:"name"`
@@ -48,7 +48,7 @@ type DatabaseConnection struct {
 	UpdatedAt time.Time         `json:"updated_at"`
 }
 
-// AuditLog represents an audit log entry
+// AuditLog represents an audit log entry.
 type AuditLog struct {
 	ID        string                 `json:"id"`
 	UserID    string                 `json:"user_id"`
@@ -60,14 +60,14 @@ type AuditLog struct {
 	CreatedAt time.Time              `json:"created_at"`
 }
 
-// StorageStats represents storage statistics
+// StorageStats represents storage statistics.
 type StorageStats struct {
-	TotalBackups     int64     `json:"total_backups"`
-	TotalSize        int64     `json:"total_size"` // bytes
-	OldestBackup     time.Time `json:"oldest_backup,omitempty"`
-	NewestBackup     time.Time `json:"newest_backup,omitempty"`
+	TotalBackups     int64            `json:"total_backups"`
+	TotalSize        int64            `json:"total_size"` // bytes
+	OldestBackup     time.Time        `json:"oldest_backup,omitempty"`
+	NewestBackup     time.Time        `json:"newest_backup,omitempty"`
 	BackupsByType    map[string]int64 `json:"backups_by_type"`
 	BackupsByStatus  map[string]int64 `json:"backups_by_status"`
-	AverageSize      int64     `json:"average_size"`
-	CompressionRatio float64   `json:"compression_ratio,omitempty"`
+	AverageSize      int64            `json:"average_size"`
+	CompressionRatio float64          `json:"compression_ratio,omitempty"`
 }

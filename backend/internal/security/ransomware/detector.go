@@ -16,39 +16,39 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// ThreatLevel represents the severity of a detected threat
+// ThreatLevel represents the severity of a detected threat.
 type ThreatLevel string
 
 const (
-	// ThreatLevelNone indicates no threat detected
+	// ThreatLevelNone indicates no threat detected.
 	ThreatLevelNone ThreatLevel = "NONE"
-	// ThreatLevelLow indicates low-risk anomaly
+	// ThreatLevelLow indicates low-risk anomaly.
 	ThreatLevelLow ThreatLevel = "LOW"
-	// ThreatLevelMedium indicates medium-risk threat
+	// ThreatLevelMedium indicates medium-risk threat.
 	ThreatLevelMedium ThreatLevel = "MEDIUM"
-	// ThreatLevelHigh indicates high-risk threat
+	// ThreatLevelHigh indicates high-risk threat.
 	ThreatLevelHigh ThreatLevel = "HIGH"
-	// ThreatLevelCritical indicates critical threat requiring immediate action
+	// ThreatLevelCritical indicates critical threat requiring immediate action.
 	ThreatLevelCritical ThreatLevel = "CRITICAL"
 )
 
-// ThreatType represents the type of threat detected
+// ThreatType represents the type of threat detected.
 type ThreatType string
 
 const (
-	// ThreatTypeEncryption indicates file encryption detected
+	// ThreatTypeEncryption indicates file encryption detected.
 	ThreatTypeEncryption ThreatType = "ENCRYPTION"
-	// ThreatTypeRapidModification indicates rapid file changes
+	// ThreatTypeRapidModification indicates rapid file changes.
 	ThreatTypeRapidModification ThreatType = "RAPID_MODIFICATION"
-	// ThreatTypeSignatureMatch indicates known ransomware signature
+	// ThreatTypeSignatureMatch indicates known ransomware signature.
 	ThreatTypeSignatureMatch ThreatType = "SIGNATURE_MATCH"
-	// ThreatTypeAnomalousBehavior indicates unusual access patterns
+	// ThreatTypeAnomalousBehavior indicates unusual access patterns.
 	ThreatTypeAnomalousBehavior ThreatType = "ANOMALOUS_BEHAVIOR"
-	// ThreatTypeSuspiciousExtension indicates suspicious file extension change
+	// ThreatTypeSuspiciousExtension indicates suspicious file extension change.
 	ThreatTypeSuspiciousExtension ThreatType = "SUSPICIOUS_EXTENSION"
 )
 
-// DetectorConfig represents ransomware detector configuration
+// DetectorConfig represents ransomware detector configuration.
 type DetectorConfig struct {
 	// EntropyThreshold is the minimum entropy to consider a file encrypted (0-8)
 	// Typical threshold is 7.0+ for encrypted files
@@ -70,7 +70,7 @@ type DetectorConfig struct {
 	SuspiciousExtensions []string
 }
 
-// DefaultDetectorConfig returns a default configuration
+// DefaultDetectorConfig returns a default configuration.
 func DefaultDetectorConfig() *DetectorConfig {
 	return &DetectorConfig{
 		EntropyThreshold:           7.0,
@@ -86,7 +86,7 @@ func DefaultDetectorConfig() *DetectorConfig {
 	}
 }
 
-// Detector provides ransomware detection capabilities
+// Detector provides ransomware detection capabilities.
 type Detector struct {
 	config        *DetectorConfig
 	mu            sync.RWMutex
@@ -94,7 +94,7 @@ type Detector struct {
 	patternEngine *PatternEngine
 }
 
-// NewDetector creates a new ransomware detector
+// NewDetector creates a new ransomware detector.
 func NewDetector(config *DetectorConfig) *Detector {
 	if config == nil {
 		config = DefaultDetectorConfig()
@@ -107,7 +107,7 @@ func NewDetector(config *DetectorConfig) *Detector {
 	}
 }
 
-// NewDetectorWithPatternEngine creates a detector with custom pattern engine
+// NewDetectorWithPatternEngine creates a detector with custom pattern engine.
 func NewDetectorWithPatternEngine(config *DetectorConfig, patternEngine *PatternEngine) *Detector {
 	if config == nil {
 		config = DefaultDetectorConfig()
@@ -123,20 +123,20 @@ func NewDetectorWithPatternEngine(config *DetectorConfig, patternEngine *Pattern
 	}
 }
 
-// ThreatReport represents a detected threat
+// ThreatReport represents a detected threat.
 type ThreatReport struct {
-	ThreatType   ThreatType
-	ThreatLevel  ThreatLevel
-	DetectedAt   time.Time
-	FilePath     string
-	FileHash     string
-	Description  string
-	Entropy      float64
-	Indicators   []string
-	Recommended  string
+	ThreatType  ThreatType
+	ThreatLevel ThreatLevel
+	DetectedAt  time.Time
+	FilePath    string
+	FileHash    string
+	Description string
+	Entropy     float64
+	Indicators  []string
+	Recommended string
 }
 
-// ScanFile scans a single file for ransomware indicators
+// ScanFile scans a single file for ransomware indicators.
 func (d *Detector) ScanFile(ctx context.Context, filePath string) (*ThreatReport, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -262,7 +262,7 @@ func (d *Detector) ScanFile(ctx context.Context, filePath string) (*ThreatReport
 	return report, nil
 }
 
-// ScanDirectory recursively scans a directory for ransomware indicators
+// ScanDirectory recursively scans a directory for ransomware indicators.
 func (d *Detector) ScanDirectory(ctx context.Context, dirPath string) ([]*ThreatReport, error) {
 	var reports []*ThreatReport
 	var mu sync.Mutex
@@ -300,7 +300,6 @@ func (d *Detector) ScanDirectory(ctx context.Context, dirPath string) ([]*Threat
 
 		return nil
 	})
-
 	if err != nil {
 		return reports, pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage,
 			"failed to scan directory")
@@ -309,7 +308,7 @@ func (d *Detector) ScanDirectory(ctx context.Context, dirPath string) ([]*Threat
 	return reports, nil
 }
 
-// DetectRapidModification checks for rapid file modifications
+// DetectRapidModification checks for rapid file modifications.
 func (d *Detector) DetectRapidModification(filePath string, modTime time.Time) *ThreatReport {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -340,7 +339,7 @@ func (d *Detector) DetectRapidModification(filePath string, modTime time.Time) *
 	return nil
 }
 
-// CalculateEntropy calculates Shannon entropy of a file (0-8 scale)
+// CalculateEntropy calculates Shannon entropy of a file (0-8 scale).
 func CalculateEntropy(reader io.Reader) (float64, error) {
 	// Count byte frequencies
 	freq := make([]int, 256)
@@ -381,7 +380,7 @@ func CalculateEntropy(reader io.Reader) (float64, error) {
 	return entropy, nil
 }
 
-// hasSuspiciousExtension checks if file has a suspicious extension
+// hasSuspiciousExtension checks if file has a suspicious extension.
 func (d *Detector) hasSuspiciousExtension(filePath string) bool {
 	ext := strings.ToLower(filepath.Ext(filePath))
 	for _, suspiciousExt := range d.config.SuspiciousExtensions {
@@ -393,7 +392,7 @@ func (d *Detector) hasSuspiciousExtension(filePath string) bool {
 }
 
 // checkSignatures checks for known ransomware signatures
-// This is a simplified implementation - in production, use a comprehensive signature database
+// This is a simplified implementation - in production, use a comprehensive signature database.
 func (d *Detector) checkSignatures(file *os.File, fileSize int64) string {
 	// Ensure we start reading from the beginning of the file
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
@@ -413,9 +412,9 @@ func (d *Detector) checkSignatures(file *os.File, fileSize int64) string {
 
 	// Check for common ransomware signatures
 	signatures := map[string][]byte{
-		"WannaCry":  []byte("WANACRY!"),
-		"Locky":     []byte("LOCKY"),
-		"Cerber":    []byte("CERBER"),
+		"WannaCry":   []byte("WANACRY!"),
+		"Locky":      []byte("LOCKY"),
+		"Cerber":     []byte("CERBER"),
 		"CryptoWall": []byte("DECRYPT_INSTRUCTION"),
 	}
 
@@ -428,7 +427,7 @@ func (d *Detector) checkSignatures(file *os.File, fileSize int64) string {
 	return ""
 }
 
-// containsBytes checks if haystack contains needle
+// containsBytes checks if haystack contains needle.
 func containsBytes(haystack, needle []byte) bool {
 	if len(needle) == 0 {
 		return true
@@ -452,26 +451,26 @@ func containsBytes(haystack, needle []byte) bool {
 	return false
 }
 
-// FileModificationHistory tracks file modifications for rapid change detection
+// FileModificationHistory tracks file modifications for rapid change detection.
 type FileModificationHistory struct {
 	mu            sync.RWMutex
 	modifications []FileModification
 }
 
-// FileModification represents a single file modification event
+// FileModification represents a single file modification event.
 type FileModification struct {
 	FilePath string
 	ModTime  time.Time
 }
 
-// NewFileModificationHistory creates a new modification history tracker
+// NewFileModificationHistory creates a new modification history tracker.
 func NewFileModificationHistory() *FileModificationHistory {
 	return &FileModificationHistory{
 		modifications: make([]FileModification, 0),
 	}
 }
 
-// Record records a file modification
+// Record records a file modification.
 func (h *FileModificationHistory) Record(filePath string, modTime time.Time) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -487,7 +486,7 @@ func (h *FileModificationHistory) Record(filePath string, modTime time.Time) {
 	}
 }
 
-// CountInWindow counts modifications within a time window
+// CountInWindow counts modifications within a time window.
 func (h *FileModificationHistory) CountInWindow(window time.Duration) int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -504,7 +503,7 @@ func (h *FileModificationHistory) CountInWindow(window time.Duration) int {
 	return count
 }
 
-// Clear clears the modification history
+// Clear clears the modification history.
 func (h *FileModificationHistory) Clear() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -512,7 +511,7 @@ func (h *FileModificationHistory) Clear() {
 	h.modifications = make([]FileModification, 0)
 }
 
-// GetRecent returns recent modifications within the window
+// GetRecent returns recent modifications within the window.
 func (h *FileModificationHistory) GetRecent(window time.Duration) []FileModification {
 	h.mu.RLock()
 	defer h.mu.RUnlock()

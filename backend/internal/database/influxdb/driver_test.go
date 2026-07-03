@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/sanskarpan/db-backup/internal/database"
 )
 
 // TestBackupRecord_RoundTrip proves that a v2 record survives the

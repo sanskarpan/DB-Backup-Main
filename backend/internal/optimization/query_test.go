@@ -6,10 +6,10 @@ import (
 	"time"
 )
 
-// Mock analyzer for testing
+// Mock analyzer for testing.
 type mockAnalyzer struct {
-	planToReturn *QueryPlan
-	costToReturn float64
+	planToReturn  *QueryPlan
+	costToReturn  float64
 	statsToReturn *TableStatistics
 	errorToReturn error
 }
@@ -22,15 +22,15 @@ func (ma *mockAnalyzer) AnalyzeQueryPlan(ctx context.Context, query string) (*Qu
 		return ma.planToReturn, nil
 	}
 	return &QueryPlan{
-		Query:         query,
-		DatabaseType:  DatabaseTypePostgreSQL,
-		EstimatedCost: 100.0,
-		EstimatedRows: 1000,
-		PlanNodes:     []*PlanNode{},
-		UsedIndexes:   []string{},
-		Warnings:      []string{},
+		Query:           query,
+		DatabaseType:    DatabaseTypePostgreSQL,
+		EstimatedCost:   100.0,
+		EstimatedRows:   1000,
+		PlanNodes:       []*PlanNode{},
+		UsedIndexes:     []string{},
+		Warnings:        []string{},
 		Recommendations: []string{},
-		AnalyzedAt:    time.Now(),
+		AnalyzedAt:      time.Now(),
 	}, nil
 }
 

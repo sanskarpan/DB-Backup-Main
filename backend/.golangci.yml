@@ -86,6 +86,11 @@ linters-settings:
 
   govet:
     enable-all: true
+    disable:
+      # fieldalignment is a memory micro-optimization that reorders struct
+      # fields; it fights positional struct literals across this codebase and
+      # is not part of go vet's defaults. Keep every other govet analyzer.
+      - fieldalignment
 
   gocyclo:
     min-complexity: 15
@@ -113,6 +118,11 @@ linters-settings:
 
   misspell:
     locale: US
+    ignore-words:
+      # MITRE (as in the MITRE ATT&CK framework) is a proper noun, not a
+      # misspelling of "miter".
+      - MITRE
+      - mitre
 
   nolintlint:
     require-explanation: true

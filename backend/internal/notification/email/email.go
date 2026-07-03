@@ -13,20 +13,20 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// EmailNotifier implements email notifications via SMTP
+// EmailNotifier implements email notifications via SMTP.
 type EmailNotifier struct {
-	smtpHost     string
-	smtpPort     int
-	username     string
-	password     string
-	from         string
-	to           []string
-	useTLS       bool
-	useHTML      bool
-	auth         smtp.Auth
+	smtpHost string
+	smtpPort int
+	username string
+	password string
+	from     string
+	to       []string
+	useTLS   bool
+	useHTML  bool
+	auth     smtp.Auth
 }
 
-// Config holds email notifier configuration
+// Config holds email notifier configuration.
 type Config struct {
 	SMTPHost string
 	SMTPPort int
@@ -38,7 +38,7 @@ type Config struct {
 	UseHTML  bool
 }
 
-// NewEmailNotifier creates a new email notifier
+// NewEmailNotifier creates a new email notifier.
 func NewEmailNotifier(cfg *Config) (*EmailNotifier, error) {
 	if cfg.SMTPHost == "" {
 		return nil, pkgErrors.New(pkgErrors.ErrorTypeConfiguration, "SMTP host is required")
@@ -71,7 +71,7 @@ func NewEmailNotifier(cfg *Config) (*EmailNotifier, error) {
 	}, nil
 }
 
-// Send sends an email notification
+// Send sends an email notification.
 func (e *EmailNotifier) Send(ctx context.Context, notif *notification.Notification) error {
 	var body string
 	var err error
@@ -100,12 +100,12 @@ func (e *EmailNotifier) Send(ctx context.Context, notif *notification.Notificati
 	return nil
 }
 
-// GetType returns the provider type
+// GetType returns the provider type.
 func (e *EmailNotifier) GetType() notification.ProviderType {
 	return notification.ProviderTypeEmail
 }
 
-// ValidateConfig validates the configuration
+// ValidateConfig validates the configuration.
 func (e *EmailNotifier) ValidateConfig() error {
 	if e.smtpHost == "" {
 		return pkgErrors.New(pkgErrors.ErrorTypeConfiguration, "SMTP host is required")
@@ -119,7 +119,7 @@ func (e *EmailNotifier) ValidateConfig() error {
 	return nil
 }
 
-// buildMessage builds the complete email message with headers
+// buildMessage builds the complete email message with headers.
 func (e *EmailNotifier) buildMessage(subject, body string) string {
 	var buf bytes.Buffer
 
@@ -140,7 +140,7 @@ func (e *EmailNotifier) buildMessage(subject, body string) string {
 	return buf.String()
 }
 
-// buildTextBody builds a plain text email body
+// buildTextBody builds a plain text email body.
 func (e *EmailNotifier) buildTextBody(notif *notification.Notification) string {
 	var buf bytes.Buffer
 
@@ -167,7 +167,7 @@ func (e *EmailNotifier) buildTextBody(notif *notification.Notification) string {
 	return buf.String()
 }
 
-// buildHTMLBody builds an HTML email body
+// buildHTMLBody builds an HTML email body.
 func (e *EmailNotifier) buildHTMLBody(notif *notification.Notification) (string, error) {
 	tmpl := `
 <!DOCTYPE html>
@@ -249,7 +249,7 @@ func (e *EmailNotifier) buildHTMLBody(notif *notification.Notification) (string,
 	return buf.String(), nil
 }
 
-// getLevelColor returns the color for a notification level
+// getLevelColor returns the color for a notification level.
 func (e *EmailNotifier) getLevelColor(level notification.NotificationLevel) string {
 	switch level {
 	case notification.LevelSuccess:

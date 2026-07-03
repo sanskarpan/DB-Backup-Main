@@ -43,7 +43,7 @@ func TestPatternEngine_WannaCryDetection(t *testing.T) {
 		// Create file with WannaCry signature
 		filePath := filepath.Join(tempDir, "document.pdf")
 		content := []byte("PDF header here... WANACRY! ...encrypted content...")
-		require.NoError(t, os.WriteFile(filePath, content, 0644))
+		require.NoError(t, os.WriteFile(filePath, content, 0o644))
 
 		match, err := engine.ScanFile(filePath)
 		require.NoError(t, err)
@@ -56,7 +56,7 @@ func TestPatternEngine_WannaCryDetection(t *testing.T) {
 	t.Run("detect WannaCry by extension", func(t *testing.T) {
 		filePath := filepath.Join(tempDir, "document.pdf.WNCRY")
 		content := []byte("encrypted content here")
-		require.NoError(t, os.WriteFile(filePath, content, 0644))
+		require.NoError(t, os.WriteFile(filePath, content, 0o644))
 
 		match, err := engine.ScanFile(filePath)
 		require.NoError(t, err)
@@ -68,7 +68,7 @@ func TestPatternEngine_WannaCryDetection(t *testing.T) {
 	t.Run("detect WannaCry ransom note", func(t *testing.T) {
 		filePath := filepath.Join(tempDir, "@Please_Read_Me@.txt")
 		content := []byte("Ooops, your important files are encrypted...")
-		require.NoError(t, os.WriteFile(filePath, content, 0644))
+		require.NoError(t, os.WriteFile(filePath, content, 0o644))
 
 		match, err := engine.ScanFile(filePath)
 		require.NoError(t, err)
@@ -84,7 +84,7 @@ func TestPatternEngine_LockBitDetection(t *testing.T) {
 	t.Run("detect LockBit by signature", func(t *testing.T) {
 		filePath := filepath.Join(tempDir, "database.sql")
 		content := []byte("database content... LockBit encrypted marker...")
-		require.NoError(t, os.WriteFile(filePath, content, 0644))
+		require.NoError(t, os.WriteFile(filePath, content, 0o644))
 
 		match, err := engine.ScanFile(filePath)
 		require.NoError(t, err)
@@ -96,7 +96,7 @@ func TestPatternEngine_LockBitDetection(t *testing.T) {
 	t.Run("detect LockBit by extension", func(t *testing.T) {
 		filePath := filepath.Join(tempDir, "important.xlsx.lockbit")
 		content := []byte("encrypted spreadsheet")
-		require.NoError(t, os.WriteFile(filePath, content, 0644))
+		require.NoError(t, os.WriteFile(filePath, content, 0o644))
 
 		match, err := engine.ScanFile(filePath)
 		require.NoError(t, err)
@@ -112,7 +112,7 @@ func TestPatternEngine_RyukDetection(t *testing.T) {
 	t.Run("detect Ryuk by signature", func(t *testing.T) {
 		filePath := filepath.Join(tempDir, "backup.tar.gz")
 		content := []byte("tar archive header here... RYUK encrypted marker present...")
-		require.NoError(t, os.WriteFile(filePath, content, 0644))
+		require.NoError(t, os.WriteFile(filePath, content, 0o644))
 
 		match, err := engine.ScanFile(filePath)
 		require.NoError(t, err)
@@ -125,7 +125,7 @@ func TestPatternEngine_RyukDetection(t *testing.T) {
 	t.Run("detect Ryuk ransom note", func(t *testing.T) {
 		filePath := filepath.Join(tempDir, "RyukReadMe.txt")
 		content := []byte("Gentlemen! Your business is at serious risk...")
-		require.NoError(t, os.WriteFile(filePath, content, 0644))
+		require.NoError(t, os.WriteFile(filePath, content, 0o644))
 
 		match, err := engine.ScanFile(filePath)
 		require.NoError(t, err)
@@ -141,7 +141,7 @@ func TestPatternEngine_BlackCatDetection(t *testing.T) {
 	t.Run("detect BlackCat/ALPHV", func(t *testing.T) {
 		filePath := filepath.Join(tempDir, "data.db")
 		content := []byte("database... ALPHV encrypted...")
-		require.NoError(t, os.WriteFile(filePath, content, 0644))
+		require.NoError(t, os.WriteFile(filePath, content, 0o644))
 
 		match, err := engine.ScanFile(filePath)
 		require.NoError(t, err)
@@ -159,7 +159,7 @@ func TestPatternEngine_ContiDetection(t *testing.T) {
 	t.Run("detect Conti ransomware", func(t *testing.T) {
 		filePath := filepath.Join(tempDir, "file.CONTI")
 		content := []byte("encrypted by conti")
-		require.NoError(t, os.WriteFile(filePath, content, 0644))
+		require.NoError(t, os.WriteFile(filePath, content, 0o644))
 
 		match, err := engine.ScanFile(filePath)
 		require.NoError(t, err)
@@ -175,7 +175,7 @@ func TestPatternEngine_GenericEncryptedFiles(t *testing.T) {
 	t.Run("detect generic encrypted extension", func(t *testing.T) {
 		filePath := filepath.Join(tempDir, "document.pdf.encrypted")
 		content := []byte("some encrypted content")
-		require.NoError(t, os.WriteFile(filePath, content, 0644))
+		require.NoError(t, os.WriteFile(filePath, content, 0o644))
 
 		match, err := engine.ScanFile(filePath)
 		require.NoError(t, err)
@@ -186,7 +186,7 @@ func TestPatternEngine_GenericEncryptedFiles(t *testing.T) {
 	t.Run("detect generic .locked extension", func(t *testing.T) {
 		filePath := filepath.Join(tempDir, "photo.jpg.locked")
 		content := []byte("encrypted image")
-		require.NoError(t, os.WriteFile(filePath, content, 0644))
+		require.NoError(t, os.WriteFile(filePath, content, 0o644))
 
 		match, err := engine.ScanFile(filePath)
 		require.NoError(t, err)
@@ -218,7 +218,7 @@ func TestPatternEngine_MultipleRansomwareFamilies(t *testing.T) {
 	for _, family := range families {
 		t.Run(family.name, func(t *testing.T) {
 			filePath := filepath.Join(tempDir, family.filename)
-			require.NoError(t, os.WriteFile(filePath, []byte(family.content), 0644))
+			require.NoError(t, os.WriteFile(filePath, []byte(family.content), 0o644))
 
 			match, err := engine.ScanFile(filePath)
 			require.NoError(t, err)
@@ -241,7 +241,7 @@ func TestPatternEngine_FuzzyMatching(t *testing.T) {
 		// Signature with some bytes different (simulating corruption or variant)
 		filePath := filepath.Join(tempDir, "file.dat")
 		content := []byte("some data... WANXCRY! ...encrypted...")
-		require.NoError(t, os.WriteFile(filePath, content, 0644))
+		require.NoError(t, os.WriteFile(filePath, content, 0o644))
 
 		match, err := engine.ScanFile(filePath)
 		require.NoError(t, err)
@@ -267,7 +267,7 @@ func TestPatternEngine_ScanDirectory(t *testing.T) {
 
 	for filename, content := range ransomNotes {
 		filePath := filepath.Join(tempDir, filename)
-		require.NoError(t, os.WriteFile(filePath, []byte(content), 0644))
+		require.NoError(t, os.WriteFile(filePath, []byte(content), 0o644))
 	}
 
 	indicators, err := engine.ScanDirectory(tempDir)
@@ -356,7 +356,7 @@ func TestPatternEngine_EdgeCases(t *testing.T) {
 
 	t.Run("empty file", func(t *testing.T) {
 		filePath := filepath.Join(tempDir, "empty.txt")
-		require.NoError(t, os.WriteFile(filePath, []byte{}, 0644))
+		require.NoError(t, os.WriteFile(filePath, []byte{}, 0o644))
 
 		match, err := engine.ScanFile(filePath)
 		require.NoError(t, err)
@@ -368,7 +368,7 @@ func TestPatternEngine_EdgeCases(t *testing.T) {
 		// Create 5MB file with signature near end
 		data := make([]byte, 5*1024*1024)
 		copy(data[len(data)-100:], []byte("RYUK"))
-		require.NoError(t, os.WriteFile(filePath, data, 0644))
+		require.NoError(t, os.WriteFile(filePath, data, 0o644))
 
 		match, err := engine.ScanFile(filePath)
 		require.NoError(t, err)
@@ -387,7 +387,7 @@ func TestPatternEngine_EdgeCases(t *testing.T) {
 	t.Run("clean file no threats", func(t *testing.T) {
 		filePath := filepath.Join(tempDir, "normal.txt")
 		content := []byte("This is a normal text file with no ransomware signatures")
-		require.NoError(t, os.WriteFile(filePath, content, 0644))
+		require.NoError(t, os.WriteFile(filePath, content, 0o644))
 
 		match, err := engine.ScanFile(filePath)
 		require.NoError(t, err)
@@ -505,7 +505,7 @@ func TestPatternEngine_ConcurrentScanning(t *testing.T) {
 
 	for _, filename := range files {
 		filePath := filepath.Join(tempDir, filename)
-		require.NoError(t, os.WriteFile(filePath, []byte("test content"), 0644))
+		require.NoError(t, os.WriteFile(filePath, []byte("test content"), 0o644))
 	}
 
 	// Scan concurrently
@@ -533,7 +533,7 @@ func TestPatternEngine_Integration_WithDetector(t *testing.T) {
 	t.Run("detector uses pattern engine for WannaCry", func(t *testing.T) {
 		filePath := filepath.Join(tempDir, "document.WNCRY")
 		content := []byte("WANACRY! encrypted content here")
-		require.NoError(t, os.WriteFile(filePath, content, 0644))
+		require.NoError(t, os.WriteFile(filePath, content, 0o644))
 
 		ctx := context.Background()
 		report, err := detector.ScanFile(ctx, filePath)
@@ -556,7 +556,7 @@ func BenchmarkPatternEngine_ScanFile(b *testing.B) {
 	filePath := filepath.Join(tempDir, "test.encrypted")
 	content := make([]byte, 1024*1024) // 1MB
 	copy(content[500:], []byte("RYUK encrypted"))
-	require.NoError(b, os.WriteFile(filePath, content, 0644))
+	require.NoError(b, os.WriteFile(filePath, content, 0o644))
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -573,7 +573,7 @@ func BenchmarkPatternEngine_MultipleScans(b *testing.B) {
 	for i := 0; i < 10; i++ {
 		filePath := filepath.Join(tempDir, fmt.Sprintf("file%d.encrypted", i))
 		content := []byte("encrypted content")
-		require.NoError(b, os.WriteFile(filePath, content, 0644))
+		require.NoError(b, os.WriteFile(filePath, content, 0o644))
 		files[i] = filePath
 	}
 

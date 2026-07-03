@@ -10,7 +10,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// AllowedOrigins should be configured via environment or config file
+// AllowedOrigins should be configured via environment or config file.
 var AllowedOrigins = []string{
 	"http://localhost:3000",
 	"http://localhost:8080",
@@ -26,32 +26,32 @@ var upgrader = websocket.Upgrader{
 			// Allow requests with no origin (e.g., mobile apps, curl)
 			return true
 		}
-		
+
 		// Check against whitelist
 		for _, allowed := range AllowedOrigins {
 			if strings.HasPrefix(origin, allowed) {
 				return true
 			}
 		}
-		
+
 		log.Printf("WebSocket: Rejected origin: %s", origin)
 		return false
 	},
 }
 
-// Handler handles WebSocket upgrade requests
+// Handler handles WebSocket upgrade requests.
 type Handler struct {
 	hub *Hub
 }
 
-// NewHandler creates a new WebSocket handler
+// NewHandler creates a new WebSocket handler.
 func NewHandler(hub *Hub) *Handler {
 	return &Handler{
 		hub: hub,
 	}
 }
 
-// ServeHTTP handles the WebSocket upgrade
+// ServeHTTP handles the WebSocket upgrade.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Extract user ID from context (set by authentication middleware)
 	userID := getUserIDFromRequest(r)
@@ -95,7 +95,7 @@ func (h *Handler) ServeWithUserID(w http.ResponseWriter, r *http.Request, userID
 	go client.ReadPump()
 }
 
-// getUserIDFromRequest extracts user ID from the request context
+// getUserIDFromRequest extracts user ID from the request context.
 func getUserIDFromRequest(r *http.Request) string {
 	// Try to get user ID from context (set by auth middleware)
 	if userID := r.Context().Value("user_id"); userID != nil {
@@ -113,7 +113,7 @@ func getUserIDFromRequest(r *http.Request) string {
 	return "anonymous"
 }
 
-// generateClientID generates a cryptographically secure unique client ID
+// generateClientID generates a cryptographically secure unique client ID.
 func generateClientID() string {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {

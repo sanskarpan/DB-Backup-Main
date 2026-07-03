@@ -16,13 +16,13 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
-// ElasticsearchClient wraps the Elasticsearch client with custom functionality
+// ElasticsearchClient wraps the Elasticsearch client with custom functionality.
 type ElasticsearchClient struct {
 	client *elasticsearch.Client
 	config *ElasticsearchConfig
 }
 
-// ElasticsearchConfig holds configuration for Elasticsearch connection
+// ElasticsearchConfig holds configuration for Elasticsearch connection.
 type ElasticsearchConfig struct {
 	// Addresses is the list of Elasticsearch nodes
 	Addresses []string
@@ -55,7 +55,7 @@ type ElasticsearchConfig struct {
 	IndexPrefix string
 }
 
-// DefaultElasticsearchConfig returns a default configuration
+// DefaultElasticsearchConfig returns a default configuration.
 func DefaultElasticsearchConfig() *ElasticsearchConfig {
 	return &ElasticsearchConfig{
 		Addresses:   []string{"http://localhost:9200"},
@@ -65,7 +65,7 @@ func DefaultElasticsearchConfig() *ElasticsearchConfig {
 	}
 }
 
-// NewElasticsearchClient creates a new Elasticsearch client
+// NewElasticsearchClient creates a new Elasticsearch client.
 func NewElasticsearchClient(config *ElasticsearchConfig) (*ElasticsearchClient, error) {
 	if config == nil {
 		config = DefaultElasticsearchConfig()
@@ -103,7 +103,7 @@ func NewElasticsearchClient(config *ElasticsearchConfig) (*ElasticsearchClient, 
 	}, nil
 }
 
-// Ping checks if Elasticsearch is reachable
+// Ping checks if Elasticsearch is reachable.
 func (es *ElasticsearchClient) Ping(ctx context.Context) error {
 	res, err := es.client.Ping(
 		es.client.Ping.WithContext(ctx),
@@ -120,7 +120,7 @@ func (es *ElasticsearchClient) Ping(ctx context.Context) error {
 	return nil
 }
 
-// CreateIndex creates a new index with the given mapping
+// CreateIndex creates a new index with the given mapping.
 func (es *ElasticsearchClient) CreateIndex(ctx context.Context, indexName string, mapping map[string]interface{}) error {
 	// Add prefix to index name
 	fullIndexName := es.getIndexName(indexName)
@@ -169,7 +169,7 @@ func (es *ElasticsearchClient) CreateIndex(ctx context.Context, indexName string
 	return nil
 }
 
-// IndexExists checks if an index exists
+// IndexExists checks if an index exists.
 func (es *ElasticsearchClient) IndexExists(ctx context.Context, indexName string) (bool, error) {
 	fullIndexName := es.getIndexName(indexName)
 
@@ -186,7 +186,7 @@ func (es *ElasticsearchClient) IndexExists(ctx context.Context, indexName string
 	return res.StatusCode == 200, nil
 }
 
-// DeleteIndex deletes an index
+// DeleteIndex deletes an index.
 func (es *ElasticsearchClient) DeleteIndex(ctx context.Context, indexName string) error {
 	fullIndexName := es.getIndexName(indexName)
 
@@ -208,7 +208,7 @@ func (es *ElasticsearchClient) DeleteIndex(ctx context.Context, indexName string
 	return nil
 }
 
-// IndexDocument indexes a document
+// IndexDocument indexes a document.
 func (es *ElasticsearchClient) IndexDocument(ctx context.Context, indexName, documentID string, document interface{}) error {
 	fullIndexName := es.getIndexName(indexName)
 
@@ -238,7 +238,7 @@ func (es *ElasticsearchClient) IndexDocument(ctx context.Context, indexName, doc
 	return nil
 }
 
-// BulkIndex indexes multiple documents in a single request
+// BulkIndex indexes multiple documents in a single request.
 func (es *ElasticsearchClient) BulkIndex(ctx context.Context, indexName string, documents []BulkDocument) error {
 	if len(documents) == 0 {
 		return nil
@@ -303,7 +303,7 @@ func (es *ElasticsearchClient) BulkIndex(ctx context.Context, indexName string, 
 	return nil
 }
 
-// GetDocument retrieves a document by ID
+// GetDocument retrieves a document by ID.
 func (es *ElasticsearchClient) GetDocument(ctx context.Context, indexName, documentID string) (map[string]interface{}, error) {
 	fullIndexName := es.getIndexName(indexName)
 
@@ -334,7 +334,7 @@ func (es *ElasticsearchClient) GetDocument(ctx context.Context, indexName, docum
 	return response.Source, nil
 }
 
-// DeleteDocument deletes a document by ID
+// DeleteDocument deletes a document by ID.
 func (es *ElasticsearchClient) DeleteDocument(ctx context.Context, indexName, documentID string) error {
 	fullIndexName := es.getIndexName(indexName)
 
@@ -358,7 +358,7 @@ func (es *ElasticsearchClient) DeleteDocument(ctx context.Context, indexName, do
 	return nil
 }
 
-// Search performs a search query
+// Search performs a search query.
 func (es *ElasticsearchClient) Search(ctx context.Context, indexName string, query map[string]interface{}) (*SearchResponse, error) {
 	fullIndexName := es.getIndexName(indexName)
 
@@ -391,7 +391,7 @@ func (es *ElasticsearchClient) Search(ctx context.Context, indexName string, que
 	return &response, nil
 }
 
-// Count returns the number of documents matching a query
+// Count returns the number of documents matching a query.
 func (es *ElasticsearchClient) Count(ctx context.Context, indexName string, query map[string]interface{}) (int64, error) {
 	fullIndexName := es.getIndexName(indexName)
 
@@ -424,7 +424,7 @@ func (es *ElasticsearchClient) Count(ctx context.Context, indexName string, quer
 	return response.Count, nil
 }
 
-// Refresh refreshes the index to make recent changes visible
+// Refresh refreshes the index to make recent changes visible.
 func (es *ElasticsearchClient) Refresh(ctx context.Context, indexName string) error {
 	fullIndexName := es.getIndexName(indexName)
 
@@ -446,7 +446,7 @@ func (es *ElasticsearchClient) Refresh(ctx context.Context, indexName string) er
 	return nil
 }
 
-// getIndexName returns the full index name with prefix
+// getIndexName returns the full index name with prefix.
 func (es *ElasticsearchClient) getIndexName(indexName string) string {
 	if es.config.IndexPrefix == "" {
 		return indexName
@@ -454,13 +454,13 @@ func (es *ElasticsearchClient) getIndexName(indexName string) string {
 	return fmt.Sprintf("%s-%s", es.config.IndexPrefix, indexName)
 }
 
-// BulkDocument represents a document to be bulk indexed
+// BulkDocument represents a document to be bulk indexed.
 type BulkDocument struct {
 	ID       string
 	Document interface{}
 }
 
-// BulkResponse represents the response from a bulk request
+// BulkResponse represents the response from a bulk request.
 type BulkResponse struct {
 	Errors bool `json:"errors"`
 	Items  []struct {
@@ -475,13 +475,13 @@ type BulkResponse struct {
 	} `json:"items"`
 }
 
-// GetResponse represents the response from a get request
+// GetResponse represents the response from a get request.
 type GetResponse struct {
 	Found  bool                   `json:"found"`
 	Source map[string]interface{} `json:"_source"`
 }
 
-// SearchResponse represents the response from a search request
+// SearchResponse represents the response from a search request.
 type SearchResponse struct {
 	Took     int  `json:"took"`
 	TimedOut bool `json:"timed_out"`
@@ -501,12 +501,12 @@ type SearchResponse struct {
 	Aggregations map[string]interface{} `json:"aggregations,omitempty"`
 }
 
-// CountResponse represents the response from a count request
+// CountResponse represents the response from a count request.
 type CountResponse struct {
 	Count int64 `json:"count"`
 }
 
-// GetHits returns the search hits as a slice of documents
+// GetHits returns the search hits as a slice of documents.
 func (sr *SearchResponse) GetHits() []map[string]interface{} {
 	results := make([]map[string]interface{}, len(sr.Hits.Hits))
 	for i, hit := range sr.Hits.Hits {
@@ -519,12 +519,12 @@ func (sr *SearchResponse) GetHits() []map[string]interface{} {
 	return results
 }
 
-// GetTotal returns the total number of matching documents
+// GetTotal returns the total number of matching documents.
 func (sr *SearchResponse) GetTotal() int64 {
 	return sr.Hits.Total.Value
 }
 
-// IsEmpty returns true if no results were found
+// IsEmpty returns true if no results were found.
 func (sr *SearchResponse) IsEmpty() bool {
 	return len(sr.Hits.Hits) == 0
 }

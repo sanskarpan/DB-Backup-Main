@@ -7,13 +7,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/models"
-	"github.com/sanskarpan/db-backup/internal/repository"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
+
+	"github.com/sanskarpan/db-backup/internal/models"
+	"github.com/sanskarpan/db-backup/internal/repository"
 )
 
-// ListOptions holds options for the list command
+// ListOptions holds options for the list command.
 type ListOptions struct {
 	Database string
 	Type     string
@@ -27,7 +28,7 @@ type ListOptions struct {
 	Order    string
 }
 
-// listCmd represents the list command
+// listCmd represents the list command.
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List available backups",
@@ -169,7 +170,8 @@ func printTable(backups []*models.BackupMetadata) error {
 	fmt.Println("────────────────────────────────────────────────────────────────────────────────────────────────────────────────")
 
 	for _, b := range backups {
-		fmt.Printf("%-38s %-14s %-10s %-11s %-21s %s\n",
+		fmt.Printf(
+			"%-38s %-14s %-10s %-11s %-21s %s\n",
 			truncate(b.ID, 38),
 			truncate(b.Database, 14),
 			string(b.DatabaseType),

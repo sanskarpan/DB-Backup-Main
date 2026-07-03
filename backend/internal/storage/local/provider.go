@@ -12,15 +12,15 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// LocalProvider implements local filesystem storage
+// LocalProvider implements local filesystem storage.
 type LocalProvider struct {
 	config *storage.LocalConfig
 }
 
-// NewLocalProvider creates a new local storage provider
+// NewLocalProvider creates a new local storage provider.
 func NewLocalProvider(config *storage.LocalConfig) (*LocalProvider, error) {
 	// Ensure storage directory exists
-	if err := os.MkdirAll(config.Path, 0755); err != nil {
+	if err := os.MkdirAll(config.Path, 0o755); err != nil {
 		return nil, pkgErrors.ErrStorageUpload(err)
 	}
 
@@ -29,7 +29,7 @@ func NewLocalProvider(config *storage.LocalConfig) (*LocalProvider, error) {
 	}, nil
 }
 
-// Upload uploads a file to local storage
+// Upload uploads a file to local storage.
 func (p *LocalProvider) Upload(ctx context.Context, localPath, remotePath string, opts *storage.UploadOptions) error {
 	// Open source file
 	srcFile, err := os.Open(localPath)
@@ -49,7 +49,7 @@ func (p *LocalProvider) Upload(ctx context.Context, localPath, remotePath string
 
 	// Ensure destination directory exists
 	destDir := filepath.Dir(destPath)
-	if err := os.MkdirAll(destDir, 0755); err != nil {
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return pkgErrors.ErrStorageUpload(err)
 	}
 
@@ -79,13 +79,13 @@ func (p *LocalProvider) Upload(ctx context.Context, localPath, remotePath string
 	return nil
 }
 
-// UploadStream uploads data from a reader to local storage
+// UploadStream uploads data from a reader to local storage.
 func (p *LocalProvider) UploadStream(ctx context.Context, reader io.Reader, remotePath string, opts *storage.UploadOptions) error {
 	destPath := filepath.Join(p.config.Path, remotePath)
 
 	// Ensure destination directory exists
 	destDir := filepath.Dir(destPath)
-	if err := os.MkdirAll(destDir, 0755); err != nil {
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return pkgErrors.ErrStorageUpload(err)
 	}
 
@@ -105,7 +105,7 @@ func (p *LocalProvider) UploadStream(ctx context.Context, reader io.Reader, remo
 	return nil
 }
 
-// Download downloads a file from local storage
+// Download downloads a file from local storage.
 func (p *LocalProvider) Download(ctx context.Context, remotePath, localPath string) error {
 	srcPath := filepath.Join(p.config.Path, remotePath)
 
@@ -118,7 +118,7 @@ func (p *LocalProvider) Download(ctx context.Context, remotePath, localPath stri
 
 	// Ensure local directory exists
 	localDir := filepath.Dir(localPath)
-	if err := os.MkdirAll(localDir, 0755); err != nil {
+	if err := os.MkdirAll(localDir, 0o755); err != nil {
 		return pkgErrors.ErrStorageDownload(err)
 	}
 
@@ -138,7 +138,7 @@ func (p *LocalProvider) Download(ctx context.Context, remotePath, localPath stri
 	return nil
 }
 
-// DownloadStream downloads data to a reader
+// DownloadStream downloads data to a reader.
 func (p *LocalProvider) DownloadStream(ctx context.Context, remotePath string) (io.ReadCloser, error) {
 	srcPath := filepath.Join(p.config.Path, remotePath)
 
@@ -150,7 +150,7 @@ func (p *LocalProvider) DownloadStream(ctx context.Context, remotePath string) (
 	return file, nil
 }
 
-// Delete deletes a file from local storage
+// Delete deletes a file from local storage.
 func (p *LocalProvider) Delete(ctx context.Context, remotePath string) error {
 	filePath := filepath.Join(p.config.Path, remotePath)
 
@@ -161,7 +161,7 @@ func (p *LocalProvider) Delete(ctx context.Context, remotePath string) error {
 	return nil
 }
 
-// Exists checks if a file exists in local storage
+// Exists checks if a file exists in local storage.
 func (p *LocalProvider) Exists(ctx context.Context, remotePath string) (bool, error) {
 	filePath := filepath.Join(p.config.Path, remotePath)
 
@@ -177,7 +177,7 @@ func (p *LocalProvider) Exists(ctx context.Context, remotePath string) (bool, er
 	return false, err
 }
 
-// GetMetadata retrieves file metadata
+// GetMetadata retrieves file metadata.
 func (p *LocalProvider) GetMetadata(ctx context.Context, remotePath string) (*storage.FileMetadata, error) {
 	filePath := filepath.Join(p.config.Path, remotePath)
 
@@ -197,7 +197,7 @@ func (p *LocalProvider) GetMetadata(ctx context.Context, remotePath string) (*st
 	return metadata, nil
 }
 
-// List lists files with a given prefix
+// List lists files with a given prefix.
 func (p *LocalProvider) List(ctx context.Context, prefix string) ([]*storage.FileMetadata, error) {
 	searchPath := filepath.Join(p.config.Path, prefix)
 
@@ -236,26 +236,26 @@ func (p *LocalProvider) List(ctx context.Context, prefix string) ([]*storage.Fil
 	return files, nil
 }
 
-// GetType returns the provider type
+// GetType returns the provider type.
 func (p *LocalProvider) GetType() storage.ProviderType {
 	return storage.ProviderTypeLocal
 }
 
-// ValidateConfig validates the provider configuration
+// ValidateConfig validates the provider configuration.
 func (p *LocalProvider) ValidateConfig() error {
 	if p.config.Path == "" {
 		return fmt.Errorf("local storage path is required")
 	}
 
 	// Try to create directory if it doesn't exist
-	if err := os.MkdirAll(p.config.Path, 0755); err != nil {
+	if err := os.MkdirAll(p.config.Path, 0o755); err != nil {
 		return fmt.Errorf("failed to create storage directory: %w", err)
 	}
 
 	return nil
 }
 
-// progressReader wraps a reader to track progress
+// progressReader wraps a reader to track progress.
 type progressReader struct {
 	reader   io.Reader
 	total    int64

@@ -23,7 +23,7 @@ import (
 
 const backupScheduleFinalizer = "backup.db.sanskarpan.com/finalizer"
 
-// BackupScheduleReconciler reconciles a BackupSchedule object
+// BackupScheduleReconciler reconciles a BackupSchedule object.
 type BackupScheduleReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
@@ -35,7 +35,7 @@ type BackupScheduleReconciler struct {
 // +kubebuilder:rbac:groups=backup.db.sanskarpan.com,resources=backuppolicies,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 
-// Reconcile is the main reconciliation loop
+// Reconcile is the main reconciliation loop.
 func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
@@ -173,7 +173,7 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
-// reconcileDelete handles schedule deletion
+// reconcileDelete handles schedule deletion.
 func (r *BackupScheduleReconciler) reconcileDelete(ctx context.Context, schedule *backupv1.BackupSchedule) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
@@ -235,7 +235,7 @@ func (r *BackupScheduleReconciler) reconcileDelete(ctx context.Context, schedule
 	return ctrl.Result{}, nil
 }
 
-// validateSchedule validates the schedule configuration
+// validateSchedule validates the schedule configuration.
 func (r *BackupScheduleReconciler) validateSchedule(schedule *backupv1.BackupSchedule) error {
 	// Validate cron schedule
 	if _, err := cron.ParseStandard(schedule.Spec.Schedule); err != nil {
@@ -260,7 +260,7 @@ func (r *BackupScheduleReconciler) validateSchedule(schedule *backupv1.BackupSch
 	return nil
 }
 
-// getBackupPolicy retrieves the referenced BackupPolicy
+// getBackupPolicy retrieves the referenced BackupPolicy.
 func (r *BackupScheduleReconciler) getBackupPolicy(ctx context.Context, schedule *backupv1.BackupSchedule) (*backupv1.BackupPolicy, error) {
 	policy := &backupv1.BackupPolicy{}
 	namespace := schedule.Spec.BackupPolicyRef.Namespace
@@ -272,7 +272,6 @@ func (r *BackupScheduleReconciler) getBackupPolicy(ctx context.Context, schedule
 		Name:      schedule.Spec.BackupPolicyRef.Name,
 		Namespace: namespace,
 	}, policy)
-
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +279,7 @@ func (r *BackupScheduleReconciler) getBackupPolicy(ctx context.Context, schedule
 	return policy, nil
 }
 
-// calculateNextScheduleTime calculates the next scheduled time
+// calculateNextScheduleTime calculates the next scheduled time.
 func (r *BackupScheduleReconciler) calculateNextScheduleTime(schedule *backupv1.BackupSchedule) (time.Time, error) {
 	cronSchedule, err := cron.ParseStandard(schedule.Spec.Schedule)
 	if err != nil {
@@ -299,7 +298,7 @@ func (r *BackupScheduleReconciler) calculateNextScheduleTime(schedule *backupv1.
 	return nextTime, nil
 }
 
-// isInMaintenanceWindow checks if current time is within maintenance window
+// isInMaintenanceWindow checks if current time is within maintenance window.
 func (r *BackupScheduleReconciler) isInMaintenanceWindow(schedule *backupv1.BackupSchedule, now time.Time) bool {
 	if schedule.Spec.MaintenanceWindow == nil {
 		return true // No maintenance window defined, always allowed
@@ -338,7 +337,7 @@ func (r *BackupScheduleReconciler) isInMaintenanceWindow(schedule *backupv1.Back
 	return true
 }
 
-// canRunBackup checks if a backup can run based on concurrency policy
+// canRunBackup checks if a backup can run based on concurrency policy.
 func (r *BackupScheduleReconciler) canRunBackup(schedule *backupv1.BackupSchedule) bool {
 	concurrencyPolicy := schedule.Spec.ConcurrencyPolicy
 	if concurrencyPolicy == "" {
@@ -390,7 +389,7 @@ func (r *BackupScheduleReconciler) canRunBackup(schedule *backupv1.BackupSchedul
 	return false
 }
 
-// triggerBackup triggers a new backup job
+// triggerBackup triggers a new backup job.
 func (r *BackupScheduleReconciler) triggerBackup(ctx context.Context, schedule *backupv1.BackupSchedule, policy *backupv1.BackupPolicy) error {
 	log := log.FromContext(ctx)
 	log.Info("Triggering backup", "schedule", schedule.Name, "policy", policy.Name)
@@ -411,7 +410,8 @@ func (r *BackupScheduleReconciler) triggerBackup(ctx context.Context, schedule *
 
 	// Add storage configuration if specified
 	if policy.Spec.Storage != nil {
-		args = append(args,
+		args = append(
+			args,
 			"--storage-provider", policy.Spec.Storage.Provider,
 			"--storage-path", policy.Spec.Storage.Path,
 		)
@@ -464,10 +464,10 @@ func (r *BackupScheduleReconciler) triggerBackup(ctx context.Context, schedule *
 
 	// Build pod labels
 	labels := map[string]string{
-		"app":                                  "db-backup",
-		"component":                            "backup",
-		"backup-schedule":                      schedule.Name,
-		"backup-policy":                        policy.Name,
+		"app":                                 "db-backup",
+		"component":                           "backup",
+		"backup-schedule":                     schedule.Name,
+		"backup-policy":                       policy.Name,
 		"backup.db.sanskarpan.com/managed-by": "backup-operator",
 	}
 
@@ -516,7 +516,7 @@ func (r *BackupScheduleReconciler) triggerBackup(ctx context.Context, schedule *
 	}
 
 	// Create backup job
-	backoffLimit := int32(3) // Default retry limit
+	backoffLimit := int32(3)   // Default retry limit
 	ttlSeconds := int32(86400) // 24 hours TTL
 
 	job := &batchv1.Job{
@@ -570,7 +570,7 @@ func (r *BackupScheduleReconciler) triggerBackup(ctx context.Context, schedule *
 	return nil
 }
 
-// cleanupOldJobs removes old job history based on limits
+// cleanupOldJobs removes old job history based on limits.
 func (r *BackupScheduleReconciler) cleanupOldJobs(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 	logger := log.FromContext(ctx)
 
@@ -603,7 +603,7 @@ func (r *BackupScheduleReconciler) cleanupOldJobs(ctx context.Context, schedule 
 	// Clean up old successful jobs
 	successLimit := 3 // Default
 	if schedule.Spec.SuccessfulJobsHistoryLimit != nil {
-		successLimit = int(*schedule.Spec.SuccessfulJobsHistoryLimit)
+		successLimit = *schedule.Spec.SuccessfulJobsHistoryLimit
 	}
 	if err := r.cleanupJobsOverLimit(ctx, successfulJobs, successLimit); err != nil {
 		logger.Error(err, "Failed to cleanup old successful jobs")
@@ -612,7 +612,7 @@ func (r *BackupScheduleReconciler) cleanupOldJobs(ctx context.Context, schedule 
 	// Clean up old failed jobs
 	failedLimit := 1 // Default
 	if schedule.Spec.FailedJobsHistoryLimit != nil {
-		failedLimit = int(*schedule.Spec.FailedJobsHistoryLimit)
+		failedLimit = *schedule.Spec.FailedJobsHistoryLimit
 	}
 	if err := r.cleanupJobsOverLimit(ctx, failedJobs, failedLimit); err != nil {
 		logger.Error(err, "Failed to cleanup old failed jobs")
@@ -679,7 +679,7 @@ func getJobCompletionTime(job *batchv1.Job) *metav1.Time {
 	return job.Status.StartTime
 }
 
-// updateCondition updates a condition in the schedule status
+// updateCondition updates a condition in the schedule status.
 func (r *BackupScheduleReconciler) updateCondition(schedule *backupv1.BackupSchedule, conditionType string, status metav1.ConditionStatus, reason, message string) {
 	condition := metav1.Condition{
 		Type:               conditionType,
@@ -707,7 +707,7 @@ func (r *BackupScheduleReconciler) updateCondition(schedule *backupv1.BackupSche
 	}
 }
 
-// SetupWithManager sets up the controller with the Manager
+// SetupWithManager sets up the controller with the Manager.
 func (r *BackupScheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&backupv1.BackupSchedule{}).

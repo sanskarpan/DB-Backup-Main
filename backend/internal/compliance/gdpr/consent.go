@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// ConsentPurpose defines the purpose for which consent is given
+// ConsentPurpose defines the purpose for which consent is given.
 type ConsentPurpose string
 
 const (
@@ -19,50 +19,50 @@ const (
 	PurposeThirdPartySharing ConsentPurpose = "third_party_sharing"
 )
 
-// ConsentStatus represents the status of consent
+// ConsentStatus represents the status of consent.
 type ConsentStatus string
 
 const (
-	ConsentStatusGranted  ConsentStatus = "granted"
-	ConsentStatusRevoked  ConsentStatus = "revoked"
-	ConsentStatusExpired  ConsentStatus = "expired"
-	ConsentStatusPending  ConsentStatus = "pending"
+	ConsentStatusGranted ConsentStatus = "granted"
+	ConsentStatusRevoked ConsentStatus = "revoked"
+	ConsentStatusExpired ConsentStatus = "expired"
+	ConsentStatusPending ConsentStatus = "pending"
 )
 
-// Consent represents a user's consent for data processing
+// Consent represents a user's consent for data processing.
 type Consent struct {
-	ID            string           `json:"id"`
-	UserID        string           `json:"user_id"`
-	Purpose       ConsentPurpose   `json:"purpose"`
-	Status        ConsentStatus    `json:"status"`
-	GrantedAt     time.Time        `json:"granted_at"`
-	RevokedAt     *time.Time       `json:"revoked_at,omitempty"`
-	ExpiresAt     *time.Time       `json:"expires_at,omitempty"`
-	LegalBasis    string           `json:"legal_basis"`
-	IPAddress     string           `json:"ip_address"`
-	UserAgent     string           `json:"user_agent"`
-	ConsentMethod string           `json:"consent_method"` // web, api, cli, etc.
-	Version       string           `json:"version"`        // consent policy version
+	ID            string                 `json:"id"`
+	UserID        string                 `json:"user_id"`
+	Purpose       ConsentPurpose         `json:"purpose"`
+	Status        ConsentStatus          `json:"status"`
+	GrantedAt     time.Time              `json:"granted_at"`
+	RevokedAt     *time.Time             `json:"revoked_at,omitempty"`
+	ExpiresAt     *time.Time             `json:"expires_at,omitempty"`
+	LegalBasis    string                 `json:"legal_basis"`
+	IPAddress     string                 `json:"ip_address"`
+	UserAgent     string                 `json:"user_agent"`
+	ConsentMethod string                 `json:"consent_method"` // web, api, cli, etc.
+	Version       string                 `json:"version"`        // consent policy version
 	Metadata      map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// ConsentRecord stores the history of consent changes
+// ConsentRecord stores the history of consent changes.
 type ConsentRecord struct {
-	ID          string        `json:"id"`
-	ConsentID   string        `json:"consent_id"`
-	Action      string        `json:"action"` // granted, revoked, updated
-	Timestamp   time.Time     `json:"timestamp"`
-	PreviousState string      `json:"previous_state"`
-	NewState    string        `json:"new_state"`
-	Reason      string        `json:"reason,omitempty"`
+	ID            string    `json:"id"`
+	ConsentID     string    `json:"consent_id"`
+	Action        string    `json:"action"` // granted, revoked, updated
+	Timestamp     time.Time `json:"timestamp"`
+	PreviousState string    `json:"previous_state"`
+	NewState      string    `json:"new_state"`
+	Reason        string    `json:"reason,omitempty"`
 }
 
-// ConsentManager manages user consent for GDPR compliance
+// ConsentManager manages user consent for GDPR compliance.
 type ConsentManager struct {
 	store ConsentStore
 }
 
-// ConsentStore defines the interface for storing consent records
+// ConsentStore defines the interface for storing consent records.
 type ConsentStore interface {
 	Save(ctx context.Context, consent *Consent) error
 	Get(ctx context.Context, consentID string) (*Consent, error)
@@ -74,14 +74,14 @@ type ConsentStore interface {
 	GetRecords(ctx context.Context, consentID string) ([]*ConsentRecord, error)
 }
 
-// NewConsentManager creates a new consent manager
+// NewConsentManager creates a new consent manager.
 func NewConsentManager(store ConsentStore) *ConsentManager {
 	return &ConsentManager{
 		store: store,
 	}
 }
 
-// GrantConsent records user consent for a specific purpose
+// GrantConsent records user consent for a specific purpose.
 func (cm *ConsentManager) GrantConsent(ctx context.Context, userID string, purpose ConsentPurpose, legalBasis, ipAddress, userAgent, method, version string, expiresIn *time.Duration) (*Consent, error) {
 	if userID == "" {
 		return nil, errors.New("user ID is required")
@@ -135,7 +135,7 @@ func (cm *ConsentManager) GrantConsent(ctx context.Context, userID string, purpo
 	return consent, nil
 }
 
-// RevokeConsent revokes user consent
+// RevokeConsent revokes user consent.
 func (cm *ConsentManager) RevokeConsent(ctx context.Context, consentID, reason string) error {
 	consent, err := cm.store.Get(ctx, consentID)
 	if err != nil {
@@ -171,7 +171,7 @@ func (cm *ConsentManager) RevokeConsent(ctx context.Context, consentID, reason s
 	return nil
 }
 
-// CheckConsent verifies if user has valid consent for a purpose
+// CheckConsent verifies if user has valid consent for a purpose.
 func (cm *ConsentManager) CheckConsent(ctx context.Context, userID string, purpose ConsentPurpose) (bool, error) {
 	consent, err := cm.store.GetByUserIDAndPurpose(ctx, userID, purpose)
 	if err != nil {
@@ -198,22 +198,22 @@ func (cm *ConsentManager) CheckConsent(ctx context.Context, userID string, purpo
 	return true, nil
 }
 
-// GetConsent retrieves a consent record
+// GetConsent retrieves a consent record.
 func (cm *ConsentManager) GetConsent(ctx context.Context, consentID string) (*Consent, error) {
 	return cm.store.Get(ctx, consentID)
 }
 
-// GetUserConsents retrieves all consent records for a user
+// GetUserConsents retrieves all consent records for a user.
 func (cm *ConsentManager) GetUserConsents(ctx context.Context, userID string) ([]*Consent, error) {
 	return cm.store.GetByUserID(ctx, userID)
 }
 
-// GetConsentHistory retrieves the history of consent changes
+// GetConsentHistory retrieves the history of consent changes.
 func (cm *ConsentManager) GetConsentHistory(ctx context.Context, consentID string) ([]*ConsentRecord, error) {
 	return cm.store.GetRecords(ctx, consentID)
 }
 
-// ExportUserConsents exports all user consents as JSON (for data portability)
+// ExportUserConsents exports all user consents as JSON (for data portability).
 func (cm *ConsentManager) ExportUserConsents(ctx context.Context, userID string) ([]byte, error) {
 	consents, err := cm.store.GetByUserID(ctx, userID)
 	if err != nil {
@@ -230,7 +230,7 @@ func (cm *ConsentManager) ExportUserConsents(ctx context.Context, userID string)
 	return json.MarshalIndent(data, "", "  ")
 }
 
-// ValidateConsent checks if a consent is still valid
+// ValidateConsent checks if a consent is still valid.
 func (cm *ConsentManager) ValidateConsent(consent *Consent) (bool, string) {
 	if consent.Status != ConsentStatusGranted {
 		return false, "consent not granted"
@@ -247,7 +247,7 @@ func (cm *ConsentManager) ValidateConsent(consent *Consent) (bool, string) {
 	return true, ""
 }
 
-// generateID generates a unique ID for consent records
+// generateID generates a unique ID for consent records.
 func generateID() string {
 	return time.Now().Format("20060102150405") + "-" + randomString(8)
 }

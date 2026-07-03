@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
 	"github.com/sanskarpan/db-backup/internal/config"
 	"github.com/sanskarpan/db-backup/internal/logger"
 )
@@ -18,7 +19,7 @@ var (
 	verbose bool
 )
 
-// rootCmd represents the base command when called without any subcommands
+// rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
 	Use:   "db-backup",
 	Short: "Enterprise-grade database backup and restore utility",
@@ -83,24 +84,24 @@ func init() {
 	viper.BindPFlag("logging.file.path", rootCmd.PersistentFlags().Lookup("log-file"))
 }
 
-// initConfig reads in config file and ENV variables if set
+// initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	}
 }
 
-// GetConfig returns the loaded configuration
+// GetConfig returns the loaded configuration.
 func GetConfig() *config.Config {
 	return cfg
 }
 
-// GetLogger returns the logger instance
+// GetLogger returns the logger instance.
 func GetLogger() *logger.Logger {
 	return log
 }
 
-// GetVersion returns version information
+// GetVersion returns version information.
 func GetVersion() string {
 	// These will be set during build using ldflags
 	var (

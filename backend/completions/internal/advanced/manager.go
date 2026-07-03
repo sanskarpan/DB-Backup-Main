@@ -14,7 +14,7 @@ import (
 	"github.com/sanskarpan/db-backup/completions/internal/templates"
 )
 
-// CompletionRequest represents a completion request
+// CompletionRequest represents a completion request.
 type CompletionRequest struct {
 	Command      string
 	Args         []string
@@ -24,7 +24,7 @@ type CompletionRequest struct {
 	ShellHistory []string
 }
 
-// CompletionResponse represents a completion response
+// CompletionResponse represents a completion response.
 type CompletionResponse struct {
 	Suggestions  []string
 	Preview      string
@@ -33,7 +33,7 @@ type CompletionResponse struct {
 	Metadata     map[string]interface{}
 }
 
-// AdvancedManager integrates all advanced completion features
+// AdvancedManager integrates all advanced completion features.
 type AdvancedManager struct {
 	cache     *cache.MultiLevelCache
 	fuzzy     *fuzzy.Matcher
@@ -45,7 +45,7 @@ type AdvancedManager struct {
 	baseDir   string
 }
 
-// NewAdvancedManager creates a new advanced completion manager
+// NewAdvancedManager creates a new advanced completion manager.
 func NewAdvancedManager(baseDir string) *AdvancedManager {
 	return &AdvancedManager{
 		cache:     cache.NewMultiLevelCache(filepath.Join(baseDir, "cache"), 5*time.Minute),
@@ -59,7 +59,7 @@ func NewAdvancedManager(baseDir string) *AdvancedManager {
 	}
 }
 
-// Initialize initializes all components
+// Initialize initializes all components.
 func (am *AdvancedManager) Initialize() error {
 	if err := am.history.Load(); err != nil {
 		return fmt.Errorf("failed to load history: %w", err)
@@ -84,7 +84,7 @@ func (am *AdvancedManager) Initialize() error {
 	return nil
 }
 
-// GetCompletions returns intelligent completions
+// GetCompletions returns intelligent completions.
 func (am *AdvancedManager) GetCompletions(req *CompletionRequest) *CompletionResponse {
 	startTime := time.Now()
 
@@ -184,7 +184,7 @@ func (am *AdvancedManager) GetCompletions(req *CompletionRequest) *CompletionRes
 	return response
 }
 
-// GetPreview returns a preview of what a command will do
+// GetPreview returns a preview of what a command will do.
 func (am *AdvancedManager) GetPreview(command string, args []string) string {
 	// Check if it's a template
 	for _, arg := range args {
@@ -209,7 +209,7 @@ func (am *AdvancedManager) GetPreview(command string, args []string) string {
 	return ""
 }
 
-// RecordExecution records a command execution for learning
+// RecordExecution records a command execution for learning.
 func (am *AdvancedManager) RecordExecution(command string, args []string, context map[string]string, execTime float64) {
 	// Record in history
 	am.history.Record(command, args)
@@ -224,7 +224,7 @@ func (am *AdvancedManager) RecordExecution(command string, args []string, contex
 	}()
 }
 
-// GetStats returns comprehensive statistics
+// GetStats returns comprehensive statistics.
 func (am *AdvancedManager) GetStats() map[string]interface{} {
 	return map[string]interface{}{
 		"cache":     am.cache.Stats(),
@@ -236,26 +236,26 @@ func (am *AdvancedManager) GetStats() map[string]interface{} {
 	}
 }
 
-// ExportProfile exports completion profile
+// ExportProfile exports completion profile.
 func (am *AdvancedManager) ExportProfile(outputPath string) error {
 	// Export all data structures
 	// Implementation would export history, learning, templates, plugins config
 	return fmt.Errorf("not implemented")
 }
 
-// ImportProfile imports completion profile
+// ImportProfile imports completion profile.
 func (am *AdvancedManager) ImportProfile(inputPath string) error {
 	// Import data structures
 	// Implementation would import and merge history, learning, templates, plugins
 	return fmt.Errorf("not implemented")
 }
 
-// buildCacheKey builds a cache key from request
+// buildCacheKey builds a cache key from request.
 func (am *AdvancedManager) buildCacheKey(req *CompletionRequest) string {
 	return fmt.Sprintf("%s:%s:%s", req.Command, req.CurrentWord, req.PrevWord)
 }
 
-// trackCompletion tracks a completion event
+// trackCompletion tracks a completion event.
 func (am *AdvancedManager) trackCompletion(req *CompletionRequest, suggestions []string, source string, responseTime float64, accepted bool) {
 	event := &analytics.CompletionEvent{
 		Command:      req.Command,

@@ -11,11 +11,11 @@ import (
 
 func TestNewEngine(t *testing.T) {
 	config := Config{
-		WorkerCount:       5,
-		QueueSize:         100,
-		MaxRetries:     3,
-		RetryDelay:        time.Second,
-		DataDir:           "/tmp/notifications_test",
+		WorkerCount: 5,
+		QueueSize:   100,
+		MaxRetries:  3,
+		RetryDelay:  time.Second,
+		DataDir:     "/tmp/notifications_test",
 	}
 
 	engine, err := NewEngine(&config)
@@ -35,10 +35,10 @@ func TestEngineSendNotification(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	config := Config{
-		WorkerCount:   2,
-		QueueSize:     10,
-		MaxRetries: 1,
-		DataDir:       tmpDir,
+		WorkerCount: 2,
+		QueueSize:   10,
+		MaxRetries:  1,
+		DataDir:     tmpDir,
 	}
 
 	engine, err := NewEngine(&config)
@@ -200,8 +200,8 @@ func TestEngineSendFromTemplate(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	config := Config{
-		DataDir:    tmpDir,
-		QueueSize:  10,
+		DataDir:   tmpDir,
+		QueueSize: 10,
 	}
 
 	engine, err := NewEngine(&config)
@@ -209,13 +209,13 @@ func TestEngineSendFromTemplate(t *testing.T) {
 
 	// Add template
 	template := &NotificationTemplate{
-		ID:       "template-002",
-		Name:     "Test Template",
-		Type:     TypeBackupCompleted,
-		Title:    "Hello ${name}",
-		Message:  "Your backup ${backup_id} is complete",
-		Priority: PriorityNormal,
-		Channels: []DeliveryChannel{ChannelInApp},
+		ID:        "template-002",
+		Name:      "Test Template",
+		Type:      TypeBackupCompleted,
+		Title:     "Hello ${name}",
+		Message:   "Your backup ${backup_id} is complete",
+		Priority:  PriorityNormal,
+		Channels:  []DeliveryChannel{ChannelInApp},
 		Variables: []string{"name", "backup_id"},
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
@@ -354,9 +354,9 @@ func BenchmarkEngineSend(b *testing.B) {
 	defer os.RemoveAll(tmpDir)
 
 	config := Config{
-		WorkerCount:   5,
-		QueueSize:     10000,
-		DataDir:       tmpDir,
+		WorkerCount: 5,
+		QueueSize:   10000,
+		DataDir:     tmpDir,
 	}
 
 	engine, err := NewEngine(&config)

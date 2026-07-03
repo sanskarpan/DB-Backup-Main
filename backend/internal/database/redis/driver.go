@@ -12,12 +12,13 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+
 	"github.com/sanskarpan/db-backup/internal/database"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 	"github.com/sanskarpan/db-backup/pkg/utils"
 )
 
-// RedisDriver implements the database.Driver interface for Redis
+// RedisDriver implements the database.Driver interface for Redis.
 type RedisDriver struct {
 	client      *redis.Client
 	config      *database.ConnectionConfig
@@ -31,12 +32,12 @@ func init() {
 	})
 }
 
-// NewRedisDriver creates a new Redis driver instance
+// NewRedisDriver creates a new Redis driver instance.
 func NewRedisDriver() *RedisDriver {
 	return &RedisDriver{}
 }
 
-// Connect establishes a connection to the Redis database
+// Connect establishes a connection to the Redis database.
 func (d *RedisDriver) Connect(ctx context.Context, config *database.ConnectionConfig) error {
 	// Convert database string to int for Redis
 	dbNum := 0
@@ -80,7 +81,7 @@ func (d *RedisDriver) Connect(ctx context.Context, config *database.ConnectionCo
 	return nil
 }
 
-// Disconnect closes the database connection
+// Disconnect closes the database connection.
 func (d *RedisDriver) Disconnect() error {
 	if d.client != nil {
 		return d.client.Close()
@@ -88,7 +89,7 @@ func (d *RedisDriver) Disconnect() error {
 	return nil
 }
 
-// Ping tests the database connection
+// Ping tests the database connection.
 func (d *RedisDriver) Ping(ctx context.Context) error {
 	if d.client == nil {
 		return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "not connected to database")
@@ -96,7 +97,7 @@ func (d *RedisDriver) Ping(ctx context.Context) error {
 	return d.client.Ping(ctx).Err()
 }
 
-// Backup creates a backup of the Redis database
+// Backup creates a backup of the Redis database.
 func (d *RedisDriver) Backup(ctx context.Context, opts *database.BackupOptions) (*database.BackupResult, error) {
 	result := &database.BackupResult{
 		ID:        utils.GenerateBackupID(),
@@ -139,7 +140,7 @@ func (d *RedisDriver) Backup(ctx context.Context, opts *database.BackupOptions) 
 	return result, nil
 }
 
-// backupRDB creates an RDB snapshot backup
+// backupRDB creates an RDB snapshot backup.
 func (d *RedisDriver) backupRDB(ctx context.Context, opts *database.BackupOptions, result *database.BackupResult) error {
 	// Trigger BGSAVE to create RDB snapshot
 	if err := d.client.BgSave(ctx).Err(); err != nil {
@@ -192,7 +193,7 @@ func (d *RedisDriver) backupRDB(ctx context.Context, opts *database.BackupOption
 	return nil
 }
 
-// backupAOF backs up the Append-Only File
+// backupAOF backs up the Append-Only File.
 func (d *RedisDriver) backupAOF(ctx context.Context, opts *database.BackupOptions, result *database.BackupResult) error {
 	// Get AOF file location
 	configDir, err := d.client.ConfigGet(ctx, "dir").Result()
@@ -244,7 +245,7 @@ func (d *RedisDriver) backupAOF(ctx context.Context, opts *database.BackupOption
 	return nil
 }
 
-// Restore restores the Redis database from a backup
+// Restore restores the Redis database from a backup.
 func (d *RedisDriver) Restore(ctx context.Context, opts *database.RestoreOptions) (*database.RestoreResult, error) {
 	result := &database.RestoreResult{
 		ID:        utils.GenerateRestoreID(),
@@ -280,7 +281,7 @@ func (d *RedisDriver) Restore(ctx context.Context, opts *database.RestoreOptions
 	return result, nil
 }
 
-// restoreRDB restores from an RDB snapshot
+// restoreRDB restores from an RDB snapshot.
 func (d *RedisDriver) restoreRDB(ctx context.Context, opts *database.RestoreOptions, result *database.RestoreResult) error {
 	// Get Redis data directory
 	configDir, err := d.client.ConfigGet(ctx, "dir").Result()
@@ -328,7 +329,7 @@ func (d *RedisDriver) restoreRDB(ctx context.Context, opts *database.RestoreOpti
 	return nil
 }
 
-// restoreAOF restores from an AOF file
+// restoreAOF restores from an AOF file.
 func (d *RedisDriver) restoreAOF(ctx context.Context, opts *database.RestoreOptions, result *database.RestoreResult) error {
 	// Get AOF directory
 	configDir, err := d.client.ConfigGet(ctx, "dir").Result()
@@ -370,7 +371,7 @@ func (d *RedisDriver) restoreAOF(ctx context.Context, opts *database.RestoreOpti
 	return nil
 }
 
-// GetDatabaseSize returns the total size of the database
+// GetDatabaseSize returns the total size of the database.
 func (d *RedisDriver) GetDatabaseSize(ctx context.Context) (int64, error) {
 	// Get memory usage
 	info, err := d.client.Info(ctx, "memory").Result()
@@ -394,7 +395,7 @@ func (d *RedisDriver) GetDatabaseSize(ctx context.Context) (int64, error) {
 	return 0, fmt.Errorf("could not determine database size")
 }
 
-// GetVersion returns the Redis server version
+// GetVersion returns the Redis server version.
 func (d *RedisDriver) GetVersion(ctx context.Context) (string, error) {
 	info, err := d.client.Info(ctx, "server").Result()
 	if err != nil {
@@ -414,22 +415,22 @@ func (d *RedisDriver) GetVersion(ctx context.Context) (string, error) {
 	return "unknown", nil
 }
 
-// GetBackupSize estimates the size of a backup
+// GetBackupSize estimates the size of a backup.
 func (d *RedisDriver) GetBackupSize(ctx context.Context, opts *database.BackupOptions) (int64, error) {
 	return d.GetDatabaseSize(ctx)
 }
 
-// StreamBackup streams a backup to the provided writer
+// StreamBackup streams a backup to the provided writer.
 func (d *RedisDriver) StreamBackup(ctx context.Context, opts *database.BackupOptions, writer io.Writer) error {
 	return fmt.Errorf("streaming backup not implemented for Redis")
 }
 
-// StreamRestore restores from a reader
+// StreamRestore restores from a reader.
 func (d *RedisDriver) StreamRestore(ctx context.Context, opts *database.RestoreOptions, reader io.Reader) error {
 	return fmt.Errorf("streaming restore not implemented for Redis")
 }
 
-// GetDatabases returns list of databases (Redis has numbered databases 0-15)
+// GetDatabases returns list of databases (Redis has numbered databases 0-15).
 func (d *RedisDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	// Redis typically has 16 databases (0-15)
 	databases := make([]string, 16)
@@ -439,23 +440,23 @@ func (d *RedisDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	return databases, nil
 }
 
-// GetTables returns list of key patterns (Redis doesn't have tables)
+// GetTables returns list of key patterns (Redis doesn't have tables).
 func (d *RedisDriver) GetTables(ctx context.Context, database string) ([]string, error) {
 	// Redis doesn't have tables, return empty list
 	return []string{}, nil
 }
 
-// GetTableSize returns the size of a table (not applicable for Redis)
+// GetTableSize returns the size of a table (not applicable for Redis).
 func (d *RedisDriver) GetTableSize(ctx context.Context, database, table string) (int64, error) {
 	return 0, fmt.Errorf("Redis does not have tables")
 }
 
-// GetType returns the database type
+// GetType returns the database type.
 func (d *RedisDriver) GetType() database.DatabaseType {
 	return "redis"
 }
 
-// SupportsIncremental returns whether incremental backups are supported
+// SupportsIncremental returns whether incremental backups are supported.
 func (d *RedisDriver) SupportsIncremental() bool {
 	return true // Redis supports incremental via AOF
 }
@@ -472,7 +473,7 @@ func (d *RedisDriver) SupportsPITR() bool {
 	return false
 }
 
-// ValidateRestore validates that a restore can be performed
+// ValidateRestore validates that a restore can be performed.
 func (d *RedisDriver) ValidateRestore(ctx context.Context, opts *database.RestoreOptions) error {
 	if opts.BackupPath == "" {
 		return fmt.Errorf("backup path is required")
@@ -483,7 +484,7 @@ func (d *RedisDriver) ValidateRestore(ctx context.Context, opts *database.Restor
 	return nil
 }
 
-// waitForBGSave waits for BGSAVE operation to complete
+// waitForBGSave waits for BGSAVE operation to complete.
 func (d *RedisDriver) waitForBGSave(ctx context.Context) error {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -510,7 +511,7 @@ func (d *RedisDriver) waitForBGSave(ctx context.Context) error {
 	}
 }
 
-// waitForAOFRewrite waits for AOF rewrite operation to complete
+// waitForAOFRewrite waits for AOF rewrite operation to complete.
 func (d *RedisDriver) waitForAOFRewrite(ctx context.Context) error {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -537,7 +538,7 @@ func (d *RedisDriver) waitForAOFRewrite(ctx context.Context) error {
 	}
 }
 
-// getRDBVersion gets the RDB format version
+// getRDBVersion gets the RDB format version.
 func (d *RedisDriver) getRDBVersion(ctx context.Context) string {
 	info, err := d.client.Info(ctx, "persistence").Result()
 	if err != nil {
@@ -554,7 +555,7 @@ func (d *RedisDriver) getRDBVersion(ctx context.Context) string {
 	return "unknown"
 }
 
-// copyFile copies a file from src to dst
+// copyFile copies a file from src to dst.
 func copyFile(src, dst string) error {
 	sourceFile, err := os.Open(src)
 	if err != nil {

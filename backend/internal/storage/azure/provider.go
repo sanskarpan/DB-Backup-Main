@@ -18,14 +18,14 @@ import (
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// AzureProvider implements Azure Blob Storage
+// AzureProvider implements Azure Blob Storage.
 type AzureProvider struct {
 	client    *azblob.Client
 	container *container.Client
 	config    *st.AzureConfig
 }
 
-// NewAzureProvider creates a new Azure storage provider
+// NewAzureProvider creates a new Azure storage provider.
 func NewAzureProvider(config *st.AzureConfig) (*AzureProvider, error) {
 	if config.Container == "" {
 		return nil, pkgErrors.New(pkgErrors.ErrorTypeConfiguration, "Azure container is required")
@@ -60,7 +60,7 @@ func NewAzureProvider(config *st.AzureConfig) (*AzureProvider, error) {
 	}, nil
 }
 
-// Upload uploads a file to Azure
+// Upload uploads a file to Azure.
 func (p *AzureProvider) Upload(ctx context.Context, localPath, remotePath string, opts *st.UploadOptions) error {
 	file, err := os.Open(localPath)
 	if err != nil {
@@ -85,7 +85,7 @@ func (p *AzureProvider) Upload(ctx context.Context, localPath, remotePath string
 	return p.UploadStream(ctx, reader, remotePath, opts)
 }
 
-// UploadStream uploads data from a reader to Azure
+// UploadStream uploads data from a reader to Azure.
 func (p *AzureProvider) UploadStream(ctx context.Context, reader io.Reader, remotePath string, opts *st.UploadOptions) error {
 	blobClient := p.container.NewBlockBlobClient(remotePath)
 
@@ -117,11 +117,11 @@ func (p *AzureProvider) UploadStream(ctx context.Context, reader io.Reader, remo
 	return nil
 }
 
-// Download downloads a file from Azure
+// Download downloads a file from Azure.
 func (p *AzureProvider) Download(ctx context.Context, remotePath, localPath string) error {
 	// Create directory if needed
 	dir := filepath.Dir(localPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return pkgErrors.Wrap(err, pkgErrors.ErrorTypeStorage, "failed to create local directory")
 	}
 
@@ -146,7 +146,7 @@ func (p *AzureProvider) Download(ctx context.Context, remotePath, localPath stri
 	return nil
 }
 
-// DownloadStream downloads data to a reader
+// DownloadStream downloads data to a reader.
 func (p *AzureProvider) DownloadStream(ctx context.Context, remotePath string) (io.ReadCloser, error) {
 	blobClient := p.container.NewBlobClient(remotePath)
 
@@ -161,7 +161,7 @@ func (p *AzureProvider) DownloadStream(ctx context.Context, remotePath string) (
 	return resp.Body, nil
 }
 
-// Delete deletes a file from Azure
+// Delete deletes a file from Azure.
 func (p *AzureProvider) Delete(ctx context.Context, remotePath string) error {
 	blobClient := p.container.NewBlobClient(remotePath)
 
@@ -176,7 +176,7 @@ func (p *AzureProvider) Delete(ctx context.Context, remotePath string) error {
 	return nil
 }
 
-// Exists checks if a file exists in Azure
+// Exists checks if a file exists in Azure.
 func (p *AzureProvider) Exists(ctx context.Context, remotePath string) (bool, error) {
 	blobClient := p.container.NewBlobClient(remotePath)
 
@@ -191,7 +191,7 @@ func (p *AzureProvider) Exists(ctx context.Context, remotePath string) (bool, er
 	return true, nil
 }
 
-// GetMetadata retrieves file metadata
+// GetMetadata retrieves file metadata.
 func (p *AzureProvider) GetMetadata(ctx context.Context, remotePath string) (*st.FileMetadata, error) {
 	blobClient := p.container.NewBlobClient(remotePath)
 
@@ -232,7 +232,7 @@ func (p *AzureProvider) GetMetadata(ctx context.Context, remotePath string) (*st
 	return metadata, nil
 }
 
-// List lists files with a given prefix
+// List lists files with a given prefix.
 func (p *AzureProvider) List(ctx context.Context, prefix string) ([]*st.FileMetadata, error) {
 	var files []*st.FileMetadata
 
@@ -272,16 +272,16 @@ func (p *AzureProvider) List(ctx context.Context, prefix string) ([]*st.FileMeta
 				}
 			}
 
-		// Convert metadata from map[string]*string to map[string]string
-		if item.Metadata != nil {
-			stringMetadata := make(map[string]string)
-			for k, v := range item.Metadata {
-				if v != nil {
-					stringMetadata[k] = *v
+			// Convert metadata from map[string]*string to map[string]string
+			if item.Metadata != nil {
+				stringMetadata := make(map[string]string)
+				for k, v := range item.Metadata {
+					if v != nil {
+						stringMetadata[k] = *v
+					}
 				}
+				metadata.Metadata = stringMetadata
 			}
-			metadata.Metadata = stringMetadata
-		}
 
 			files = append(files, metadata)
 		}
@@ -290,12 +290,12 @@ func (p *AzureProvider) List(ctx context.Context, prefix string) ([]*st.FileMeta
 	return files, nil
 }
 
-// GetType returns the provider type
+// GetType returns the provider type.
 func (p *AzureProvider) GetType() st.ProviderType {
 	return st.ProviderTypeAzure
 }
 
-// ValidateConfig validates the provider configuration
+// ValidateConfig validates the provider configuration.
 func (p *AzureProvider) ValidateConfig() error {
 	if p.config.Container == "" {
 		return pkgErrors.New(pkgErrors.ErrorTypeConfiguration, "Azure container is required")
@@ -309,7 +309,7 @@ func (p *AzureProvider) ValidateConfig() error {
 	return nil
 }
 
-// progressReader wraps a reader to track progress
+// progressReader wraps a reader to track progress.
 type progressReader struct {
 	reader   io.Reader
 	total    int64

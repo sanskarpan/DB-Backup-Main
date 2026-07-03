@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Mock uploader for testing
+// Mock uploader for testing.
 type mockUploader struct {
 	shouldFail bool
 	delay      time.Duration
@@ -39,7 +39,7 @@ func (m *mockUploader) Verify(ctx context.Context, destination *BackupDestinatio
 	return nil
 }
 
-// Mock downloader for testing
+// Mock downloader for testing.
 type mockDownloader struct {
 	shouldFail bool
 }
@@ -135,14 +135,14 @@ func TestExecuteBackup(t *testing.T) {
 
 	// Create backup job
 	job := &BackupJob{
-		ID:           "job-001",
-		DatabaseName: "test-db",
-		BackupData:   []byte("test backup data"),
-		Metadata:     map[string]interface{}{"test": "metadata"},
-		Destinations: []*BackupDestination{awsDest, azureDest},
-		RequireAll:   false,
+		ID:            "job-001",
+		DatabaseName:  "test-db",
+		BackupData:    []byte("test backup data"),
+		Metadata:      map[string]interface{}{"test": "metadata"},
+		Destinations:  []*BackupDestination{awsDest, azureDest},
+		RequireAll:    false,
 		MinSuccessful: 1,
-		CreatedAt:    time.Now(),
+		CreatedAt:     time.Now(),
 	}
 
 	// Execute backup

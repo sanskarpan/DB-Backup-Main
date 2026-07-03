@@ -11,23 +11,23 @@ import (
 
 // ==================== Smart Features Manager ====================
 
-// SmartFeaturesManager coordinates all AI-powered intelligent features
+// SmartFeaturesManager coordinates all AI-powered intelligent features.
 type SmartFeaturesManager struct {
-	predictiveScheduler  *PredictiveScheduler
-	qualityScorer        *BackupQualityScorer
-	sizeEstimator        *BackupSizeEstimator
-	autoCategorizer      *AutoCategorizer
-	duplicateDetector    *DuplicateDetector
-	nlpSearchEngine      *NLPSearchEngine
-	retentionPolicyGen   *SmartRetentionPolicyGenerator
-	aiAdvisor            *AIAdvisor
+	predictiveScheduler   *PredictiveScheduler
+	qualityScorer         *BackupQualityScorer
+	sizeEstimator         *BackupSizeEstimator
+	autoCategorizer       *AutoCategorizer
+	duplicateDetector     *DuplicateDetector
+	nlpSearchEngine       *NLPSearchEngine
+	retentionPolicyGen    *SmartRetentionPolicyGenerator
+	aiAdvisor             *AIAdvisor
 	troubleshootingEngine *AutomatedTroubleshootingEngine
-	failurePredictorAPI  *FailurePredictionAPI
+	failurePredictorAPI   *FailurePredictionAPI
 
 	mu sync.RWMutex
 }
 
-// NewSmartFeaturesManager creates a new smart features manager
+// NewSmartFeaturesManager creates a new smart features manager.
 func NewSmartFeaturesManager() *SmartFeaturesManager {
 	return &SmartFeaturesManager{
 		predictiveScheduler:   NewPredictiveScheduler(),
@@ -43,113 +43,113 @@ func NewSmartFeaturesManager() *SmartFeaturesManager {
 	}
 }
 
-// GetPredictiveScheduler returns the predictive scheduler
+// GetPredictiveScheduler returns the predictive scheduler.
 func (sfm *SmartFeaturesManager) GetPredictiveScheduler() *PredictiveScheduler {
 	return sfm.predictiveScheduler
 }
 
-// GetQualityScorer returns the quality scorer
+// GetQualityScorer returns the quality scorer.
 func (sfm *SmartFeaturesManager) GetQualityScorer() *BackupQualityScorer {
 	return sfm.qualityScorer
 }
 
-// GetSizeEstimator returns the size estimator
+// GetSizeEstimator returns the size estimator.
 func (sfm *SmartFeaturesManager) GetSizeEstimator() *BackupSizeEstimator {
 	return sfm.sizeEstimator
 }
 
-// GetAutoCategorizer returns the auto categorizer
+// GetAutoCategorizer returns the auto categorizer.
 func (sfm *SmartFeaturesManager) GetAutoCategorizer() *AutoCategorizer {
 	return sfm.autoCategorizer
 }
 
-// GetDuplicateDetector returns the duplicate detector
+// GetDuplicateDetector returns the duplicate detector.
 func (sfm *SmartFeaturesManager) GetDuplicateDetector() *DuplicateDetector {
 	return sfm.duplicateDetector
 }
 
-// GetNLPSearchEngine returns the NLP search engine
+// GetNLPSearchEngine returns the NLP search engine.
 func (sfm *SmartFeaturesManager) GetNLPSearchEngine() *NLPSearchEngine {
 	return sfm.nlpSearchEngine
 }
 
-// GetRetentionPolicyGenerator returns the retention policy generator
+// GetRetentionPolicyGenerator returns the retention policy generator.
 func (sfm *SmartFeaturesManager) GetRetentionPolicyGenerator() *SmartRetentionPolicyGenerator {
 	return sfm.retentionPolicyGen
 }
 
-// GetAIAdvisor returns the AI advisor
+// GetAIAdvisor returns the AI advisor.
 func (sfm *SmartFeaturesManager) GetAIAdvisor() *AIAdvisor {
 	return sfm.aiAdvisor
 }
 
-// GetTroubleshootingEngine returns the troubleshooting engine
+// GetTroubleshootingEngine returns the troubleshooting engine.
 func (sfm *SmartFeaturesManager) GetTroubleshootingEngine() *AutomatedTroubleshootingEngine {
 	return sfm.troubleshootingEngine
 }
 
-// GetFailurePredictorAPI returns the failure predictor API
+// GetFailurePredictorAPI returns the failure predictor API.
 func (sfm *SmartFeaturesManager) GetFailurePredictorAPI() *FailurePredictionAPI {
 	return sfm.failurePredictorAPI
 }
 
 // ==================== 1. ML-Based Predictive Scheduling ====================
 
-// PredictiveScheduler uses machine learning to predict optimal backup times
+// PredictiveScheduler uses machine learning to predict optimal backup times.
 type PredictiveScheduler struct {
-	historicalData  map[string][]*ScheduleDataPoint // database -> data points
-	models          map[string]*SchedulePredictionModel // database -> model
-	mu              sync.RWMutex
+	historicalData map[string][]*ScheduleDataPoint     // database -> data points
+	models         map[string]*SchedulePredictionModel // database -> model
+	mu             sync.RWMutex
 }
 
-// ScheduleDataPoint represents a historical backup execution
+// ScheduleDataPoint represents a historical backup execution.
 type ScheduleDataPoint struct {
-	Timestamp     time.Time
-	Hour          int
-	DayOfWeek     int
-	Duration      time.Duration
-	Size          int64
-	Success       bool
-	CPUUsage      float64
-	MemoryUsage   float64
-	SystemLoad    float64
+	Timestamp   time.Time
+	Hour        int
+	DayOfWeek   int
+	Duration    time.Duration
+	Size        int64
+	Success     bool
+	CPUUsage    float64
+	MemoryUsage float64
+	SystemLoad  float64
 }
 
-// SchedulePredictionModel contains the ML model for schedule prediction
+// SchedulePredictionModel contains the ML model for schedule prediction.
 type SchedulePredictionModel struct {
 	DatabaseName      string
-	OptimalHours      []int // Hours of day sorted by success rate
-	OptimalDaysOfWeek []int // Days of week sorted by success rate
-	HourlySuccessRate map[int]float64 // hour -> success rate
-	DailySuccessRate  map[int]float64 // day of week -> success rate
+	OptimalHours      []int                 // Hours of day sorted by success rate
+	OptimalDaysOfWeek []int                 // Days of week sorted by success rate
+	HourlySuccessRate map[int]float64       // hour -> success rate
+	DailySuccessRate  map[int]float64       // day of week -> success rate
 	AvgDuration       map[int]time.Duration // hour -> avg duration
-	AvgSystemLoad     map[int]float64 // hour -> avg system load
+	AvgSystemLoad     map[int]float64       // hour -> avg system load
 	TrainedAt         time.Time
 	SampleCount       int
 	Confidence        float64 // 0-100
 }
 
-// ScheduleRecommendation represents a recommended backup schedule
+// ScheduleRecommendation represents a recommended backup schedule.
 type ScheduleRecommendation struct {
-	DatabaseName       string
-	RecommendedTime    time.Time
-	CronExpression     string
-	Confidence         float64 // 0-100
-	ExpectedDuration   time.Duration
+	DatabaseName        string
+	RecommendedTime     time.Time
+	CronExpression      string
+	Confidence          float64 // 0-100
+	ExpectedDuration    time.Duration
 	ExpectedSuccessRate float64
-	Reasoning          []string
-	AlternativeTimes   []time.Time
-	OptimalWindow      TimeWindow
+	Reasoning           []string
+	AlternativeTimes    []time.Time
+	OptimalWindow       TimeWindow
 }
 
-// TimeWindow represents a time range
+// TimeWindow represents a time range.
 type TimeWindow struct {
 	Start time.Time
 	End   time.Time
 	Score float64
 }
 
-// NewPredictiveScheduler creates a new predictive scheduler
+// NewPredictiveScheduler creates a new predictive scheduler.
 func NewPredictiveScheduler() *PredictiveScheduler {
 	return &PredictiveScheduler{
 		historicalData: make(map[string][]*ScheduleDataPoint),
@@ -157,7 +157,7 @@ func NewPredictiveScheduler() *PredictiveScheduler {
 	}
 }
 
-// AddDataPoint adds a historical backup execution data point
+// AddDataPoint adds a historical backup execution data point.
 func (ps *PredictiveScheduler) AddDataPoint(database string, point *ScheduleDataPoint) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
@@ -174,7 +174,7 @@ func (ps *PredictiveScheduler) AddDataPoint(database string, point *ScheduleData
 	}
 }
 
-// TrainModel trains the prediction model for a database
+// TrainModel trains the prediction model for a database.
 func (ps *PredictiveScheduler) TrainModel(ctx context.Context, database string) (*SchedulePredictionModel, error) {
 	ps.mu.RLock()
 	data, exists := ps.historicalData[database]
@@ -292,7 +292,7 @@ type dayStats struct {
 	successCount int
 }
 
-// calculateConfidence calculates model confidence based on data quality
+// calculateConfidence calculates model confidence based on data quality.
 func (ps *PredictiveScheduler) calculateConfidence(sampleCount int, successRates map[int]float64) float64 {
 	// Base confidence from sample size (logarithmic scale)
 	sampleConfidence := math.Min(100.0, math.Log10(float64(sampleCount))*30)
@@ -320,7 +320,7 @@ func (ps *PredictiveScheduler) calculateConfidence(sampleCount int, successRates
 	return sampleConfidence*0.6 + varianceConfidence*0.4
 }
 
-// GetRecommendation generates a schedule recommendation for a database
+// GetRecommendation generates a schedule recommendation for a database.
 func (ps *PredictiveScheduler) GetRecommendation(ctx context.Context, database string) (*ScheduleRecommendation, error) {
 	ps.mu.RLock()
 	model, exists := ps.models[database]
@@ -394,12 +394,12 @@ func (ps *PredictiveScheduler) GetRecommendation(ctx context.Context, database s
 
 // ==================== 2. Backup Quality Scoring ====================
 
-// BackupQualityScorer calculates a comprehensive quality score (0-100) for backups
+// BackupQualityScorer calculates a comprehensive quality score (0-100) for backups.
 type BackupQualityScorer struct {
 	mu sync.RWMutex
 }
 
-// QualityScore represents a backup's quality assessment
+// QualityScore represents a backup's quality assessment.
 type QualityScore struct {
 	OverallScore    float64            // 0-100
 	ComponentScores map[string]float64 // Individual component scores
@@ -410,31 +410,31 @@ type QualityScore struct {
 	Metadata        map[string]interface{}
 }
 
-// BackupMetrics represents metrics for quality scoring
+// BackupMetrics represents metrics for quality scoring.
 type BackupMetrics struct {
-	DatabaseName    string
-	Size            int64
-	CompressedSize  int64
-	Duration        time.Duration
-	Success         bool
-	ErrorCount      int
-	ChecksumValid   bool
-	Encrypted       bool
+	DatabaseName     string
+	Size             int64
+	CompressedSize   int64
+	Duration         time.Duration
+	Success          bool
+	ErrorCount       int
+	ChecksumValid    bool
+	Encrypted        bool
 	CompressionRatio float64
-	Age             time.Duration
-	RedundancyLevel int // Number of copies/replicas
-	LastValidated   time.Time
-	RecoveryTested  bool
+	Age              time.Duration
+	RedundancyLevel  int // Number of copies/replicas
+	LastValidated    time.Time
+	RecoveryTested   bool
 	IncrementalChain int // Length of incremental chain
-	Metadata        map[string]interface{}
+	Metadata         map[string]interface{}
 }
 
-// NewBackupQualityScorer creates a new quality scorer
+// NewBackupQualityScorer creates a new quality scorer.
 func NewBackupQualityScorer() *BackupQualityScorer {
 	return &BackupQualityScorer{}
 }
 
-// CalculateScore calculates a comprehensive quality score for a backup
+// CalculateScore calculates a comprehensive quality score for a backup.
 func (bqs *BackupQualityScorer) CalculateScore(ctx context.Context, metrics *BackupMetrics) (*QualityScore, error) {
 	score := &QualityScore{
 		ComponentScores: make(map[string]float64),
@@ -484,7 +484,7 @@ func (bqs *BackupQualityScorer) CalculateScore(ctx context.Context, metrics *Bac
 	return score, nil
 }
 
-// scoreCompleteness evaluates backup completeness (25 points max)
+// scoreCompleteness evaluates backup completeness (25 points max).
 func (bqs *BackupQualityScorer) scoreCompleteness(metrics *BackupMetrics, score *QualityScore) float64 {
 	points := 25.0
 
@@ -510,7 +510,7 @@ func (bqs *BackupQualityScorer) scoreCompleteness(metrics *BackupMetrics, score 
 	return math.Max(0, points)
 }
 
-// scoreReliability evaluates backup reliability (25 points max)
+// scoreReliability evaluates backup reliability (25 points max).
 func (bqs *BackupQualityScorer) scoreReliability(metrics *BackupMetrics, score *QualityScore) float64 {
 	points := 25.0
 
@@ -541,7 +541,7 @@ func (bqs *BackupQualityScorer) scoreReliability(metrics *BackupMetrics, score *
 	return math.Max(0, points)
 }
 
-// scoreSecurity evaluates backup security (20 points max)
+// scoreSecurity evaluates backup security (20 points max).
 func (bqs *BackupQualityScorer) scoreSecurity(metrics *BackupMetrics, score *QualityScore) float64 {
 	points := 20.0
 
@@ -556,7 +556,7 @@ func (bqs *BackupQualityScorer) scoreSecurity(metrics *BackupMetrics, score *Qua
 	return math.Max(0, points)
 }
 
-// scoreEfficiency evaluates backup efficiency (15 points max)
+// scoreEfficiency evaluates backup efficiency (15 points max).
 func (bqs *BackupQualityScorer) scoreEfficiency(metrics *BackupMetrics, score *QualityScore) float64 {
 	points := 15.0
 
@@ -587,7 +587,7 @@ func (bqs *BackupQualityScorer) scoreEfficiency(metrics *BackupMetrics, score *Q
 	return math.Max(0, points)
 }
 
-// scoreFreshness evaluates backup freshness (10 points max)
+// scoreFreshness evaluates backup freshness (10 points max).
 func (bqs *BackupQualityScorer) scoreFreshness(metrics *BackupMetrics, score *QualityScore) float64 {
 	points := 10.0
 
@@ -611,7 +611,7 @@ func (bqs *BackupQualityScorer) scoreFreshness(metrics *BackupMetrics, score *Qu
 	return math.Max(0, points)
 }
 
-// scoreRedundancy evaluates backup redundancy (5 points max)
+// scoreRedundancy evaluates backup redundancy (5 points max).
 func (bqs *BackupQualityScorer) scoreRedundancy(metrics *BackupMetrics, score *QualityScore) float64 {
 	points := 5.0
 
@@ -630,7 +630,7 @@ func (bqs *BackupQualityScorer) scoreRedundancy(metrics *BackupMetrics, score *Q
 	return points
 }
 
-// assignGrade assigns a letter grade based on overall score
+// assignGrade assigns a letter grade based on overall score.
 func (bqs *BackupQualityScorer) assignGrade(score float64) string {
 	switch {
 	case score >= 97:
@@ -660,21 +660,21 @@ func (bqs *BackupQualityScorer) assignGrade(score float64) string {
 
 // ==================== 3. Backup Size Estimation ====================
 
-// BackupSizeEstimator predicts backup sizes using historical growth patterns
+// BackupSizeEstimator predicts backup sizes using historical growth patterns.
 type BackupSizeEstimator struct {
 	historicalSizes map[string][]SizeDataPoint // database -> size history
 	growthModels    map[string]*GrowthModel
 	mu              sync.RWMutex
 }
 
-// SizeDataPoint represents a historical size measurement
+// SizeDataPoint represents a historical size measurement.
 type SizeDataPoint struct {
 	Timestamp time.Time
 	Size      int64
 	Type      string // "full", "incremental", "differential"
 }
 
-// GrowthModel represents a linear growth model
+// GrowthModel represents a linear growth model.
 type GrowthModel struct {
 	DatabaseName     string
 	GrowthRatePerDay float64 // bytes per day
@@ -686,21 +686,21 @@ type GrowthModel struct {
 	TrainedAt        time.Time
 }
 
-// SizeEstimation represents an estimated backup size
+// SizeEstimation represents an estimated backup size.
 type SizeEstimation struct {
-	DatabaseName      string
-	EstimatedSize     int64
-	EstimatedSizeStr  string
-	Confidence        float64
-	EstimationMethod  string
-	GrowthRate        float64 // bytes/day
-	DaysProjected     int
-	LowerBound        int64
-	UpperBound        int64
-	Reasoning         []string
+	DatabaseName     string
+	EstimatedSize    int64
+	EstimatedSizeStr string
+	Confidence       float64
+	EstimationMethod string
+	GrowthRate       float64 // bytes/day
+	DaysProjected    int
+	LowerBound       int64
+	UpperBound       int64
+	Reasoning        []string
 }
 
-// NewBackupSizeEstimator creates a new size estimator
+// NewBackupSizeEstimator creates a new size estimator.
 func NewBackupSizeEstimator() *BackupSizeEstimator {
 	return &BackupSizeEstimator{
 		historicalSizes: make(map[string][]SizeDataPoint),
@@ -708,7 +708,7 @@ func NewBackupSizeEstimator() *BackupSizeEstimator {
 	}
 }
 
-// AddSizeDataPoint adds a historical size measurement
+// AddSizeDataPoint adds a historical size measurement.
 func (bse *BackupSizeEstimator) AddSizeDataPoint(database string, point SizeDataPoint) {
 	bse.mu.Lock()
 	defer bse.mu.Unlock()
@@ -725,7 +725,7 @@ func (bse *BackupSizeEstimator) AddSizeDataPoint(database string, point SizeData
 	}
 }
 
-// TrainGrowthModel trains a linear growth model for size prediction
+// TrainGrowthModel trains a linear growth model for size prediction.
 func (bse *BackupSizeEstimator) TrainGrowthModel(ctx context.Context, database string) (*GrowthModel, error) {
 	bse.mu.RLock()
 	data, exists := bse.historicalSizes[database]
@@ -803,7 +803,7 @@ func (bse *BackupSizeEstimator) TrainGrowthModel(ctx context.Context, database s
 	return model, nil
 }
 
-// EstimateSize estimates the backup size for a future date
+// EstimateSize estimates the backup size for a future date.
 func (bse *BackupSizeEstimator) EstimateSize(ctx context.Context, database string, targetDate time.Time) (*SizeEstimation, error) {
 	bse.mu.RLock()
 	model, exists := bse.growthModels[database]
@@ -840,22 +840,22 @@ func (bse *BackupSizeEstimator) EstimateSize(ctx context.Context, database strin
 	}
 
 	estimation := &SizeEstimation{
-		DatabaseName:      database,
-		EstimatedSize:     estimatedSize,
-		EstimatedSizeStr:  formatBytes(estimatedSize),
-		Confidence:        model.Confidence,
-		EstimationMethod:  "Linear Regression",
-		GrowthRate:        model.GrowthRatePerDay,
-		DaysProjected:     daysProjected,
-		LowerBound:        lowerBound,
-		UpperBound:        upperBound,
-		Reasoning:         reasoning,
+		DatabaseName:     database,
+		EstimatedSize:    estimatedSize,
+		EstimatedSizeStr: formatBytes(estimatedSize),
+		Confidence:       model.Confidence,
+		EstimationMethod: "Linear Regression",
+		GrowthRate:       model.GrowthRatePerDay,
+		DaysProjected:    daysProjected,
+		LowerBound:       lowerBound,
+		UpperBound:       upperBound,
+		Reasoning:        reasoning,
 	}
 
 	return estimation, nil
 }
 
-// formatBytes formats bytes to human-readable string
+// formatBytes formats bytes to human-readable string.
 func formatBytes(bytes int64) string {
 	const unit = 1024
 	if bytes < unit {

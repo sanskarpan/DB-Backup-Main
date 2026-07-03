@@ -11,12 +11,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// TemplateEngine manages webhook payload templates
+// TemplateEngine manages webhook payload templates.
 type TemplateEngine struct {
 	templates map[string]*template.Template
 }
 
-// NewTemplateEngine creates a new template engine
+// NewTemplateEngine creates a new template engine.
 func NewTemplateEngine() *TemplateEngine {
 	engine := &TemplateEngine{
 		templates: make(map[string]*template.Template),
@@ -28,7 +28,7 @@ func NewTemplateEngine() *TemplateEngine {
 	return engine
 }
 
-// registerBuiltInTemplates registers default templates
+// registerBuiltInTemplates registers default templates.
 func (e *TemplateEngine) registerBuiltInTemplates() {
 	// Default template - simple JSON event
 	defaultTemplate := `{
@@ -138,18 +138,18 @@ func (e *TemplateEngine) registerBuiltInTemplates() {
 	log.Info().Int("count", len(e.templates)).Msg("Registered built-in webhook templates")
 }
 
-// RegisterTemplate registers a new template
+// RegisterTemplate registers a new template.
 func (e *TemplateEngine) RegisterTemplate(name, templateStr string) error {
 	// Create function map
 	funcMap := template.FuncMap{
-		"toJSON":           toJSON,
-		"eventColor":       eventColor,
-		"eventColorHex":    eventColorHex,
+		"toJSON":            toJSON,
+		"eventColor":        eventColor,
+		"eventColorHex":     eventColorHex,
 		"pagerDutySeverity": pagerDutySeverity,
-		"formatTime":       formatTime,
-		"upper":            strings.ToUpper,
-		"lower":            strings.ToLower,
-		"title":            strings.Title,
+		"formatTime":        formatTime,
+		"upper":             strings.ToUpper,
+		"lower":             strings.ToLower,
+		"title":             strings.Title,
 	}
 
 	// Parse template
@@ -165,7 +165,7 @@ func (e *TemplateEngine) RegisterTemplate(name, templateStr string) error {
 	return nil
 }
 
-// Render renders an event using the specified template
+// Render renders an event using the specified template.
 func (e *TemplateEngine) Render(templateName string, event *Event) ([]byte, error) {
 	// Use default template if not specified
 	if templateName == "" {
@@ -187,13 +187,13 @@ func (e *TemplateEngine) Render(templateName string, event *Event) ([]byte, erro
 	return buf.Bytes(), nil
 }
 
-// GetTemplate returns a template by name
+// GetTemplate returns a template by name.
 func (e *TemplateEngine) GetTemplate(name string) (*template.Template, bool) {
 	tmpl, exists := e.templates[name]
 	return tmpl, exists
 }
 
-// ListTemplates returns all registered template names
+// ListTemplates returns all registered template names.
 func (e *TemplateEngine) ListTemplates() []string {
 	names := make([]string, 0, len(e.templates))
 	for name := range e.templates {
@@ -202,14 +202,14 @@ func (e *TemplateEngine) ListTemplates() []string {
 	return names
 }
 
-// DeleteTemplate removes a template
+// DeleteTemplate removes a template.
 func (e *TemplateEngine) DeleteTemplate(name string) {
 	delete(e.templates, name)
 }
 
 // Template helper functions
 
-// toJSON converts data to JSON string
+// toJSON converts data to JSON string.
 func toJSON(v interface{}) string {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
@@ -218,7 +218,7 @@ func toJSON(v interface{}) string {
 	return string(data)
 }
 
-// eventColor returns a color code for Discord based on event type
+// eventColor returns a color code for Discord based on event type.
 func eventColor(eventType EventType) int {
 	switch {
 	case strings.Contains(string(eventType), "completed"):
@@ -232,7 +232,7 @@ func eventColor(eventType EventType) int {
 	}
 }
 
-// eventColorHex returns a hex color for Teams based on event type
+// eventColorHex returns a hex color for Teams based on event type.
 func eventColorHex(eventType EventType) string {
 	switch {
 	case strings.Contains(string(eventType), "completed"):
@@ -246,7 +246,7 @@ func eventColorHex(eventType EventType) string {
 	}
 }
 
-// pagerDutySeverity returns PagerDuty severity based on event type
+// pagerDutySeverity returns PagerDuty severity based on event type.
 func pagerDutySeverity(eventType EventType) string {
 	switch {
 	case strings.Contains(string(eventType), "failed"):
@@ -260,7 +260,7 @@ func pagerDutySeverity(eventType EventType) string {
 	}
 }
 
-// formatTime formats a time value
+// formatTime formats a time value.
 func formatTime(t time.Time, format string) string {
 	if format == "" {
 		format = "2006-01-02 15:04:05"
@@ -268,14 +268,14 @@ func formatTime(t time.Time, format string) string {
 	return t.Format(format)
 }
 
-// TemplateInfo holds information about a template
+// TemplateInfo holds information about a template.
 type TemplateInfo struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Example     string `json:"example,omitempty"`
 }
 
-// GetTemplateInfo returns information about built-in templates
+// GetTemplateInfo returns information about built-in templates.
 func (e *TemplateEngine) GetTemplateInfo() []TemplateInfo {
 	return []TemplateInfo{
 		{
@@ -313,7 +313,7 @@ func (e *TemplateEngine) GetTemplateInfo() []TemplateInfo {
 	}
 }
 
-// ValidateTemplate validates a template string
+// ValidateTemplate validates a template string.
 func (e *TemplateEngine) ValidateTemplate(templateStr string) error {
 	funcMap := template.FuncMap{
 		"toJSON":            toJSON,
@@ -330,7 +330,7 @@ func (e *TemplateEngine) ValidateTemplate(templateStr string) error {
 	return err
 }
 
-// RenderWithData renders a template with custom data (for testing)
+// RenderWithData renders a template with custom data (for testing).
 func (e *TemplateEngine) RenderWithData(templateName string, data interface{}) ([]byte, error) {
 	tmpl, exists := e.templates[templateName]
 	if !exists {

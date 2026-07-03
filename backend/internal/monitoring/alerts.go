@@ -11,7 +11,7 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// AlertSeverity represents the severity of an alert
+// AlertSeverity represents the severity of an alert.
 type AlertSeverity string
 
 const (
@@ -21,7 +21,7 @@ const (
 	SeverityInfo     AlertSeverity = "info"
 )
 
-// Alert represents a monitoring alert
+// Alert represents a monitoring alert.
 type Alert struct {
 	ID          string            `json:"id"`
 	Severity    AlertSeverity     `json:"severity"`
@@ -34,7 +34,7 @@ type Alert struct {
 	ResolvedAt  *time.Time        `json:"resolved_at,omitempty"`
 }
 
-// AlertManager manages monitoring alerts
+// AlertManager manages monitoring alerts.
 type AlertManager struct {
 	mu           sync.RWMutex
 	config       MonitorConfig
@@ -43,7 +43,7 @@ type AlertManager struct {
 	maxHistory   int
 }
 
-// NewAlertManager creates a new alert manager
+// NewAlertManager creates a new alert manager.
 func NewAlertManager(config MonitorConfig) *AlertManager {
 	return &AlertManager{
 		config:       config,
@@ -53,7 +53,7 @@ func NewAlertManager(config MonitorConfig) *AlertManager {
 	}
 }
 
-// TriggerAlert triggers a new alert
+// TriggerAlert triggers a new alert.
 func (am *AlertManager) TriggerAlert(alert *Alert) {
 	am.mu.Lock()
 	defer am.mu.Unlock()
@@ -79,7 +79,7 @@ func (am *AlertManager) TriggerAlert(alert *Alert) {
 	go am.sendNotifications(alert)
 }
 
-// ResolveAlert resolves an active alert
+// ResolveAlert resolves an active alert.
 func (am *AlertManager) ResolveAlert(alertID string) error {
 	am.mu.Lock()
 	defer am.mu.Unlock()
@@ -99,7 +99,7 @@ func (am *AlertManager) ResolveAlert(alertID string) error {
 	return nil
 }
 
-// GetActiveAlerts returns all active alerts
+// GetActiveAlerts returns all active alerts.
 func (am *AlertManager) GetActiveAlerts() []*Alert {
 	am.mu.RLock()
 	defer am.mu.RUnlock()
@@ -111,14 +111,14 @@ func (am *AlertManager) GetActiveAlerts() []*Alert {
 	return alerts
 }
 
-// GetActiveAlertCount returns the count of active alerts
+// GetActiveAlertCount returns the count of active alerts.
 func (am *AlertManager) GetActiveAlertCount() int {
 	am.mu.RLock()
 	defer am.mu.RUnlock()
 	return len(am.alerts)
 }
 
-// GetAlertHistory returns the alert history
+// GetAlertHistory returns the alert history.
 func (am *AlertManager) GetAlertHistory(limit int) []*Alert {
 	am.mu.RLock()
 	defer am.mu.RUnlock()
@@ -131,7 +131,7 @@ func (am *AlertManager) GetAlertHistory(limit int) []*Alert {
 	return am.alertHistory[start:]
 }
 
-// sendNotifications sends alert notifications
+// sendNotifications sends alert notifications.
 func (am *AlertManager) sendNotifications(alert *Alert) {
 	// Send to Slack if configured
 	if am.config.SlackWebhookURL != "" {
@@ -149,7 +149,7 @@ func (am *AlertManager) sendNotifications(alert *Alert) {
 	}
 }
 
-// sendSlackNotification sends an alert to Slack
+// sendSlackNotification sends an alert to Slack.
 func (am *AlertManager) sendSlackNotification(alert *Alert) error {
 	color := "good"
 	switch alert.Severity {
@@ -207,7 +207,7 @@ func (am *AlertManager) sendSlackNotification(alert *Alert) error {
 	return nil
 }
 
-// sendAlertmanagerNotification sends an alert to Alertmanager
+// sendAlertmanagerNotification sends an alert to Alertmanager.
 func (am *AlertManager) sendAlertmanagerNotification(alert *Alert) error {
 	// Alertmanager v2 API format
 	payload := []map[string]interface{}{
@@ -244,7 +244,7 @@ func (am *AlertManager) sendAlertmanagerNotification(alert *Alert) error {
 	return nil
 }
 
-// ClearResolvedAlerts clears old resolved alerts from history
+// ClearResolvedAlerts clears old resolved alerts from history.
 func (am *AlertManager) ClearResolvedAlerts(olderThan time.Duration) int {
 	am.mu.Lock()
 	defer am.mu.Unlock()

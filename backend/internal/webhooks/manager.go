@@ -17,20 +17,20 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Manager manages webhook subscriptions and delivery
+// Manager manages webhook subscriptions and delivery.
 type Manager struct {
-	subscriptions map[string]*Subscription
-	deliveryQueue chan *DeliveryTask
-	analytics     *Analytics
-	templates     *TemplateEngine
+	subscriptions  map[string]*Subscription
+	deliveryQueue  chan *DeliveryTask
+	analytics      *Analytics
+	templates      *TemplateEngine
 	circuitBreaker *CircuitBreaker
-	mu            sync.RWMutex
-	ctx           context.Context
-	cancel        context.CancelFunc
-	workers       int
+	mu             sync.RWMutex
+	ctx            context.Context
+	cancel         context.CancelFunc
+	workers        int
 }
 
-// Subscription represents a webhook subscription
+// Subscription represents a webhook subscription.
 type Subscription struct {
 	ID          string            `json:"id"`
 	Name        string            `json:"name"`
@@ -47,42 +47,42 @@ type Subscription struct {
 	Metadata    map[string]string `json:"metadata"` // Additional metadata
 }
 
-// EventType represents the type of event
+// EventType represents the type of event.
 type EventType string
 
 const (
-	EventBackupStarted   EventType = "backup.started"
-	EventBackupCompleted EventType = "backup.completed"
-	EventBackupFailed    EventType = "backup.failed"
-	EventRestoreStarted  EventType = "restore.started"
+	EventBackupStarted    EventType = "backup.started"
+	EventBackupCompleted  EventType = "backup.completed"
+	EventBackupFailed     EventType = "backup.failed"
+	EventRestoreStarted   EventType = "restore.started"
 	EventRestoreCompleted EventType = "restore.completed"
-	EventRestoreFailed   EventType = "restore.failed"
-	EventScheduleCreated EventType = "schedule.created"
-	EventScheduleUpdated EventType = "schedule.updated"
-	EventScheduleDeleted EventType = "schedule.deleted"
-	EventAlertTriggered  EventType = "alert.triggered"
-	EventHealthChanged   EventType = "health.changed"
-	EventAll             EventType = "*" // Subscribe to all events
+	EventRestoreFailed    EventType = "restore.failed"
+	EventScheduleCreated  EventType = "schedule.created"
+	EventScheduleUpdated  EventType = "schedule.updated"
+	EventScheduleDeleted  EventType = "schedule.deleted"
+	EventAlertTriggered   EventType = "alert.triggered"
+	EventHealthChanged    EventType = "health.changed"
+	EventAll              EventType = "*" // Subscribe to all events
 )
 
-// EventFilter represents filtering criteria
+// EventFilter represents filtering criteria.
 type EventFilter struct {
 	Field    string      `json:"field"`    // Field to filter on (e.g., "database_id", "status")
 	Operator string      `json:"operator"` // Operator (eq, ne, contains, regex)
 	Value    interface{} `json:"value"`    // Value to compare against
 }
 
-// RetryConfig configures retry behavior
+// RetryConfig configures retry behavior.
 type RetryConfig struct {
-	MaxRetries     int           `json:"max_retries"`     // Maximum number of retries
-	InitialDelay   time.Duration `json:"initial_delay"`   // Initial delay before first retry
-	MaxDelay       time.Duration `json:"max_delay"`       // Maximum delay between retries
-	Multiplier     float64       `json:"multiplier"`      // Backoff multiplier
-	Timeout        time.Duration `json:"timeout"`         // Request timeout
+	MaxRetries      int           `json:"max_retries"`      // Maximum number of retries
+	InitialDelay    time.Duration `json:"initial_delay"`    // Initial delay before first retry
+	MaxDelay        time.Duration `json:"max_delay"`        // Maximum delay between retries
+	Multiplier      float64       `json:"multiplier"`       // Backoff multiplier
+	Timeout         time.Duration `json:"timeout"`          // Request timeout
 	RetryableStatus []int         `json:"retryable_status"` // HTTP status codes that should be retried
 }
 
-// DefaultRetryConfig returns default retry configuration
+// DefaultRetryConfig returns default retry configuration.
 func DefaultRetryConfig() *RetryConfig {
 	return &RetryConfig{
 		MaxRetries:      5,
@@ -94,7 +94,7 @@ func DefaultRetryConfig() *RetryConfig {
 	}
 }
 
-// DeliveryTask represents a webhook delivery task
+// DeliveryTask represents a webhook delivery task.
 type DeliveryTask struct {
 	ID             string
 	SubscriptionID string
@@ -105,7 +105,7 @@ type DeliveryTask struct {
 	CreatedAt      time.Time
 }
 
-// Event represents an event to be sent
+// Event represents an event to be sent.
 type Event struct {
 	ID        string                 `json:"id"`
 	Type      EventType              `json:"type"`
@@ -115,14 +115,14 @@ type Event struct {
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// ManagerConfig holds manager configuration
+// ManagerConfig holds manager configuration.
 type ManagerConfig struct {
 	Workers      int           // Number of delivery workers
 	QueueSize    int           // Size of delivery queue
 	RetryTimeout time.Duration // Global retry timeout
 }
 
-// NewManager creates a new webhook manager
+// NewManager creates a new webhook manager.
 func NewManager(config *ManagerConfig) *Manager {
 	if config.Workers == 0 {
 		config.Workers = 10
@@ -163,7 +163,7 @@ func NewManager(config *ManagerConfig) *Manager {
 	return m
 }
 
-// Subscribe creates a new webhook subscription
+// Subscribe creates a new webhook subscription.
 func (m *Manager) Subscribe(sub *Subscription) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -205,7 +205,7 @@ func (m *Manager) Subscribe(sub *Subscription) error {
 	return nil
 }
 
-// Unsubscribe removes a webhook subscription
+// Unsubscribe removes a webhook subscription.
 func (m *Manager) Unsubscribe(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -221,7 +221,7 @@ func (m *Manager) Unsubscribe(id string) error {
 	return nil
 }
 
-// UpdateSubscription updates an existing subscription
+// UpdateSubscription updates an existing subscription.
 func (m *Manager) UpdateSubscription(id string, updates *Subscription) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -261,7 +261,7 @@ func (m *Manager) UpdateSubscription(id string, updates *Subscription) error {
 	return nil
 }
 
-// EnableSubscription enables a subscription
+// EnableSubscription enables a subscription.
 func (m *Manager) EnableSubscription(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -279,7 +279,7 @@ func (m *Manager) EnableSubscription(id string) error {
 	return nil
 }
 
-// DisableSubscription disables a subscription
+// DisableSubscription disables a subscription.
 func (m *Manager) DisableSubscription(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -297,7 +297,7 @@ func (m *Manager) DisableSubscription(id string) error {
 	return nil
 }
 
-// GetSubscription returns a subscription by ID
+// GetSubscription returns a subscription by ID.
 func (m *Manager) GetSubscription(id string) (*Subscription, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -310,7 +310,7 @@ func (m *Manager) GetSubscription(id string) (*Subscription, error) {
 	return sub, nil
 }
 
-// ListSubscriptions returns all subscriptions
+// ListSubscriptions returns all subscriptions.
 func (m *Manager) ListSubscriptions() []*Subscription {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -323,7 +323,7 @@ func (m *Manager) ListSubscriptions() []*Subscription {
 	return subs
 }
 
-// Publish publishes an event to all matching subscriptions
+// Publish publishes an event to all matching subscriptions.
 func (m *Manager) Publish(event *Event) error {
 	if event.ID == "" {
 		event.ID = uuid.New().String()
@@ -375,7 +375,7 @@ func (m *Manager) Publish(event *Event) error {
 	return nil
 }
 
-// matchesSubscription checks if event matches subscription criteria
+// matchesSubscription checks if event matches subscription criteria.
 func (m *Manager) matchesSubscription(sub *Subscription, event *Event) bool {
 	// Check event type
 	eventMatches := false
@@ -400,7 +400,7 @@ func (m *Manager) matchesSubscription(sub *Subscription, event *Event) bool {
 	return true
 }
 
-// applyFilter applies a filter to an event
+// applyFilter applies a filter to an event.
 func (m *Manager) applyFilter(filter EventFilter, event *Event) bool {
 	// Get field value from event data
 	value, exists := event.Data[filter.Field]
@@ -442,7 +442,7 @@ func (m *Manager) applyFilter(filter EventFilter, event *Event) bool {
 	}
 }
 
-// deliveryWorker processes delivery tasks
+// deliveryWorker processes delivery tasks.
 func (m *Manager) deliveryWorker(id int) {
 	log.Debug().Int("worker_id", id).Msg("Delivery worker started")
 
@@ -464,7 +464,7 @@ func (m *Manager) deliveryWorker(id int) {
 	}
 }
 
-// processDelivery processes a single delivery task
+// processDelivery processes a single delivery task.
 func (m *Manager) processDelivery(task *DeliveryTask) {
 	m.mu.RLock()
 	sub, exists := m.subscriptions[task.SubscriptionID]
@@ -553,7 +553,7 @@ func (m *Manager) processDelivery(task *DeliveryTask) {
 	}
 }
 
-// deliver sends the webhook HTTP request
+// deliver sends the webhook HTTP request.
 func (m *Manager) deliver(sub *Subscription, payload []byte) error {
 	// Create HTTP client with timeout; disable redirects to prevent SSRF
 	client := &http.Client{
@@ -597,7 +597,7 @@ func (m *Manager) deliver(sub *Subscription, payload []byte) error {
 	return nil
 }
 
-// calculateRetryDelay calculates the delay before next retry with exponential backoff
+// calculateRetryDelay calculates the delay before next retry with exponential backoff.
 func (m *Manager) calculateRetryDelay(config *RetryConfig, attempt int) time.Duration {
 	delay := float64(config.InitialDelay) * pow(config.Multiplier, float64(attempt-1))
 
@@ -608,7 +608,7 @@ func (m *Manager) calculateRetryDelay(config *RetryConfig, attempt int) time.Dur
 	return time.Duration(delay)
 }
 
-// retryProcessor processes retry tasks
+// retryProcessor processes retry tasks.
 func (m *Manager) retryProcessor() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
@@ -624,14 +624,14 @@ func (m *Manager) retryProcessor() {
 	}
 }
 
-// Stop stops the webhook manager
+// Stop stops the webhook manager.
 func (m *Manager) Stop() {
 	log.Info().Msg("Stopping webhook manager")
 	m.cancel()
 	close(m.deliveryQueue)
 }
 
-// GetAnalytics returns analytics data
+// GetAnalytics returns analytics data.
 func (m *Manager) GetAnalytics() *Analytics {
 	return m.analytics
 }

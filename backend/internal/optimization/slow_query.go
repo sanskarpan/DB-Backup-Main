@@ -7,16 +7,16 @@ import (
 	"time"
 )
 
-// SlowQueryDetector detects and tracks slow queries
+// SlowQueryDetector detects and tracks slow queries.
 type SlowQueryDetector struct {
-	threshold    time.Duration
-	slowQueries  []*SlowQuery
-	queryStats   map[string]*slowQueryStats
-	mu           sync.RWMutex
-	maxEntries   int
+	threshold   time.Duration
+	slowQueries []*SlowQuery
+	queryStats  map[string]*slowQueryStats
+	mu          sync.RWMutex
+	maxEntries  int
 }
 
-// slowQueryStats tracks statistics for a specific query pattern
+// slowQueryStats tracks statistics for a specific query pattern.
 type slowQueryStats struct {
 	count         int64
 	totalDuration time.Duration
@@ -25,7 +25,7 @@ type slowQueryStats struct {
 	lastSeen      time.Time
 }
 
-// NewSlowQueryDetector creates a new slow query detector
+// NewSlowQueryDetector creates a new slow query detector.
 func NewSlowQueryDetector(threshold time.Duration) *SlowQueryDetector {
 	return &SlowQueryDetector{
 		threshold:   threshold,
@@ -35,7 +35,7 @@ func NewSlowQueryDetector(threshold time.Duration) *SlowQueryDetector {
 	}
 }
 
-// Detect detects if a query is slow and records it
+// Detect detects if a query is slow and records it.
 func (sqd *SlowQueryDetector) Detect(query string, executionTime time.Duration) *SlowQuery {
 	if executionTime < sqd.threshold {
 		return nil
@@ -52,11 +52,11 @@ func (sqd *SlowQueryDetector) Detect(query string, executionTime time.Duration) 
 
 	// Create slow query entry
 	slowQuery := &SlowQuery{
-		Query:         query,
-		QueryHash:     queryHash,
-		ExecutionTime: executionTime,
-		Timestamp:     time.Now(),
-		Severity:      severity,
+		Query:           query,
+		QueryHash:       queryHash,
+		ExecutionTime:   executionTime,
+		Timestamp:       time.Now(),
+		Severity:        severity,
 		Recommendations: sqd.generateRecommendations(executionTime),
 	}
 
@@ -92,7 +92,7 @@ func (sqd *SlowQueryDetector) Detect(query string, executionTime time.Duration) 
 	return slowQuery
 }
 
-// GetSlowQueries returns the most recent slow queries
+// GetSlowQueries returns the most recent slow queries.
 func (sqd *SlowQueryDetector) GetSlowQueries(limit int) []*SlowQuery {
 	sqd.mu.RLock()
 	defer sqd.mu.RUnlock()
@@ -109,7 +109,7 @@ func (sqd *SlowQueryDetector) GetSlowQueries(limit int) []*SlowQuery {
 	return result
 }
 
-// GetQueryStats returns statistics for a specific query pattern
+// GetQueryStats returns statistics for a specific query pattern.
 func (sqd *SlowQueryDetector) GetQueryStats(queryHash string) *QueryStatsSummary {
 	sqd.mu.RLock()
 	defer sqd.mu.RUnlock()
@@ -135,7 +135,7 @@ func (sqd *SlowQueryDetector) GetQueryStats(queryHash string) *QueryStatsSummary
 	}
 }
 
-// GetTopSlowQueries returns the top N slowest query patterns
+// GetTopSlowQueries returns the top N slowest query patterns.
 func (sqd *SlowQueryDetector) GetTopSlowQueries(limit int) []*QueryStatsSummary {
 	sqd.mu.RLock()
 	defer sqd.mu.RUnlock()
@@ -169,7 +169,7 @@ func (sqd *SlowQueryDetector) GetTopSlowQueries(limit int) []*QueryStatsSummary 
 	return summaries
 }
 
-// Clear clears all slow query data
+// Clear clears all slow query data.
 func (sqd *SlowQueryDetector) Clear() {
 	sqd.mu.Lock()
 	defer sqd.mu.Unlock()
@@ -178,26 +178,26 @@ func (sqd *SlowQueryDetector) Clear() {
 	sqd.queryStats = make(map[string]*slowQueryStats)
 }
 
-// GetThreshold returns the slow query threshold
+// GetThreshold returns the slow query threshold.
 func (sqd *SlowQueryDetector) GetThreshold() time.Duration {
 	return sqd.threshold
 }
 
-// SetThreshold sets the slow query threshold
+// SetThreshold sets the slow query threshold.
 func (sqd *SlowQueryDetector) SetThreshold(threshold time.Duration) {
 	sqd.mu.Lock()
 	defer sqd.mu.Unlock()
 	sqd.threshold = threshold
 }
 
-// GetCount returns the total number of slow queries detected
+// GetCount returns the total number of slow queries detected.
 func (sqd *SlowQueryDetector) GetCount() int {
 	sqd.mu.RLock()
 	defer sqd.mu.RUnlock()
 	return len(sqd.slowQueries)
 }
 
-// calculateSeverity determines the severity based on execution time
+// calculateSeverity determines the severity based on execution time.
 func (sqd *SlowQueryDetector) calculateSeverity(executionTime time.Duration) Severity {
 	ratio := float64(executionTime) / float64(sqd.threshold)
 
@@ -213,7 +213,7 @@ func (sqd *SlowQueryDetector) calculateSeverity(executionTime time.Duration) Sev
 	}
 }
 
-// generateRecommendations generates recommendations for slow queries
+// generateRecommendations generates recommendations for slow queries.
 func (sqd *SlowQueryDetector) generateRecommendations(executionTime time.Duration) []string {
 	recommendations := make([]string, 0)
 
@@ -235,7 +235,7 @@ func (sqd *SlowQueryDetector) generateRecommendations(executionTime time.Duratio
 	return recommendations
 }
 
-// QueryStatsSummary summarizes query statistics
+// QueryStatsSummary summarizes query statistics.
 type QueryStatsSummary struct {
 	QueryHash      string
 	ExecutionCount int64
@@ -246,13 +246,13 @@ type QueryStatsSummary struct {
 	LastSeen       time.Time
 }
 
-// calculateQueryHash calculates a hash for a query
+// calculateQueryHash calculates a hash for a query.
 func calculateQueryHash(query string) string {
 	hash := md5.Sum([]byte(query))
 	return fmt.Sprintf("%x", hash)
 }
 
-// sortQueryStatsByAvgDuration sorts query stats by average duration (descending)
+// sortQueryStatsByAvgDuration sorts query stats by average duration (descending).
 func sortQueryStatsByAvgDuration(summaries []*QueryStatsSummary) {
 	// Simple bubble sort for demonstration
 	n := len(summaries)

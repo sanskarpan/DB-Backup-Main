@@ -13,13 +13,14 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/sanskarpan/db-backup/internal/database"
 	internalUtils "github.com/sanskarpan/db-backup/internal/utils"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 	"github.com/sanskarpan/db-backup/pkg/utils"
 )
 
-// TimescaleDBDriver implements the database.Driver interface for TimescaleDB
+// TimescaleDBDriver implements the database.Driver interface for TimescaleDB.
 type TimescaleDBDriver struct {
 	pool               *pgxpool.Pool
 	config             *database.ConnectionConfig
@@ -34,12 +35,12 @@ func init() {
 	})
 }
 
-// NewTimescaleDBDriver creates a new TimescaleDB driver instance
+// NewTimescaleDBDriver creates a new TimescaleDB driver instance.
 func NewTimescaleDBDriver() *TimescaleDBDriver {
 	return &TimescaleDBDriver{}
 }
 
-// Connect establishes a connection to TimescaleDB
+// Connect establishes a connection to TimescaleDB.
 func (d *TimescaleDBDriver) Connect(ctx context.Context, config *database.ConnectionConfig) error {
 	// Build connection string
 	connStr := d.buildConnectionString(config)
@@ -93,7 +94,7 @@ func (d *TimescaleDBDriver) Connect(ctx context.Context, config *database.Connec
 	return nil
 }
 
-// buildConnectionString builds PostgreSQL connection string
+// buildConnectionString builds PostgreSQL connection string.
 func (d *TimescaleDBDriver) buildConnectionString(config *database.ConnectionConfig) string {
 	if config.ConnectionString != "" {
 		return config.ConnectionString
@@ -129,7 +130,7 @@ func (d *TimescaleDBDriver) buildConnectionString(config *database.ConnectionCon
 	return strings.Join(parts, " ")
 }
 
-// Disconnect closes the database connection
+// Disconnect closes the database connection.
 func (d *TimescaleDBDriver) Disconnect() error {
 	if d.pool != nil {
 		d.pool.Close()
@@ -137,7 +138,7 @@ func (d *TimescaleDBDriver) Disconnect() error {
 	return nil
 }
 
-// Ping tests the database connection
+// Ping tests the database connection.
 func (d *TimescaleDBDriver) Ping(ctx context.Context) error {
 	if d.pool == nil {
 		return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "not connected to database")
@@ -145,7 +146,7 @@ func (d *TimescaleDBDriver) Ping(ctx context.Context) error {
 	return d.pool.Ping(ctx)
 }
 
-// Backup creates a backup of the TimescaleDB database
+// Backup creates a backup of the TimescaleDB database.
 func (d *TimescaleDBDriver) Backup(ctx context.Context, opts *database.BackupOptions) (*database.BackupResult, error) {
 	result := &database.BackupResult{
 		ID:        utils.GenerateBackupID(),
@@ -156,7 +157,7 @@ func (d *TimescaleDBDriver) Backup(ctx context.Context, opts *database.BackupOpt
 
 	// Create backup directory
 	backupDir := filepath.Join(opts.OutputDir, result.ID)
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(backupDir, 0o755); err != nil {
 		result.Status = database.BackupStatusFailed
 		result.Error = err
 		return result, pkgErrors.ErrDatabaseBackup(err)
@@ -207,7 +208,7 @@ func (d *TimescaleDBDriver) Backup(ctx context.Context, opts *database.BackupOpt
 	return result, nil
 }
 
-// pgDump performs a pg_dump backup
+// pgDump performs a pg_dump backup.
 func (d *TimescaleDBDriver) pgDump(ctx context.Context, outputFile string, opts *database.BackupOptions) error {
 	args := []string{
 		"-h", d.config.Host,
@@ -243,7 +244,7 @@ func (d *TimescaleDBDriver) pgDump(ctx context.Context, outputFile string, opts 
 	return nil
 }
 
-// backupHypertableMetadata backs up hypertable metadata
+// backupHypertableMetadata backs up hypertable metadata.
 func (d *TimescaleDBDriver) backupHypertableMetadata(ctx context.Context, backupDir string) error {
 	query := `
 		SELECT
@@ -294,7 +295,7 @@ func (d *TimescaleDBDriver) backupHypertableMetadata(ctx context.Context, backup
 	return rows.Err()
 }
 
-// backupContinuousAggregates backs up continuous aggregates metadata
+// backupContinuousAggregates backs up continuous aggregates metadata.
 func (d *TimescaleDBDriver) backupContinuousAggregates(ctx context.Context, backupDir string) error {
 	query := `
 		SELECT
@@ -332,7 +333,7 @@ func (d *TimescaleDBDriver) backupContinuousAggregates(ctx context.Context, back
 	return rows.Err()
 }
 
-// Restore restores TimescaleDB from a backup
+// Restore restores TimescaleDB from a backup.
 func (d *TimescaleDBDriver) Restore(ctx context.Context, opts *database.RestoreOptions) (*database.RestoreResult, error) {
 	result := &database.RestoreResult{
 		ID:        utils.GenerateRestoreID(),
@@ -386,7 +387,7 @@ func (d *TimescaleDBDriver) Restore(ctx context.Context, opts *database.RestoreO
 	return result, nil
 }
 
-// pgRestore performs a pg_restore operation
+// pgRestore performs a pg_restore operation.
 func (d *TimescaleDBDriver) pgRestore(ctx context.Context, inputFile string, opts *database.RestoreOptions) error {
 	args := []string{
 		"-h", d.config.Host,
@@ -412,7 +413,7 @@ func (d *TimescaleDBDriver) pgRestore(ctx context.Context, inputFile string, opt
 	return nil
 }
 
-// restoreHypertableMetadata restores hypertable metadata
+// restoreHypertableMetadata restores hypertable metadata.
 func (d *TimescaleDBDriver) restoreHypertableMetadata(ctx context.Context, metadataFile string) error {
 	// Read and execute the metadata SQL file
 	content, err := os.ReadFile(metadataFile)
@@ -424,7 +425,7 @@ func (d *TimescaleDBDriver) restoreHypertableMetadata(ctx context.Context, metad
 	return err
 }
 
-// GetDatabases returns the list of databases
+// GetDatabases returns the list of databases.
 func (d *TimescaleDBDriver) GetDatabases(ctx context.Context) ([]string, error) {
 	query := "SELECT datname FROM pg_database WHERE datistemplate = false"
 	rows, err := d.pool.Query(ctx, query)
@@ -445,7 +446,7 @@ func (d *TimescaleDBDriver) GetDatabases(ctx context.Context) ([]string, error) 
 	return databases, rows.Err()
 }
 
-// GetTables returns the list of tables (including hypertables)
+// GetTables returns the list of tables (including hypertables).
 func (d *TimescaleDBDriver) GetTables(ctx context.Context, database string) ([]string, error) {
 	query := `
 		SELECT table_schema || '.' || table_name as full_name
@@ -472,7 +473,7 @@ func (d *TimescaleDBDriver) GetTables(ctx context.Context, database string) ([]s
 	return tables, rows.Err()
 }
 
-// GetTableSize returns the size of a table
+// GetTableSize returns the size of a table.
 func (d *TimescaleDBDriver) GetTableSize(ctx context.Context, database, table string) (int64, error) {
 	var size int64
 	query := fmt.Sprintf("SELECT pg_total_relation_size('%s')", pgx.Identifier{table}.Sanitize())
@@ -480,7 +481,7 @@ func (d *TimescaleDBDriver) GetTableSize(ctx context.Context, database, table st
 	return size, err
 }
 
-// GetDatabaseSize returns the total database size
+// GetDatabaseSize returns the total database size.
 func (d *TimescaleDBDriver) GetDatabaseSize(ctx context.Context) (int64, error) {
 	var size int64
 	query := fmt.Sprintf("SELECT pg_database_size('%s')", d.config.Database)
@@ -488,7 +489,7 @@ func (d *TimescaleDBDriver) GetDatabaseSize(ctx context.Context) (int64, error) 
 	return size, err
 }
 
-// GetVersion returns the TimescaleDB version
+// GetVersion returns the TimescaleDB version.
 func (d *TimescaleDBDriver) GetVersion(ctx context.Context) (string, error) {
 	var pgVersion string
 	err := d.pool.QueryRow(ctx, "SELECT version()").Scan(&pgVersion)
@@ -499,22 +500,22 @@ func (d *TimescaleDBDriver) GetVersion(ctx context.Context) (string, error) {
 	return fmt.Sprintf("TimescaleDB %s on %s", d.version, pgVersion), nil
 }
 
-// StreamBackup streams backup data to a writer
+// StreamBackup streams backup data to a writer.
 func (d *TimescaleDBDriver) StreamBackup(ctx context.Context, opts *database.BackupOptions, writer io.Writer) error {
 	return fmt.Errorf("streaming backup not implemented for TimescaleDB")
 }
 
-// StreamRestore streams restore data from a reader
+// StreamRestore streams restore data from a reader.
 func (d *TimescaleDBDriver) StreamRestore(ctx context.Context, opts *database.RestoreOptions, reader io.Reader) error {
 	return fmt.Errorf("streaming restore not implemented for TimescaleDB")
 }
 
-// GetBackupSize returns the estimated size of a backup
+// GetBackupSize returns the estimated size of a backup.
 func (d *TimescaleDBDriver) GetBackupSize(ctx context.Context, opts *database.BackupOptions) (int64, error) {
 	return d.GetDatabaseSize(ctx)
 }
 
-// ValidateRestore validates restore options
+// ValidateRestore validates restore options.
 func (d *TimescaleDBDriver) ValidateRestore(ctx context.Context, opts *database.RestoreOptions) error {
 	if opts.BackupPath == "" && opts.SourceBackup == "" {
 		return fmt.Errorf("backup path is required")
@@ -533,24 +534,24 @@ func (d *TimescaleDBDriver) ValidateRestore(ctx context.Context, opts *database.
 	return nil
 }
 
-// GetType returns the database type
+// GetType returns the database type.
 func (d *TimescaleDBDriver) GetType() database.DatabaseType {
 	return "timescaledb"
 }
 
-// SupportsIncremental returns whether the driver supports incremental backups
+// SupportsIncremental returns whether the driver supports incremental backups.
 func (d *TimescaleDBDriver) SupportsIncremental() bool {
 	// TimescaleDB can support incremental backups via chunk-based backups
 	return true
 }
 
-// SupportsPITR returns whether the driver supports point-in-time recovery
+// SupportsPITR returns whether the driver supports point-in-time recovery.
 func (d *TimescaleDBDriver) SupportsPITR() bool {
 	// PostgreSQL/TimescaleDB supports PITR via WAL archiving
 	return true
 }
 
-// GetHypertables returns the list of hypertables
+// GetHypertables returns the list of hypertables.
 func (d *TimescaleDBDriver) GetHypertables(ctx context.Context) ([]string, error) {
 	query := `
 		SELECT schema_name || '.' || table_name as full_name

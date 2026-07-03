@@ -15,11 +15,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+
 	"github.com/sanskarpan/db-backup/internal/storage"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// S3Provider implements AWS S3 storage
+// S3Provider implements AWS S3 storage.
 type S3Provider struct {
 	client     *s3.Client
 	uploader   *manager.Uploader
@@ -27,12 +28,13 @@ type S3Provider struct {
 	config     *storage.S3Config
 }
 
-// NewS3Provider creates a new S3 storage provider
+// NewS3Provider creates a new S3 storage provider.
 func NewS3Provider(cfg *storage.S3Config) (*S3Provider, error) {
 	ctx := context.Background()
 
 	// Load AWS config
-	awsConfig, err := config.LoadDefaultConfig(ctx,
+	awsConfig, err := config.LoadDefaultConfig(
+		ctx,
 		config.WithRegion(cfg.Region),
 		config.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(
@@ -73,7 +75,7 @@ func NewS3Provider(cfg *storage.S3Config) (*S3Provider, error) {
 	}, nil
 }
 
-// Upload uploads a file to S3
+// Upload uploads a file to S3.
 func (p *S3Provider) Upload(ctx context.Context, localPath, remotePath string, opts *storage.UploadOptions) error {
 	file, err := os.Open(localPath)
 	if err != nil {
@@ -84,7 +86,7 @@ func (p *S3Provider) Upload(ctx context.Context, localPath, remotePath string, o
 	return p.UploadStream(ctx, file, remotePath, opts)
 }
 
-// UploadStream uploads data from a reader to S3
+// UploadStream uploads data from a reader to S3.
 func (p *S3Provider) UploadStream(ctx context.Context, reader io.Reader, remotePath string, opts *storage.UploadOptions) error {
 	input := &s3.PutObjectInput{
 		Bucket: aws.String(p.config.Bucket),
@@ -119,11 +121,11 @@ func (p *S3Provider) UploadStream(ctx context.Context, reader io.Reader, remoteP
 	return nil
 }
 
-// Download downloads a file from S3
+// Download downloads a file from S3.
 func (p *S3Provider) Download(ctx context.Context, remotePath, localPath string) error {
 	// Ensure local directory exists
 	localDir := filepath.Dir(localPath)
-	if err := os.MkdirAll(localDir, 0755); err != nil {
+	if err := os.MkdirAll(localDir, 0o755); err != nil {
 		return pkgErrors.ErrStorageDownload(err)
 	}
 
@@ -138,7 +140,6 @@ func (p *S3Provider) Download(ctx context.Context, remotePath, localPath string)
 		Bucket: aws.String(p.config.Bucket),
 		Key:    aws.String(remotePath),
 	})
-
 	if err != nil {
 		return pkgErrors.ErrStorageDownload(err).WithMetadata("bucket", p.config.Bucket).WithMetadata("key", remotePath)
 	}
@@ -146,13 +147,12 @@ func (p *S3Provider) Download(ctx context.Context, remotePath, localPath string)
 	return nil
 }
 
-// DownloadStream downloads data to a reader
+// DownloadStream downloads data to a reader.
 func (p *S3Provider) DownloadStream(ctx context.Context, remotePath string) (io.ReadCloser, error) {
 	result, err := p.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(p.config.Bucket),
 		Key:    aws.String(remotePath),
 	})
-
 	if err != nil {
 		return nil, pkgErrors.ErrStorageDownload(err).WithMetadata("bucket", p.config.Bucket).WithMetadata("key", remotePath)
 	}
@@ -160,13 +160,12 @@ func (p *S3Provider) DownloadStream(ctx context.Context, remotePath string) (io.
 	return result.Body, nil
 }
 
-// Delete deletes a file from S3
+// Delete deletes a file from S3.
 func (p *S3Provider) Delete(ctx context.Context, remotePath string) error {
 	_, err := p.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(p.config.Bucket),
 		Key:    aws.String(remotePath),
 	})
-
 	if err != nil {
 		return pkgErrors.ErrStorageUpload(err).WithMetadata("operation", "delete").WithMetadata("bucket", p.config.Bucket).WithMetadata("key", remotePath)
 	}
@@ -174,13 +173,12 @@ func (p *S3Provider) Delete(ctx context.Context, remotePath string) error {
 	return nil
 }
 
-// Exists checks if a file exists in S3
+// Exists checks if a file exists in S3.
 func (p *S3Provider) Exists(ctx context.Context, remotePath string) (bool, error) {
 	_, err := p.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(p.config.Bucket),
 		Key:    aws.String(remotePath),
 	})
-
 	if err != nil {
 		// Check if it's a "not found" error
 		var notFound *types.NotFound
@@ -193,13 +191,12 @@ func (p *S3Provider) Exists(ctx context.Context, remotePath string) (bool, error
 	return true, nil
 }
 
-// GetMetadata retrieves file metadata
+// GetMetadata retrieves file metadata.
 func (p *S3Provider) GetMetadata(ctx context.Context, remotePath string) (*storage.FileMetadata, error) {
 	result, err := p.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(p.config.Bucket),
 		Key:    aws.String(remotePath),
 	})
-
 	if err != nil {
 		return nil, pkgErrors.ErrStorageDownload(err)
 	}
@@ -216,7 +213,7 @@ func (p *S3Provider) GetMetadata(ctx context.Context, remotePath string) (*stora
 	return metadata, nil
 }
 
-// List lists files with a given prefix
+// List lists files with a given prefix.
 func (p *S3Provider) List(ctx context.Context, prefix string) ([]*storage.FileMetadata, error) {
 	var files []*storage.FileMetadata
 
@@ -246,12 +243,12 @@ func (p *S3Provider) List(ctx context.Context, prefix string) ([]*storage.FileMe
 	return files, nil
 }
 
-// GetType returns the provider type
+// GetType returns the provider type.
 func (p *S3Provider) GetType() storage.ProviderType {
 	return storage.ProviderTypeS3
 }
 
-// ValidateConfig validates the provider configuration
+// ValidateConfig validates the provider configuration.
 func (p *S3Provider) ValidateConfig() error {
 	if p.config.Bucket == "" {
 		return fmt.Errorf("S3 bucket is required")

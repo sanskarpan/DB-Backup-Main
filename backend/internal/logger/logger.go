@@ -13,30 +13,30 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-// Config holds logger configuration
+// Config holds logger configuration.
 type Config struct {
-	Level      string `mapstructure:"level"`       // debug, info, warn, error
-	Format     string `mapstructure:"format"`      // json, text
-	Output     string `mapstructure:"output"`      // stdout, file
+	Level      string     `mapstructure:"level"`  // debug, info, warn, error
+	Format     string     `mapstructure:"format"` // json, text
+	Output     string     `mapstructure:"output"` // stdout, file
 	File       FileConfig `mapstructure:"file"`
-	TimeFormat string `mapstructure:"time_format"` // Time format for logs
+	TimeFormat string     `mapstructure:"time_format"` // Time format for logs
 }
 
-// FileConfig holds file logging configuration
+// FileConfig holds file logging configuration.
 type FileConfig struct {
 	Path       string `mapstructure:"path"`
-	MaxSize    int    `mapstructure:"max_size"`     // megabytes
+	MaxSize    int    `mapstructure:"max_size"` // megabytes
 	MaxBackups int    `mapstructure:"max_backups"`
-	MaxAge     int    `mapstructure:"max_age"`      // days
+	MaxAge     int    `mapstructure:"max_age"` // days
 	Compress   bool   `mapstructure:"compress"`
 }
 
-// Logger wraps zerolog.Logger
+// Logger wraps zerolog.Logger.
 type Logger struct {
 	logger zerolog.Logger
 }
 
-// New creates a new logger instance
+// New creates a new logger instance.
 func New(config Config) *Logger {
 	// Set default time format if not specified
 	if config.TimeFormat == "" {
@@ -79,11 +79,11 @@ func New(config Config) *Logger {
 	return &Logger{logger: logger}
 }
 
-// createFileWriter creates a file writer with rotation
+// createFileWriter creates a file writer with rotation.
 func createFileWriter(config FileConfig) io.Writer {
 	// Ensure directory exists
 	dir := filepath.Dir(config.Path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		log.Fatal().Err(err).Msg("Failed to create log directory")
 	}
 
@@ -96,7 +96,7 @@ func createFileWriter(config FileConfig) io.Writer {
 	}
 }
 
-// parseLevel parses string log level to zerolog.Level
+// parseLevel parses string log level to zerolog.Level.
 func parseLevel(level string) zerolog.Level {
 	switch level {
 	case "debug":
@@ -116,12 +116,12 @@ func parseLevel(level string) zerolog.Level {
 	}
 }
 
-// Zerolog returns the underlying zerolog.Logger
+// Zerolog returns the underlying zerolog.Logger.
 func (l *Logger) Zerolog() zerolog.Logger {
 	return l.logger
 }
 
-// WithContext adds context fields to the logger
+// WithContext adds context fields to the logger.
 func (l *Logger) WithContext(fields map[string]interface{}) *Logger {
 	ctx := l.logger.With()
 	for k, v := range fields {
@@ -130,7 +130,7 @@ func (l *Logger) WithContext(fields map[string]interface{}) *Logger {
 	return &Logger{logger: ctx.Logger()}
 }
 
-// Debug logs a debug message
+// Debug logs a debug message.
 func (l *Logger) Debug(msg string, fields ...map[string]interface{}) {
 	event := l.logger.Debug()
 	for _, f := range fields {
@@ -141,7 +141,7 @@ func (l *Logger) Debug(msg string, fields ...map[string]interface{}) {
 	event.Msg(msg)
 }
 
-// Info logs an info message
+// Info logs an info message.
 func (l *Logger) Info(msg string, fields ...map[string]interface{}) {
 	event := l.logger.Info()
 	for _, f := range fields {
@@ -152,7 +152,7 @@ func (l *Logger) Info(msg string, fields ...map[string]interface{}) {
 	event.Msg(msg)
 }
 
-// Warn logs a warning message
+// Warn logs a warning message.
 func (l *Logger) Warn(msg string, fields ...map[string]interface{}) {
 	event := l.logger.Warn()
 	for _, f := range fields {
@@ -163,7 +163,7 @@ func (l *Logger) Warn(msg string, fields ...map[string]interface{}) {
 	event.Msg(msg)
 }
 
-// Error logs an error message
+// Error logs an error message.
 func (l *Logger) Error(msg string, err error, fields ...map[string]interface{}) {
 	event := l.logger.Error().Err(err)
 	for _, f := range fields {
@@ -174,7 +174,7 @@ func (l *Logger) Error(msg string, err error, fields ...map[string]interface{}) 
 	event.Msg(msg)
 }
 
-// Fatal logs a fatal message and exits
+// Fatal logs a fatal message and exits.
 func (l *Logger) Fatal(msg string, err error, fields ...map[string]interface{}) {
 	event := l.logger.Fatal().Err(err)
 	for _, f := range fields {
@@ -185,7 +185,7 @@ func (l *Logger) Fatal(msg string, err error, fields ...map[string]interface{}) 
 	event.Msg(msg)
 }
 
-// Panic logs a panic message and panics
+// Panic logs a panic message and panics.
 func (l *Logger) Panic(msg string, err error, fields ...map[string]interface{}) {
 	event := l.logger.Panic().Err(err)
 	for _, f := range fields {
@@ -196,12 +196,12 @@ func (l *Logger) Panic(msg string, err error, fields ...map[string]interface{}) 
 	event.Msg(msg)
 }
 
-// Printf implements a Printf-style logging (for compatibility)
+// Printf implements a Printf-style logging (for compatibility).
 func (l *Logger) Printf(format string, v ...interface{}) {
 	l.logger.Info().Msg(fmt.Sprintf(format, v...))
 }
 
-// DefaultLogger creates a default logger for development
+// DefaultLogger creates a default logger for development.
 func DefaultLogger() *Logger {
 	return New(Config{
 		Level:  "info",

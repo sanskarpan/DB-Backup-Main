@@ -13,11 +13,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/config"
 	"golang.org/x/oauth2"
+
+	"github.com/sanskarpan/db-backup/internal/config"
 )
 
-// OAuth2Service handles OAuth2 authentication operations
+// OAuth2Service handles OAuth2 authentication operations.
 type OAuth2Service struct {
 	config     *config.OAuth2Config
 	providers  map[string]*oauth2.Config
@@ -26,29 +27,29 @@ type OAuth2Service struct {
 	userStore  *UserStore
 }
 
-// StateStore manages OAuth2 state tokens for CSRF protection
+// StateStore manages OAuth2 state tokens for CSRF protection.
 type StateStore struct {
 	states map[string]*StateEntry
 	mu     sync.RWMutex
 }
 
-// StateEntry represents a state token entry
+// StateEntry represents a state token entry.
 type StateEntry struct {
 	Provider  string
 	CreatedAt time.Time
 }
 
-// UserInfo represents OAuth2 user information
+// UserInfo represents OAuth2 user information.
 type UserInfo struct {
-	ID       string            `json:"id"`
-	Email    string            `json:"email"`
-	Name     string            `json:"name"`
-	Picture  string            `json:"picture,omitempty"`
-	Provider string            `json:"provider"`
+	ID       string                 `json:"id"`
+	Email    string                 `json:"email"`
+	Name     string                 `json:"name"`
+	Picture  string                 `json:"picture,omitempty"`
+	Provider string                 `json:"provider"`
 	Raw      map[string]interface{} `json:"raw,omitempty"`
 }
 
-// NewOAuth2Service creates a new OAuth2 service
+// NewOAuth2Service creates a new OAuth2 service.
 func NewOAuth2Service(cfg *config.OAuth2Config, jwtService *TokenService) (*OAuth2Service, error) {
 	if cfg == nil || !cfg.Enabled {
 		return nil, fmt.Errorf("OAuth2 is not enabled")
@@ -94,7 +95,7 @@ func NewOAuth2Service(cfg *config.OAuth2Config, jwtService *TokenService) (*OAut
 	return service, nil
 }
 
-// GetProvider returns an OAuth2 provider by name
+// GetProvider returns an OAuth2 provider by name.
 func (s *OAuth2Service) GetProvider(name string) (*oauth2.Config, error) {
 	provider, ok := s.providers[name]
 	if !ok {
@@ -103,7 +104,7 @@ func (s *OAuth2Service) GetProvider(name string) (*oauth2.Config, error) {
 	return provider, nil
 }
 
-// GetAuthorizationURL generates an OAuth2 authorization URL
+// GetAuthorizationURL generates an OAuth2 authorization URL.
 func (s *OAuth2Service) GetAuthorizationURL(providerName string) (string, error) {
 	provider, err := s.GetProvider(providerName)
 	if err != nil {
@@ -125,7 +126,7 @@ func (s *OAuth2Service) GetAuthorizationURL(providerName string) (string, error)
 	return url, nil
 }
 
-// ExchangeCode exchanges an authorization code for tokens
+// ExchangeCode exchanges an authorization code for tokens.
 func (s *OAuth2Service) ExchangeCode(ctx context.Context, providerName, code, state string) (*oauth2.Token, error) {
 	// Validate state
 	if !s.states.Validate(state, providerName) {
@@ -149,7 +150,7 @@ func (s *OAuth2Service) ExchangeCode(ctx context.Context, providerName, code, st
 	return token, nil
 }
 
-// GetUserInfo retrieves user information from the OAuth2 provider
+// GetUserInfo retrieves user information from the OAuth2 provider.
 func (s *OAuth2Service) GetUserInfo(ctx context.Context, providerName string, token *oauth2.Token) (*UserInfo, error) {
 	providerCfg, ok := s.config.Providers[providerName]
 	if !ok {
@@ -191,7 +192,7 @@ func (s *OAuth2Service) GetUserInfo(ctx context.Context, providerName string, to
 	return userInfo, nil
 }
 
-// GenerateJWT generates a JWT token for an OAuth2 authenticated user
+// GenerateJWT generates a JWT token for an OAuth2 authenticated user.
 func (s *OAuth2Service) GenerateJWT(userInfo *UserInfo, roles []string) (string, error) {
 	if s.jwtService == nil {
 		return "", fmt.Errorf("JWT service not configured")
@@ -200,7 +201,7 @@ func (s *OAuth2Service) GenerateJWT(userInfo *UserInfo, roles []string) (string,
 	return s.jwtService.GenerateToken(userInfo.ID, userInfo.Email, roles)
 }
 
-// ListProviders returns a list of enabled provider names
+// ListProviders returns a list of enabled provider names.
 func (s *OAuth2Service) ListProviders() []string {
 	providers := make([]string, 0, len(s.providers))
 	for name := range s.providers {
@@ -209,14 +210,14 @@ func (s *OAuth2Service) ListProviders() []string {
 	return providers
 }
 
-// NewStateStore creates a new state store
+// NewStateStore creates a new state store.
 func NewStateStore() *StateStore {
 	return &StateStore{
 		states: make(map[string]*StateEntry),
 	}
 }
 
-// Set stores a new state token
+// Set stores a new state token.
 func (s *StateStore) Set(state, provider string, timeout time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -230,7 +231,7 @@ func (s *StateStore) Set(state, provider string, timeout time.Duration) {
 	go s.cleanup(timeout)
 }
 
-// Validate checks if a state token is valid
+// Validate checks if a state token is valid.
 func (s *StateStore) Validate(state, provider string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -243,7 +244,7 @@ func (s *StateStore) Validate(state, provider string) bool {
 	return entry.Provider == provider
 }
 
-// Delete removes a state token
+// Delete removes a state token.
 func (s *StateStore) Delete(state string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -251,7 +252,7 @@ func (s *StateStore) Delete(state string) {
 	delete(s.states, state)
 }
 
-// cleanup removes expired state tokens
+// cleanup removes expired state tokens.
 func (s *StateStore) cleanup(timeout time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -264,7 +265,7 @@ func (s *StateStore) cleanup(timeout time.Duration) {
 	}
 }
 
-// generateState generates a random state token
+// generateState generates a random state token.
 func generateState() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -273,7 +274,7 @@ func generateState() (string, error) {
 	return base64.URLEncoding.EncodeToString(b), nil
 }
 
-// mapUserInfo maps provider-specific user info to standard UserInfo
+// mapUserInfo maps provider-specific user info to standard UserInfo.
 func mapUserInfo(provider string, raw map[string]interface{}) *UserInfo {
 	userInfo := &UserInfo{
 		Provider: provider,
@@ -362,7 +363,7 @@ func mapUserInfo(provider string, raw map[string]interface{}) *UserInfo {
 	return userInfo
 }
 
-// GetPresetProvider returns preset OAuth2 configuration for popular providers
+// GetPresetProvider returns preset OAuth2 configuration for popular providers.
 func GetPresetProvider(providerName string) *config.OAuth2Provider {
 	presets := map[string]*config.OAuth2Provider{
 		"google": {
@@ -397,14 +398,14 @@ func GetPresetProvider(providerName string) *config.OAuth2Provider {
 	return nil
 }
 
-// UserStore manages user data persistence
+// UserStore manages user data persistence.
 type UserStore struct {
 	users map[string]*User
 	mu    sync.RWMutex
 	file  string
 }
 
-// User represents a user in the system
+// User represents a user in the system.
 type User struct {
 	ID          string    `json:"id"`
 	Email       string    `json:"email"`
@@ -418,7 +419,7 @@ type User struct {
 	IsActive    bool      `json:"is_active"`
 }
 
-// NewUserStore creates a new user store
+// NewUserStore creates a new user store.
 func NewUserStore() (*UserStore, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -426,7 +427,7 @@ func NewUserStore() (*UserStore, error) {
 	}
 
 	storeDir := filepath.Join(homeDir, ".db-backup", "auth")
-	if err := os.MkdirAll(storeDir, 0700); err != nil {
+	if err := os.MkdirAll(storeDir, 0o700); err != nil {
 		return nil, fmt.Errorf("failed to create auth directory: %w", err)
 	}
 
@@ -445,7 +446,7 @@ func NewUserStore() (*UserStore, error) {
 	return store, nil
 }
 
-// load loads users from file
+// load loads users from file.
 func (s *UserStore) load() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -458,7 +459,7 @@ func (s *UserStore) load() error {
 	return json.Unmarshal(data, &s.users)
 }
 
-// save saves users to file
+// save saves users to file.
 func (s *UserStore) save() error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -468,10 +469,10 @@ func (s *UserStore) save() error {
 		return err
 	}
 
-	return os.WriteFile(s.file, data, 0600)
+	return os.WriteFile(s.file, data, 0o600)
 }
 
-// Get retrieves a user by ID
+// Get retrieves a user by ID.
 func (s *UserStore) Get(id string) (*User, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -480,7 +481,7 @@ func (s *UserStore) Get(id string) (*User, bool) {
 	return user, ok
 }
 
-// GetByEmail retrieves a user by email
+// GetByEmail retrieves a user by email.
 func (s *UserStore) GetByEmail(email string) (*User, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -493,7 +494,7 @@ func (s *UserStore) GetByEmail(email string) (*User, bool) {
 	return nil, false
 }
 
-// Create creates a new user
+// Create creates a new user.
 func (s *UserStore) Create(user *User) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -506,7 +507,7 @@ func (s *UserStore) Create(user *User) error {
 	return s.save()
 }
 
-// Update updates an existing user
+// Update updates an existing user.
 func (s *UserStore) Update(user *User) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -520,7 +521,7 @@ func (s *UserStore) Update(user *User) error {
 	return s.save()
 }
 
-// GetOrCreateUser gets an existing user or creates a new one
+// GetOrCreateUser gets an existing user or creates a new one.
 func (s *OAuth2Service) GetOrCreateUser(ctx context.Context, userInfo *UserInfo) (*User, error) {
 	// Try to find user by email first
 	user, exists := s.userStore.GetByEmail(userInfo.Email)
@@ -550,7 +551,7 @@ func (s *OAuth2Service) GetOrCreateUser(ctx context.Context, userInfo *UserInfo)
 	return user, nil
 }
 
-// UpdateLastLogin updates the last login time for a user
+// UpdateLastLogin updates the last login time for a user.
 func (s *OAuth2Service) UpdateLastLogin(ctx context.Context, userID string) error {
 	user, exists := s.userStore.Get(userID)
 	if !exists {

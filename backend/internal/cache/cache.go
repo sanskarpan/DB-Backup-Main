@@ -6,14 +6,14 @@ import (
 	"time"
 )
 
-// Common errors
+// Common errors.
 var (
 	ErrCacheMiss     = errors.New("cache miss")
 	ErrInvalidConfig = errors.New("invalid cache configuration")
 	ErrNotSupported  = errors.New("operation not supported")
 )
 
-// Cache defines the interface for cache operations
+// Cache defines the interface for cache operations.
 type Cache interface {
 	// Get retrieves a value from cache
 	Get(ctx context.Context, key string, dest interface{}) error
@@ -34,7 +34,7 @@ type Cache interface {
 	Close() error
 }
 
-// AdvancedCache extends Cache with additional operations
+// AdvancedCache extends Cache with additional operations.
 type AdvancedCache interface {
 	Cache
 
@@ -57,7 +57,7 @@ type AdvancedCache interface {
 	SetTTL(ctx context.Context, key string, ttl time.Duration) error
 }
 
-// CacheStats holds cache statistics
+// CacheStats holds cache statistics.
 type CacheStats struct {
 	Hits          int64
 	Misses        int64
@@ -70,7 +70,7 @@ type CacheStats struct {
 	LastResetTime time.Time
 }
 
-// CacheType represents the type of cache backend
+// CacheType represents the type of cache backend.
 type CacheType string
 
 const (
@@ -79,7 +79,7 @@ const (
 	CacheTypeInMemory  CacheType = "inmemory"
 )
 
-// Config holds common cache configuration
+// Config holds common cache configuration.
 type Config struct {
 	Type     CacheType
 	Enabled  bool

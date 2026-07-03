@@ -15,19 +15,20 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+
 	"github.com/sanskarpan/db-backup/internal/storage"
 )
 
-// MinIOProvider implements the storage.Provider interface for MinIO
+// MinIOProvider implements the storage.Provider interface for MinIO.
 type MinIOProvider struct {
-	client       *s3.Client
-	uploader     *manager.Uploader
-	downloader   *manager.Downloader
-	config       *storage.MinIOConfig
-	bucket       string
+	client     *s3.Client
+	uploader   *manager.Uploader
+	downloader *manager.Downloader
+	config     *storage.MinIOConfig
+	bucket     string
 }
 
-// NewMinIOProvider creates a new MinIO storage provider
+// NewMinIOProvider creates a new MinIO storage provider.
 func NewMinIOProvider(cfg *storage.MinIOConfig) (*MinIOProvider, error) {
 	if err := validateConfig(cfg); err != nil {
 		return nil, err
@@ -46,7 +47,8 @@ func NewMinIOProvider(cfg *storage.MinIOConfig) (*MinIOProvider, error) {
 	})
 
 	// Build AWS config for MinIO
-	awsCfg, err := config.LoadDefaultConfig(context.Background(),
+	awsCfg, err := config.LoadDefaultConfig(
+		context.Background(),
 		config.WithRegion(cfg.Region),
 		config.WithEndpointResolverWithOptions(customResolver),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
@@ -77,7 +79,7 @@ func NewMinIOProvider(cfg *storage.MinIOConfig) (*MinIOProvider, error) {
 	}, nil
 }
 
-// buildEndpointURL builds the MinIO endpoint URL
+// buildEndpointURL builds the MinIO endpoint URL.
 func buildEndpointURL(cfg *storage.MinIOConfig) string {
 	scheme := "http"
 	if cfg.UseSSL {
@@ -86,7 +88,7 @@ func buildEndpointURL(cfg *storage.MinIOConfig) string {
 	return fmt.Sprintf("%s://%s", scheme, cfg.Endpoint)
 }
 
-// validateConfig validates the MinIO configuration
+// validateConfig validates the MinIO configuration.
 func validateConfig(cfg *storage.MinIOConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("MinIO config is required")
@@ -109,7 +111,7 @@ func validateConfig(cfg *storage.MinIOConfig) error {
 	return nil
 }
 
-// Upload uploads a file to MinIO
+// Upload uploads a file to MinIO.
 func (p *MinIOProvider) Upload(ctx context.Context, localPath, remotePath string, opts *storage.UploadOptions) error {
 	file, err := os.Open(localPath)
 	if err != nil {
@@ -120,7 +122,7 @@ func (p *MinIOProvider) Upload(ctx context.Context, localPath, remotePath string
 	return p.UploadStream(ctx, file, remotePath, opts)
 }
 
-// UploadStream uploads data from a reader to MinIO
+// UploadStream uploads data from a reader to MinIO.
 func (p *MinIOProvider) UploadStream(ctx context.Context, reader io.Reader, remotePath string, opts *storage.UploadOptions) error {
 	if opts == nil {
 		opts = &storage.UploadOptions{}
@@ -161,11 +163,11 @@ func (p *MinIOProvider) UploadStream(ctx context.Context, reader io.Reader, remo
 	return nil
 }
 
-// Download downloads a file from MinIO
+// Download downloads a file from MinIO.
 func (p *MinIOProvider) Download(ctx context.Context, remotePath, localPath string) error {
 	// Create local directory if it doesn't exist
 	dir := filepath.Dir(localPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
@@ -188,7 +190,7 @@ func (p *MinIOProvider) Download(ctx context.Context, remotePath, localPath stri
 	return nil
 }
 
-// DownloadStream downloads data to a reader
+// DownloadStream downloads data to a reader.
 func (p *MinIOProvider) DownloadStream(ctx context.Context, remotePath string) (io.ReadCloser, error) {
 	output, err := p.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(p.bucket),
@@ -201,7 +203,7 @@ func (p *MinIOProvider) DownloadStream(ctx context.Context, remotePath string) (
 	return output.Body, nil
 }
 
-// Delete deletes a file from MinIO
+// Delete deletes a file from MinIO.
 func (p *MinIOProvider) Delete(ctx context.Context, remotePath string) error {
 	_, err := p.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(p.bucket),
@@ -214,7 +216,7 @@ func (p *MinIOProvider) Delete(ctx context.Context, remotePath string) error {
 	return nil
 }
 
-// Exists checks if a file exists in MinIO
+// Exists checks if a file exists in MinIO.
 func (p *MinIOProvider) Exists(ctx context.Context, remotePath string) (bool, error) {
 	_, err := p.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(p.bucket),
@@ -231,7 +233,7 @@ func (p *MinIOProvider) Exists(ctx context.Context, remotePath string) (bool, er
 	return true, nil
 }
 
-// GetMetadata retrieves file metadata from MinIO
+// GetMetadata retrieves file metadata from MinIO.
 func (p *MinIOProvider) GetMetadata(ctx context.Context, remotePath string) (*storage.FileMetadata, error) {
 	output, err := p.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(p.bucket),
@@ -242,10 +244,10 @@ func (p *MinIOProvider) GetMetadata(ctx context.Context, remotePath string) (*st
 	}
 
 	metadata := &storage.FileMetadata{
-		Path:         remotePath,
-		Size:         *output.ContentLength,
-		ContentType:  aws.ToString(output.ContentType),
-		Metadata:     output.Metadata,
+		Path:        remotePath,
+		Size:        *output.ContentLength,
+		ContentType: aws.ToString(output.ContentType),
+		Metadata:    output.Metadata,
 	}
 
 	if output.LastModified != nil {
@@ -259,7 +261,7 @@ func (p *MinIOProvider) GetMetadata(ctx context.Context, remotePath string) (*st
 	return metadata, nil
 }
 
-// List lists files with a given prefix in MinIO
+// List lists files with a given prefix in MinIO.
 func (p *MinIOProvider) List(ctx context.Context, prefix string) ([]*storage.FileMetadata, error) {
 	var files []*storage.FileMetadata
 
@@ -296,17 +298,17 @@ func (p *MinIOProvider) List(ctx context.Context, prefix string) ([]*storage.Fil
 	return files, nil
 }
 
-// GetType returns the provider type
+// GetType returns the provider type.
 func (p *MinIOProvider) GetType() storage.ProviderType {
 	return storage.ProviderTypeMinIO
 }
 
-// ValidateConfig validates the provider configuration
+// ValidateConfig validates the provider configuration.
 func (p *MinIOProvider) ValidateConfig() error {
 	return validateConfig(p.config)
 }
 
-// CreateBucket creates a bucket in MinIO
+// CreateBucket creates a bucket in MinIO.
 func (p *MinIOProvider) CreateBucket(ctx context.Context) error {
 	_, err := p.client.CreateBucket(ctx, &s3.CreateBucketInput{
 		Bucket: aws.String(p.bucket),
@@ -322,7 +324,7 @@ func (p *MinIOProvider) CreateBucket(ctx context.Context) error {
 	return nil
 }
 
-// DeleteBucket deletes a bucket from MinIO
+// DeleteBucket deletes a bucket from MinIO.
 func (p *MinIOProvider) DeleteBucket(ctx context.Context) error {
 	_, err := p.client.DeleteBucket(ctx, &s3.DeleteBucketInput{
 		Bucket: aws.String(p.bucket),
@@ -334,7 +336,7 @@ func (p *MinIOProvider) DeleteBucket(ctx context.Context) error {
 	return nil
 }
 
-// SetVersioning enables or disables versioning for the bucket
+// SetVersioning enables or disables versioning for the bucket.
 func (p *MinIOProvider) SetVersioning(ctx context.Context, enabled bool) error {
 	status := types.BucketVersioningStatusSuspended
 	if enabled {
@@ -354,7 +356,7 @@ func (p *MinIOProvider) SetVersioning(ctx context.Context, enabled bool) error {
 	return nil
 }
 
-// GetVersioning returns the versioning status of the bucket
+// GetVersioning returns the versioning status of the bucket.
 func (p *MinIOProvider) GetVersioning(ctx context.Context) (bool, error) {
 	output, err := p.client.GetBucketVersioning(ctx, &s3.GetBucketVersioningInput{
 		Bucket: aws.String(p.bucket),
@@ -366,7 +368,7 @@ func (p *MinIOProvider) GetVersioning(ctx context.Context) (bool, error) {
 	return output.Status == types.BucketVersioningStatusEnabled, nil
 }
 
-// SetReplication configures replication for the bucket
+// SetReplication configures replication for the bucket.
 func (p *MinIOProvider) SetReplication(ctx context.Context, destinationBucket, destinationRegion string) error {
 	// MinIO uses the same replication config as S3
 	replicationConfig := &types.ReplicationConfiguration{
@@ -395,7 +397,7 @@ func (p *MinIOProvider) SetReplication(ctx context.Context, destinationBucket, d
 	return nil
 }
 
-// GetReplication returns the replication configuration of the bucket
+// GetReplication returns the replication configuration of the bucket.
 func (p *MinIOProvider) GetReplication(ctx context.Context) (*types.ReplicationConfiguration, error) {
 	output, err := p.client.GetBucketReplication(ctx, &s3.GetBucketReplicationInput{
 		Bucket: aws.String(p.bucket),
@@ -407,7 +409,7 @@ func (p *MinIOProvider) GetReplication(ctx context.Context) (*types.ReplicationC
 	return output.ReplicationConfiguration, nil
 }
 
-// SetLifecyclePolicy sets a lifecycle policy for the bucket
+// SetLifecyclePolicy sets a lifecycle policy for the bucket.
 func (p *MinIOProvider) SetLifecyclePolicy(ctx context.Context, rules []types.LifecycleRule) error {
 	_, err := p.client.PutBucketLifecycleConfiguration(ctx, &s3.PutBucketLifecycleConfigurationInput{
 		Bucket: aws.String(p.bucket),
@@ -422,7 +424,7 @@ func (p *MinIOProvider) SetLifecyclePolicy(ctx context.Context, rules []types.Li
 	return nil
 }
 
-// GetLifecyclePolicy returns the lifecycle policy of the bucket
+// GetLifecyclePolicy returns the lifecycle policy of the bucket.
 func (p *MinIOProvider) GetLifecyclePolicy(ctx context.Context) ([]types.LifecycleRule, error) {
 	output, err := p.client.GetBucketLifecycleConfiguration(ctx, &s3.GetBucketLifecycleConfigurationInput{
 		Bucket: aws.String(p.bucket),

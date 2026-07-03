@@ -10,9 +10,10 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/sanskarpan/db-backup/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/sanskarpan/db-backup/internal/storage"
 )
 
 func TestMinIOProvider_NewProvider(t *testing.T) {

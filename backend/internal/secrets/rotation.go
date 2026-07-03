@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// KeyRotationConfig configures the key rotation system
+// KeyRotationConfig configures the key rotation system.
 type KeyRotationConfig struct {
 	// RotationInterval is how often keys should be rotated
 	RotationInterval time.Duration `mapstructure:"rotation_interval"`
@@ -27,7 +27,7 @@ type KeyRotationConfig struct {
 	NotifyOnRotation func(keyID string, oldKey, newKey string) error
 }
 
-// KeyRotationManager manages automatic key rotation
+// KeyRotationManager manages automatic key rotation.
 type KeyRotationManager struct {
 	config       *KeyRotationConfig
 	vault        *VaultClient
@@ -38,7 +38,7 @@ type KeyRotationManager struct {
 	rotationChan chan string
 }
 
-// RotatableKey represents a key that can be rotated
+// RotatableKey represents a key that can be rotated.
 type RotatableKey struct {
 	ID              string
 	CurrentKey      string
@@ -51,7 +51,7 @@ type RotatableKey struct {
 	mu              sync.RWMutex
 }
 
-// NewKeyRotationManager creates a new key rotation manager
+// NewKeyRotationManager creates a new key rotation manager.
 func NewKeyRotationManager(config *KeyRotationConfig, vault *VaultClient) *KeyRotationManager {
 	if config.KeyLength == 0 {
 		config.KeyLength = 32 // Default to 256 bits
@@ -74,7 +74,7 @@ func NewKeyRotationManager(config *KeyRotationConfig, vault *VaultClient) *KeyRo
 	}
 }
 
-// RegisterKey registers a key for rotation
+// RegisterKey registers a key for rotation.
 func (m *KeyRotationManager) RegisterKey(keyID, path string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -137,7 +137,7 @@ func (m *KeyRotationManager) RegisterKey(keyID, path string) error {
 	return nil
 }
 
-// GetKey retrieves the current key
+// GetKey retrieves the current key.
 func (m *KeyRotationManager) GetKey(keyID string) (string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -153,7 +153,7 @@ func (m *KeyRotationManager) GetKey(keyID string) (string, error) {
 	return key.CurrentKey, nil
 }
 
-// GetKeyWithVersion retrieves a specific key version
+// GetKeyWithVersion retrieves a specific key version.
 func (m *KeyRotationManager) GetKeyWithVersion(keyID string, version int) (string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -181,7 +181,7 @@ func (m *KeyRotationManager) GetKeyWithVersion(keyID string, version int) (strin
 	return "", fmt.Errorf("key version %d not found", version)
 }
 
-// RotateKey manually rotates a key
+// RotateKey manually rotates a key.
 func (m *KeyRotationManager) RotateKey(keyID string) error {
 	m.mu.RLock()
 	key, exists := m.keys[keyID]
@@ -240,7 +240,7 @@ func (m *KeyRotationManager) RotateKey(keyID string) error {
 	return nil
 }
 
-// Start starts the automatic key rotation scheduler
+// Start starts the automatic key rotation scheduler.
 func (m *KeyRotationManager) Start(ctx context.Context) error {
 	if !m.config.AutoRotate {
 		return nil
@@ -273,7 +273,7 @@ func (m *KeyRotationManager) Start(ctx context.Context) error {
 	return nil
 }
 
-// checkAndRotateKeys checks all keys and rotates those that need it
+// checkAndRotateKeys checks all keys and rotates those that need it.
 func (m *KeyRotationManager) checkAndRotateKeys() {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -296,7 +296,7 @@ func (m *KeyRotationManager) checkAndRotateKeys() {
 	}
 }
 
-// ForceRotation forces immediate rotation of a key
+// ForceRotation forces immediate rotation of a key.
 func (m *KeyRotationManager) ForceRotation(keyID string) error {
 	select {
 	case m.rotationChan <- keyID:
@@ -306,7 +306,7 @@ func (m *KeyRotationManager) ForceRotation(keyID string) error {
 	}
 }
 
-// GetKeyInfo returns information about a key
+// GetKeyInfo returns information about a key.
 func (m *KeyRotationManager) GetKeyInfo(keyID string) (*KeyInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -332,7 +332,7 @@ func (m *KeyRotationManager) GetKeyInfo(keyID string) (*KeyInfo, error) {
 	}, nil
 }
 
-// ListKeys returns all registered keys
+// ListKeys returns all registered keys.
 func (m *KeyRotationManager) ListKeys() []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -345,7 +345,7 @@ func (m *KeyRotationManager) ListKeys() []string {
 	return keys
 }
 
-// DeleteKey removes a key from rotation management (does not delete from Vault)
+// DeleteKey removes a key from rotation management (does not delete from Vault).
 func (m *KeyRotationManager) DeleteKey(keyID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -358,7 +358,7 @@ func (m *KeyRotationManager) DeleteKey(keyID string) error {
 	return nil
 }
 
-// generateKey generates a cryptographically secure random key
+// generateKey generates a cryptographically secure random key.
 func (m *KeyRotationManager) generateKey() (string, error) {
 	key := make([]byte, m.config.KeyLength)
 
@@ -370,7 +370,7 @@ func (m *KeyRotationManager) generateKey() (string, error) {
 	return base64.StdEncoding.EncodeToString(key), nil
 }
 
-// Stop stops the key rotation manager
+// Stop stops the key rotation manager.
 func (m *KeyRotationManager) Stop() {
 	m.closeStopChan()
 }
@@ -384,7 +384,7 @@ func (m *KeyRotationManager) closeStopChan() {
 	})
 }
 
-// KeyInfo contains information about a key
+// KeyInfo contains information about a key.
 type KeyInfo struct {
 	ID                string
 	CurrentVersion    int
@@ -397,13 +397,13 @@ type KeyInfo struct {
 	InGracePeriod     bool
 }
 
-// EncryptionKeyManager manages encryption keys with rotation
+// EncryptionKeyManager manages encryption keys with rotation.
 type EncryptionKeyManager struct {
 	rotationManager *KeyRotationManager
 	vault           *VaultClient
 }
 
-// NewEncryptionKeyManager creates a new encryption key manager
+// NewEncryptionKeyManager creates a new encryption key manager.
 func NewEncryptionKeyManager(config *KeyRotationConfig, vault *VaultClient) *EncryptionKeyManager {
 	return &EncryptionKeyManager{
 		rotationManager: NewKeyRotationManager(config, vault),
@@ -411,7 +411,7 @@ func NewEncryptionKeyManager(config *KeyRotationConfig, vault *VaultClient) *Enc
 	}
 }
 
-// GetEncryptionKey gets the current encryption key for a purpose
+// GetEncryptionKey gets the current encryption key for a purpose.
 func (m *EncryptionKeyManager) GetEncryptionKey(purpose string) (string, int, error) {
 	keyID := fmt.Sprintf("encryption/%s", purpose)
 
@@ -434,25 +434,25 @@ func (m *EncryptionKeyManager) GetEncryptionKey(purpose string) (string, int, er
 	return key, info.CurrentVersion, nil
 }
 
-// DecryptWithVersion decrypts data using a specific key version
+// DecryptWithVersion decrypts data using a specific key version.
 func (m *EncryptionKeyManager) DecryptWithVersion(purpose string, version int) (string, error) {
 	keyID := fmt.Sprintf("encryption/%s", purpose)
 
 	return m.rotationManager.GetKeyWithVersion(keyID, version)
 }
 
-// RotateEncryptionKey rotates an encryption key
+// RotateEncryptionKey rotates an encryption key.
 func (m *EncryptionKeyManager) RotateEncryptionKey(purpose string) error {
 	keyID := fmt.Sprintf("encryption/%s", purpose)
 	return m.rotationManager.RotateKey(keyID)
 }
 
-// Start starts the encryption key manager
+// Start starts the encryption key manager.
 func (m *EncryptionKeyManager) Start(ctx context.Context) error {
 	return m.rotationManager.Start(ctx)
 }
 
-// Stop stops the encryption key manager
+// Stop stops the encryption key manager.
 func (m *EncryptionKeyManager) Stop() {
 	m.rotationManager.Stop()
 }

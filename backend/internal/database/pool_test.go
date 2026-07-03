@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Helper function to create a test database connection
+// Helper function to create a test database connection.
 func createTestDB() (*sql.DB, error) {
 	return sql.Open("sqlite3", ":memory:")
 }
 
-// Helper function to create a test connection pool
+// Helper function to create a test connection pool.
 func createTestPool(t *testing.T, config PoolConfig) *ConnectionPool {
 	t.Helper()
 
@@ -429,7 +429,7 @@ func TestConnectionPool_ContextCancellation(t *testing.T) {
 	db1, err := pool.Get(ctx1)
 	require.NoError(t, err)
 
-	// Try to get another with cancelled context
+	// Try to get another with canceled context
 	ctx2, cancel := context.WithCancel(context.Background())
 	cancel()
 

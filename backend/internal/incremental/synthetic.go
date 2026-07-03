@@ -10,14 +10,14 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// SyntheticBackupGenerator generates synthetic full backups
+// SyntheticBackupGenerator generates synthetic full backups.
 type SyntheticBackupGenerator struct {
 	mu       sync.RWMutex
 	strategy *IncrementalForeverStrategy
 	tempDir  string
 }
 
-// NewSyntheticBackupGenerator creates a new synthetic backup generator
+// NewSyntheticBackupGenerator creates a new synthetic backup generator.
 func NewSyntheticBackupGenerator(strategy *IncrementalForeverStrategy, tempDir string) *SyntheticBackupGenerator {
 	return &SyntheticBackupGenerator{
 		strategy: strategy,
@@ -25,7 +25,7 @@ func NewSyntheticBackupGenerator(strategy *IncrementalForeverStrategy, tempDir s
 	}
 }
 
-// GenerateSyntheticFull generates a synthetic full backup from a backup chain
+// GenerateSyntheticFull generates a synthetic full backup from a backup chain.
 func (sbg *SyntheticBackupGenerator) GenerateSyntheticFull(latestIncrementalID string) (*BackupManifest, error) {
 	sbg.mu.Lock()
 	defer sbg.mu.Unlock()
@@ -129,7 +129,7 @@ func (sbg *SyntheticBackupGenerator) GenerateSyntheticFull(latestIncrementalID s
 	return syntheticManifest, nil
 }
 
-// ShouldGenerateSynthetic determines if a synthetic full should be generated
+// ShouldGenerateSynthetic determines if a synthetic full should be generated.
 func (sbg *SyntheticBackupGenerator) ShouldGenerateSynthetic(latestBackupID string, threshold int) (bool, error) {
 	// Get backup chain
 	chain, err := sbg.strategy.GetBackupChain(latestBackupID)
@@ -148,7 +148,7 @@ func (sbg *SyntheticBackupGenerator) ShouldGenerateSynthetic(latestBackupID stri
 	return incrementalCount >= threshold, nil
 }
 
-// GetSyntheticBackupRecommendation provides recommendation on synthetic backup
+// GetSyntheticBackupRecommendation provides recommendation on synthetic backup.
 func (sbg *SyntheticBackupGenerator) GetSyntheticBackupRecommendation(latestBackupID string) (map[string]interface{}, error) {
 	chain, err := sbg.strategy.GetBackupChain(latestBackupID)
 	if err != nil {
@@ -208,7 +208,7 @@ func (sbg *SyntheticBackupGenerator) GetSyntheticBackupRecommendation(latestBack
 	return recommendation, nil
 }
 
-// VerifySyntheticBackup verifies a synthetic backup's integrity
+// VerifySyntheticBackup verifies a synthetic backup's integrity.
 func (sbg *SyntheticBackupGenerator) VerifySyntheticBackup(syntheticID string) error {
 	manifest, exists := sbg.strategy.GetManifest(syntheticID)
 	if !exists {
@@ -234,7 +234,7 @@ func (sbg *SyntheticBackupGenerator) VerifySyntheticBackup(syntheticID string) e
 	return nil
 }
 
-// ConvertToBase converts a synthetic full backup to a base backup for new incrementals
+// ConvertToBase converts a synthetic full backup to a base backup for new incrementals.
 func (sbg *SyntheticBackupGenerator) ConvertToBase(syntheticID string) error {
 	sbg.strategy.mu.Lock()
 	defer sbg.strategy.mu.Unlock()
@@ -263,7 +263,7 @@ func (sbg *SyntheticBackupGenerator) ConvertToBase(syntheticID string) error {
 	return nil
 }
 
-// CleanupOldChain removes old backups after synthetic full is created
+// CleanupOldChain removes old backups after synthetic full is created.
 func (sbg *SyntheticBackupGenerator) CleanupOldChain(syntheticID string, keepLatestN int) ([]string, error) {
 	sbg.strategy.mu.Lock()
 	defer sbg.strategy.mu.Unlock()
@@ -321,7 +321,7 @@ func (sbg *SyntheticBackupGenerator) CleanupOldChain(syntheticID string, keepLat
 	return removed, nil
 }
 
-// EstimateSyntheticCreationTime estimates how long it will take to create a synthetic
+// EstimateSyntheticCreationTime estimates how long it will take to create a synthetic.
 func (sbg *SyntheticBackupGenerator) EstimateSyntheticCreationTime(latestBackupID string) (time.Duration, error) {
 	chain, err := sbg.strategy.GetBackupChain(latestBackupID)
 	if err != nil {
@@ -351,7 +351,7 @@ func (sbg *SyntheticBackupGenerator) EstimateSyntheticCreationTime(latestBackupI
 	return time.Duration(estimatedSeconds)*time.Second + overhead, nil
 }
 
-// GetSyntheticBackups returns all synthetic backups
+// GetSyntheticBackups returns all synthetic backups.
 func (sbg *SyntheticBackupGenerator) GetSyntheticBackups() []*BackupManifest {
 	sbg.strategy.mu.RLock()
 	defer sbg.strategy.mu.RUnlock()
@@ -366,7 +366,7 @@ func (sbg *SyntheticBackupGenerator) GetSyntheticBackups() []*BackupManifest {
 	return synthetics
 }
 
-// ScheduleSyntheticBackup schedules a synthetic backup to be created
+// ScheduleSyntheticBackup schedules a synthetic backup to be created.
 func (sbg *SyntheticBackupGenerator) ScheduleSyntheticBackup(latestBackupID string, scheduleTime time.Time) (*SyntheticSchedule, error) {
 	schedule := &SyntheticSchedule{
 		ID:             uid.New("sched"),
@@ -379,7 +379,7 @@ func (sbg *SyntheticBackupGenerator) ScheduleSyntheticBackup(latestBackupID stri
 	return schedule, nil
 }
 
-// SyntheticSchedule represents a scheduled synthetic backup
+// SyntheticSchedule represents a scheduled synthetic backup.
 type SyntheticSchedule struct {
 	ID             string
 	LatestBackupID string
@@ -391,7 +391,7 @@ type SyntheticSchedule struct {
 	CompletedAt    time.Time
 }
 
-// GetStatistics returns statistics about synthetic backups
+// GetStatistics returns statistics about synthetic backups.
 func (sbg *SyntheticBackupGenerator) GetStatistics() map[string]interface{} {
 	synthetics := sbg.GetSyntheticBackups()
 

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Mock stores for testing
+// Mock stores for testing.
 type mockPolicyStore struct {
 	policies map[string]*ResidencyPolicy
 }
@@ -253,12 +253,12 @@ func TestValidateResidency(t *testing.T) {
 
 	// Create a policy
 	policy := &ResidencyPolicy{
-		ID:                   "policy-1",
-		Name:                 "EU Policy",
-		PrimaryRegion:        RegionEUWest,
-		AllowedRegions:       []Region{RegionEUWest, RegionEUCentral},
-		RestrictedRegions:    []Region{RegionUSEast},
-		Active:               true,
+		ID:                "policy-1",
+		Name:              "EU Policy",
+		PrimaryRegion:     RegionEUWest,
+		AllowedRegions:    []Region{RegionEUWest, RegionEUCentral},
+		RestrictedRegions: []Region{RegionUSEast},
+		Active:            true,
 	}
 	policyStore.Save(ctx, policy)
 

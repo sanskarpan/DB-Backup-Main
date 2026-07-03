@@ -11,20 +11,20 @@ import (
 )
 
 var (
-	// ErrPoolClosed is returned when attempting to use a closed pool
+	// ErrPoolClosed is returned when attempting to use a closed pool.
 	ErrPoolClosed = errors.New("connection pool is closed")
 
-	// ErrPoolExhausted is returned when pool has no available connections
+	// ErrPoolExhausted is returned when pool has no available connections.
 	ErrPoolExhausted = errors.New("connection pool exhausted")
 
-	// ErrConnectionUnhealthy is returned when connection health check fails
+	// ErrConnectionUnhealthy is returned when connection health check fails.
 	ErrConnectionUnhealthy = errors.New("connection is unhealthy")
 
-	// ErrTenantNotFound is returned when tenant pool doesn't exist
+	// ErrTenantNotFound is returned when tenant pool doesn't exist.
 	ErrTenantNotFound = errors.New("tenant pool not found")
 )
 
-// PoolConfig defines connection pool configuration
+// PoolConfig defines connection pool configuration.
 type PoolConfig struct {
 	// MinConnections is the minimum number of connections to maintain
 	MinConnections int
@@ -60,7 +60,7 @@ type PoolConfig struct {
 	ScaleDownThreshold float64
 }
 
-// DefaultPoolConfig returns default pool configuration
+// DefaultPoolConfig returns default pool configuration.
 func DefaultPoolConfig() PoolConfig {
 	return PoolConfig{
 		MinConnections:      2,
@@ -72,12 +72,12 @@ func DefaultPoolConfig() PoolConfig {
 		ReconnectDelay:      1 * time.Second,
 		MaxReconnectDelay:   30 * time.Second,
 		AutoScale:           true,
-		ScaleUpThreshold:    0.8,  // Scale up at 80% utilization
-		ScaleDownThreshold:  0.3,  // Scale down at 30% utilization
+		ScaleUpThreshold:    0.8, // Scale up at 80% utilization
+		ScaleDownThreshold:  0.3, // Scale down at 30% utilization
 	}
 }
 
-// PoolStats represents pool statistics
+// PoolStats represents pool statistics.
 type PoolStats struct {
 	// TotalConnections is the total number of connections
 	TotalConnections int64
@@ -107,7 +107,7 @@ type PoolStats struct {
 	ReconnectSuccess int64
 }
 
-// ConnectionPool manages a pool of database connections
+// ConnectionPool manages a pool of database connections.
 type ConnectionPool struct {
 	config   PoolConfig
 	connFunc func(context.Context) (*sql.DB, error)
@@ -116,7 +116,7 @@ type ConnectionPool struct {
 	connections []*pooledConnection
 	closed      bool
 
-	stats       atomic.Value // *PoolStats
+	stats atomic.Value // *PoolStats
 
 	healthTicker *time.Ticker
 	scaleTicker  *time.Ticker
@@ -124,18 +124,18 @@ type ConnectionPool struct {
 	wg           sync.WaitGroup
 }
 
-// pooledConnection wraps a database connection with metadata
+// pooledConnection wraps a database connection with metadata.
 type pooledConnection struct {
-	db         *sql.DB
-	createdAt  time.Time
-	lastUsed   time.Time
-	inUse      bool
-	healthy    bool
-	failCount  int
-	mu         sync.RWMutex
+	db        *sql.DB
+	createdAt time.Time
+	lastUsed  time.Time
+	inUse     bool
+	healthy   bool
+	failCount int
+	mu        sync.RWMutex
 }
 
-// NewConnectionPool creates a new connection pool
+// NewConnectionPool creates a new connection pool.
 func NewConnectionPool(config PoolConfig, connFunc func(context.Context) (*sql.DB, error)) (*ConnectionPool, error) {
 	if config.MinConnections < 1 {
 		return nil, errors.New("minimum connections must be at least 1")
@@ -172,7 +172,7 @@ func NewConnectionPool(config PoolConfig, connFunc func(context.Context) (*sql.D
 	return pool, nil
 }
 
-// Get acquires a connection from the pool
+// Get acquires a connection from the pool.
 func (p *ConnectionPool) Get(ctx context.Context) (*sql.DB, error) {
 	p.mu.Lock()
 	if p.closed {
@@ -224,7 +224,7 @@ func (p *ConnectionPool) Get(ctx context.Context) (*sql.DB, error) {
 	return p.waitForConnection(ctx)
 }
 
-// Put returns a connection to the pool
+// Put returns a connection to the pool.
 func (p *ConnectionPool) Put(db *sql.DB) error {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -253,7 +253,7 @@ func (p *ConnectionPool) Put(db *sql.DB) error {
 	return errors.New("connection not found in pool")
 }
 
-// Stats returns current pool statistics
+// Stats returns current pool statistics.
 func (p *ConnectionPool) Stats() PoolStats {
 	stats := p.stats.Load().(*PoolStats)
 
@@ -281,7 +281,7 @@ func (p *ConnectionPool) Stats() PoolStats {
 	return result
 }
 
-// Close closes all connections in the pool
+// Close closes all connections in the pool.
 func (p *ConnectionPool) Close() error {
 	p.mu.Lock()
 
@@ -378,7 +378,7 @@ func (p *ConnectionPool) createConnectionLocked(ctx context.Context) error {
 	return nil
 }
 
-// waitForConnection waits for a connection to become available
+// waitForConnection waits for a connection to become available.
 func (p *ConnectionPool) waitForConnection(ctx context.Context) (*sql.DB, error) {
 	waitStart := time.Now()
 
@@ -415,7 +415,7 @@ func (p *ConnectionPool) waitForConnection(ctx context.Context) (*sql.DB, error)
 	}
 }
 
-// tryGetConnection attempts to get a connection without waiting
+// tryGetConnection attempts to get a connection without waiting.
 func (p *ConnectionPool) tryGetConnection() (*sql.DB, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -444,7 +444,7 @@ func (p *ConnectionPool) tryGetConnection() (*sql.DB, error) {
 	return nil, ErrPoolExhausted
 }
 
-// startHealthCheck starts the health check worker
+// startHealthCheck starts the health check worker.
 func (p *ConnectionPool) startHealthCheck() {
 	p.healthTicker = time.NewTicker(p.config.HealthCheckInterval)
 
@@ -463,7 +463,7 @@ func (p *ConnectionPool) startHealthCheck() {
 	}()
 }
 
-// healthCheck performs health checks on all connections
+// healthCheck performs health checks on all connections.
 func (p *ConnectionPool) healthCheck() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -548,7 +548,7 @@ func (p *ConnectionPool) healthCheck() {
 	}
 }
 
-// reconnect attempts to reconnect a failed connection
+// reconnect attempts to reconnect a failed connection.
 func (p *ConnectionPool) reconnect(oldConn *pooledConnection) {
 	p.updateStats(func(s *PoolStats) {
 		atomic.AddInt64(&s.ReconnectAttempts, 1)
@@ -582,7 +582,7 @@ func (p *ConnectionPool) reconnect(oldConn *pooledConnection) {
 	}
 }
 
-// removeConnection removes a connection from the pool
+// removeConnection removes a connection from the pool.
 func (p *ConnectionPool) removeConnection(conn *pooledConnection) {
 	for i, c := range p.connections {
 		if c == conn {
@@ -599,7 +599,7 @@ func (p *ConnectionPool) removeConnection(conn *pooledConnection) {
 	}
 }
 
-// startAutoScaling starts the auto-scaling worker
+// startAutoScaling starts the auto-scaling worker.
 func (p *ConnectionPool) startAutoScaling() {
 	p.scaleTicker = time.NewTicker(30 * time.Second)
 
@@ -618,7 +618,7 @@ func (p *ConnectionPool) startAutoScaling() {
 	}()
 }
 
-// autoScale automatically adjusts pool size based on utilization
+// autoScale automatically adjusts pool size based on utilization.
 func (p *ConnectionPool) autoScale() {
 	stats := p.Stats()
 
@@ -654,7 +654,7 @@ func (p *ConnectionPool) autoScale() {
 	}
 }
 
-// updateStats updates pool statistics atomically
+// updateStats updates pool statistics atomically.
 func (p *ConnectionPool) updateStats(fn func(*PoolStats)) {
 	for {
 		oldStats := p.stats.Load().(*PoolStats)
@@ -666,14 +666,14 @@ func (p *ConnectionPool) updateStats(fn func(*PoolStats)) {
 	}
 }
 
-// MultiTenantPool manages separate connection pools for multiple tenants
+// MultiTenantPool manages separate connection pools for multiple tenants.
 type MultiTenantPool struct {
 	mu     sync.RWMutex
 	pools  map[string]*ConnectionPool
 	config PoolConfig
 }
 
-// NewMultiTenantPool creates a new multi-tenant pool manager
+// NewMultiTenantPool creates a new multi-tenant pool manager.
 func NewMultiTenantPool(config PoolConfig) *MultiTenantPool {
 	return &MultiTenantPool{
 		pools:  make(map[string]*ConnectionPool),
@@ -681,7 +681,7 @@ func NewMultiTenantPool(config PoolConfig) *MultiTenantPool {
 	}
 }
 
-// GetPool returns the connection pool for a tenant, creating it if needed
+// GetPool returns the connection pool for a tenant, creating it if needed.
 func (m *MultiTenantPool) GetPool(tenantID string, connFunc func(context.Context) (*sql.DB, error)) (*ConnectionPool, error) {
 	m.mu.RLock()
 	pool, exists := m.pools[tenantID]
@@ -709,7 +709,7 @@ func (m *MultiTenantPool) GetPool(tenantID string, connFunc func(context.Context
 	return pool, nil
 }
 
-// RemovePool removes a tenant's connection pool
+// RemovePool removes a tenant's connection pool.
 func (m *MultiTenantPool) RemovePool(tenantID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -723,7 +723,7 @@ func (m *MultiTenantPool) RemovePool(tenantID string) error {
 	return pool.Close()
 }
 
-// Close closes all tenant pools
+// Close closes all tenant pools.
 func (m *MultiTenantPool) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -744,7 +744,7 @@ func (m *MultiTenantPool) Close() error {
 	return nil
 }
 
-// Stats returns statistics for all tenant pools
+// Stats returns statistics for all tenant pools.
 func (m *MultiTenantPool) Stats() map[string]PoolStats {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

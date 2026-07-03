@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-// PIIType represents a type of personally identifiable information
+// PIIType represents a type of personally identifiable information.
 type PIIType string
 
 const (
@@ -21,7 +21,7 @@ const (
 	PIITypeCustom      PIIType = "custom"
 )
 
-// PIIPattern represents a pattern for detecting PII
+// PIIPattern represents a pattern for detecting PII.
 type PIIPattern struct {
 	Type        PIIType
 	Name        string
@@ -31,7 +31,7 @@ type PIIPattern struct {
 	Description string
 }
 
-// PIIDetection represents a detected PII instance
+// PIIDetection represents a detected PII instance.
 type PIIDetection struct {
 	Type       PIIType
 	Value      string
@@ -44,14 +44,14 @@ type PIIDetection struct {
 	Metadata   map[string]interface{}
 }
 
-// PIIDetector detects PII in data
+// PIIDetector detects PII in data.
 type PIIDetector struct {
 	mu       sync.RWMutex
 	patterns map[PIIType][]*PIIPattern
 	enabled  map[PIIType]bool
 }
 
-// NewPIIDetector creates a new PII detector
+// NewPIIDetector creates a new PII detector.
 func NewPIIDetector() *PIIDetector {
 	detector := &PIIDetector{
 		patterns: make(map[PIIType][]*PIIPattern),
@@ -64,7 +64,7 @@ func NewPIIDetector() *PIIDetector {
 	return detector
 }
 
-// initializeDefaultPatterns initializes the default PII detection patterns
+// initializeDefaultPatterns initializes the default PII detection patterns.
 func (pd *PIIDetector) initializeDefaultPatterns() {
 	// Email patterns
 	pd.AddPattern(&PIIPattern{
@@ -180,7 +180,7 @@ func (pd *PIIDetector) initializeDefaultPatterns() {
 	}
 }
 
-// AddPattern adds a custom PII detection pattern
+// AddPattern adds a custom PII detection pattern.
 func (pd *PIIDetector) AddPattern(pattern *PIIPattern) {
 	pd.mu.Lock()
 	defer pd.mu.Unlock()
@@ -193,21 +193,21 @@ func (pd *PIIDetector) AddPattern(pattern *PIIPattern) {
 	pd.enabled[pattern.Type] = true
 }
 
-// EnableType enables detection for a specific PII type
+// EnableType enables detection for a specific PII type.
 func (pd *PIIDetector) EnableType(piiType PIIType) {
 	pd.mu.Lock()
 	defer pd.mu.Unlock()
 	pd.enabled[piiType] = true
 }
 
-// DisableType disables detection for a specific PII type
+// DisableType disables detection for a specific PII type.
 func (pd *PIIDetector) DisableType(piiType PIIType) {
 	pd.mu.Lock()
 	defer pd.mu.Unlock()
 	pd.enabled[piiType] = false
 }
 
-// DetectInString detects PII in a string
+// DetectInString detects PII in a string.
 func (pd *PIIDetector) DetectInString(input string) []*PIIDetection {
 	pd.mu.RLock()
 	defer pd.mu.RUnlock()
@@ -249,7 +249,7 @@ func (pd *PIIDetector) DetectInString(input string) []*PIIDetection {
 	return detections
 }
 
-// DetectInColumn detects PII in a column value
+// DetectInColumn detects PII in a column value.
 func (pd *PIIDetector) DetectInColumn(table, column, value string) []*PIIDetection {
 	detections := pd.DetectInString(value)
 
@@ -261,7 +261,7 @@ func (pd *PIIDetector) DetectInColumn(table, column, value string) []*PIIDetecti
 	return detections
 }
 
-// DetectInRow detects PII across multiple columns in a row
+// DetectInRow detects PII across multiple columns in a row.
 func (pd *PIIDetector) DetectInRow(table string, row map[string]string) map[string][]*PIIDetection {
 	results := make(map[string][]*PIIDetection)
 
@@ -275,7 +275,7 @@ func (pd *PIIDetector) DetectInRow(table string, row map[string]string) map[stri
 	return results
 }
 
-// AnalyzeColumn analyzes a column to determine if it likely contains PII
+// AnalyzeColumn analyzes a column to determine if it likely contains PII.
 func (pd *PIIDetector) AnalyzeColumn(table, column string, samples []string, threshold float64) map[PIIType]float64 {
 	if threshold == 0 {
 		threshold = 0.5 // Default 50% threshold
@@ -303,7 +303,7 @@ func (pd *PIIDetector) AnalyzeColumn(table, column string, samples []string, thr
 	return scores
 }
 
-// SuggestMaskingStrategy suggests a masking strategy based on detected PII
+// SuggestMaskingStrategy suggests a masking strategy based on detected PII.
 func (pd *PIIDetector) SuggestMaskingStrategy(piiType PIIType) MaskingStrategy {
 	switch piiType {
 	case PIITypeEmail:
@@ -329,7 +329,7 @@ func (pd *PIIDetector) SuggestMaskingStrategy(piiType PIIType) MaskingStrategy {
 
 // Validator functions
 
-// validateSSN validates a SSN using basic rules
+// validateSSN validates a SSN using basic rules.
 func validateSSN(ssn string) bool {
 	// Remove dashes
 	clean := strings.ReplaceAll(ssn, "-", "")
@@ -365,7 +365,7 @@ func validateSSN(ssn string) bool {
 	return true
 }
 
-// luhnValidate validates a credit card number using the Luhn algorithm
+// luhnValidate validates a credit card number using the Luhn algorithm.
 func luhnValidate(cardNumber string) bool {
 	// Remove spaces and dashes
 	clean := strings.ReplaceAll(strings.ReplaceAll(cardNumber, " ", ""), "-", "")
@@ -395,7 +395,7 @@ func luhnValidate(cardNumber string) bool {
 	return sum%10 == 0
 }
 
-// validateIPv4 validates an IPv4 address
+// validateIPv4 validates an IPv4 address.
 func validateIPv4(ip string) bool {
 	parts := strings.Split(ip, ".")
 	if len(parts) != 4 {
@@ -418,14 +418,14 @@ func validateIPv4(ip string) bool {
 	return true
 }
 
-// GetStatistics returns statistics about the detector
+// GetStatistics returns statistics about the detector.
 func (pd *PIIDetector) GetStatistics() map[string]interface{} {
 	pd.mu.RLock()
 	defer pd.mu.RUnlock()
 
 	stats := map[string]interface{}{
-		"total_patterns": 0,
-		"enabled_types":  0,
+		"total_patterns":   0,
+		"enabled_types":    0,
 		"patterns_by_type": make(map[PIIType]int),
 	}
 

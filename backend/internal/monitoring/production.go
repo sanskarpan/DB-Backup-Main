@@ -11,21 +11,21 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// ProductionMonitor provides comprehensive production monitoring
+// ProductionMonitor provides comprehensive production monitoring.
 type ProductionMonitor struct {
-	mu               sync.RWMutex
-	config           MonitorConfig
-	alertManager     *AlertManager
-	errorTracker     *ErrorTracker
+	mu                 sync.RWMutex
+	config             MonitorConfig
+	alertManager       *AlertManager
+	errorTracker       *ErrorTracker
 	performanceMonitor *PerformanceMonitor
-	feedbackCollector *FeedbackCollector
-	healthChecks     map[string]*HealthCheck
-	running          bool
-	stopCh           chan struct{}
-	wg               sync.WaitGroup
+	feedbackCollector  *FeedbackCollector
+	healthChecks       map[string]*HealthCheck
+	running            bool
+	stopCh             chan struct{}
+	wg                 sync.WaitGroup
 }
 
-// MonitorConfig configures the production monitor
+// MonitorConfig configures the production monitor.
 type MonitorConfig struct {
 	// Monitoring intervals
 	HealthCheckInterval    time.Duration
@@ -33,12 +33,12 @@ type MonitorConfig struct {
 	AlertCheckInterval     time.Duration
 
 	// Alert thresholds
-	ErrorRateThreshold      float64 // errors per second
-	ResponseTimeThreshold   time.Duration
-	AvailabilityThreshold   float64 // percentage (0-1)
-	CPUUsageThreshold       float64 // percentage (0-100)
-	MemoryUsageThreshold    float64 // percentage (0-100)
-	DiskUsageThreshold      float64 // percentage (0-100)
+	ErrorRateThreshold    float64 // errors per second
+	ResponseTimeThreshold time.Duration
+	AvailabilityThreshold float64 // percentage (0-1)
+	CPUUsageThreshold     float64 // percentage (0-100)
+	MemoryUsageThreshold  float64 // percentage (0-100)
+	DiskUsageThreshold    float64 // percentage (0-100)
 
 	// Alerting
 	AlertManagerURL string
@@ -46,30 +46,30 @@ type MonitorConfig struct {
 	EmailRecipients []string
 
 	// Features
-	EnableUserFeedback  bool
+	EnableUserFeedback        bool
 	EnablePerformanceTracking bool
-	EnableAutoRemediation bool
+	EnableAutoRemediation     bool
 }
 
-// DefaultMonitorConfig returns default monitoring configuration
+// DefaultMonitorConfig returns default monitoring configuration.
 func DefaultMonitorConfig() MonitorConfig {
 	return MonitorConfig{
-		HealthCheckInterval:    30 * time.Second,
-		MetricsCollectInterval: 10 * time.Second,
-		AlertCheckInterval:     30 * time.Second,
-		ErrorRateThreshold:      10.0, // 10 errors per second
-		ResponseTimeThreshold:   5 * time.Second,
-		AvailabilityThreshold:   0.999, // 99.9%
-		CPUUsageThreshold:       80.0,
-		MemoryUsageThreshold:    85.0,
-		DiskUsageThreshold:      90.0,
-		EnableUserFeedback:      true,
+		HealthCheckInterval:       30 * time.Second,
+		MetricsCollectInterval:    10 * time.Second,
+		AlertCheckInterval:        30 * time.Second,
+		ErrorRateThreshold:        10.0, // 10 errors per second
+		ResponseTimeThreshold:     5 * time.Second,
+		AvailabilityThreshold:     0.999, // 99.9%
+		CPUUsageThreshold:         80.0,
+		MemoryUsageThreshold:      85.0,
+		DiskUsageThreshold:        90.0,
+		EnableUserFeedback:        true,
 		EnablePerformanceTracking: true,
-		EnableAutoRemediation:   false,
+		EnableAutoRemediation:     false,
 	}
 }
 
-// NewProductionMonitor creates a new production monitor
+// NewProductionMonitor creates a new production monitor.
 func NewProductionMonitor(config MonitorConfig) *ProductionMonitor {
 	return &ProductionMonitor{
 		config:             config,
@@ -82,7 +82,7 @@ func NewProductionMonitor(config MonitorConfig) *ProductionMonitor {
 	}
 }
 
-// Start starts the production monitor
+// Start starts the production monitor.
 func (pm *ProductionMonitor) Start(ctx context.Context) error {
 	pm.mu.Lock()
 	if pm.running {
@@ -113,7 +113,7 @@ func (pm *ProductionMonitor) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop stops the production monitor
+// Stop stops the production monitor.
 func (pm *ProductionMonitor) Stop() error {
 	pm.mu.Lock()
 	if !pm.running {
@@ -129,7 +129,7 @@ func (pm *ProductionMonitor) Stop() error {
 	return nil
 }
 
-// RegisterHealthCheck registers a health check
+// RegisterHealthCheck registers a health check.
 func (pm *ProductionMonitor) RegisterHealthCheck(name string, check HealthCheckFunc, critical bool) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
@@ -142,19 +142,19 @@ func (pm *ProductionMonitor) RegisterHealthCheck(name string, check HealthCheckF
 	}
 }
 
-// RecordError records an error for tracking
+// RecordError records an error for tracking.
 func (pm *ProductionMonitor) RecordError(err error, context map[string]interface{}) {
 	pm.errorTracker.RecordError(err, context)
 	errorRateGauge.Set(pm.errorTracker.GetErrorRate())
 }
 
-// RecordResponse records a response time
+// RecordResponse records a response time.
 func (pm *ProductionMonitor) RecordResponse(duration time.Duration, endpoint string) {
 	pm.performanceMonitor.RecordResponse(duration, endpoint)
 	responseTimeHistogram.WithLabelValues(endpoint).Observe(duration.Seconds())
 }
 
-// CollectFeedback collects user feedback
+// CollectFeedback collects user feedback.
 func (pm *ProductionMonitor) CollectFeedback(feedback *UserFeedback) error {
 	if !pm.config.EnableUserFeedback {
 		return fmt.Errorf("user feedback collection is disabled")
@@ -162,7 +162,7 @@ func (pm *ProductionMonitor) CollectFeedback(feedback *UserFeedback) error {
 	return pm.feedbackCollector.Collect(feedback)
 }
 
-// GetStatus returns the current monitoring status
+// GetStatus returns the current monitoring status.
 func (pm *ProductionMonitor) GetStatus() *MonitorStatus {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
@@ -178,7 +178,7 @@ func (pm *ProductionMonitor) GetStatus() *MonitorStatus {
 	}
 }
 
-// runHealthChecks runs health checks periodically
+// runHealthChecks runs health checks periodically.
 func (pm *ProductionMonitor) runHealthChecks(ctx context.Context) {
 	defer pm.wg.Done()
 
@@ -197,7 +197,7 @@ func (pm *ProductionMonitor) runHealthChecks(ctx context.Context) {
 	}
 }
 
-// executeHealthChecks executes all registered health checks
+// executeHealthChecks executes all registered health checks.
 func (pm *ProductionMonitor) executeHealthChecks(ctx context.Context) {
 	pm.mu.RLock()
 	checks := make([]*HealthCheck, 0, len(pm.healthChecks))
@@ -232,7 +232,7 @@ func (pm *ProductionMonitor) executeHealthChecks(ctx context.Context) {
 	}
 }
 
-// collectMetrics collects and updates metrics
+// collectMetrics collects and updates metrics.
 func (pm *ProductionMonitor) collectMetrics(ctx context.Context) {
 	defer pm.wg.Done()
 
@@ -251,7 +251,7 @@ func (pm *ProductionMonitor) collectMetrics(ctx context.Context) {
 	}
 }
 
-// updateMetrics updates all monitoring metrics
+// updateMetrics updates all monitoring metrics.
 func (pm *ProductionMonitor) updateMetrics() {
 	// Update error rate
 	errorRate := pm.errorTracker.GetErrorRate()
@@ -271,7 +271,7 @@ func (pm *ProductionMonitor) updateMetrics() {
 	// diskUsageGauge.Set(getCurrentDiskUsage())
 }
 
-// checkAlerts checks for alert conditions
+// checkAlerts checks for alert conditions.
 func (pm *ProductionMonitor) checkAlerts(ctx context.Context) {
 	defer pm.wg.Done()
 
@@ -290,7 +290,7 @@ func (pm *ProductionMonitor) checkAlerts(ctx context.Context) {
 	}
 }
 
-// evaluateAlertConditions evaluates all alert conditions
+// evaluateAlertConditions evaluates all alert conditions.
 func (pm *ProductionMonitor) evaluateAlertConditions() {
 	// Check error rate
 	errorRate := pm.errorTracker.GetErrorRate()
@@ -341,7 +341,7 @@ func (pm *ProductionMonitor) evaluateAlertConditions() {
 	}
 }
 
-// getHealthyCheckCount returns the number of healthy checks
+// getHealthyCheckCount returns the number of healthy checks.
 func (pm *ProductionMonitor) getHealthyCheckCount() int {
 	count := 0
 	for _, check := range pm.healthChecks {
@@ -352,7 +352,7 @@ func (pm *ProductionMonitor) getHealthyCheckCount() int {
 	return count
 }
 
-// calculateUptime calculates the current uptime percentage
+// calculateUptime calculates the current uptime percentage.
 func (pm *ProductionMonitor) calculateUptime() float64 {
 	// This is a simplified calculation
 	// In production, you'd track actual uptime vs downtime
@@ -366,7 +366,7 @@ func (pm *ProductionMonitor) calculateUptime() float64 {
 	return float64(healthyCount) / float64(totalCount)
 }
 
-// Prometheus metrics for monitoring
+// Prometheus metrics for monitoring.
 var (
 	healthCheckStatus = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -414,7 +414,7 @@ var (
 	)
 )
 
-// MonitorStatus represents the current monitoring status
+// MonitorStatus represents the current monitoring status.
 type MonitorStatus struct {
 	Running          bool          `json:"running"`
 	HealthyChecks    int           `json:"healthy_checks"`

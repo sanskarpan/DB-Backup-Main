@@ -10,17 +10,17 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
-// RepositoryManager handles Elasticsearch snapshot repositories
+// RepositoryManager handles Elasticsearch snapshot repositories.
 type RepositoryManager struct {
 	client *elasticsearch.Client
 }
 
-// NewRepositoryManager creates a new repository manager
+// NewRepositoryManager creates a new repository manager.
 func NewRepositoryManager(client *elasticsearch.Client) *RepositoryManager {
 	return &RepositoryManager{client: client}
 }
 
-// CreateRepository creates a snapshot repository
+// CreateRepository creates a snapshot repository.
 func (r *RepositoryManager) CreateRepository(ctx context.Context, name, location string) error {
 	// Check if repository exists
 	exists, err := r.RepositoryExists(ctx, name)
@@ -63,7 +63,7 @@ func (r *RepositoryManager) CreateRepository(ctx context.Context, name, location
 	return nil
 }
 
-// DeleteRepository deletes a snapshot repository
+// DeleteRepository deletes a snapshot repository.
 func (r *RepositoryManager) DeleteRepository(ctx context.Context, name string) error {
 	res, err := r.client.Snapshot.DeleteRepository([]string{name})
 	if err != nil {
@@ -78,7 +78,7 @@ func (r *RepositoryManager) DeleteRepository(ctx context.Context, name string) e
 	return nil
 }
 
-// RepositoryExists checks if a repository exists
+// RepositoryExists checks if a repository exists.
 func (r *RepositoryManager) RepositoryExists(ctx context.Context, name string) (bool, error) {
 	res, err := r.client.Snapshot.GetRepository(
 		r.client.Snapshot.GetRepository.WithRepository(name),
@@ -91,7 +91,7 @@ func (r *RepositoryManager) RepositoryExists(ctx context.Context, name string) (
 	return !res.IsError(), nil
 }
 
-// ListRepositories lists all snapshot repositories
+// ListRepositories lists all snapshot repositories.
 func (r *RepositoryManager) ListRepositories(ctx context.Context) ([]string, error) {
 	res, err := r.client.Snapshot.GetRepository()
 	if err != nil {

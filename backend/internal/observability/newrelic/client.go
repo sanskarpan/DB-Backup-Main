@@ -10,7 +10,7 @@ import (
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
-// Config holds New Relic configuration
+// Config holds New Relic configuration.
 type Config struct {
 	LicenseKey  string
 	AppName     string
@@ -18,13 +18,13 @@ type Config struct {
 	Enabled     bool
 }
 
-// Client represents a New Relic APM client
+// Client represents a New Relic APM client.
 type Client struct {
 	config *Config
 	app    *newrelic.Application
 }
 
-// NewClient creates a new New Relic client
+// NewClient creates a new New Relic client.
 func NewClient(config *Config) (*Client, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
@@ -51,7 +51,7 @@ func NewClient(config *Config) (*Client, error) {
 	}, nil
 }
 
-// Start initializes the New Relic application
+// Start initializes the New Relic application.
 func (c *Client) Start() error {
 	if !c.config.Enabled {
 		return nil
@@ -68,7 +68,6 @@ func (c *Client) Start() error {
 			}
 		},
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to create New Relic application: %w", err)
 	}
@@ -77,7 +76,7 @@ func (c *Client) Start() error {
 	return nil
 }
 
-// Stop gracefully shuts down the New Relic application
+// Stop gracefully shuts down the New Relic application.
 func (c *Client) Stop() {
 	if !c.config.Enabled || c.app == nil {
 		return
@@ -85,7 +84,7 @@ func (c *Client) Stop() {
 	c.app.Shutdown(10 * time.Second)
 }
 
-// StartTransaction starts a new transaction
+// StartTransaction starts a new transaction.
 func (c *Client) StartTransaction(name string) *newrelic.Transaction {
 	if !c.config.Enabled || c.app == nil {
 		return nil
@@ -93,7 +92,7 @@ func (c *Client) StartTransaction(name string) *newrelic.Transaction {
 	return c.app.StartTransaction(name)
 }
 
-// StartTransactionFromContext starts a new transaction from context
+// StartTransactionFromContext starts a new transaction from context.
 func (c *Client) StartTransactionFromContext(ctx context.Context, name string) (*newrelic.Transaction, context.Context) {
 	if !c.config.Enabled || c.app == nil {
 		return nil, ctx
@@ -103,7 +102,7 @@ func (c *Client) StartTransactionFromContext(ctx context.Context, name string) (
 	return txn, newrelic.NewContext(ctx, txn)
 }
 
-// TraceBackup traces a backup operation
+// TraceBackup traces a backup operation.
 func (c *Client) TraceBackup(ctx context.Context, databaseName, backupType string, fn func(context.Context) error) error {
 	if !c.config.Enabled || c.app == nil {
 		return fn(ctx)
@@ -133,7 +132,7 @@ func (c *Client) TraceBackup(ctx context.Context, databaseName, backupType strin
 	return nil
 }
 
-// TraceRestore traces a restore operation
+// TraceRestore traces a restore operation.
 func (c *Client) TraceRestore(ctx context.Context, databaseName string, fn func(context.Context) error) error {
 	if !c.config.Enabled || c.app == nil {
 		return fn(ctx)
@@ -162,7 +161,7 @@ func (c *Client) TraceRestore(ctx context.Context, databaseName string, fn func(
 	return nil
 }
 
-// TraceStorageOperation traces a storage operation
+// TraceStorageOperation traces a storage operation.
 func (c *Client) TraceStorageOperation(ctx context.Context, operation, provider string, fn func(context.Context) error) error {
 	if !c.config.Enabled || c.app == nil {
 		return fn(ctx)
@@ -190,7 +189,7 @@ func (c *Client) TraceStorageOperation(ctx context.Context, operation, provider 
 	return nil
 }
 
-// TraceEncryption traces an encryption operation
+// TraceEncryption traces an encryption operation.
 func (c *Client) TraceEncryption(ctx context.Context, algorithm string, dataSize int64, fn func(context.Context) error) error {
 	if !c.config.Enabled || c.app == nil {
 		return fn(ctx)
@@ -222,7 +221,7 @@ func (c *Client) TraceEncryption(ctx context.Context, algorithm string, dataSize
 	return nil
 }
 
-// RecordMetric records a custom metric
+// RecordMetric records a custom metric.
 func (c *Client) RecordMetric(name string, value float64) error {
 	if !c.config.Enabled || c.app == nil {
 		return nil
@@ -232,7 +231,7 @@ func (c *Client) RecordMetric(name string, value float64) error {
 	return nil
 }
 
-// RecordEvent records a custom event
+// RecordEvent records a custom event.
 func (c *Client) RecordEvent(eventType string, attributes map[string]interface{}) error {
 	if !c.config.Enabled || c.app == nil {
 		return nil
@@ -242,7 +241,7 @@ func (c *Client) RecordEvent(eventType string, attributes map[string]interface{}
 	return nil
 }
 
-// NoticeError reports an error to New Relic
+// NoticeError reports an error to New Relic.
 func (c *Client) NoticeError(ctx context.Context, err error, attributes map[string]interface{}) {
 	if !c.config.Enabled || c.app == nil {
 		return
@@ -265,7 +264,7 @@ func (c *Client) NoticeError(ctx context.Context, err error, attributes map[stri
 	}
 }
 
-// StartSegment starts a new segment within a transaction
+// StartSegment starts a new segment within a transaction.
 func (c *Client) StartSegment(ctx context.Context, name string) *newrelic.Segment {
 	if !c.config.Enabled || c.app == nil {
 		return nil
@@ -282,14 +281,14 @@ func (c *Client) StartSegment(ctx context.Context, name string) *newrelic.Segmen
 	}
 }
 
-// EndSegment ends a segment
+// EndSegment ends a segment.
 func (c *Client) EndSegment(segment *newrelic.Segment) {
 	if segment != nil {
 		segment.End()
 	}
 }
 
-// StartDatastoreSegment starts a new datastore segment
+// StartDatastoreSegment starts a new datastore segment.
 func (c *Client) StartDatastoreSegment(ctx context.Context, product, collection, operation string) *newrelic.DatastoreSegment {
 	if !c.config.Enabled || c.app == nil {
 		return nil
@@ -308,14 +307,14 @@ func (c *Client) StartDatastoreSegment(ctx context.Context, product, collection,
 	}
 }
 
-// EndDatastoreSegment ends a datastore segment
+// EndDatastoreSegment ends a datastore segment.
 func (c *Client) EndDatastoreSegment(segment *newrelic.DatastoreSegment) {
 	if segment != nil {
 		segment.End()
 	}
 }
 
-// StartExternalSegment starts a new external segment
+// StartExternalSegment starts a new external segment.
 func (c *Client) StartExternalSegment(ctx context.Context, url string) *newrelic.ExternalSegment {
 	if !c.config.Enabled || c.app == nil {
 		return nil
@@ -332,19 +331,19 @@ func (c *Client) StartExternalSegment(ctx context.Context, url string) *newrelic
 	}
 }
 
-// EndExternalSegment ends an external segment
+// EndExternalSegment ends an external segment.
 func (c *Client) EndExternalSegment(segment *newrelic.ExternalSegment) {
 	if segment != nil {
 		segment.End()
 	}
 }
 
-// Application returns the underlying New Relic application
+// Application returns the underlying New Relic application.
 func (c *Client) Application() *newrelic.Application {
 	return c.app
 }
 
-// WaitForConnection waits for the New Relic agent to connect
+// WaitForConnection waits for the New Relic agent to connect.
 func (c *Client) WaitForConnection(timeout time.Duration) error {
 	if !c.config.Enabled || c.app == nil {
 		return nil

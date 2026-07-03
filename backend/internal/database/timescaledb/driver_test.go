@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/sanskarpan/db-backup/internal/database"
 )
 
 func contains(s, sub string) bool { return strings.Contains(s, sub) }

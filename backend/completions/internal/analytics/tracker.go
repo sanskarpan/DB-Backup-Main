@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// CompletionEvent represents a completion usage event
+// CompletionEvent represents a completion usage event.
 type CompletionEvent struct {
 	Timestamp    time.Time         `json:"timestamp"`
 	Command      string            `json:"command"`
@@ -20,7 +20,7 @@ type CompletionEvent struct {
 	Context      map[string]string `json:"context"`
 }
 
-// QualityMetrics tracks completion quality
+// QualityMetrics tracks completion quality.
 type QualityMetrics struct {
 	TotalCompletions int     `json:"total_completions"`
 	AcceptedCount    int     `json:"accepted_count"`
@@ -33,7 +33,7 @@ type QualityMetrics struct {
 	ErrorCount       int     `json:"error_count"`
 }
 
-// Analytics tracks completion usage and quality
+// Analytics tracks completion usage and quality.
 type Analytics struct {
 	mu           sync.RWMutex
 	dataFile     string
@@ -43,7 +43,7 @@ type Analytics struct {
 	flushEnabled bool
 }
 
-// NewAnalytics creates a new analytics tracker
+// NewAnalytics creates a new analytics tracker.
 func NewAnalytics(dataFile string) *Analytics {
 	return &Analytics{
 		dataFile:     dataFile,
@@ -54,13 +54,13 @@ func NewAnalytics(dataFile string) *Analytics {
 	}
 }
 
-// Load loads analytics data from file
+// Load loads analytics data from file.
 func (a *Analytics) Load() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
 	dir := filepath.Dir(a.dataFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 
@@ -88,7 +88,7 @@ func (a *Analytics) Load() error {
 	return nil
 }
 
-// Save saves analytics data to file
+// Save saves analytics data to file.
 func (a *Analytics) Save() error {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -108,10 +108,10 @@ func (a *Analytics) Save() error {
 		return err
 	}
 
-	return os.WriteFile(a.dataFile, data, 0644)
+	return os.WriteFile(a.dataFile, data, 0o644)
 }
 
-// TrackCompletion records a completion event
+// TrackCompletion records a completion event.
 func (a *Analytics) TrackCompletion(event *CompletionEvent) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -133,7 +133,7 @@ func (a *Analytics) TrackCompletion(event *CompletionEvent) {
 	}
 }
 
-// TrackError records a completion error
+// TrackError records a completion error.
 func (a *Analytics) TrackError(command string, errorMsg string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -152,7 +152,7 @@ func (a *Analytics) TrackError(command string, errorMsg string) {
 	a.events = append(a.events, event)
 }
 
-// GetMetrics returns current quality metrics
+// GetMetrics returns current quality metrics.
 func (a *Analytics) GetMetrics() *QualityMetrics {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -162,7 +162,7 @@ func (a *Analytics) GetMetrics() *QualityMetrics {
 	return &metricsCopy
 }
 
-// GetRecentEvents returns recent completion events
+// GetRecentEvents returns recent completion events.
 func (a *Analytics) GetRecentEvents(limit int) []*CompletionEvent {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -178,7 +178,7 @@ func (a *Analytics) GetRecentEvents(limit int) []*CompletionEvent {
 	return events
 }
 
-// GetEventsByTimeRange returns events within time range
+// GetEventsByTimeRange returns events within time range.
 func (a *Analytics) GetEventsByTimeRange(start, end time.Time) []*CompletionEvent {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -194,7 +194,7 @@ func (a *Analytics) GetEventsByTimeRange(start, end time.Time) []*CompletionEven
 	return filtered
 }
 
-// GetTopCommands returns most used commands
+// GetTopCommands returns most used commands.
 func (a *Analytics) GetTopCommands(limit int) []map[string]interface{} {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -241,7 +241,7 @@ func (a *Analytics) GetTopCommands(limit int) []map[string]interface{} {
 	return result
 }
 
-// GetPerformanceStats returns performance statistics
+// GetPerformanceStats returns performance statistics.
 func (a *Analytics) GetPerformanceStats() map[string]interface{} {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -303,7 +303,7 @@ func (a *Analytics) GetPerformanceStats() map[string]interface{} {
 	}
 }
 
-// Clear clears all analytics data
+// Clear clears all analytics data.
 func (a *Analytics) Clear() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -314,7 +314,7 @@ func (a *Analytics) Clear() error {
 	return os.Remove(a.dataFile)
 }
 
-// updateMetrics updates quality metrics based on event
+// updateMetrics updates quality metrics based on event.
 func (a *Analytics) updateMetrics(event *CompletionEvent) {
 	a.metrics.TotalCompletions++
 

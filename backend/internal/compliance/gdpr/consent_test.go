@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Mock ConsentStore for testing
+// Mock ConsentStore for testing.
 type mockConsentStore struct {
 	consents map[string]*Consent
 	records  map[string][]*ConsentRecord
@@ -83,16 +83,16 @@ func TestGrantConsent(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name          string
-		userID        string
-		purpose       ConsentPurpose
-		legalBasis    string
-		ipAddress     string
-		userAgent     string
-		method        string
-		version       string
-		expiresIn     *time.Duration
-		expectError   bool
+		name        string
+		userID      string
+		purpose     ConsentPurpose
+		legalBasis  string
+		ipAddress   string
+		userAgent   string
+		method      string
+		version     string
+		expiresIn   *time.Duration
+		expectError bool
 	}{
 		{
 			name:        "Valid consent grant",
@@ -300,7 +300,7 @@ func TestValidateConsent(t *testing.T) {
 		{
 			name: "Revoked consent",
 			consent: &Consent{
-				Status:    ConsentStatusRevoked,
+				Status: ConsentStatusRevoked,
 			},
 			expectedValid: false,
 			expectedMsg:   "consent not granted",

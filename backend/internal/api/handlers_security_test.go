@@ -10,11 +10,12 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/sanskarpan/db-backup/internal/logger"
 	"github.com/sanskarpan/db-backup/internal/security/ransomware"
 	"github.com/sanskarpan/db-backup/internal/storageregistry"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func setupSecurityTestServer(t *testing.T) (*Server, *gin.Engine) {
@@ -82,7 +83,7 @@ func TestHandleScanFile_Success(t *testing.T) {
 	// Create a temporary test file
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.txt")
-	err := os.WriteFile(testFile, []byte("test content"), 0644)
+	err := os.WriteFile(testFile, []byte("test content"), 0o644)
 	require.NoError(t, err)
 
 	requestBody := ScanFileRequest{
@@ -158,9 +159,9 @@ func TestHandleScanDirectory_Success(t *testing.T) {
 
 	// Create temporary test directory with files
 	tmpDir := t.TempDir()
-	err := os.WriteFile(filepath.Join(tmpDir, "file1.txt"), []byte("content1"), 0644)
+	err := os.WriteFile(filepath.Join(tmpDir, "file1.txt"), []byte("content1"), 0o644)
 	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(tmpDir, "file2.txt"), []byte("content2"), 0644)
+	err = os.WriteFile(filepath.Join(tmpDir, "file2.txt"), []byte("content2"), 0o644)
 	require.NoError(t, err)
 
 	requestBody := ScanDirectoryRequest{

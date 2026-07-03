@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// MaskingStrategy represents a data masking strategy
+// MaskingStrategy represents a data masking strategy.
 type MaskingStrategy string
 
 const (
@@ -22,7 +22,7 @@ const (
 	StrategyNullification    MaskingStrategy = "nullification"
 )
 
-// MaskingConfig represents configuration for a masking operation
+// MaskingConfig represents configuration for a masking operation.
 type MaskingConfig struct {
 	Strategy        MaskingStrategy
 	PreserveLength  bool
@@ -35,14 +35,14 @@ type MaskingConfig struct {
 	Metadata        map[string]interface{}
 }
 
-// Masker interface for different masking strategies
+// Masker interface for different masking strategies.
 type Masker interface {
 	Mask(value string, config *MaskingConfig) (string, error)
 	Unmask(value string, config *MaskingConfig) (string, error)
 	IsReversible() bool
 }
 
-// RedactionMasker implements redaction masking
+// RedactionMasker implements redaction masking.
 type RedactionMasker struct{}
 
 func (rm *RedactionMasker) Mask(value string, config *MaskingConfig) (string, error) {
@@ -83,7 +83,7 @@ func (rm *RedactionMasker) IsReversible() bool {
 	return false
 }
 
-// HashingMasker implements one-way hashing masking
+// HashingMasker implements one-way hashing masking.
 type HashingMasker struct{}
 
 func (hm *HashingMasker) Mask(value string, config *MaskingConfig) (string, error) {
@@ -122,7 +122,7 @@ func (hm *HashingMasker) IsReversible() bool {
 	return false
 }
 
-// PseudonymizationMasker implements reversible pseudonymization
+// PseudonymizationMasker implements reversible pseudonymization.
 type PseudonymizationMasker struct {
 	mapping map[string]string
 	reverse map[string]string
@@ -203,7 +203,7 @@ func (pm *PseudonymizationMasker) preserveFormatPseudonym(value, hash string) st
 	return hash
 }
 
-// SyntheticMasker generates synthetic data using cryptographically secure random
+// SyntheticMasker generates synthetic data using cryptographically secure random.
 type SyntheticMasker struct{}
 
 func NewSyntheticMasker() *SyntheticMasker {
@@ -251,7 +251,7 @@ func (sm *SyntheticMasker) IsReversible() bool {
 	return false
 }
 
-// secureRandInt generates a cryptographically secure random integer in range [0, max)
+// secureRandInt generates a cryptographically secure random integer in range [0, max).
 func (sm *SyntheticMasker) secureRandInt(max int) int {
 	if max <= 0 {
 		return 0
@@ -369,7 +369,7 @@ func (sm *SyntheticMasker) generateRandomString(length int) string {
 	return string(result)
 }
 
-// NullificationMasker replaces values with NULL
+// NullificationMasker replaces values with NULL.
 type NullificationMasker struct{}
 
 func (nm *NullificationMasker) Mask(value string, config *MaskingConfig) (string, error) {
@@ -384,7 +384,7 @@ func (nm *NullificationMasker) IsReversible() bool {
 	return false
 }
 
-// MaskerFactory creates maskers based on strategy
+// MaskerFactory creates maskers based on strategy.
 type MaskerFactory struct {
 	pseudonymizer *PseudonymizationMasker
 	synthetic     *SyntheticMasker
@@ -414,7 +414,7 @@ func (mf *MaskerFactory) GetMasker(strategy MaskingStrategy) Masker {
 	}
 }
 
-// MaskValue is a convenience function to mask a single value
+// MaskValue is a convenience function to mask a single value.
 func MaskValue(value string, strategy MaskingStrategy, config *MaskingConfig) (string, error) {
 	if config == nil {
 		config = &MaskingConfig{

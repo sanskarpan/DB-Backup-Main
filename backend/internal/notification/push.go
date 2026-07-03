@@ -14,7 +14,7 @@ import (
 	webpush "github.com/SherClockHolmes/webpush-go"
 )
 
-// PushNotificationType defines the type of push notification
+// PushNotificationType defines the type of push notification.
 type PushNotificationType string
 
 const (
@@ -25,27 +25,27 @@ const (
 	PushNotificationSystemCritical  PushNotificationType = "system_critical"
 )
 
-// Subscription represents a push notification subscription
+// Subscription represents a push notification subscription.
 type Subscription struct {
-	ID           string                 `json:"id"`
-	UserID       string                 `json:"user_id"`
-	Endpoint     string                 `json:"endpoint"`
-	Keys         SubscriptionKeys       `json:"keys"`
-	Preferences  NotificationPreferences `json:"preferences"`
-	CreatedAt    time.Time              `json:"created_at"`
-	UpdatedAt    time.Time              `json:"updated_at"`
-	LastUsedAt   *time.Time             `json:"last_used_at,omitempty"`
-	Active       bool                   `json:"active"`
-	DeviceInfo   map[string]string      `json:"device_info,omitempty"`
+	ID          string                  `json:"id"`
+	UserID      string                  `json:"user_id"`
+	Endpoint    string                  `json:"endpoint"`
+	Keys        SubscriptionKeys        `json:"keys"`
+	Preferences NotificationPreferences `json:"preferences"`
+	CreatedAt   time.Time               `json:"created_at"`
+	UpdatedAt   time.Time               `json:"updated_at"`
+	LastUsedAt  *time.Time              `json:"last_used_at,omitempty"`
+	Active      bool                    `json:"active"`
+	DeviceInfo  map[string]string       `json:"device_info,omitempty"`
 }
 
-// SubscriptionKeys contains the encryption keys for the subscription
+// SubscriptionKeys contains the encryption keys for the subscription.
 type SubscriptionKeys struct {
 	P256dh string `json:"p256dh"`
 	Auth   string `json:"auth"`
 }
 
-// NotificationPreferences defines user preferences for notifications
+// NotificationPreferences defines user preferences for notifications.
 type NotificationPreferences struct {
 	BackupSuccess   bool `json:"backup_success"`
 	BackupFailed    bool `json:"backup_failed"`
@@ -56,31 +56,31 @@ type NotificationPreferences struct {
 	QuietHoursEnd   int  `json:"quiet_hours_end"`   // 24-hour format
 }
 
-// PushNotification represents a notification to be sent
+// PushNotification represents a notification to be sent.
 type PushNotification struct {
-	Title            string                 `json:"title"`
-	Body             string                 `json:"body"`
-	Icon             string                 `json:"icon,omitempty"`
-	Badge            string                 `json:"badge,omitempty"`
-	Tag              string                 `json:"tag,omitempty"`
-	Type             PushNotificationType   `json:"type"`
-	Priority         string                 `json:"priority"` // low, normal, high
-	Data             map[string]interface{} `json:"data,omitempty"`
-	Actions          []NotificationAction   `json:"actions,omitempty"`
-	RequireInteraction bool                 `json:"require_interaction,omitempty"`
-	Silent           bool                   `json:"silent,omitempty"`
-	Vibrate          []int                  `json:"vibrate,omitempty"`
-	BadgeCount       int                    `json:"badge_count,omitempty"`
+	Title              string                 `json:"title"`
+	Body               string                 `json:"body"`
+	Icon               string                 `json:"icon,omitempty"`
+	Badge              string                 `json:"badge,omitempty"`
+	Tag                string                 `json:"tag,omitempty"`
+	Type               PushNotificationType   `json:"type"`
+	Priority           string                 `json:"priority"` // low, normal, high
+	Data               map[string]interface{} `json:"data,omitempty"`
+	Actions            []NotificationAction   `json:"actions,omitempty"`
+	RequireInteraction bool                   `json:"require_interaction,omitempty"`
+	Silent             bool                   `json:"silent,omitempty"`
+	Vibrate            []int                  `json:"vibrate,omitempty"`
+	BadgeCount         int                    `json:"badge_count,omitempty"`
 }
 
-// NotificationAction represents an action button in the notification
+// NotificationAction represents an action button in the notification.
 type NotificationAction struct {
 	Action string `json:"action"`
 	Title  string `json:"title"`
 	Icon   string `json:"icon,omitempty"`
 }
 
-// PushService handles push notifications
+// PushService handles push notifications.
 type PushService struct {
 	mu            sync.RWMutex
 	subscriptions map[string]*Subscription // endpoint -> subscription
@@ -90,13 +90,13 @@ type PushService struct {
 	subject       string // Email or URL for VAPID
 }
 
-// VAPIDKeys contains the VAPID key pair
+// VAPIDKeys contains the VAPID key pair.
 type VAPIDKeys struct {
 	PublicKey  string
 	PrivateKey string
 }
 
-// NewPushService creates a new push notification service
+// NewPushService creates a new push notification service.
 func NewPushService(subject string) (*PushService, error) {
 	// Generate VAPID keys
 	privateKey, publicKey, err := generateVAPIDKeys()
@@ -116,7 +116,7 @@ func NewPushService(subject string) (*PushService, error) {
 	}, nil
 }
 
-// generateVAPIDKeys generates a new VAPID key pair
+// generateVAPIDKeys generates a new VAPID key pair.
 func generateVAPIDKeys() (privateKey, publicKey string, err error) {
 	// Generate ECDSA key pair on the P-256 curve
 	curve := elliptic.P256()
@@ -136,12 +136,12 @@ func generateVAPIDKeys() (privateKey, publicKey string, err error) {
 	return privateKey, publicKey, nil
 }
 
-// GetPublicKey returns the VAPID public key for client-side subscription
+// GetPublicKey returns the VAPID public key for client-side subscription.
 func (s *PushService) GetPublicKey() string {
 	return s.publicKey
 }
 
-// Subscribe adds a new push subscription
+// Subscribe adds a new push subscription.
 func (s *PushService) Subscribe(ctx context.Context, sub *Subscription) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -168,7 +168,7 @@ func (s *PushService) Subscribe(ctx context.Context, sub *Subscription) error {
 	return nil
 }
 
-// Unsubscribe removes a push subscription
+// Unsubscribe removes a push subscription.
 func (s *PushService) Unsubscribe(ctx context.Context, endpoint string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -181,7 +181,7 @@ func (s *PushService) Unsubscribe(ctx context.Context, endpoint string) error {
 	return nil
 }
 
-// GetSubscription retrieves a subscription by endpoint
+// GetSubscription retrieves a subscription by endpoint.
 func (s *PushService) GetSubscription(endpoint string) (*Subscription, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -190,7 +190,7 @@ func (s *PushService) GetSubscription(endpoint string) (*Subscription, bool) {
 	return sub, exists
 }
 
-// GetUserSubscriptions retrieves all subscriptions for a user
+// GetUserSubscriptions retrieves all subscriptions for a user.
 func (s *PushService) GetUserSubscriptions(userID string) []*Subscription {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -205,7 +205,7 @@ func (s *PushService) GetUserSubscriptions(userID string) []*Subscription {
 	return subs
 }
 
-// UpdatePreferences updates notification preferences for a subscription
+// UpdatePreferences updates notification preferences for a subscription.
 func (s *PushService) UpdatePreferences(endpoint string, prefs NotificationPreferences) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -221,7 +221,7 @@ func (s *PushService) UpdatePreferences(endpoint string, prefs NotificationPrefe
 	return nil
 }
 
-// SendNotification sends a push notification to a specific subscription
+// SendNotification sends a push notification to a specific subscription.
 func (s *PushService) SendNotification(ctx context.Context, endpoint string, notification *PushNotification) error {
 	s.mu.RLock()
 	sub, exists := s.subscriptions[endpoint]
@@ -272,7 +272,6 @@ func (s *PushService) SendNotification(ctx context.Context, endpoint string, not
 		TTL:             ttl,
 		Urgency:         webpush.UrgencyHigh,
 	})
-
 	if err != nil {
 		return fmt.Errorf("failed to send push notification: %w", err)
 	}
@@ -298,7 +297,7 @@ func (s *PushService) SendNotification(ctx context.Context, endpoint string, not
 	return nil
 }
 
-// SendToUser sends a notification to all active subscriptions for a user
+// SendToUser sends a notification to all active subscriptions for a user.
 func (s *PushService) SendToUser(ctx context.Context, userID string, notification *PushNotification) error {
 	subscriptions := s.GetUserSubscriptions(userID)
 
@@ -321,7 +320,7 @@ func (s *PushService) SendToUser(ctx context.Context, userID string, notificatio
 	return nil
 }
 
-// BroadcastNotification sends a notification to all active subscriptions
+// BroadcastNotification sends a notification to all active subscriptions.
 func (s *PushService) BroadcastNotification(ctx context.Context, notification *PushNotification) error {
 	s.mu.RLock()
 	endpoints := make([]string, 0, len(s.subscriptions))
@@ -351,7 +350,7 @@ func (s *PushService) BroadcastNotification(ctx context.Context, notification *P
 	return nil
 }
 
-// shouldSendNotification checks if notification should be sent based on preferences
+// shouldSendNotification checks if notification should be sent based on preferences.
 func (s *PushService) shouldSendNotification(sub *Subscription, notification *PushNotification) bool {
 	prefs := sub.Preferences
 
@@ -371,7 +370,7 @@ func (s *PushService) shouldSendNotification(sub *Subscription, notification *Pu
 	}
 }
 
-// isQuietHours checks if current time is within quiet hours
+// isQuietHours checks if current time is within quiet hours.
 func (s *PushService) isQuietHours(prefs NotificationPreferences) bool {
 	now := time.Now()
 	currentHour := now.Hour()
@@ -390,7 +389,7 @@ func (s *PushService) isQuietHours(prefs NotificationPreferences) bool {
 	return false
 }
 
-// CleanupInactiveSubscriptions removes subscriptions that haven't been used recently
+// CleanupInactiveSubscriptions removes subscriptions that haven't been used recently.
 func (s *PushService) CleanupInactiveSubscriptions(inactiveDays int) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -418,7 +417,7 @@ func (s *PushService) CleanupInactiveSubscriptions(inactiveDays int) int {
 	return removed
 }
 
-// GetStats returns statistics about subscriptions
+// GetStats returns statistics about subscriptions.
 func (s *PushService) GetStats() map[string]interface{} {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -433,8 +432,8 @@ func (s *PushService) GetStats() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"total_subscriptions":  total,
-		"active_subscriptions": active,
+		"total_subscriptions":    total,
+		"active_subscriptions":   active,
 		"inactive_subscriptions": total - active,
 	}
 }

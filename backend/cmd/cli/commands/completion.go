@@ -8,11 +8,12 @@ import (
 	"runtime"
 
 	"github.com/spf13/cobra"
+
 	"github.com/sanskarpan/db-backup/internal/config"
 	"github.com/sanskarpan/db-backup/internal/repository"
 )
 
-// completionCmd represents the completion command
+// completionCmd represents the completion command.
 var completionCmd = &cobra.Command{
 	Use:   "completion [bash|zsh|fish|powershell]",
 	Short: "Generate shell completion scripts",
@@ -145,7 +146,7 @@ func installCompletion(shell string) error {
 
 	// Ensure directory exists
 	dir := filepath.Dir(installPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
@@ -252,7 +253,7 @@ func getFishCompletionPath() string {
 	}
 
 	// Create user config dir and return path
-	os.MkdirAll(filepath.Dir(userConfig), 0755)
+	os.MkdirAll(filepath.Dir(userConfig), 0o755)
 	return userConfig
 }
 
@@ -288,7 +289,7 @@ func init() {
 	// Custom completion functions are registered per-command in each command's init function.
 }
 
-// Helper functions to get dynamic data
+// Helper functions to get dynamic data.
 func getDatabases(ctx context.Context) ([]string, error) {
 	// Get repository instance
 	repo, err := getRepository()
@@ -512,7 +513,7 @@ func getTags(ctx context.Context) ([]string, error) {
 	return tags, nil
 }
 
-// getRepository creates a repository instance using configuration
+// getRepository creates a repository instance using configuration.
 func getRepository() (*repository.FileRepository, error) {
 	// Try to load configuration
 	loadedCfg, err := config.Load("")

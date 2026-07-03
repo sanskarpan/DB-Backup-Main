@@ -647,7 +647,6 @@ func TestComplianceReporter_GenerateExecutiveReport(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			report, err := reporter.GenerateReport(ReportTypeExecutive, tt.format, periodStart, periodEnd)
-
 			if err != nil {
 				t.Fatalf("Failed to generate executive report: %v", err)
 			}
@@ -715,7 +714,6 @@ func TestComplianceReporter_GenerateDetailedReport(t *testing.T) {
 	periodEnd := time.Now()
 
 	report, err := reporter.GenerateReport(ReportTypeDetailed, ReportFormatMarkdown, periodStart, periodEnd)
-
 	if err != nil {
 		t.Fatalf("Failed to generate detailed report: %v", err)
 	}
@@ -754,7 +752,6 @@ func TestComplianceReporter_GenerateViolationReport(t *testing.T) {
 	periodEnd := time.Now()
 
 	report, err := reporter.GenerateReport(ReportTypeViolation, ReportFormatMarkdown, periodStart, periodEnd)
-
 	if err != nil {
 		t.Fatalf("Failed to generate violation report: %v", err)
 	}
@@ -789,7 +786,6 @@ func TestComplianceReporter_GenerateTrendReport(t *testing.T) {
 	periodEnd := time.Now()
 
 	report, err := reporter.GenerateReport(ReportTypeTrend, ReportFormatMarkdown, periodStart, periodEnd)
-
 	if err != nil {
 		t.Fatalf("Failed to generate trend report: %v", err)
 	}
@@ -832,7 +828,6 @@ func TestComplianceReporter_GenerateComplianceStandardReport(t *testing.T) {
 	periodEnd := time.Now()
 
 	report, err := reporter.GenerateReport(ReportTypeCompliance, ReportFormatMarkdown, periodStart, periodEnd)
-
 	if err != nil {
 		t.Fatalf("Failed to generate compliance standard report: %v", err)
 	}
@@ -1022,7 +1017,7 @@ func TestDatabaseComplianceDetail_Sorting(t *testing.T) {
 	}
 }
 
-// Helper function to check if a string contains a substring
+// Helper function to check if a string contains a substring.
 func containsString(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && stringContains(s, substr))
 }

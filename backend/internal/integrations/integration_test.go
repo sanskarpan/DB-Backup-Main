@@ -265,8 +265,8 @@ func TestRegistryConfigure(t *testing.T) {
 	registry := NewRegistry()
 
 	mockIntegration := &MockIntegration{
-		typ:  IntegrationTypeJira,
-		name: "test-jira",
+		typ:             IntegrationTypeJira,
+		name:            "test-jira",
 		BaseIntegration: NewBaseIntegration(),
 	}
 

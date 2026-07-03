@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// BackupOptimizer provides intelligent backup optimization recommendations
+// BackupOptimizer provides intelligent backup optimization recommendations.
 type BackupOptimizer struct {
 	mu              sync.RWMutex
 	historicalData  map[string][]OptimizationMetrics
@@ -19,76 +19,76 @@ type BackupOptimizer struct {
 	costCalculator  *CostCalculator
 }
 
-// OptimizationMetrics represents metrics for a backup operation
+// OptimizationMetrics represents metrics for a backup operation.
 type OptimizationMetrics struct {
-	ID                  string
-	DatabaseName        string
-	Timestamp           time.Time
-	Duration            time.Duration
-	OriginalSize        int64
-	CompressedSize      int64
-	CompressionAlgo     CompressionAlgorithm
-	CompressionRatio    float64
-	ParallelWorkers     int
-	CPUUsage            float64
-	MemoryUsage         float64
-	DiskIOPS            float64
-	NetworkThroughput   float64
-	Success             bool
-	StartHour           int
-	DayOfWeek           time.Weekday
-	DataType            DataType
-	StorageTier         StorageTier
-	Cost                float64
+	ID                string
+	DatabaseName      string
+	Timestamp         time.Time
+	Duration          time.Duration
+	OriginalSize      int64
+	CompressedSize    int64
+	CompressionAlgo   CompressionAlgorithm
+	CompressionRatio  float64
+	ParallelWorkers   int
+	CPUUsage          float64
+	MemoryUsage       float64
+	DiskIOPS          float64
+	NetworkThroughput float64
+	Success           bool
+	StartHour         int
+	DayOfWeek         time.Weekday
+	DataType          DataType
+	StorageTier       StorageTier
+	Cost              float64
 }
 
-// CompressionAlgorithm represents a compression algorithm
+// CompressionAlgorithm represents a compression algorithm.
 type CompressionAlgorithm string
 
 const (
-	CompressionNone     CompressionAlgorithm = "none"
-	CompressionGzip     CompressionAlgorithm = "gzip"
-	CompressionZstd     CompressionAlgorithm = "zstd"
-	CompressionLZ4      CompressionAlgorithm = "lz4"
-	CompressionBzip2    CompressionAlgorithm = "bzip2"
-	CompressionSnappy   CompressionAlgorithm = "snappy"
+	CompressionNone   CompressionAlgorithm = "none"
+	CompressionGzip   CompressionAlgorithm = "gzip"
+	CompressionZstd   CompressionAlgorithm = "zstd"
+	CompressionLZ4    CompressionAlgorithm = "lz4"
+	CompressionBzip2  CompressionAlgorithm = "bzip2"
+	CompressionSnappy CompressionAlgorithm = "snappy"
 )
 
-// DataType represents the type of data being backed up
+// DataType represents the type of data being backed up.
 type DataType string
 
 const (
-	DataTypeText      DataType = "text"
-	DataTypeBinary    DataType = "binary"
-	DataTypeMixed     DataType = "mixed"
-	DataTypeJSON      DataType = "json"
-	DataTypeImages    DataType = "images"
-	DataTypeVideo     DataType = "video"
+	DataTypeText   DataType = "text"
+	DataTypeBinary DataType = "binary"
+	DataTypeMixed  DataType = "mixed"
+	DataTypeJSON   DataType = "json"
+	DataTypeImages DataType = "images"
+	DataTypeVideo  DataType = "video"
 )
 
-// StorageTier represents storage tier
+// StorageTier represents storage tier.
 type StorageTier string
 
 const (
-	StorageTierHot     StorageTier = "hot"      // Frequent access
-	StorageTierCool    StorageTier = "cool"     // Infrequent access
-	StorageTierArchive StorageTier = "archive"  // Rare access
-	StorageTierGlacier StorageTier = "glacier"  // Long-term archive
+	StorageTierHot     StorageTier = "hot"     // Frequent access
+	StorageTierCool    StorageTier = "cool"    // Infrequent access
+	StorageTierArchive StorageTier = "archive" // Rare access
+	StorageTierGlacier StorageTier = "glacier" // Long-term archive
 )
 
-// OptimizationRecommendation represents optimization recommendations
+// OptimizationRecommendation represents optimization recommendations.
 type OptimizationRecommendation struct {
-	DatabaseName           string
-	GeneratedAt            time.Time
+	DatabaseName              string
+	GeneratedAt               time.Time
 	CompressionRecommendation *CompressionRecommendation
-	WindowRecommendation   *WindowRecommendation
+	WindowRecommendation      *WindowRecommendation
 	ParallelismRecommendation *ParallelismRecommendation
-	StorageRecommendation  *StorageRecommendation
-	OverallScore           float64 // 0-100
-	EstimatedSavings       CostSavings
+	StorageRecommendation     *StorageRecommendation
+	OverallScore              float64 // 0-100
+	EstimatedSavings          CostSavings
 }
 
-// CompressionRecommendation recommends optimal compression
+// CompressionRecommendation recommends optimal compression.
 type CompressionRecommendation struct {
 	Algorithm        CompressionAlgorithm
 	Confidence       float64 // 0-100
@@ -99,7 +99,7 @@ type CompressionRecommendation struct {
 	Alternatives     []CompressionAlternative
 }
 
-// CompressionAlternative represents an alternative compression option
+// CompressionAlternative represents an alternative compression option.
 type CompressionAlternative struct {
 	Algorithm        CompressionAlgorithm
 	Score            float64
@@ -108,81 +108,81 @@ type CompressionAlternative struct {
 	TradeOff         string
 }
 
-// WindowRecommendation recommends optimal backup windows
+// WindowRecommendation recommends optimal backup windows.
 type WindowRecommendation struct {
-	OptimalWindows   []BackupWindow
-	WorstWindows     []BackupWindow
-	Confidence       float64
-	AverageDuration  time.Duration
-	Reasoning        []string
+	OptimalWindows  []BackupWindow
+	WorstWindows    []BackupWindow
+	Confidence      float64
+	AverageDuration time.Duration
+	Reasoning       []string
 }
 
-// BackupWindow represents a backup time window
+// BackupWindow represents a backup time window.
 type BackupWindow struct {
-	DayOfWeek    time.Weekday
-	StartHour    int
-	EndHour      int
-	Score        float64 // 0-100
-	AvgDuration  time.Duration
-	SuccessRate  float64
-	AvgLoad      float64
+	DayOfWeek   time.Weekday
+	StartHour   int
+	EndHour     int
+	Score       float64 // 0-100
+	AvgDuration time.Duration
+	SuccessRate float64
+	AvgLoad     float64
 }
 
-// ParallelismRecommendation recommends optimal parallelism
+// ParallelismRecommendation recommends optimal parallelism.
 type ParallelismRecommendation struct {
-	OptimalWorkers     int
-	MinWorkers         int
-	MaxWorkers         int
-	Confidence         float64
-	ExpectedSpeedup    float64
+	OptimalWorkers      int
+	MinWorkers          int
+	MaxWorkers          int
+	Confidence          float64
+	ExpectedSpeedup     float64
 	ResourceUtilization map[string]float64
-	Reasoning          []string
+	Reasoning           []string
 }
 
-// StorageRecommendation recommends storage optimization
+// StorageRecommendation recommends storage optimization.
 type StorageRecommendation struct {
-	RecommendedTier    StorageTier
-	CurrentCost        float64
-	ProjectedCost      float64
-	Savings            float64
-	GrowthRate         float64 // GB per day
+	RecommendedTier       StorageTier
+	CurrentCost           float64
+	ProjectedCost         float64
+	Savings               float64
+	GrowthRate            float64 // GB per day
 	RetentionOptimization *RetentionOptimization
-	Reasoning          []string
+	Reasoning             []string
 }
 
-// RetentionOptimization recommends retention policy optimization
+// RetentionOptimization recommends retention policy optimization.
 type RetentionOptimization struct {
-	CurrentRetention   int // days
-	OptimalRetention   int // days
-	EstimatedSavings   float64
-	RiskAssessment     string
+	CurrentRetention int // days
+	OptimalRetention int // days
+	EstimatedSavings float64
+	RiskAssessment   string
 }
 
-// CostSavings represents cost savings from optimization
+// CostSavings represents cost savings from optimization.
 type CostSavings struct {
-	TimesSaved      time.Duration
-	StorageSaved    int64 // bytes
+	TimesSaved       time.Duration
+	StorageSaved     int64 // bytes
 	MonthlyCostSaved float64
 	AnnualCostSaved  float64
 }
 
-// OptimizerConfig configures the optimizer
+// OptimizerConfig configures the optimizer.
 type OptimizerConfig struct {
-	MinHistoryDays       int
-	ConfidenceThreshold  float64
-	StorageCostPerGB     float64
-	CPUCostPerHour       float64
-	NetworkCostPerGB     float64
-	TargetSuccessRate    float64
+	MinHistoryDays      int
+	ConfidenceThreshold float64
+	StorageCostPerGB    float64
+	CPUCostPerHour      float64
+	NetworkCostPerGB    float64
+	TargetSuccessRate   float64
 }
 
-// CostCalculator calculates storage costs
+// CostCalculator calculates storage costs.
 type CostCalculator struct {
 	tierPricing map[StorageTier]float64
 	config      *OptimizerConfig
 }
 
-// NewBackupOptimizer creates a new backup optimizer
+// NewBackupOptimizer creates a new backup optimizer.
 func NewBackupOptimizer(config *OptimizerConfig) *BackupOptimizer {
 	if config == nil {
 		config = DefaultOptimizerConfig()
@@ -196,32 +196,32 @@ func NewBackupOptimizer(config *OptimizerConfig) *BackupOptimizer {
 	}
 }
 
-// DefaultOptimizerConfig returns default configuration
+// DefaultOptimizerConfig returns default configuration.
 func DefaultOptimizerConfig() *OptimizerConfig {
 	return &OptimizerConfig{
-		MinHistoryDays:       7,
-		ConfidenceThreshold:  70.0,
-		StorageCostPerGB:     0.023, // S3 Standard pricing
-		CPUCostPerHour:       0.05,
-		NetworkCostPerGB:     0.09,
-		TargetSuccessRate:    95.0,
+		MinHistoryDays:      7,
+		ConfidenceThreshold: 70.0,
+		StorageCostPerGB:    0.023, // S3 Standard pricing
+		CPUCostPerHour:      0.05,
+		NetworkCostPerGB:    0.09,
+		TargetSuccessRate:   95.0,
 	}
 }
 
-// NewCostCalculator creates a new cost calculator
+// NewCostCalculator creates a new cost calculator.
 func NewCostCalculator(config *OptimizerConfig) *CostCalculator {
 	return &CostCalculator{
 		tierPricing: map[StorageTier]float64{
-			StorageTierHot:     0.023, // S3 Standard
-			StorageTierCool:    0.0125, // S3 Infrequent Access
-			StorageTierArchive: 0.004, // S3 Glacier Flexible
+			StorageTierHot:     0.023,   // S3 Standard
+			StorageTierCool:    0.0125,  // S3 Infrequent Access
+			StorageTierArchive: 0.004,   // S3 Glacier Flexible
 			StorageTierGlacier: 0.00099, // S3 Glacier Deep Archive
 		},
 		config: config,
 	}
 }
 
-// AddMetrics adds optimization metrics
+// AddMetrics adds optimization metrics.
 func (bo *BackupOptimizer) AddMetrics(metrics OptimizationMetrics) {
 	bo.mu.Lock()
 	defer bo.mu.Unlock()
@@ -243,7 +243,7 @@ func (bo *BackupOptimizer) AddMetrics(metrics OptimizationMetrics) {
 	bo.historicalData[metrics.DatabaseName] = filtered
 }
 
-// GenerateRecommendations generates optimization recommendations
+// GenerateRecommendations generates optimization recommendations.
 func (bo *BackupOptimizer) GenerateRecommendations(ctx context.Context, databaseName string) (*OptimizationRecommendation, error) {
 	bo.mu.Lock()
 	defer bo.mu.Unlock()
@@ -282,7 +282,7 @@ func (bo *BackupOptimizer) GenerateRecommendations(ctx context.Context, database
 	return recommendation, nil
 }
 
-// recommendCompression recommends optimal compression algorithm
+// recommendCompression recommends optimal compression algorithm.
 func (bo *BackupOptimizer) recommendCompression(metrics []OptimizationMetrics) *CompressionRecommendation {
 	// Analyze historical compression performance
 	algoPerformance := make(map[CompressionAlgorithm]*CompressionStats)
@@ -362,7 +362,7 @@ func (bo *BackupOptimizer) recommendCompression(metrics []OptimizationMetrics) *
 	}
 }
 
-// scoreCompressionAlgorithm scores a compression algorithm
+// scoreCompressionAlgorithm scores a compression algorithm.
 func (bo *BackupOptimizer) scoreCompressionAlgorithm(algo CompressionAlgorithm, stats *CompressionStats, dataType DataType) float64 {
 	score := 0.0
 
@@ -384,7 +384,7 @@ func (bo *BackupOptimizer) scoreCompressionAlgorithm(algo CompressionAlgorithm, 
 	return math.Min(100.0, score)
 }
 
-// getDataTypeBonus returns bonus score based on data type
+// getDataTypeBonus returns bonus score based on data type.
 func (bo *BackupOptimizer) getDataTypeBonus(algo CompressionAlgorithm, dataType DataType) float64 {
 	bonuses := map[DataType]map[CompressionAlgorithm]float64{
 		DataTypeText: {
@@ -418,7 +418,7 @@ func (bo *BackupOptimizer) getDataTypeBonus(algo CompressionAlgorithm, dataType 
 	return 50.0
 }
 
-// getCompressionTradeOff returns tradeoff description
+// getCompressionTradeOff returns tradeoff description.
 func (bo *BackupOptimizer) getCompressionTradeOff(algo CompressionAlgorithm) string {
 	tradeoffs := map[CompressionAlgorithm]string{
 		CompressionNone:   "Fastest, no compression",
@@ -431,7 +431,7 @@ func (bo *BackupOptimizer) getCompressionTradeOff(algo CompressionAlgorithm) str
 	return tradeoffs[algo]
 }
 
-// getCompressionReasoning returns reasoning for compression choice
+// getCompressionReasoning returns reasoning for compression choice.
 func (bo *BackupOptimizer) getCompressionReasoning(algo CompressionAlgorithm, stats *CompressionStats, dataType DataType) []string {
 	reasoning := make([]string, 0)
 
@@ -451,7 +451,7 @@ func (bo *BackupOptimizer) getCompressionReasoning(algo CompressionAlgorithm, st
 	return reasoning
 }
 
-// recommendBackupWindow recommends optimal backup windows
+// recommendBackupWindow recommends optimal backup windows.
 func (bo *BackupOptimizer) recommendBackupWindow(metrics []OptimizationMetrics) *WindowRecommendation {
 	// Analyze performance by time window
 	windowStats := make(map[string]*WindowStats)
@@ -471,10 +471,10 @@ func (bo *BackupOptimizer) recommendBackupWindow(metrics []OptimizationMetrics) 
 		}
 
 		windowStats[key].Samples = append(windowStats[key].Samples, WindowSample{
-			Duration:   m.Duration,
-			CPUUsage:   m.CPUUsage,
-			DiskIOPS:   m.DiskIOPS,
-			Success:    m.Success,
+			Duration: m.Duration,
+			CPUUsage: m.CPUUsage,
+			DiskIOPS: m.DiskIOPS,
+			Success:  m.Success,
 		})
 	}
 
@@ -532,7 +532,7 @@ func (bo *BackupOptimizer) recommendBackupWindow(metrics []OptimizationMetrics) 
 	}
 }
 
-// scoreBackupWindow scores a backup window
+// scoreBackupWindow scores a backup window.
 func (bo *BackupOptimizer) scoreBackupWindow(stats *WindowStats) float64 {
 	score := 0.0
 
@@ -555,7 +555,7 @@ func (bo *BackupOptimizer) scoreBackupWindow(stats *WindowStats) float64 {
 	return math.Min(100.0, score)
 }
 
-// getWindowReasoning returns reasoning for window recommendations
+// getWindowReasoning returns reasoning for window recommendations.
 func (bo *BackupOptimizer) getWindowReasoning(optimal, worst []BackupWindow) []string {
 	reasoning := make([]string, 0)
 
@@ -575,7 +575,7 @@ func (bo *BackupOptimizer) getWindowReasoning(optimal, worst []BackupWindow) []s
 	return reasoning
 }
 
-// recommendParallelism recommends optimal parallelism
+// recommendParallelism recommends optimal parallelism.
 func (bo *BackupOptimizer) recommendParallelism(metrics []OptimizationMetrics) *ParallelismRecommendation {
 	// Analyze performance by worker count
 	workerPerformance := make(map[int]*ParallelismStats)
@@ -649,7 +649,7 @@ func (bo *BackupOptimizer) recommendParallelism(metrics []OptimizationMetrics) *
 	}
 }
 
-// calculateParallelismEfficiency calculates parallelism efficiency
+// calculateParallelismEfficiency calculates parallelism efficiency.
 func (bo *BackupOptimizer) calculateParallelismEfficiency(stats *ParallelismStats) float64 {
 	// Efficiency = Speed improvement / Resource cost
 	speedScore := 100.0 / (1.0 + stats.AvgDuration.Minutes())
@@ -662,7 +662,7 @@ func (bo *BackupOptimizer) calculateParallelismEfficiency(stats *ParallelismStat
 	return speedScore / resourceCost
 }
 
-// getParallelismReasoning returns reasoning for parallelism recommendation
+// getParallelismReasoning returns reasoning for parallelism recommendation.
 func (bo *BackupOptimizer) getParallelismReasoning(workers int, speedup float64, resources map[string]float64) []string {
 	reasoning := make([]string, 0)
 
@@ -680,7 +680,7 @@ func (bo *BackupOptimizer) getParallelismReasoning(workers int, speedup float64,
 	return reasoning
 }
 
-// recommendStorage recommends storage optimization
+// recommendStorage recommends storage optimization.
 func (bo *BackupOptimizer) recommendStorage(metrics []OptimizationMetrics) *StorageRecommendation {
 	// Calculate current storage usage and growth
 	totalSize := int64(0)
@@ -727,7 +727,7 @@ func (bo *BackupOptimizer) recommendStorage(metrics []OptimizationMetrics) *Stor
 	}
 }
 
-// calculateGrowthRate calculates data growth rate in GB per day
+// calculateGrowthRate calculates data growth rate in GB per day.
 func (bo *BackupOptimizer) calculateGrowthRate(metrics []OptimizationMetrics) float64 {
 	if len(metrics) < 2 {
 		return 0.0
@@ -753,7 +753,7 @@ func (bo *BackupOptimizer) calculateGrowthRate(metrics []OptimizationMetrics) fl
 	return sizeGrowth / daysElapsed
 }
 
-// recommendStorageTier recommends optimal storage tier
+// recommendStorageTier recommends optimal storage tier.
 func (bo *BackupOptimizer) recommendStorageTier(metrics []OptimizationMetrics) StorageTier {
 	// Analyze access patterns (simplified for now)
 	avgAge := bo.calculateAverageAge(metrics)
@@ -768,7 +768,7 @@ func (bo *BackupOptimizer) recommendStorageTier(metrics []OptimizationMetrics) S
 	return StorageTierGlacier
 }
 
-// calculateAverageAge calculates average age of backups
+// calculateAverageAge calculates average age of backups.
 func (bo *BackupOptimizer) calculateAverageAge(metrics []OptimizationMetrics) time.Duration {
 	if len(metrics) == 0 {
 		return 0
@@ -784,7 +784,7 @@ func (bo *BackupOptimizer) calculateAverageAge(metrics []OptimizationMetrics) ti
 	return totalAge / time.Duration(len(metrics))
 }
 
-// optimizeRetention optimizes retention policy
+// optimizeRetention optimizes retention policy.
 func (bo *BackupOptimizer) optimizeRetention(metrics []OptimizationMetrics) *RetentionOptimization {
 	// Current retention (assume 30 days default)
 	currentRetention := 30
@@ -811,7 +811,7 @@ func (bo *BackupOptimizer) optimizeRetention(metrics []OptimizationMetrics) *Ret
 	}
 }
 
-// calculateOptimalRetention calculates optimal retention period
+// calculateOptimalRetention calculates optimal retention period.
 func (bo *BackupOptimizer) calculateOptimalRetention(metrics []OptimizationMetrics) int {
 	// Simplified: recommend 7 days for frequent changes, 30 for stable
 	if len(metrics) < 7 {
@@ -829,7 +829,7 @@ func (bo *BackupOptimizer) calculateOptimalRetention(metrics []OptimizationMetri
 	return 30
 }
 
-// calculateChangeRate calculates data change rate
+// calculateChangeRate calculates data change rate.
 func (bo *BackupOptimizer) calculateChangeRate(metrics []OptimizationMetrics) float64 {
 	if len(metrics) < 2 {
 		return 0.0
@@ -845,7 +845,7 @@ func (bo *BackupOptimizer) calculateChangeRate(metrics []OptimizationMetrics) fl
 	return float64(changes) / float64(len(metrics)-1)
 }
 
-// getStorageReasoning returns reasoning for storage recommendation
+// getStorageReasoning returns reasoning for storage recommendation.
 func (bo *BackupOptimizer) getStorageReasoning(current, recommended StorageTier, growth, savings float64) []string {
 	reasoning := make([]string, 0)
 
@@ -868,7 +868,7 @@ func (bo *BackupOptimizer) getStorageReasoning(current, recommended StorageTier,
 	return reasoning
 }
 
-// calculateOverallScore calculates overall optimization score
+// calculateOverallScore calculates overall optimization score.
 func (bo *BackupOptimizer) calculateOverallScore(rec *OptimizationRecommendation) float64 {
 	score := 0.0
 
@@ -891,7 +891,7 @@ func (bo *BackupOptimizer) calculateOverallScore(rec *OptimizationRecommendation
 	return score
 }
 
-// calculateSavings calculates estimated cost savings
+// calculateSavings calculates estimated cost savings.
 func (bo *BackupOptimizer) calculateSavings(metrics []OptimizationMetrics, rec *OptimizationRecommendation) CostSavings {
 	// Calculate time savings from optimal compression and parallelism
 	avgDuration := time.Duration(0)
@@ -930,7 +930,7 @@ func (bo *BackupOptimizer) calculateSavings(metrics []OptimizationMetrics, rec *
 	}
 }
 
-// CalculateMonthlyCost calculates monthly storage cost
+// CalculateMonthlyCost calculates monthly storage cost.
 func (cc *CostCalculator) CalculateMonthlyCost(sizeBytes float64, tier StorageTier) float64 {
 	sizeGB := sizeBytes / (1024 * 1024 * 1024)
 	pricePerGB := cc.tierPricing[tier]
@@ -940,11 +940,11 @@ func (cc *CostCalculator) CalculateMonthlyCost(sizeBytes float64, tier StorageTi
 // Helper structures
 
 type CompressionStats struct {
-	Algorithm    CompressionAlgorithm
-	Samples      []CompressionSample
-	AvgRatio     float64
-	AvgDuration  time.Duration
-	AvgCPUUsage  float64
+	Algorithm   CompressionAlgorithm
+	Samples     []CompressionSample
+	AvgRatio    float64
+	AvgDuration time.Duration
+	AvgCPUUsage float64
 }
 
 type CompressionSample struct {
@@ -1012,12 +1012,12 @@ func (ws *WindowStats) Calculate() {
 }
 
 type ParallelismStats struct {
-	Workers         int
-	Samples         []ParallelismSample
-	AvgDuration     time.Duration
-	AvgCPUUsage     float64
-	AvgMemoryUsage  float64
-	AvgDiskIOPS     float64
+	Workers        int
+	Samples        []ParallelismSample
+	AvgDuration    time.Duration
+	AvgCPUUsage    float64
+	AvgMemoryUsage float64
+	AvgDiskIOPS    float64
 }
 
 type ParallelismSample struct {
@@ -1050,7 +1050,7 @@ func (ps *ParallelismStats) Calculate() {
 	ps.AvgDiskIOPS = totalDisk / float64(len(ps.Samples))
 }
 
-// GetRecommendations returns all recommendations
+// GetRecommendations returns all recommendations.
 func (bo *BackupOptimizer) GetRecommendations() map[string]*OptimizationRecommendation {
 	bo.mu.RLock()
 	defer bo.mu.RUnlock()
@@ -1062,7 +1062,7 @@ func (bo *BackupOptimizer) GetRecommendations() map[string]*OptimizationRecommen
 	return recommendations
 }
 
-// GetStatistics returns optimizer statistics
+// GetStatistics returns optimizer statistics.
 func (bo *BackupOptimizer) GetStatistics() map[string]interface{} {
 	bo.mu.RLock()
 	defer bo.mu.RUnlock()

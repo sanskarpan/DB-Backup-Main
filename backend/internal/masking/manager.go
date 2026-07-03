@@ -5,22 +5,22 @@ import (
 	"sync"
 )
 
-// MaskingRule represents a rule for masking a specific column
+// MaskingRule represents a rule for masking a specific column.
 type MaskingRule struct {
-	ID              string
-	Table           string
-	Column          string
-	Strategy        MaskingStrategy
-	Config          *MaskingConfig
-	Priority        int
-	Enabled         bool
-	Description     string
-	PreserveNulls   bool
-	ReferentialKey  string // For referential integrity preservation
-	Metadata        map[string]interface{}
+	ID             string
+	Table          string
+	Column         string
+	Strategy       MaskingStrategy
+	Config         *MaskingConfig
+	Priority       int
+	Enabled        bool
+	Description    string
+	PreserveNulls  bool
+	ReferentialKey string // For referential integrity preservation
+	Metadata       map[string]interface{}
 }
 
-// ReferentialIntegrityRule represents a referential integrity relationship
+// ReferentialIntegrityRule represents a referential integrity relationship.
 type ReferentialIntegrityRule struct {
 	ID              string
 	SourceTable     string
@@ -31,52 +31,52 @@ type ReferentialIntegrityRule struct {
 	Description     string
 }
 
-// MaskingJob represents a masking operation job
+// MaskingJob represents a masking operation job.
 type MaskingJob struct {
-	ID          string
-	Database    string
-	Tables      []string
-	Rules       []*MaskingRule
-	Status      string
-	TotalRows   int64
+	ID            string
+	Database      string
+	Tables        []string
+	Rules         []*MaskingRule
+	Status        string
+	TotalRows     int64
 	ProcessedRows int64
-	MaskedFields int64
-	StartTime   string
-	EndTime     string
-	Error       string
-	Metadata    map[string]interface{}
+	MaskedFields  int64
+	StartTime     string
+	EndTime       string
+	Error         string
+	Metadata      map[string]interface{}
 }
 
-// MaskingManager manages data masking operations
+// MaskingManager manages data masking operations.
 type MaskingManager struct {
-	mu                      sync.RWMutex
-	detector                *PIIDetector
-	factory                 *MaskerFactory
-	rules                   map[string]*MaskingRule
-	referentialRules        map[string]*ReferentialIntegrityRule
-	referentialMappings     map[string]map[string]string // key: source_table:source_column:value -> masked_value
-	jobs                    map[string]*MaskingJob
-	autoDetect              bool
-	autoDetectThreshold     float64
+	mu                          sync.RWMutex
+	detector                    *PIIDetector
+	factory                     *MaskerFactory
+	rules                       map[string]*MaskingRule
+	referentialRules            map[string]*ReferentialIntegrityRule
+	referentialMappings         map[string]map[string]string // key: source_table:source_column:value -> masked_value
+	jobs                        map[string]*MaskingJob
+	autoDetect                  bool
+	autoDetectThreshold         float64
 	enforceReferentialIntegrity bool
 }
 
-// NewMaskingManager creates a new masking manager
+// NewMaskingManager creates a new masking manager.
 func NewMaskingManager() *MaskingManager {
 	return &MaskingManager{
-		detector:                NewPIIDetector(),
-		factory:                 NewMaskerFactory(),
-		rules:                   make(map[string]*MaskingRule),
-		referentialRules:        make(map[string]*ReferentialIntegrityRule),
-		referentialMappings:     make(map[string]map[string]string),
-		jobs:                    make(map[string]*MaskingJob),
-		autoDetect:              true,
-		autoDetectThreshold:     0.7,
+		detector:                    NewPIIDetector(),
+		factory:                     NewMaskerFactory(),
+		rules:                       make(map[string]*MaskingRule),
+		referentialRules:            make(map[string]*ReferentialIntegrityRule),
+		referentialMappings:         make(map[string]map[string]string),
+		jobs:                        make(map[string]*MaskingJob),
+		autoDetect:                  true,
+		autoDetectThreshold:         0.7,
 		enforceReferentialIntegrity: true,
 	}
 }
 
-// AddRule adds a masking rule
+// AddRule adds a masking rule.
 func (mm *MaskingManager) AddRule(rule *MaskingRule) error {
 	if rule == nil {
 		return fmt.Errorf("rule cannot be nil")
@@ -105,7 +105,7 @@ func (mm *MaskingManager) AddRule(rule *MaskingRule) error {
 	return nil
 }
 
-// GetRule retrieves a masking rule
+// GetRule retrieves a masking rule.
 func (mm *MaskingManager) GetRule(table, column string) (*MaskingRule, bool) {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
@@ -115,7 +115,7 @@ func (mm *MaskingManager) GetRule(table, column string) (*MaskingRule, bool) {
 	return rule, exists
 }
 
-// RemoveRule removes a masking rule
+// RemoveRule removes a masking rule.
 func (mm *MaskingManager) RemoveRule(table, column string) {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
@@ -124,7 +124,7 @@ func (mm *MaskingManager) RemoveRule(table, column string) {
 	delete(mm.rules, ruleKey)
 }
 
-// AddReferentialIntegrityRule adds a referential integrity rule
+// AddReferentialIntegrityRule adds a referential integrity rule.
 func (mm *MaskingManager) AddReferentialIntegrityRule(rule *ReferentialIntegrityRule) error {
 	if rule == nil {
 		return fmt.Errorf("referential integrity rule cannot be nil")
@@ -152,7 +152,7 @@ func (mm *MaskingManager) AddReferentialIntegrityRule(rule *ReferentialIntegrity
 	return nil
 }
 
-// MaskValue masks a single value according to rules
+// MaskValue masks a single value according to rules.
 func (mm *MaskingManager) MaskValue(table, column, value string) (string, error) {
 	// Check for NULL preservation
 	if value == "" {
@@ -210,7 +210,7 @@ func (mm *MaskingManager) MaskValue(table, column, value string) (string, error)
 	return maskedValue, nil
 }
 
-// autoMaskValue automatically masks a value based on PII detection
+// autoMaskValue automatically masks a value based on PII detection.
 func (mm *MaskingManager) autoMaskValue(table, column, value string) (string, error) {
 	detections := mm.detector.DetectInColumn(table, column, value)
 	if len(detections) == 0 {
@@ -232,8 +232,8 @@ func (mm *MaskingManager) autoMaskValue(table, column, value string) (string, er
 	config := &MaskingConfig{
 		Strategy: strategy,
 		Metadata: map[string]interface{}{
-			"pii_type":   bestDetection.Type,
-			"confidence": bestDetection.Confidence,
+			"pii_type":      bestDetection.Type,
+			"confidence":    bestDetection.Confidence,
 			"auto_detected": true,
 		},
 	}
@@ -243,7 +243,7 @@ func (mm *MaskingManager) autoMaskValue(table, column, value string) (string, er
 	return masker.Mask(value, config)
 }
 
-// MaskRow masks all values in a row according to rules
+// MaskRow masks all values in a row according to rules.
 func (mm *MaskingManager) MaskRow(table string, row map[string]string) (map[string]string, error) {
 	maskedRow := make(map[string]string)
 
@@ -258,7 +258,7 @@ func (mm *MaskingManager) MaskRow(table string, row map[string]string) (map[stri
 	return maskedRow, nil
 }
 
-// AnalyzeTable analyzes a table to suggest masking rules
+// AnalyzeTable analyzes a table to suggest masking rules.
 func (mm *MaskingManager) AnalyzeTable(table string, sampleData map[string][]string) []*MaskingRule {
 	rules := make([]*MaskingRule, 0)
 
@@ -278,9 +278,9 @@ func (mm *MaskingManager) AnalyzeTable(table string, sampleData map[string][]str
 				Config: &MaskingConfig{
 					Strategy: strategy,
 					Metadata: map[string]interface{}{
-						"pii_type":      piiType,
+						"pii_type":        piiType,
 						"detection_score": score,
-						"auto_detected":  true,
+						"auto_detected":   true,
 					},
 				},
 			}
@@ -292,7 +292,7 @@ func (mm *MaskingManager) AnalyzeTable(table string, sampleData map[string][]str
 	return rules
 }
 
-// ValidateReferentialIntegrity validates that referential integrity will be preserved
+// ValidateReferentialIntegrity validates that referential integrity will be preserved.
 func (mm *MaskingManager) ValidateReferentialIntegrity() []string {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
@@ -327,7 +327,7 @@ func (mm *MaskingManager) ValidateReferentialIntegrity() []string {
 	return warnings
 }
 
-// CreateMaskingJob creates a new masking job
+// CreateMaskingJob creates a new masking job.
 func (mm *MaskingManager) CreateMaskingJob(database string, tables []string) *MaskingJob {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
@@ -354,7 +354,7 @@ func (mm *MaskingManager) CreateMaskingJob(database string, tables []string) *Ma
 	return job
 }
 
-// GetJob retrieves a masking job
+// GetJob retrieves a masking job.
 func (mm *MaskingManager) GetJob(jobID string) (*MaskingJob, bool) {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
@@ -363,7 +363,7 @@ func (mm *MaskingManager) GetJob(jobID string) (*MaskingJob, bool) {
 	return job, exists
 }
 
-// ListJobs returns all masking jobs
+// ListJobs returns all masking jobs.
 func (mm *MaskingManager) ListJobs() []*MaskingJob {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
@@ -375,7 +375,7 @@ func (mm *MaskingManager) ListJobs() []*MaskingJob {
 	return jobs
 }
 
-// UpdateJobProgress updates job progress
+// UpdateJobProgress updates job progress.
 func (mm *MaskingManager) UpdateJobProgress(jobID string, processedRows, maskedFields int64) error {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
@@ -396,7 +396,7 @@ func (mm *MaskingManager) UpdateJobProgress(jobID string, processedRows, maskedF
 	return nil
 }
 
-// CompleteJob marks a job as completed
+// CompleteJob marks a job as completed.
 func (mm *MaskingManager) CompleteJob(jobID string, success bool, errorMsg string) error {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
@@ -416,17 +416,17 @@ func (mm *MaskingManager) CompleteJob(jobID string, success bool, errorMsg strin
 	return nil
 }
 
-// GetStatistics returns masking statistics
+// GetStatistics returns masking statistics.
 func (mm *MaskingManager) GetStatistics() map[string]interface{} {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
 
 	stats := map[string]interface{}{
-		"total_rules":              len(mm.rules),
-		"total_referential_rules":  len(mm.referentialRules),
-		"total_jobs":               len(mm.jobs),
-		"auto_detect_enabled":      mm.autoDetect,
-		"auto_detect_threshold":    mm.autoDetectThreshold,
+		"total_rules":                   len(mm.rules),
+		"total_referential_rules":       len(mm.referentialRules),
+		"total_jobs":                    len(mm.jobs),
+		"auto_detect_enabled":           mm.autoDetect,
+		"auto_detect_threshold":         mm.autoDetectThreshold,
 		"referential_integrity_enabled": mm.enforceReferentialIntegrity,
 	}
 
@@ -459,23 +459,23 @@ func (mm *MaskingManager) GetStatistics() map[string]interface{} {
 	return stats
 }
 
-// ExportMaskingConfiguration exports masking configuration
+// ExportMaskingConfiguration exports masking configuration.
 func (mm *MaskingManager) ExportMaskingConfiguration() map[string]interface{} {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
 
 	config := map[string]interface{}{
-		"rules":                     mm.rules,
-		"referential_rules":         mm.referentialRules,
-		"auto_detect":               mm.autoDetect,
-		"auto_detect_threshold":     mm.autoDetectThreshold,
+		"rules":                         mm.rules,
+		"referential_rules":             mm.referentialRules,
+		"auto_detect":                   mm.autoDetect,
+		"auto_detect_threshold":         mm.autoDetectThreshold,
 		"enforce_referential_integrity": mm.enforceReferentialIntegrity,
 	}
 
 	return config
 }
 
-// ClearMappings clears all referential integrity mappings
+// ClearMappings clears all referential integrity mappings.
 func (mm *MaskingManager) ClearMappings() {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
@@ -483,7 +483,7 @@ func (mm *MaskingManager) ClearMappings() {
 	mm.referentialMappings = make(map[string]map[string]string)
 }
 
-// SetAutoDetect enables or disables auto-detection
+// SetAutoDetect enables or disables auto-detection.
 func (mm *MaskingManager) SetAutoDetect(enabled bool, threshold float64) {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
@@ -494,7 +494,7 @@ func (mm *MaskingManager) SetAutoDetect(enabled bool, threshold float64) {
 	}
 }
 
-// SetEnforceReferentialIntegrity enables or disables referential integrity enforcement
+// SetEnforceReferentialIntegrity enables or disables referential integrity enforcement.
 func (mm *MaskingManager) SetEnforceReferentialIntegrity(enabled bool) {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
@@ -502,7 +502,7 @@ func (mm *MaskingManager) SetEnforceReferentialIntegrity(enabled bool) {
 	mm.enforceReferentialIntegrity = enabled
 }
 
-// ListRules returns all masking rules
+// ListRules returns all masking rules.
 func (mm *MaskingManager) ListRules() []*MaskingRule {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
@@ -514,7 +514,7 @@ func (mm *MaskingManager) ListRules() []*MaskingRule {
 	return rules
 }
 
-// ListReferentialRules returns all referential integrity rules
+// ListReferentialRules returns all referential integrity rules.
 func (mm *MaskingManager) ListReferentialRules() []*ReferentialIntegrityRule {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()

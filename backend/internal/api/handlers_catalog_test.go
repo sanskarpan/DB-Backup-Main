@@ -13,10 +13,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
 	"github.com/sanskarpan/db-backup/internal/catalog"
 )
 
-// MockSearchEngine is a mock implementation of catalog.SearchEngineInterface
+// MockSearchEngine is a mock implementation of catalog.SearchEngineInterface.
 type MockSearchEngine struct {
 	mock.Mock
 }
@@ -76,7 +77,7 @@ func TestHandleSearchCatalog(t *testing.T) {
 						DatabaseType:    "postgres",
 						BackupType:      "full",
 						Status:          "success",
-						SizeBytes:       1024*1024*100, // 100MB
+						SizeBytes:       1024 * 1024 * 100, // 100MB
 						Duration:        45.5,
 						StoragePath:     "/backups/prod-20240101.sql.gz",
 						StorageProvider: "s3",

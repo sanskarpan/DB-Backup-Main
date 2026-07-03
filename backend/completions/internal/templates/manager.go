@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-// Template represents a command template
+// Template represents a command template.
 type Template struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description"`
@@ -21,14 +21,14 @@ type Template struct {
 	Example     string            `json:"example"`
 }
 
-// TemplateManager manages command templates
+// TemplateManager manages command templates.
 type TemplateManager struct {
 	mu           sync.RWMutex
 	templates    map[string]*Template
 	templateFile string
 }
 
-// NewTemplateManager creates a new template manager
+// NewTemplateManager creates a new template manager.
 func NewTemplateManager(templateFile string) *TemplateManager {
 	return &TemplateManager{
 		templates:    make(map[string]*Template),
@@ -36,13 +36,13 @@ func NewTemplateManager(templateFile string) *TemplateManager {
 	}
 }
 
-// Load loads templates from file
+// Load loads templates from file.
 func (tm *TemplateManager) Load() error {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 
 	dir := filepath.Dir(tm.templateFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 
@@ -69,7 +69,7 @@ func (tm *TemplateManager) Load() error {
 	return nil
 }
 
-// Save saves templates to file
+// Save saves templates to file.
 func (tm *TemplateManager) Save() error {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
@@ -88,10 +88,10 @@ func (tm *TemplateManager) saveUnlocked() error {
 		return err
 	}
 
-	return os.WriteFile(tm.templateFile, data, 0644)
+	return os.WriteFile(tm.templateFile, data, 0o644)
 }
 
-// AddTemplate adds a new template
+// AddTemplate adds a new template.
 func (tm *TemplateManager) AddTemplate(template *Template) error {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
@@ -105,7 +105,7 @@ func (tm *TemplateManager) AddTemplate(template *Template) error {
 	return tm.saveUnlocked()
 }
 
-// GetTemplate retrieves a template by name
+// GetTemplate retrieves a template by name.
 func (tm *TemplateManager) GetTemplate(name string) (*Template, bool) {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
@@ -114,7 +114,7 @@ func (tm *TemplateManager) GetTemplate(name string) (*Template, bool) {
 	return template, exists
 }
 
-// DeleteTemplate deletes a template
+// DeleteTemplate deletes a template.
 func (tm *TemplateManager) DeleteTemplate(name string) error {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
@@ -124,7 +124,7 @@ func (tm *TemplateManager) DeleteTemplate(name string) error {
 	return tm.saveUnlocked()
 }
 
-// ListTemplates returns all templates
+// ListTemplates returns all templates.
 func (tm *TemplateManager) ListTemplates() []*Template {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
@@ -137,7 +137,7 @@ func (tm *TemplateManager) ListTemplates() []*Template {
 	return templates
 }
 
-// SearchTemplates searches templates by query
+// SearchTemplates searches templates by query.
 func (tm *TemplateManager) SearchTemplates(query string) []*Template {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
@@ -164,7 +164,7 @@ func (tm *TemplateManager) SearchTemplates(query string) []*Template {
 	return results
 }
 
-// GetTemplatesByCategory returns templates in a category
+// GetTemplatesByCategory returns templates in a category.
 func (tm *TemplateManager) GetTemplatesByCategory(category string) []*Template {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
@@ -180,7 +180,7 @@ func (tm *TemplateManager) GetTemplatesByCategory(category string) []*Template {
 	return results
 }
 
-// Expand expands a template with variable substitution
+// Expand expands a template with variable substitution.
 func (tm *TemplateManager) Expand(templateName string, variables map[string]string) (string, error) {
 	template, exists := tm.GetTemplate(templateName)
 	if !exists {
@@ -211,7 +211,7 @@ func (tm *TemplateManager) Expand(templateName string, variables map[string]stri
 	return result, nil
 }
 
-// Preview previews a template expansion
+// Preview previews a template expansion.
 func (tm *TemplateManager) Preview(templateName string, variables map[string]string) (map[string]interface{}, error) {
 	template, exists := tm.GetTemplate(templateName)
 	if !exists {
@@ -235,7 +235,7 @@ func (tm *TemplateManager) Preview(templateName string, variables map[string]str
 	return preview, nil
 }
 
-// loadDefaults loads default templates
+// loadDefaults loads default templates.
 func (tm *TemplateManager) loadDefaults() {
 	defaults := []*Template{
 		{
@@ -357,7 +357,7 @@ func (tm *TemplateManager) loadDefaults() {
 	}
 }
 
-// GetCategories returns all unique categories
+// GetCategories returns all unique categories.
 func (tm *TemplateManager) GetCategories() []string {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()

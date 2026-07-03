@@ -9,10 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+
+	"github.com/sanskarpan/db-backup/internal/database"
 )
 
 func skipIfMongoDBUnavailable(t *testing.T) {
@@ -236,7 +237,7 @@ func TestBackupWithOplog(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// Helper function to setup test MongoDB connection
+// Helper function to setup test MongoDB connection.
 func setupTestMongoDB(t *testing.T) *MongoDBDriver {
 	skipIfMongoDBUnavailable(t)
 	host := os.Getenv("MONGODB_TEST_HOST")

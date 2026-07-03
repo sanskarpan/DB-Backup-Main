@@ -4,19 +4,20 @@ import (
 	"io"
 
 	"github.com/klauspost/compress/zstd"
+
 	"github.com/sanskarpan/db-backup/internal/types"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
 
-// ZstdCompressor implements zstandard compression
+// ZstdCompressor implements zstandard compression.
 type ZstdCompressor struct{}
 
-// NewZstdCompressor creates a new zstd compressor
+// NewZstdCompressor creates a new zstd compressor.
 func NewZstdCompressor() *ZstdCompressor {
 	return &ZstdCompressor{}
 }
 
-// Compress compresses data using zstd
+// Compress compresses data using zstd.
 func (c *ZstdCompressor) Compress(input io.Reader, output io.Writer, level int) error {
 	// Map level (1-9) to zstd levels
 	var encoderLevel zstd.EncoderLevel
@@ -42,7 +43,7 @@ func (c *ZstdCompressor) Compress(input io.Reader, output io.Writer, level int) 
 	return writer.Close()
 }
 
-// Decompress decompresses zstd data
+// Decompress decompresses zstd data.
 func (c *ZstdCompressor) Decompress(input io.Reader, output io.Writer) error {
 	reader, err := zstd.NewReader(input)
 	if err != nil {
@@ -57,12 +58,12 @@ func (c *ZstdCompressor) Decompress(input io.Reader, output io.Writer) error {
 	return nil
 }
 
-// GetType returns the compression type
+// GetType returns the compression type.
 func (c *ZstdCompressor) GetType() types.CompressionType {
 	return types.CompressionZstd
 }
 
-// GetExtension returns the file extension
+// GetExtension returns the file extension.
 func (c *ZstdCompressor) GetExtension() string {
 	return ".zst"
 }

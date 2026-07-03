@@ -8,19 +8,19 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// LoginRequest represents a login request
+// LoginRequest represents a login request.
 type LoginRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
 
-// LoginResponse represents a login response
+// LoginResponse represents a login response.
 type LoginResponse struct {
 	Token string `json:"token"`
 	User  User   `json:"user"`
 }
 
-// User represents a user
+// User represents a user.
 type User struct {
 	ID    string   `json:"id"`
 	Email string   `json:"email"`
@@ -38,7 +38,7 @@ type User struct {
 // @Success 200 {object} LoginResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 401 {object} ErrorResponse
-// @Router /api/v1/auth/login [post]
+// @Router /api/v1/auth/login [post].
 func (s *Server) handleLogin(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

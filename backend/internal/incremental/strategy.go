@@ -14,7 +14,7 @@ import (
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
-// BackupType represents the type of backup
+// BackupType represents the type of backup.
 type BackupType string
 
 const (
@@ -23,7 +23,7 @@ const (
 	BackupTypeSynthetic   BackupType = "synthetic"   // Synthetic full backup
 )
 
-// BackupManifest represents metadata for a backup
+// BackupManifest represents metadata for a backup.
 type BackupManifest struct {
 	ID             string
 	Type           BackupType
@@ -50,7 +50,7 @@ type BackupManifest struct {
 	Metadata       map[string]interface{}
 }
 
-// BackupBlock represents a backed up block with its data
+// BackupBlock represents a backed up block with its data.
 type BackupBlock struct {
 	Offset   int64
 	Size     int64
@@ -58,7 +58,7 @@ type BackupBlock struct {
 	Data     []byte
 }
 
-// IncrementalForeverStrategy implements the incremental forever backup strategy
+// IncrementalForeverStrategy implements the incremental forever backup strategy.
 type IncrementalForeverStrategy struct {
 	mu                 sync.RWMutex
 	tracker            *ChangeTracker
@@ -172,7 +172,7 @@ func (ifs *IncrementalForeverStrategy) RemoveBackup(backupID string) error {
 	return nil
 }
 
-// PerformFullBackup performs an initial full backup
+// PerformFullBackup performs an initial full backup.
 func (ifs *IncrementalForeverStrategy) PerformFullBackup(sourcePath, databaseID, databaseName string) (*BackupManifest, error) {
 	manifest := &BackupManifest{
 		ID:           uid.New("full"),
@@ -240,7 +240,7 @@ func (ifs *IncrementalForeverStrategy) PerformFullBackup(sourcePath, databaseID,
 	return manifest, nil
 }
 
-// PerformIncrementalBackup performs an incremental backup
+// PerformIncrementalBackup performs an incremental backup.
 func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, databaseID, databaseName string, baseBackupID string) (*BackupManifest, error) {
 	// Find base backup
 	ifs.mu.RLock()
@@ -333,7 +333,7 @@ func (ifs *IncrementalForeverStrategy) PerformIncrementalBackup(sourcePath, data
 	return manifest, nil
 }
 
-// RestoreFromBackup restores data from a backup chain
+// RestoreFromBackup restores data from a backup chain.
 func (ifs *IncrementalForeverStrategy) RestoreFromBackup(backupID, targetPath string) error {
 	// Build restore chain
 	chain, err := ifs.buildRestoreChain(backupID)
@@ -363,7 +363,7 @@ func (ifs *IncrementalForeverStrategy) RestoreFromBackup(backupID, targetPath st
 	return nil
 }
 
-// buildRestoreChain builds the chain of backups needed for restore
+// buildRestoreChain builds the chain of backups needed for restore.
 func (ifs *IncrementalForeverStrategy) buildRestoreChain(backupID string) ([]*BackupManifest, error) {
 	ifs.mu.RLock()
 	defer ifs.mu.RUnlock()
@@ -399,7 +399,7 @@ func (ifs *IncrementalForeverStrategy) buildRestoreChain(backupID string) ([]*Ba
 	return chain, nil
 }
 
-// applyIncrementalBackup applies an incremental backup to a file
+// applyIncrementalBackup applies an incremental backup to a file.
 func (ifs *IncrementalForeverStrategy) applyIncrementalBackup(filePath string, manifest *BackupManifest) error {
 	// Load incremental backup data
 	backupData, err := ifs.loadIncrementalBackup(manifest.BackupPath, manifest.Compression)
@@ -430,7 +430,7 @@ func (ifs *IncrementalForeverStrategy) applyIncrementalBackup(filePath string, m
 	return nil
 }
 
-// saveIncrementalBackup saves an incremental backup
+// saveIncrementalBackup saves an incremental backup.
 func (ifs *IncrementalForeverStrategy) saveIncrementalBackup(backupPath string, blockData map[int64][]byte, changeSet *ChangeSet, compression string) error {
 	// Create backup structure
 	backup := struct {
@@ -500,7 +500,7 @@ func (ifs *IncrementalForeverStrategy) saveIncrementalBackup(backupPath string, 
 	return nil
 }
 
-// loadIncrementalBackup loads an incremental backup
+// loadIncrementalBackup loads an incremental backup.
 func (ifs *IncrementalForeverStrategy) loadIncrementalBackup(backupPath string, compression string) (map[int64][]byte, error) {
 	file, err := os.Open(backupPath)
 	if err != nil {
@@ -546,7 +546,7 @@ func (ifs *IncrementalForeverStrategy) loadIncrementalBackup(backupPath string, 
 	return blockData, nil
 }
 
-// copyWithCompression copies a file with optional compression
+// copyWithCompression copies a file with optional compression.
 func (ifs *IncrementalForeverStrategy) copyWithCompression(sourcePath, destPath, compression string) error {
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
@@ -578,7 +578,7 @@ func (ifs *IncrementalForeverStrategy) copyWithCompression(sourcePath, destPath,
 	return nil
 }
 
-// extractWithDecompression extracts a file with optional decompression
+// extractWithDecompression extracts a file with optional decompression.
 func (ifs *IncrementalForeverStrategy) extractWithDecompression(sourcePath, destPath, compression string) error {
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
@@ -613,7 +613,7 @@ func (ifs *IncrementalForeverStrategy) extractWithDecompression(sourcePath, dest
 	return nil
 }
 
-// saveManifest saves a backup manifest to disk
+// saveManifest saves a backup manifest to disk.
 func (ifs *IncrementalForeverStrategy) saveManifest(manifest *BackupManifest) error {
 	manifestPath := filepath.Join(ifs.backupDir, fmt.Sprintf("%s-manifest.json", manifest.ID))
 
@@ -624,7 +624,7 @@ func (ifs *IncrementalForeverStrategy) saveManifest(manifest *BackupManifest) er
 	return nil
 }
 
-// LoadManifest loads a backup manifest from disk
+// LoadManifest loads a backup manifest from disk.
 func (ifs *IncrementalForeverStrategy) LoadManifest(manifestPath string) (*BackupManifest, error) {
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -640,7 +640,7 @@ func (ifs *IncrementalForeverStrategy) LoadManifest(manifestPath string) (*Backu
 	return &manifest, nil
 }
 
-// GetManifest retrieves a backup manifest by ID
+// GetManifest retrieves a backup manifest by ID.
 func (ifs *IncrementalForeverStrategy) GetManifest(backupID string) (*BackupManifest, bool) {
 	ifs.mu.RLock()
 	defer ifs.mu.RUnlock()
@@ -649,7 +649,7 @@ func (ifs *IncrementalForeverStrategy) GetManifest(backupID string) (*BackupMani
 	return manifest, exists
 }
 
-// ListBackups lists all backup manifests
+// ListBackups lists all backup manifests.
 func (ifs *IncrementalForeverStrategy) ListBackups() []*BackupManifest {
 	ifs.mu.RLock()
 	defer ifs.mu.RUnlock()
@@ -662,12 +662,12 @@ func (ifs *IncrementalForeverStrategy) ListBackups() []*BackupManifest {
 	return manifests
 }
 
-// GetBackupChain returns the backup chain for a given backup
+// GetBackupChain returns the backup chain for a given backup.
 func (ifs *IncrementalForeverStrategy) GetBackupChain(backupID string) ([]*BackupManifest, error) {
 	return ifs.buildRestoreChain(backupID)
 }
 
-// VerifyBackup verifies the integrity of a backup
+// VerifyBackup verifies the integrity of a backup.
 func (ifs *IncrementalForeverStrategy) VerifyBackup(backupID string) error {
 	manifest, exists := ifs.GetManifest(backupID)
 	if !exists {
@@ -691,7 +691,7 @@ func (ifs *IncrementalForeverStrategy) VerifyBackup(backupID string) error {
 	return nil
 }
 
-// GetStatistics returns statistics about backups
+// GetStatistics returns statistics about backups.
 func (ifs *IncrementalForeverStrategy) GetStatistics() map[string]interface{} {
 	ifs.mu.RLock()
 	defer ifs.mu.RUnlock()

@@ -63,7 +63,6 @@ func TestRewriteQueryNotInToNotExists(t *testing.T) {
 
 	query := "SELECT * FROM users WHERE id NOT IN (SELECT user_id FROM banned)"
 	result, err := rewriter.RewriteQuery(ctx, query)
-
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -90,7 +89,6 @@ func TestRewriteQueryExplicitJoin(t *testing.T) {
 
 	query := "SELECT * FROM users JOIN orders ON users.id = orders.user_id"
 	result, err := rewriter.RewriteQuery(ctx, query)
-
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -108,7 +106,6 @@ func TestRewriteQueryOrToIn(t *testing.T) {
 
 	query := "SELECT * FROM users WHERE status = 'active' OR status = 'pending'"
 	result, err := rewriter.RewriteQuery(ctx, query)
-
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -135,7 +132,6 @@ func TestApplyRule(t *testing.T) {
 
 	query := "SELECT * FROM test WHERE id = 1"
 	rewritten, err := rewriter.ApplyRule(ctx, query, rule)
-
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -354,7 +350,6 @@ func TestRewriteQueryNoChanges(t *testing.T) {
 
 	query := "SELECT * FROM users WHERE id = 1"
 	result, err := rewriter.RewriteQuery(ctx, query)
-
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}

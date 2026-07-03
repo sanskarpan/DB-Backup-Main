@@ -13,7 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// QuiesceState represents the state of a quiesced database
+// QuiesceState represents the state of a quiesced database.
 type QuiesceState string
 
 const (
@@ -24,7 +24,7 @@ const (
 	StateFailed    QuiesceState = "failed"
 )
 
-// QuiesceOperation represents a database quiesce operation
+// QuiesceOperation represents a database quiesce operation.
 type QuiesceOperation struct {
 	DatabaseType string
 	DatabaseName string
@@ -36,20 +36,20 @@ type QuiesceOperation struct {
 	Metadata     map[string]interface{}
 }
 
-// QuiesceManager manages database quiesce operations
+// QuiesceManager manages database quiesce operations.
 type QuiesceManager struct {
 	mu         sync.RWMutex
 	operations map[string]*QuiesceOperation
 }
 
-// NewQuiesceManager creates a new quiesce manager
+// NewQuiesceManager creates a new quiesce manager.
 func NewQuiesceManager() *QuiesceManager {
 	return &QuiesceManager{
 		operations: make(map[string]*QuiesceOperation),
 	}
 }
 
-// PostgreSQLQuiescer handles PostgreSQL quiesce operations
+// PostgreSQLQuiescer handles PostgreSQL quiesce operations.
 type PostgreSQLQuiescer struct {
 	db            *sql.DB
 	conn          *sql.Conn // pinned connection for the non-exclusive backup session
@@ -57,7 +57,7 @@ type PostgreSQLQuiescer struct {
 	checkpointLSN string
 }
 
-// NewPostgreSQLQuiescer creates a new PostgreSQL quiescer
+// NewPostgreSQLQuiescer creates a new PostgreSQL quiescer.
 func NewPostgreSQLQuiescer(connString string) (*PostgreSQLQuiescer, error) {
 	db, err := sql.Open("postgres", connString)
 	if err != nil {
@@ -70,7 +70,7 @@ func NewPostgreSQLQuiescer(connString string) (*PostgreSQLQuiescer, error) {
 	}, nil
 }
 
-// Quiesce starts a PostgreSQL backup session
+// Quiesce starts a PostgreSQL backup session.
 func (pq *PostgreSQLQuiescer) Quiesce(ctx context.Context) (*QuiesceOperation, error) {
 	op := &QuiesceOperation{
 		DatabaseType: "postgresql",
@@ -151,7 +151,7 @@ func (pq *PostgreSQLQuiescer) Resume(ctx context.Context) error {
 	return nil
 }
 
-// Close closes the PostgreSQL connection
+// Close closes the PostgreSQL connection.
 func (pq *PostgreSQLQuiescer) Close() error {
 	// Ensure the backup session is ended and the pinned connection released.
 	var resumeErr error
@@ -166,7 +166,7 @@ func (pq *PostgreSQLQuiescer) Close() error {
 	return resumeErr
 }
 
-// MySQLQuiescer handles MySQL quiesce operations
+// MySQLQuiescer handles MySQL quiesce operations.
 type MySQLQuiescer struct {
 	db               *sql.DB
 	conn             *sql.Conn // pinned connection holding the read lock
@@ -175,7 +175,7 @@ type MySQLQuiescer struct {
 	originalReadOnly bool
 }
 
-// NewMySQLQuiescer creates a new MySQL quiescer
+// NewMySQLQuiescer creates a new MySQL quiescer.
 func NewMySQLQuiescer(connString string, lockTimeout time.Duration) (*MySQLQuiescer, error) {
 	db, err := sql.Open("mysql", connString)
 	if err != nil {
@@ -192,7 +192,7 @@ func NewMySQLQuiescer(connString string, lockTimeout time.Duration) (*MySQLQuies
 	}, nil
 }
 
-// Quiesce locks all MySQL tables for consistent backup
+// Quiesce locks all MySQL tables for consistent backup.
 func (mq *MySQLQuiescer) Quiesce(ctx context.Context) (*QuiesceOperation, error) {
 	op := &QuiesceOperation{
 		DatabaseType: "mysql",
@@ -300,7 +300,7 @@ func (mq *MySQLQuiescer) Resume(ctx context.Context) error {
 	return nil
 }
 
-// Close closes the MySQL connection
+// Close closes the MySQL connection.
 func (mq *MySQLQuiescer) Close() error {
 	// Ensure tables are unlocked
 	if mq.tablesLocked {
@@ -311,14 +311,14 @@ func (mq *MySQLQuiescer) Close() error {
 	return mq.db.Close()
 }
 
-// MongoDBQuiescer handles MongoDB quiesce operations
+// MongoDBQuiescer handles MongoDB quiesce operations.
 type MongoDBQuiescer struct {
 	client      *mongo.Client
 	database    string
 	fsyncLocked bool
 }
 
-// NewMongoDBQuiescer creates a new MongoDB quiescer
+// NewMongoDBQuiescer creates a new MongoDB quiescer.
 func NewMongoDBQuiescer(connString, database string) (*MongoDBQuiescer, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -339,7 +339,7 @@ func NewMongoDBQuiescer(connString, database string) (*MongoDBQuiescer, error) {
 	}, nil
 }
 
-// Quiesce locks MongoDB with fsync
+// Quiesce locks MongoDB with fsync.
 func (mq *MongoDBQuiescer) Quiesce(ctx context.Context) (*QuiesceOperation, error) {
 	op := &QuiesceOperation{
 		DatabaseType: "mongodb",
@@ -410,7 +410,7 @@ func (mq *MongoDBQuiescer) Quiesce(ctx context.Context) (*QuiesceOperation, erro
 	return op, nil
 }
 
-// Resume unlocks MongoDB
+// Resume unlocks MongoDB.
 func (mq *MongoDBQuiescer) Resume(ctx context.Context) error {
 	if !mq.fsyncLocked {
 		return nil
@@ -438,7 +438,7 @@ func (mq *MongoDBQuiescer) Resume(ctx context.Context) error {
 	return nil
 }
 
-// Close closes the MongoDB connection
+// Close closes the MongoDB connection.
 func (mq *MongoDBQuiescer) Close() error {
 	// Ensure database is unlocked
 	if mq.fsyncLocked {
@@ -452,14 +452,14 @@ func (mq *MongoDBQuiescer) Close() error {
 	return mq.client.Disconnect(ctx)
 }
 
-// Quiescer interface for database-agnostic quiesce operations
+// Quiescer interface for database-agnostic quiesce operations.
 type Quiescer interface {
 	Quiesce(ctx context.Context) (*QuiesceOperation, error)
 	Resume(ctx context.Context) error
 	Close() error
 }
 
-// QuiesceDatabase performs a quiesce operation on a database
+// QuiesceDatabase performs a quiesce operation on a database.
 func (qm *QuiesceManager) QuiesceDatabase(ctx context.Context, quiescer Quiescer, dbID string) (*QuiesceOperation, error) {
 	qm.mu.Lock()
 	defer qm.mu.Unlock()
@@ -480,7 +480,7 @@ func (qm *QuiesceManager) QuiesceDatabase(ctx context.Context, quiescer Quiescer
 	return op, nil
 }
 
-// ResumeDatabase resumes a quiesced database
+// ResumeDatabase resumes a quiesced database.
 func (qm *QuiesceManager) ResumeDatabase(ctx context.Context, quiescer Quiescer, dbID string) error {
 	qm.mu.Lock()
 	defer qm.mu.Unlock()
@@ -509,7 +509,7 @@ func (qm *QuiesceManager) ResumeDatabase(ctx context.Context, quiescer Quiescer,
 	return nil
 }
 
-// GetOperation returns the quiesce operation for a database
+// GetOperation returns the quiesce operation for a database.
 func (qm *QuiesceManager) GetOperation(dbID string) (*QuiesceOperation, bool) {
 	qm.mu.RLock()
 	defer qm.mu.RUnlock()
@@ -518,7 +518,7 @@ func (qm *QuiesceManager) GetOperation(dbID string) (*QuiesceOperation, bool) {
 	return op, exists
 }
 
-// GetAllOperations returns all quiesce operations
+// GetAllOperations returns all quiesce operations.
 func (qm *QuiesceManager) GetAllOperations() map[string]*QuiesceOperation {
 	qm.mu.RLock()
 	defer qm.mu.RUnlock()
@@ -530,7 +530,7 @@ func (qm *QuiesceManager) GetAllOperations() map[string]*QuiesceOperation {
 	return operations
 }
 
-// ClearOperation removes a quiesce operation
+// ClearOperation removes a quiesce operation.
 func (qm *QuiesceManager) ClearOperation(dbID string) {
 	qm.mu.Lock()
 	defer qm.mu.Unlock()

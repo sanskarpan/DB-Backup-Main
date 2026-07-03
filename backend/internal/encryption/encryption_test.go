@@ -91,9 +91,9 @@ func TestAESEncryptor_KeyHashing(t *testing.T) {
 	keys := [][]byte{
 		[]byte("short"),
 		[]byte("this is a longer key"),
-		make([]byte, 16),  // 128 bits
-		make([]byte, 32),  // 256 bits
-		make([]byte, 64),  // 512 bits
+		make([]byte, 16), // 128 bits
+		make([]byte, 32), // 256 bits
+		make([]byte, 64), // 512 bits
 	}
 
 	testData := []byte("Test data")
@@ -137,7 +137,7 @@ func TestAESEncryptor_CorruptedData(t *testing.T) {
 	assert.Error(t, err) // Should fail
 }
 
-// Benchmark tests
+// Benchmark tests.
 func BenchmarkAESEncrypt(b *testing.B) {
 	key := make([]byte, 32)
 	rand.Read(key)

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/sanskarpan/db-backup/internal/repository"
 	"github.com/sanskarpan/db-backup/internal/restore"
 )
@@ -36,7 +37,7 @@ type RestoreBackupRequest struct {
 	Force          bool     `json:"force"`
 }
 
-// HandleRestoreBackup restores a backup
+// HandleRestoreBackup restores a backup.
 func (h *RestoreHandler) HandleRestoreBackup(c *gin.Context) {
 	id := c.Param("id")
 	ctx := c.Request.Context()

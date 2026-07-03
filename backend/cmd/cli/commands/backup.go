@@ -6,14 +6,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/sanskarpan/db-backup/internal/backup"
 	"github.com/sanskarpan/db-backup/internal/config"
 	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/sanskarpan/db-backup/internal/repository"
-	"github.com/spf13/cobra"
 )
 
-// BackupOptions holds options for the backup command
+// BackupOptions holds options for the backup command.
 type BackupOptions struct {
 	// Database connection
 	Type     string
@@ -24,9 +25,9 @@ type BackupOptions struct {
 	Database string
 
 	// Multiple databases
-	Databases    []string
-	AllDatabases bool
-	Tables       []string
+	Databases     []string
+	AllDatabases  bool
+	Tables        []string
 	ExcludeTables []string
 
 	// Backup options
@@ -48,7 +49,7 @@ type BackupOptions struct {
 	DryRun bool
 }
 
-// backupCmd represents the backup command
+// backupCmd represents the backup command.
 var backupCmd = &cobra.Command{
 	Use:   "backup",
 	Short: "Create a database backup",

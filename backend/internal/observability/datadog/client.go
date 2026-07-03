@@ -11,7 +11,7 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
-// Config holds Datadog configuration
+// Config holds Datadog configuration.
 type Config struct {
 	APIKey      string
 	AppKey      string
@@ -22,12 +22,12 @@ type Config struct {
 	Enabled     bool
 }
 
-// Client represents a Datadog APM client
+// Client represents a Datadog APM client.
 type Client struct {
 	config *Config
 }
 
-// NewClient creates a new Datadog client
+// NewClient creates a new Datadog client.
 func NewClient(config *Config) (*Client, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
@@ -58,7 +58,7 @@ func NewClient(config *Config) (*Client, error) {
 	}, nil
 }
 
-// Start initializes the Datadog tracer
+// Start initializes the Datadog tracer.
 func (c *Client) Start() error {
 	if !c.config.Enabled {
 		return nil
@@ -77,7 +77,7 @@ func (c *Client) Start() error {
 	return nil
 }
 
-// Stop gracefully shuts down the Datadog tracer
+// Stop gracefully shuts down the Datadog tracer.
 func (c *Client) Stop() {
 	if !c.config.Enabled {
 		return
@@ -85,7 +85,7 @@ func (c *Client) Stop() {
 	tracer.Stop()
 }
 
-// StartSpan creates a new span for tracing
+// StartSpan creates a new span for tracing.
 func (c *Client) StartSpan(operationName string, opts ...tracer.StartSpanOption) ddtrace.Span {
 	if !c.config.Enabled {
 		return &noopSpan{}
@@ -93,7 +93,7 @@ func (c *Client) StartSpan(operationName string, opts ...tracer.StartSpanOption)
 	return tracer.StartSpan(operationName, opts...)
 }
 
-// StartSpanFromContext creates a new span from context
+// StartSpanFromContext creates a new span from context.
 func (c *Client) StartSpanFromContext(ctx context.Context, operationName string, opts ...tracer.StartSpanOption) (ddtrace.Span, context.Context) {
 	if !c.config.Enabled {
 		return &noopSpan{}, ctx
@@ -101,9 +101,10 @@ func (c *Client) StartSpanFromContext(ctx context.Context, operationName string,
 	return tracer.StartSpanFromContext(ctx, operationName, opts...)
 }
 
-// TraceBackup traces a backup operation
+// TraceBackup traces a backup operation.
 func (c *Client) TraceBackup(ctx context.Context, databaseName, backupType string, fn func(context.Context) error) error {
-	span, ctx := c.StartSpanFromContext(ctx, "backup.create",
+	span, ctx := c.StartSpanFromContext(
+		ctx, "backup.create",
 		tracer.ResourceName(fmt.Sprintf("backup:%s", databaseName)),
 		tracer.Tag("database.name", databaseName),
 		tracer.Tag("backup.type", backupType),
@@ -128,9 +129,10 @@ func (c *Client) TraceBackup(ctx context.Context, databaseName, backupType strin
 	return nil
 }
 
-// TraceRestore traces a restore operation
+// TraceRestore traces a restore operation.
 func (c *Client) TraceRestore(ctx context.Context, databaseName string, fn func(context.Context) error) error {
-	span, ctx := c.StartSpanFromContext(ctx, "restore.execute",
+	span, ctx := c.StartSpanFromContext(
+		ctx, "restore.execute",
 		tracer.ResourceName(fmt.Sprintf("restore:%s", databaseName)),
 		tracer.Tag("database.name", databaseName),
 		tracer.Tag("service.name", c.config.ServiceName),
@@ -154,9 +156,10 @@ func (c *Client) TraceRestore(ctx context.Context, databaseName string, fn func(
 	return nil
 }
 
-// TraceStorageOperation traces a storage operation
+// TraceStorageOperation traces a storage operation.
 func (c *Client) TraceStorageOperation(ctx context.Context, operation, provider string, fn func(context.Context) error) error {
-	span, ctx := c.StartSpanFromContext(ctx, "storage."+operation,
+	span, ctx := c.StartSpanFromContext(
+		ctx, "storage."+operation,
 		tracer.ResourceName(fmt.Sprintf("storage:%s:%s", provider, operation)),
 		tracer.Tag("storage.provider", provider),
 		tracer.Tag("storage.operation", operation),
@@ -179,9 +182,10 @@ func (c *Client) TraceStorageOperation(ctx context.Context, operation, provider 
 	return nil
 }
 
-// TraceEncryption traces an encryption operation
+// TraceEncryption traces an encryption operation.
 func (c *Client) TraceEncryption(ctx context.Context, algorithm string, dataSize int64, fn func(context.Context) error) error {
-	span, ctx := c.StartSpanFromContext(ctx, "encryption.encrypt",
+	span, ctx := c.StartSpanFromContext(
+		ctx, "encryption.encrypt",
 		tracer.ResourceName("encryption:"+algorithm),
 		tracer.Tag("encryption.algorithm", algorithm),
 		tracer.Tag("encryption.data_size_bytes", dataSize),
@@ -208,7 +212,7 @@ func (c *Client) TraceEncryption(ctx context.Context, algorithm string, dataSize
 	return nil
 }
 
-// SendMetric sends a custom metric to Datadog
+// SendMetric sends a custom metric to Datadog.
 func (c *Client) SendMetric(name string, value float64, tags map[string]string) error {
 	if !c.config.Enabled {
 		return nil
@@ -219,7 +223,7 @@ func (c *Client) SendMetric(name string, value float64, tags map[string]string) 
 	return nil
 }
 
-// SendEvent sends an event to Datadog
+// SendEvent sends an event to Datadog.
 func (c *Client) SendEvent(title, text string, tags map[string]string, alertType string) error {
 	if !c.config.Enabled {
 		return nil
@@ -230,7 +234,7 @@ func (c *Client) SendEvent(title, text string, tags map[string]string, alertType
 	return nil
 }
 
-// LogError logs an error to Datadog
+// LogError logs an error to Datadog.
 func (c *Client) LogError(ctx context.Context, err error, tags map[string]string) {
 	if !c.config.Enabled {
 		return
@@ -248,20 +252,20 @@ func (c *Client) LogError(ctx context.Context, err error, tags map[string]string
 	}
 }
 
-// noopSpan is a no-op implementation of ddtrace.Span
+// noopSpan is a no-op implementation of ddtrace.Span.
 type noopSpan struct{}
 
-func (n *noopSpan) SetTag(key string, value interface{}) {}
+func (n *noopSpan) SetTag(key string, value interface{})  {}
 func (n *noopSpan) SetOperationName(operationName string) {}
-func (n *noopSpan) BaggageItem(key string) string          { return "" }
-func (n *noopSpan) SetBaggageItem(key, value string)       {}
-func (n *noopSpan) Finish(opts ...ddtrace.FinishOption)    {}
-func (n *noopSpan) Context() ddtrace.SpanContext           { return &noopSpanContext{} }
+func (n *noopSpan) BaggageItem(key string) string         { return "" }
+func (n *noopSpan) SetBaggageItem(key, value string)      {}
+func (n *noopSpan) Finish(opts ...ddtrace.FinishOption)   {}
+func (n *noopSpan) Context() ddtrace.SpanContext          { return &noopSpanContext{} }
 
-// noopSpanContext is a no-op implementation of ddtrace.SpanContext
+// noopSpanContext is a no-op implementation of ddtrace.SpanContext.
 type noopSpanContext struct{}
 
-func (n *noopSpanContext) TraceID() uint64              { return 0 }
-func (n *noopSpanContext) SpanID() uint64               { return 0 }
+func (n *noopSpanContext) TraceID() uint64 { return 0 }
+func (n *noopSpanContext) SpanID() uint64  { return 0 }
 func (n *noopSpanContext) ForeachBaggageItem(handler func(k, v string) bool) {
 }

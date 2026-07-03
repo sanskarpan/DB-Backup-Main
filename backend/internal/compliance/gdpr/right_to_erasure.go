@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// ErasureRequest represents a user's request to be forgotten
+// ErasureRequest represents a user's request to be forgotten.
 type ErasureRequest struct {
 	ID            string                 `json:"id"`
 	UserID        string                 `json:"user_id"`
@@ -24,7 +24,7 @@ type ErasureRequest struct {
 	Results       map[string]EraseResult `json:"results,omitempty"`
 }
 
-// ErasureStatus represents the status of an erasure request
+// ErasureStatus represents the status of an erasure request.
 type ErasureStatus string
 
 const (
@@ -33,10 +33,10 @@ const (
 	ErasureStatusProcessing ErasureStatus = "processing"
 	ErasureStatusCompleted  ErasureStatus = "completed"
 	ErasureStatusFailed     ErasureStatus = "failed"
-	ErasureStatusCancelled  ErasureStatus = "cancelled"
+	ErasureStatusCancelled  ErasureStatus = "canceled"
 )
 
-// EraseResult represents the result of erasing data from a specific source
+// EraseResult represents the result of erasing data from a specific source.
 type EraseResult struct {
 	Source    string    `json:"source"` // database, storage, logs, etc.
 	Success   bool      `json:"success"`
@@ -45,13 +45,13 @@ type EraseResult struct {
 	Count     int       `json:"count"` // number of records deleted
 }
 
-// ErasureManager manages right to be forgotten requests
+// ErasureManager manages right to be forgotten requests.
 type ErasureManager struct {
 	store       ErasureStore
 	dataErasers []DataEraser
 }
 
-// ErasureStore defines the interface for storing erasure requests
+// ErasureStore defines the interface for storing erasure requests.
 type ErasureStore interface {
 	Save(ctx context.Context, request *ErasureRequest) error
 	Get(ctx context.Context, requestID string) (*ErasureRequest, error)
@@ -59,13 +59,13 @@ type ErasureStore interface {
 	Update(ctx context.Context, request *ErasureRequest) error
 }
 
-// DataEraser defines the interface for erasing user data from various sources
+// DataEraser defines the interface for erasing user data from various sources.
 type DataEraser interface {
 	Name() string
 	EraseUserData(ctx context.Context, userID string) (int, error)
 }
 
-// NewErasureManager creates a new erasure manager
+// NewErasureManager creates a new erasure manager.
 func NewErasureManager(store ErasureStore, erasers []DataEraser) *ErasureManager {
 	return &ErasureManager{
 		store:       store,
@@ -73,7 +73,7 @@ func NewErasureManager(store ErasureStore, erasers []DataEraser) *ErasureManager
 	}
 }
 
-// CreateErasureRequest creates a new right to be forgotten request
+// CreateErasureRequest creates a new right to be forgotten request.
 func (em *ErasureManager) CreateErasureRequest(ctx context.Context, userID, reason string, dataTypes []string, retentionDays int) (*ErasureRequest, error) {
 	if userID == "" {
 		return nil, errors.New("user ID is required")
@@ -115,7 +115,7 @@ func (em *ErasureManager) CreateErasureRequest(ctx context.Context, userID, reas
 	return request, nil
 }
 
-// ProcessErasureRequest processes a right to be forgotten request
+// ProcessErasureRequest processes a right to be forgotten request.
 func (em *ErasureManager) ProcessErasureRequest(ctx context.Context, requestID, verifiedBy string) error {
 	request, err := em.store.Get(ctx, requestID)
 	if err != nil {
@@ -173,7 +173,7 @@ func (em *ErasureManager) ProcessErasureRequest(ctx context.Context, requestID, 
 	return em.store.Update(ctx, request)
 }
 
-// CancelErasureRequest cancels a pending erasure request
+// CancelErasureRequest cancels a pending erasure request.
 func (em *ErasureManager) CancelErasureRequest(ctx context.Context, requestID string) error {
 	request, err := em.store.Get(ctx, requestID)
 	if err != nil {
@@ -191,12 +191,12 @@ func (em *ErasureManager) CancelErasureRequest(ctx context.Context, requestID st
 	return em.store.Update(ctx, request)
 }
 
-// GetErasureRequest retrieves an erasure request
+// GetErasureRequest retrieves an erasure request.
 func (em *ErasureManager) GetErasureRequest(ctx context.Context, requestID string) (*ErasureRequest, error) {
 	return em.store.Get(ctx, requestID)
 }
 
-// GetUserErasureRequests retrieves all erasure requests for a user
+// GetUserErasureRequests retrieves all erasure requests for a user.
 func (em *ErasureManager) GetUserErasureRequests(ctx context.Context, userID string) ([]*ErasureRequest, error) {
 	return em.store.GetByUserID(ctx, userID)
 }

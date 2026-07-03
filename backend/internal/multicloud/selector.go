@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// SelectionCriteria defines criteria for selecting cloud providers
+// SelectionCriteria defines criteria for selecting cloud providers.
 type SelectionCriteria struct {
 	// Strategy is the selection strategy (cost, performance, compliance, balanced)
 	Strategy SelectionStrategy
@@ -43,17 +43,17 @@ type SelectionCriteria struct {
 	Weights SelectionWeights
 }
 
-// SelectionStrategy defines the provider selection strategy
+// SelectionStrategy defines the provider selection strategy.
 type SelectionStrategy string
 
 const (
-	StrategyCost        SelectionStrategy = "cost"         // Minimize cost
-	StrategyPerformance SelectionStrategy = "performance"  // Maximize performance
-	StrategyCompliance  SelectionStrategy = "compliance"   // Prioritize compliance
-	StrategyBalanced    SelectionStrategy = "balanced"     // Balance all factors
+	StrategyCost        SelectionStrategy = "cost"        // Minimize cost
+	StrategyPerformance SelectionStrategy = "performance" // Maximize performance
+	StrategyCompliance  SelectionStrategy = "compliance"  // Prioritize compliance
+	StrategyBalanced    SelectionStrategy = "balanced"    // Balance all factors
 )
 
-// SelectionWeights defines weights for balanced selection
+// SelectionWeights defines weights for balanced selection.
 type SelectionWeights struct {
 	Cost        float64 // 0-1
 	Performance float64 // 0-1
@@ -61,7 +61,7 @@ type SelectionWeights struct {
 	Redundancy  float64 // 0-1
 }
 
-// DefaultSelectionWeights returns default balanced weights
+// DefaultSelectionWeights returns default balanced weights.
 func DefaultSelectionWeights() SelectionWeights {
 	return SelectionWeights{
 		Cost:        0.4,
@@ -71,7 +71,7 @@ func DefaultSelectionWeights() SelectionWeights {
 	}
 }
 
-// ProviderMetrics contains performance and cost metrics for a provider
+// ProviderMetrics contains performance and cost metrics for a provider.
 type ProviderMetrics struct {
 	Provider             StorageProvider
 	Region               string
@@ -87,28 +87,28 @@ type ProviderMetrics struct {
 	LastUpdated          time.Time
 }
 
-// ProviderSelection represents a selected provider with score
+// ProviderSelection represents a selected provider with score.
 type ProviderSelection struct {
-	Provider StorageProvider
-	Region   string
-	Score    float64
+	Provider  StorageProvider
+	Region    string
+	Score     float64
 	Reasoning []string
 	Metrics   *ProviderMetrics
 }
 
-// CloudSelector selects optimal cloud providers
+// CloudSelector selects optimal cloud providers.
 type CloudSelector struct {
 	metrics map[string]*ProviderMetrics // key: provider-region
 }
 
-// NewCloudSelector creates a new cloud selector
+// NewCloudSelector creates a new cloud selector.
 func NewCloudSelector() *CloudSelector {
 	return &CloudSelector{
 		metrics: make(map[string]*ProviderMetrics),
 	}
 }
 
-// RegisterProviderMetrics registers metrics for a provider
+// RegisterProviderMetrics registers metrics for a provider.
 func (cs *CloudSelector) RegisterProviderMetrics(metrics *ProviderMetrics) error {
 	if metrics == nil {
 		return fmt.Errorf("metrics cannot be nil")
@@ -119,7 +119,7 @@ func (cs *CloudSelector) RegisterProviderMetrics(metrics *ProviderMetrics) error
 	return nil
 }
 
-// SelectProviders selects optimal providers based on criteria
+// SelectProviders selects optimal providers based on criteria.
 func (cs *CloudSelector) SelectProviders(ctx context.Context, criteria *SelectionCriteria) ([]*ProviderSelection, error) {
 	if criteria == nil {
 		criteria = &SelectionCriteria{
@@ -164,7 +164,7 @@ func (cs *CloudSelector) SelectProviders(ctx context.Context, criteria *Selectio
 	return selections, nil
 }
 
-// getCandidates filters providers that meet basic criteria
+// getCandidates filters providers that meet basic criteria.
 func (cs *CloudSelector) getCandidates(criteria *SelectionCriteria) map[string]*ProviderMetrics {
 	candidates := make(map[string]*ProviderMetrics)
 
@@ -249,7 +249,7 @@ func (cs *CloudSelector) getCandidates(criteria *SelectionCriteria) map[string]*
 	return candidates
 }
 
-// calculateScore calculates a score for a provider based on strategy
+// calculateScore calculates a score for a provider based on strategy.
 func (cs *CloudSelector) calculateScore(metrics *ProviderMetrics, criteria *SelectionCriteria, selection *ProviderSelection) float64 {
 	switch criteria.Strategy {
 	case StrategyCost:
@@ -265,7 +265,7 @@ func (cs *CloudSelector) calculateScore(metrics *ProviderMetrics, criteria *Sele
 	}
 }
 
-// calculateCostScore calculates cost-based score (lower cost = higher score)
+// calculateCostScore calculates cost-based score (lower cost = higher score).
 func (cs *CloudSelector) calculateCostScore(metrics *ProviderMetrics, criteria *SelectionCriteria, selection *ProviderSelection) float64 {
 	// Normalize cost to 0-100 scale (assuming max reasonable cost is $0.50/GB)
 	maxCost := 0.50
@@ -293,7 +293,7 @@ func (cs *CloudSelector) calculateCostScore(metrics *ProviderMetrics, criteria *
 	return score
 }
 
-// calculatePerformanceScore calculates performance-based score
+// calculatePerformanceScore calculates performance-based score.
 func (cs *CloudSelector) calculatePerformanceScore(metrics *ProviderMetrics, criteria *SelectionCriteria, selection *ProviderSelection) float64 {
 	// Base on performance score
 	score := metrics.PerformanceScore
@@ -327,7 +327,7 @@ func (cs *CloudSelector) calculatePerformanceScore(metrics *ProviderMetrics, cri
 	return score
 }
 
-// calculateComplianceScore calculates compliance-based score
+// calculateComplianceScore calculates compliance-based score.
 func (cs *CloudSelector) calculateComplianceScore(metrics *ProviderMetrics, criteria *SelectionCriteria, selection *ProviderSelection) float64 {
 	score := 50.0 // Base score
 
@@ -353,7 +353,7 @@ func (cs *CloudSelector) calculateComplianceScore(metrics *ProviderMetrics, crit
 	return score
 }
 
-// calculateBalancedScore calculates balanced score with custom weights
+// calculateBalancedScore calculates balanced score with custom weights.
 func (cs *CloudSelector) calculateBalancedScore(metrics *ProviderMetrics, criteria *SelectionCriteria, selection *ProviderSelection) float64 {
 	weights := criteria.Weights
 
@@ -381,7 +381,7 @@ func (cs *CloudSelector) calculateBalancedScore(metrics *ProviderMetrics, criter
 	return score
 }
 
-// ensureRedundancy ensures provider diversity for redundancy
+// ensureRedundancy ensures provider diversity for redundancy.
 func (cs *CloudSelector) ensureRedundancy(selections []*ProviderSelection, minRedundancy int) []*ProviderSelection {
 	if len(selections) <= minRedundancy {
 		return selections
@@ -435,7 +435,7 @@ func (cs *CloudSelector) ensureRedundancy(selections []*ProviderSelection, minRe
 	return result
 }
 
-// GetBestProvider returns the single best provider based on criteria
+// GetBestProvider returns the single best provider based on criteria.
 func (cs *CloudSelector) GetBestProvider(ctx context.Context, criteria *SelectionCriteria) (*ProviderSelection, error) {
 	selections, err := cs.SelectProviders(ctx, criteria)
 	if err != nil {
@@ -449,7 +449,7 @@ func (cs *CloudSelector) GetBestProvider(ctx context.Context, criteria *Selectio
 	return selections[0], nil
 }
 
-// CompareProviders compares providers and returns a comparison report
+// CompareProviders compares providers and returns a comparison report.
 func (cs *CloudSelector) CompareProviders(providers []StorageProvider) *ProviderComparison {
 	comparison := &ProviderComparison{
 		Providers: make(map[StorageProvider]*ProviderMetrics),
@@ -483,7 +483,7 @@ func (cs *CloudSelector) CompareProviders(providers []StorageProvider) *Provider
 	return comparison
 }
 
-// ProviderComparison represents a comparison of multiple providers
+// ProviderComparison represents a comparison of multiple providers.
 type ProviderComparison struct {
 	Providers map[StorageProvider]*ProviderMetrics
 	BestCost  *ProviderMetrics
