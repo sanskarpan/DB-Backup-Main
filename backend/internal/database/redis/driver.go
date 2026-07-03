@@ -514,7 +514,7 @@ func (d *RedisDriver) ValidateRestore(ctx context.Context, opts *database.Restor
 // waitForPersistenceCompletion polls the Redis "persistence" INFO section until
 // the given completion marker appears, indicating the background operation has
 // finished. It fails with timeoutErr if the operation does not complete within
-// the timeout window, or returns the context error if the context is cancelled.
+// the timeout window, or returns the context error if the context is canceled.
 func (d *RedisDriver) waitForPersistenceCompletion(ctx context.Context, completionMarker string, timeoutErr error) error {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
