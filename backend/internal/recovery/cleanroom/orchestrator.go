@@ -172,7 +172,7 @@ func (o *Orchestrator) Recover(ctx context.Context, meta *models.BackupMetadata,
 	}
 	if opts.Cleanup {
 		defer func() {
-			_ = os.RemoveAll(isolated) //nolint:errcheck // best-effort cleanup of isolated dir
+			_ = os.RemoveAll(isolated)
 		}()
 	}
 
@@ -280,7 +280,7 @@ func validateIntegrity(ctx context.Context, dbPath string, expectedTables []stri
 		return fmt.Errorf("open recovered database: %w", err)
 	}
 	defer func() {
-		_ = db.Close() //nolint:errcheck // read-only handle, close error is not actionable
+		_ = db.Close()
 	}()
 
 	if err = db.PingContext(ctx); err != nil {
@@ -309,7 +309,7 @@ func userTables(ctx context.Context, db *sql.DB) ([]string, error) {
 		return nil, fmt.Errorf("list tables: %w", err)
 	}
 	defer func() {
-		_ = rows.Close() //nolint:errcheck // rows error surfaced via rows.Err below
+		_ = rows.Close()
 	}()
 
 	var tables []string

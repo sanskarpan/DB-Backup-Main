@@ -120,7 +120,7 @@ func (j *Journal) openActive() error {
 	}
 	info, err := f.Stat()
 	if err != nil {
-		_ = f.Close() //nolint:errcheck // best-effort close on error path.
+		_ = f.Close()
 		return fmt.Errorf("cdp: stat active segment: %w", err)
 	}
 	j.active = f
@@ -205,7 +205,7 @@ func (j *Journal) Close() error {
 		return nil
 	}
 	if err := j.active.Sync(); err != nil {
-		_ = j.active.Close() //nolint:errcheck // prefer reporting the sync error.
+		_ = j.active.Close()
 		return fmt.Errorf("cdp: fsync on close: %w", err)
 	}
 	if err := j.active.Close(); err != nil {
@@ -261,7 +261,7 @@ func (j *Journal) collect(ctx context.Context, keep func(ChangeRecord) bool) ([]
 // stopping cleanly at a torn trailing write.
 func (j *Journal) forEachRecord(seq int, fn func(ChangeRecord) error) error {
 	path := j.segmentPath(seq)
-	data, err := os.ReadFile(path) //nolint:gosec // path is derived internally.
+	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil

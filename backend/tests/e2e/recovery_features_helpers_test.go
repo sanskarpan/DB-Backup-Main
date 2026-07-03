@@ -67,7 +67,7 @@ type cleanRoomAdapter struct {
 
 // Validate runs a real clean-room recovery for the point's backup and reports
 // whether the backup is promotable.
-func (c *cleanRoomAdapter) Validate(ctx context.Context, rp *aiRecovery.Point) (bool, string, error) {
+func (c *cleanRoomAdapter) Validate(ctx context.Context, rp *aiRecovery.Point) (ok bool, detail string, err error) {
 	meta, ok := c.backups[rp.BackupID]
 	if !ok {
 		return false, "", errors.New("unknown backup for recovery point")

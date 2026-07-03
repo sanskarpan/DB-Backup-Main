@@ -139,7 +139,7 @@ func openReadOnlySQLite(ctx context.Context, path string) (*sql.DB, error) {
 	// A read-only SQLite database supports a single connection safely.
 	db.SetMaxOpenConns(1)
 	if pingErr := db.PingContext(ctx); pingErr != nil {
-		_ = db.Close() //nolint:errcheck // best-effort close on a failed open
+		_ = db.Close()
 		return nil, fmt.Errorf("queryable: verify sqlite artifact: %w", pingErr)
 	}
 	return db, nil
@@ -287,5 +287,5 @@ func scanRows(rows *sql.Rows) (cols []string, out [][]any, err error) {
 // cleanupDir removes dir best-effort, ignoring any error (used on failure
 // paths where the original error is what matters).
 func cleanupDir(dir string) {
-	_ = os.RemoveAll(dir) //nolint:errcheck // best-effort cleanup on an error path
+	_ = os.RemoveAll(dir)
 }

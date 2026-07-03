@@ -248,12 +248,12 @@ func (a *Assistant) scoreCandidates(ctx context.Context, candidates []Point) []s
 // probe runs the clean-room validator to learn whether a candidate is safe. A
 // validator error is treated as "not validated" for scoring so a flaky probe
 // downranks rather than aborts planning; the detail is preserved.
-func (a *Assistant) probe(ctx context.Context, p *Point) (bool, string) {
-	ok, detail, err := a.validator.Validate(ctx, p)
+func (a *Assistant) probe(ctx context.Context, p *Point) (ok bool, detail string) {
+	valid, msg, err := a.validator.Validate(ctx, p)
 	if err != nil {
 		return false, fmt.Sprintf("validation probe failed: %v", err)
 	}
-	return ok, detail
+	return valid, msg
 }
 
 // timeRange returns the earliest and latest times among the candidates.
