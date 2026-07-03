@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,14 +15,29 @@ import (
 
 	"github.com/sanskarpan/db-backup/internal/database"
 	"github.com/sanskarpan/db-backup/internal/models"
+	"github.com/sanskarpan/db-backup/internal/security/ransomware"
 	"github.com/sanskarpan/db-backup/internal/storage"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 )
+
+// ErrMalwareDetected indicates the pre-restore malware scan found a threat at or
+// above the configured severity threshold and the restore was aborted to avoid
+// restoring infected data.
+var ErrMalwareDetected = errors.New("pre-restore malware scan detected a threat above the configured severity threshold")
+
+// ArtifactScanner scans an on-disk backup artifact for malware/ransomware
+// indicators before it is restored. It is satisfied by *ransomware.Detector.
+type ArtifactScanner interface {
+	// ScanFile scans the file at path and returns a threat report describing
+	// what, if anything, was found.
+	ScanFile(ctx context.Context, path string) (*ransomware.ThreatReport, error)
+}
 
 // Engine orchestrates restore operations.
 type Engine struct {
 	config   *Config
 	provider storage.Provider
+	scanner  ArtifactScanner
 }
 
 // Config holds restore engine configuration.
@@ -32,6 +48,19 @@ type Config struct {
 	// StorageProvider is the optional remote storage backend. When set, remote
 	// backups are downloaded into TempDirectory before being restored.
 	StorageProvider storage.Provider
+
+	// ArtifactScanner is the optional malware/ransomware scanner run against the
+	// local backup artifact before it is restored. When nil, scanning is skipped.
+	ArtifactScanner ArtifactScanner
+
+	// MalwareScanThreshold is the minimum threat severity that aborts a restore.
+	// When empty it defaults to ransomware.ThreatLevelHigh.
+	MalwareScanThreshold ransomware.ThreatLevel
+
+	// MalwareScanWarnOnly, when true, downgrades scan failures and detections to
+	// warnings surfaced in the result instead of aborting the restore. It
+	// defaults to false so scans fail closed.
+	MalwareScanWarnOnly bool
 }
 
 // RestoreOptions holds options for restoring a backup.
@@ -62,6 +91,10 @@ type RestoreOptions struct {
 	SkipValidation bool
 	Force          bool
 
+	// SkipMalwareScan disables the pre-restore malware/ransomware scan for this
+	// restore even when the engine has a scanner configured.
+	SkipMalwareScan bool
+
 	// Callbacks
 	ProgressCallback func(progress Progress)
 }
@@ -87,6 +120,11 @@ type RestoreResult struct {
 	RowsRestored   int64
 	Status         database.RestoreStatus
 	Error          error
+
+	// ThreatReport holds the pre-restore malware scan result when a scan ran.
+	// It is populated for both clean scans and detections so callers can audit
+	// what was found, and is the source of the abort details on ErrMalwareDetected.
+	ThreatReport *ransomware.ThreatReport
 }
 
 // NewEngine creates a new restore engine.
@@ -94,6 +132,7 @@ func NewEngine(config *Config) *Engine {
 	return &Engine{
 		config:   config,
 		provider: config.StorageProvider,
+		scanner:  config.ArtifactScanner,
 	}
 }
 
@@ -101,6 +140,13 @@ func NewEngine(config *Config) *Engine {
 // downloading remote backups. Passing nil disables remote downloads.
 func (e *Engine) SetStorageProvider(provider storage.Provider) {
 	e.provider = provider
+}
+
+// SetArtifactScanner injects (or replaces) the malware/ransomware scanner run
+// against a backup artifact before it is restored. Passing nil disables
+// pre-restore scanning.
+func (e *Engine) SetArtifactScanner(scanner ArtifactScanner) {
+	e.scanner = scanner
 }
 
 // RestoreBackup restores a database from backup.
@@ -151,6 +197,29 @@ func (e *Engine) RestoreBackup(ctx context.Context, backupMetadata *models.Backu
 			result.Status = database.RestoreStatusFailed
 			result.Error = err
 			return result, err
+		}
+	}
+
+	// Scan the local artifact for malware/ransomware before touching the target.
+	// A detection at/above the configured severity (or a scan failure, unless
+	// warn-only) aborts the restore so infected data is never restored.
+	if e.scanEnabled(opts) {
+		if opts.ProgressCallback != nil {
+			opts.ProgressCallback(Progress{
+				Stage:      "scanning",
+				Percentage: 15,
+				Message:    "Scanning backup for malware...",
+			})
+		}
+
+		report, scanErr := e.scanArtifact(ctx, localPath, opts)
+		if report != nil {
+			result.ThreatReport = report
+		}
+		if scanErr != nil {
+			result.Status = database.RestoreStatusFailed
+			result.Error = scanErr
+			return result, scanErr
 		}
 	}
 
@@ -283,6 +352,82 @@ func (e *Engine) RestorePointInTime(ctx context.Context, backupMetadata *models.
 
 	// Perform restore with PITR
 	return e.RestoreBackup(ctx, backupMetadata, opts)
+}
+
+// RestoreTables performs a selective restore of only the named tables from the
+// backup described by backupMetadata, delegating to RestoreBackup with the
+// table list applied to the restore options. The returned result reports which
+// tables were actually restored via RestoreResult.RestoredTables.
+//
+// Table-granular restore ultimately depends on the target database driver
+// honoring RestoreOptions.Tables; drivers that ignore it will restore the full
+// backup regardless of the requested subset.
+func (e *Engine) RestoreTables(ctx context.Context, backupMetadata *models.BackupMetadata, tables []string, opts *RestoreOptions) (*RestoreResult, error) {
+	if len(tables) == 0 {
+		return nil, pkgErrors.ErrValidationFailed("selective restore requires at least one table")
+	}
+	if opts == nil {
+		opts = &RestoreOptions{}
+	}
+	opts.Tables = tables
+	return e.RestoreBackup(ctx, backupMetadata, opts)
+}
+
+// scanEnabled reports whether a pre-restore malware scan should run for opts.
+func (e *Engine) scanEnabled(opts *RestoreOptions) bool {
+	return e.scanner != nil && !opts.SkipMalwareScan
+}
+
+// malwareThreshold returns the configured abort severity, defaulting to HIGH.
+func (e *Engine) malwareThreshold() ransomware.ThreatLevel {
+	if e.config.MalwareScanThreshold != "" {
+		return e.config.MalwareScanThreshold
+	}
+	return ransomware.ThreatLevelHigh
+}
+
+// scanArtifact runs the configured scanner over the local backup artifact. It
+// returns the threat report (when one is available) and a non-nil error when
+// the restore must be aborted: either the scan itself failed (fail-closed) or a
+// threat at/above the configured severity threshold was detected. When the
+// engine is configured warn-only, failures and detections are surfaced via the
+// report/logs but never produce an abort error.
+func (e *Engine) scanArtifact(ctx context.Context, localPath string, _ *RestoreOptions) (*ransomware.ThreatReport, error) {
+	report, err := e.scanner.ScanFile(ctx, localPath)
+	if err != nil {
+		if e.config.MalwareScanWarnOnly {
+			return nil, nil
+		}
+		return nil, pkgErrors.Wrap(err, pkgErrors.ErrorTypeValidation, "pre-restore malware scan failed")
+	}
+	if report == nil {
+		return nil, nil
+	}
+
+	if severityRank(report.ThreatLevel) >= severityRank(e.malwareThreshold()) && !e.config.MalwareScanWarnOnly {
+		return report, fmt.Errorf("%w: %s %s threat in backup artifact %q: %s",
+			ErrMalwareDetected, report.ThreatLevel, report.ThreatType, localPath, report.Description)
+	}
+	return report, nil
+}
+
+// severityRank maps a threat level to an orderable rank so severities can be
+// compared against the configured abort threshold.
+func severityRank(level ransomware.ThreatLevel) int {
+	switch level {
+	case ransomware.ThreatLevelCritical:
+		return 4
+	case ransomware.ThreatLevelHigh:
+		return 3
+	case ransomware.ThreatLevelMedium:
+		return 2
+	case ransomware.ThreatLevelLow:
+		return 1
+	case ransomware.ThreatLevelNone:
+		return 0
+	default:
+		return 0
+	}
 }
 
 // validateBackup validates the backup before restore. localPath, when
