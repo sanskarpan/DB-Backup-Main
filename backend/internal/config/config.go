@@ -25,6 +25,55 @@ type Config struct {
 	Metrics       MetricsConfig      `mapstructure:"metrics"`
 	Tracing       TracingConfig      `mapstructure:"tracing"`
 	Security      SecurityConfig     `mapstructure:"security"`
+	Integrations  IntegrationsConfig `mapstructure:"integrations"`
+}
+
+// IntegrationsConfig holds incident-integration provider configuration. Each
+// enabled provider opens a ticket/alert when a backup fails.
+type IntegrationsConfig struct {
+	Jira       JiraIntegrationConfig       `mapstructure:"jira"`
+	Opsgenie   OpsgenieIntegrationConfig   `mapstructure:"opsgenie"`
+	ServiceNow ServiceNowIntegrationConfig `mapstructure:"servicenow"`
+	PagerDuty  PagerDutyIntegrationConfig  `mapstructure:"pagerduty"`
+	Teams      TeamsIntegrationConfig      `mapstructure:"teams"`
+}
+
+// JiraIntegrationConfig holds Jira incident-integration settings.
+type JiraIntegrationConfig struct {
+	Enabled    bool   `mapstructure:"enabled"`
+	BaseURL    string `mapstructure:"base_url"`
+	Username   string `mapstructure:"username"`
+	APIToken   string `mapstructure:"api_token"`
+	ProjectKey string `mapstructure:"project_key"`
+	IssueType  string `mapstructure:"issue_type"`
+}
+
+// OpsgenieIntegrationConfig holds Opsgenie incident-integration settings.
+type OpsgenieIntegrationConfig struct {
+	Enabled bool   `mapstructure:"enabled"`
+	APIKey  string `mapstructure:"api_key"`
+	APIURL  string `mapstructure:"api_url"`
+}
+
+// ServiceNowIntegrationConfig holds ServiceNow incident-integration settings.
+type ServiceNowIntegrationConfig struct {
+	Enabled  bool   `mapstructure:"enabled"`
+	BaseURL  string `mapstructure:"base_url"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+}
+
+// PagerDutyIntegrationConfig holds PagerDuty incident-integration settings.
+type PagerDutyIntegrationConfig struct {
+	Enabled    bool   `mapstructure:"enabled"`
+	RoutingKey string `mapstructure:"routing_key"`
+	Token      string `mapstructure:"token"`
+}
+
+// TeamsIntegrationConfig holds Microsoft Teams incident-integration settings.
+type TeamsIntegrationConfig struct {
+	Enabled    bool   `mapstructure:"enabled"`
+	WebhookURL string `mapstructure:"webhook_url"`
 }
 
 // ServerConfig holds server configuration.

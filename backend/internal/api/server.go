@@ -14,6 +14,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/catalog"
 	"github.com/sanskarpan/db-backup/internal/dbregistry"
 	"github.com/sanskarpan/db-backup/internal/health"
+	"github.com/sanskarpan/db-backup/internal/integrations"
 	"github.com/sanskarpan/db-backup/internal/logger"
 	"github.com/sanskarpan/db-backup/internal/restore"
 	"github.com/sanskarpan/db-backup/internal/scheduler"
@@ -22,6 +23,7 @@ import (
 	"github.com/sanskarpan/db-backup/internal/storage"
 	"github.com/sanskarpan/db-backup/internal/storage/replication"
 	"github.com/sanskarpan/db-backup/internal/storageregistry"
+	"github.com/sanskarpan/db-backup/internal/webhooks"
 	"github.com/sanskarpan/db-backup/internal/websocket"
 )
 
@@ -52,6 +54,12 @@ type Server struct {
 	// siemExporter pushes detected threat events to a SIEM/EDR sink. It may be
 	// nil (or disabled) when SIEM export is not configured.
 	siemExporter *siem.SIEMExporter
+	// webhookManager backs the webhook-subscription CRUD API and fans backup /
+	// restore events out to subscribed HTTP endpoints. May be nil.
+	webhookManager *webhooks.Manager
+	// incidentDispatcher backs the incident-integration API and opens tickets /
+	// alerts on backup failure. May be nil.
+	incidentDispatcher *integrations.IncidentDispatcher
 }
 
 // Config holds API server configuration.
@@ -87,28 +95,32 @@ func NewServer(
 	storageProvider storage.Provider,
 	siemExporter *siem.SIEMExporter,
 	wsHub *websocket.Hub,
+	webhookManager *webhooks.Manager,
+	incidentDispatcher *integrations.IncidentDispatcher,
 	log *logger.Logger,
 ) *Server {
 	return &Server{
-		config:          cfg,
-		backupEngine:    backupEngine,
-		restoreEngine:   restoreEngine,
-		scheduler:       sched,
-		healthChecker:   healthChecker,
-		detector:        detector,
-		searchEngine:    searchEngine,
-		jwtService:      jwtService,
-		oauth2Service:   oauth2Service,
-		oauth2Handler:   oauth2Handler,
-		dbStore:         dbStore,
-		storageStore:    storageStore,
-		approvalStore:   approvalStore,
-		muaEnabled:      muaEnabled,
-		storageProvider: storageProvider,
-		replicator:      replication.NewReplicator(),
-		siemExporter:    siemExporter,
-		wsHub:           wsHub,
-		logger:          log,
+		config:             cfg,
+		backupEngine:       backupEngine,
+		restoreEngine:      restoreEngine,
+		scheduler:          sched,
+		healthChecker:      healthChecker,
+		detector:           detector,
+		searchEngine:       searchEngine,
+		jwtService:         jwtService,
+		oauth2Service:      oauth2Service,
+		oauth2Handler:      oauth2Handler,
+		dbStore:            dbStore,
+		storageStore:       storageStore,
+		approvalStore:      approvalStore,
+		muaEnabled:         muaEnabled,
+		storageProvider:    storageProvider,
+		replicator:         replication.NewReplicator(),
+		siemExporter:       siemExporter,
+		wsHub:              wsHub,
+		webhookManager:     webhookManager,
+		incidentDispatcher: incidentDispatcher,
+		logger:             log,
 	}
 }
 
@@ -281,6 +293,30 @@ func (s *Server) SetupRoutes(router *gin.Engine) {
 		catalogRoutes.GET("/suggest", s.handleSuggestCatalog)
 		catalogRoutes.GET("/stats", s.handleGetCatalogStats)
 		catalogRoutes.GET("/query-examples", s.handleQueryExamples)
+
+		// Webhook subscription management. Backup/restore notifications are fanned
+		// out to subscribers via the manager's Notifier adapter; these endpoints
+		// manage the subscriptions themselves. The static "/analytics" route
+		// coexists with the "/:id" param route (gin's radix tree allows it).
+		if s.webhookManager != nil {
+			webhooksGrp := v1.Group("/webhooks", authMiddleware)
+			webhooksGrp.GET("", s.handleListWebhooks)
+			webhooksGrp.POST("", s.handleCreateWebhook)
+			webhooksGrp.GET("/analytics", s.handleWebhookAnalytics)
+			webhooksGrp.GET("/:id", s.handleGetWebhook)
+			webhooksGrp.PUT("/:id", s.handleUpdateWebhook)
+			webhooksGrp.DELETE("/:id", s.handleDeleteWebhook)
+			webhooksGrp.POST("/:id/enable", s.handleEnableWebhook)
+			webhooksGrp.POST("/:id/disable", s.handleDisableWebhook)
+		}
+
+		// Incident integrations (open tickets/alerts on backup failure). Registered
+		// only when a dispatcher is wired in.
+		if s.incidentDispatcher != nil {
+			integrationsGrp := v1.Group("/integrations", authMiddleware)
+			integrationsGrp.GET("", s.handleListIntegrations)
+			integrationsGrp.POST("/:type/test", s.handleTestIntegration)
+		}
 	}
 
 	// Swagger/OpenAPI documentation
