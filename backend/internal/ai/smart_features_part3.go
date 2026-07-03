@@ -9,8 +9,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sanskarpan/db-backup/internal/ai/prediction"
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
+
+// manualActionRequired is the honest auto-fix note used when no remediation
+// backend is configured to actually resolve a diagnosed issue.
+const manualActionRequired = "no automatic remediation configured - manual action required"
 
 // severityCritical is the severity/priority label for critical issues.
 const severityCritical = "critical"
@@ -431,10 +436,28 @@ func (aa *AIAdvisor) handleGeneralQuery(_ context.Context, _ string) (*AdvisorRe
 
 // ==================== 9. Automated Troubleshooting Engine ====================
 
+// Remediator performs real remediation actions for diagnosed issues.
+//
+// It is optional: when no Remediator is configured, the troubleshooting engine
+// does not claim to have fixed anything and instead reports that manual action
+// is required. This keeps auto-fix results honest.
+type Remediator interface {
+	// CleanupOldBackups frees disk space by removing backups beyond the
+	// retention period for the database, returning the number of bytes freed.
+	CleanupOldBackups(ctx context.Context, database string) (int64, error)
+	// RetryConnection re-attempts the database connection, typically with an
+	// increased timeout and backoff.
+	RetryConnection(ctx context.Context, database string) error
+	// RetryBackup triggers a fresh backup for the database, for example after a
+	// checksum validation failure.
+	RetryBackup(ctx context.Context, database string) error
+}
+
 // AutomatedTroubleshootingEngine diagnoses and resolves backup issues automatically.
 type AutomatedTroubleshootingEngine struct {
 	diagnosticRules map[string]*DiagnosticRule
 	issueHistory    map[string][]*DiagnosticResult
+	remediator      Remediator
 	mu              sync.RWMutex
 }
 
@@ -491,6 +514,15 @@ func NewAutomatedTroubleshootingEngine() *AutomatedTroubleshootingEngine {
 	ate.initializeDiagnosticRules()
 
 	return ate
+}
+
+// SetRemediator wires a real remediation backend into the engine so that
+// auto-fixable issues can actually be remediated. Passing nil disables
+// auto-remediation and makes diagnoses report that manual action is required.
+func (ate *AutomatedTroubleshootingEngine) SetRemediator(r Remediator) {
+	ate.mu.Lock()
+	defer ate.mu.Unlock()
+	ate.remediator = r
 }
 
 // initializeDiagnosticRules sets up diagnostic rules.
@@ -608,11 +640,20 @@ func (ate *AutomatedTroubleshootingEngine) Diagnose(ctx context.Context, databas
 			Metadata:     metadata,
 		}
 
-		// Attempt auto-fix if enabled
+		// Attempt auto-fix only if a real remediation backend is wired.
+		// Without one, be honest: nothing was applied and manual action is
+		// required (the Resolution steps describe the manual remediation).
 		if rule.AutoFix && rule.AutoFixFunc != nil {
-			result.AutoFixApplied = true
-			err := rule.AutoFixFunc(ctx, result)
-			result.AutoFixSuccess = err == nil
+			if ate.remediator == nil {
+				if result.Metadata == nil {
+					result.Metadata = make(map[string]interface{})
+				}
+				result.Metadata["auto_fix_action"] = manualActionRequired
+			} else {
+				result.AutoFixApplied = true
+				err := rule.AutoFixFunc(ctx, result)
+				result.AutoFixSuccess = err == nil
+			}
 		}
 
 		// Store in history
@@ -705,35 +746,47 @@ func (ate *AutomatedTroubleshootingEngine) calculateDiagnosticConfidence(rule *D
 	return math.Min(100.0, baseConfidence)
 }
 
-// autoFixDiskSpace attempts to automatically fix disk space issues.
+// autoFixDiskSpace delegates to the remediator to clean up old backups. It is
+// only invoked when a Remediator is configured, so it never fakes success.
 func (ate *AutomatedTroubleshootingEngine) autoFixDiskSpace(ctx context.Context, result *DiagnosticResult) error {
-	// Implement automatic cleanup of old backups
-	// This would integrate with the backup manager to remove old backups
-	// For now, return success to simulate auto-fix
 	if result.Metadata == nil {
 		result.Metadata = make(map[string]interface{})
 	}
-	result.Metadata["auto_fix_action"] = "Cleaned up old backups older than retention period"
+	freed, err := ate.remediator.CleanupOldBackups(ctx, result.DatabaseName)
+	if err != nil {
+		result.Metadata["auto_fix_action"] = fmt.Sprintf("attempted cleanup of old backups: %v", err)
+		return fmt.Errorf("cleanup old backups for %s: %w", result.DatabaseName, err)
+	}
+	result.Metadata["auto_fix_action"] = fmt.Sprintf("cleaned up old backups, freed %d bytes", freed)
+	result.Metadata["bytes_freed"] = freed
 	return nil
 }
 
-// autoFixConnection attempts to automatically fix connection issues.
+// autoFixConnection delegates to the remediator to retry the connection. It is
+// only invoked when a Remediator is configured, so it never fakes success.
 func (ate *AutomatedTroubleshootingEngine) autoFixConnection(ctx context.Context, result *DiagnosticResult) error {
-	// Implement automatic connection retry with exponential backoff
 	if result.Metadata == nil {
 		result.Metadata = make(map[string]interface{})
 	}
-	result.Metadata["auto_fix_action"] = "Retried connection with increased timeout"
+	if err := ate.remediator.RetryConnection(ctx, result.DatabaseName); err != nil {
+		result.Metadata["auto_fix_action"] = fmt.Sprintf("connection retry failed: %v", err)
+		return fmt.Errorf("retry connection for %s: %w", result.DatabaseName, err)
+	}
+	result.Metadata["auto_fix_action"] = "reconnected successfully after retry"
 	return nil
 }
 
-// autoFixChecksum attempts to automatically fix checksum issues.
+// autoFixChecksum delegates to the remediator to retry the backup. It is only
+// invoked when a Remediator is configured, so it never fakes success.
 func (ate *AutomatedTroubleshootingEngine) autoFixChecksum(ctx context.Context, result *DiagnosticResult) error {
-	// Implement automatic backup retry
 	if result.Metadata == nil {
 		result.Metadata = make(map[string]interface{})
 	}
-	result.Metadata["auto_fix_action"] = "Triggered automatic backup retry"
+	if err := ate.remediator.RetryBackup(ctx, result.DatabaseName); err != nil {
+		result.Metadata["auto_fix_action"] = fmt.Sprintf("backup retry failed: %v", err)
+		return fmt.Errorf("retry backup for %s: %w", result.DatabaseName, err)
+	}
+	result.Metadata["auto_fix_action"] = "triggered fresh backup after checksum failure"
 	return nil
 }
 
@@ -785,45 +838,97 @@ func (ate *AutomatedTroubleshootingEngine) GenerateReport(ctx context.Context, d
 
 // ==================== 10. Failure Prediction API ====================
 
-// FailurePredictionAPI provides API access to failure prediction.
+// FailurePredictionAPI provides API access to the real failure predictor.
 type FailurePredictionAPI struct {
-	predictor interface{} // Placeholder for existing failure predictor
+	predictor *prediction.FailurePredictor
 }
 
-// NewFailurePredictionAPI creates a new failure prediction API.
+// NewFailurePredictionAPI creates a new failure prediction API backed by the
+// real prediction.FailurePredictor with a sensible default configuration.
 func NewFailurePredictionAPI() *FailurePredictionAPI {
 	return &FailurePredictionAPI{
-		// predictor would be initialized with actual failure predictor instance
-		// This is a placeholder - will be integrated with existing prediction package
-		predictor: nil,
+		predictor: prediction.NewFailurePredictor(prediction.DefaultPredictorConfig()),
 	}
 }
 
-// GetPrediction gets failure prediction for a database.
+// RecordBackupEvent feeds a real historical backup event into the underlying
+// predictor so that future predictions reflect actual outcomes.
+//
+//nolint:gocritic // hugeParam: BackupEvent is passed by value to match the predictor's public API
+func (fpa *FailurePredictionAPI) RecordBackupEvent(event prediction.BackupEvent) {
+	fpa.predictor.AddBackupEvent(event)
+}
+
+// GetPrediction returns failure predictions for a database using the real
+// predictor. When there is insufficient history to identify a pattern, it
+// returns an empty slice rather than fabricated predictions.
 func (fpa *FailurePredictionAPI) GetPrediction(ctx context.Context, database string) ([]*FailurePrediction, error) {
-	// This would delegate to the existing FailurePredictor
-	// For now, return mock predictions
-	predictions := []*FailurePrediction{
-		{
-			DatabaseName: database,
-			PredictedAt:  time.Now(),
-			TimeWindow:   24 * time.Hour,
-			Probability:  0.15,
-			Confidence:   82.0,
-			Severity:     "medium",
-			Patterns:     []string{"time_window", "resource_based"},
-			RiskFactors: []string{
-				"High failure rate during 2-4 AM window",
-				"Disk usage trending above 80%",
-			},
-			PreventiveActions: []string{
-				"Reschedule backup to avoid high-risk window",
-				"Free up disk space before next backup",
-			},
-		},
+	// Refresh patterns from the latest recorded events before predicting.
+	if err := fpa.predictor.AnalyzePatterns(ctx); err != nil {
+		return nil, fmt.Errorf("analyze failure patterns: %w", err)
+	}
+
+	raw, err := fpa.predictor.PredictFailures(ctx, database)
+	if err != nil {
+		return nil, fmt.Errorf("predict failures for %s: %w", database, err)
+	}
+
+	predictions := make([]*FailurePrediction, 0, len(raw))
+	for _, p := range raw {
+		predictions = append(predictions, mapPrediction(database, p))
 	}
 
 	return predictions, nil
+}
+
+// mapPrediction converts a prediction.FailurePrediction from the real predictor
+// into the local FailurePrediction API type.
+func mapPrediction(database string, p *prediction.FailurePrediction) *FailurePrediction {
+	patterns := make([]string, 0, len(p.RelatedPatterns))
+	for _, rp := range p.RelatedPatterns {
+		if rp == nil {
+			continue
+		}
+		patterns = append(patterns, string(rp.PatternType))
+	}
+
+	actions := make([]string, 0, len(p.PreventiveActions))
+	for i := range p.PreventiveActions {
+		actions = append(actions, p.PreventiveActions[i].Action)
+	}
+
+	timeWindow := p.PredictedFailureTime.Sub(p.PredictionTime)
+	if timeWindow < 0 {
+		timeWindow = 0
+	}
+
+	return &FailurePrediction{
+		DatabaseName:      database,
+		PredictedAt:       p.PredictionTime,
+		TimeWindow:        timeWindow,
+		Probability:       p.RiskScore / 100.0,
+		Confidence:        p.Confidence,
+		Severity:          mapPredictionSeverity(p.Severity),
+		Patterns:          patterns,
+		RiskFactors:       p.Reasons,
+		PreventiveActions: actions,
+	}
+}
+
+// mapPredictionSeverity maps a predictor severity to the local lowercase label.
+func mapPredictionSeverity(s prediction.PredictionSeverity) string {
+	switch s {
+	case prediction.PredictionSeverityCritical:
+		return severityCritical
+	case prediction.PredictionSeverityHigh:
+		return "high"
+	case prediction.PredictionSeverityMedium:
+		return "medium"
+	case prediction.PredictionSeverityLow:
+		return "low"
+	default:
+		return "low"
+	}
 }
 
 // ==================== Helper Functions ====================

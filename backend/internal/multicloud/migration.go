@@ -2,10 +2,13 @@ package multicloud
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
+	"github.com/sanskarpan/db-backup/internal/storage"
 	"github.com/sanskarpan/db-backup/pkg/uid"
 )
 
@@ -305,13 +308,52 @@ type FailoverManager struct {
 	healthChecks    map[StorageProvider]*HealthCheckConfig
 	failoverRules   []*FailoverRule
 	activeFailovers map[string]*FailoverEvent
+	activeProvider  StorageProvider
 	monitoring      bool
 	stopChan        chan struct{}
+}
+
+// HealthChecker probes the reachability of a storage backend.
+type HealthChecker interface {
+	// Probe performs a lightweight reachability check against the backend,
+	// returning a non-nil error when the backend is unreachable.
+	Probe(ctx context.Context) error
+}
+
+// storageProber adapts a storage.Provider to the HealthChecker interface by
+// performing a lightweight existence check against a probe path.
+type storageProber struct {
+	provider  storage.Provider
+	probePath string
+}
+
+// NewStorageHealthChecker returns a HealthChecker that probes the given storage
+// provider for reachability using a lightweight existence check. An empty
+// probePath falls back to a default sentinel path.
+func NewStorageHealthChecker(provider storage.Provider, probePath string) HealthChecker {
+	if probePath == "" {
+		probePath = ".multicloud-healthcheck"
+	}
+	return &storageProber{provider: provider, probePath: probePath}
+}
+
+// Probe checks the reachability of the underlying storage provider. A missing
+// probe object is treated as reachable; only transport-level errors are treated
+// as unreachable.
+func (p *storageProber) Probe(ctx context.Context) error {
+	if p.provider == nil {
+		return errors.New("multicloud: storage provider is nil")
+	}
+	if _, err := p.provider.Exists(ctx, p.probePath); err != nil {
+		return fmt.Errorf("multicloud: probe of %q failed: %w", p.probePath, err)
+	}
+	return nil
 }
 
 // HealthCheckConfig configures health checks for a provider.
 type HealthCheckConfig struct {
 	Provider         StorageProvider
+	Checker          HealthChecker
 	Interval         time.Duration
 	Timeout          time.Duration
 	FailureThreshold int
@@ -319,6 +361,7 @@ type HealthCheckConfig struct {
 	CurrentFailures  int
 	Healthy          bool
 	LastCheck        time.Time
+	LastLatency      time.Duration
 	LastError        error
 }
 
@@ -354,6 +397,21 @@ func NewFailoverManager(orchestrator *MultiCloudOrchestrator, selector *CloudSel
 		activeFailovers: make(map[string]*FailoverEvent),
 		stopChan:        make(chan struct{}),
 	}
+}
+
+// SetActiveProvider sets the currently active (primary) provider that failover
+// re-routes away from when it becomes unhealthy.
+func (fm *FailoverManager) SetActiveProvider(provider StorageProvider) {
+	fm.mu.Lock()
+	defer fm.mu.Unlock()
+	fm.activeProvider = provider
+}
+
+// GetActiveProvider returns the currently active (primary) provider.
+func (fm *FailoverManager) GetActiveProvider() StorageProvider {
+	fm.mu.RLock()
+	defer fm.mu.RUnlock()
+	return fm.activeProvider
 }
 
 // RegisterHealthCheck registers a health check configuration.
@@ -454,83 +512,178 @@ func (fm *FailoverManager) performHealthChecks(ctx context.Context) {
 	}
 }
 
-// performHealthCheck performs a health check on a single provider.
+// performHealthCheck performs a real health probe of a single provider,
+// measuring latency and recording healthy/unhealthy state. When the probe
+// causes the provider to transition to unhealthy, an automatic failover is
+// triggered.
 func (fm *FailoverManager) performHealthCheck(ctx context.Context, config *HealthCheckConfig) {
 	checkCtx, cancel := context.WithTimeout(ctx, config.Timeout)
 	defer cancel()
 
-	// Simulate health check (in real implementation, this would ping the provider)
-	err := fm.checkProviderHealth(checkCtx, config.Provider)
+	start := time.Now()
+	err := fm.checkProviderHealth(checkCtx, config)
+	latency := time.Since(start)
 
 	fm.mu.Lock()
-	defer fm.mu.Unlock()
-
 	config.LastCheck = time.Now()
+	config.LastLatency = latency
+	becameUnhealthy := applyProbeResult(config, err)
+	provider := config.Provider
+	fm.mu.Unlock()
 
+	if becameUnhealthy {
+		reason := fmt.Sprintf("provider %s failed health check %d times: %v",
+			provider, config.FailureThreshold, err)
+		_, _ = fm.triggerFailover(ctx, provider, reason)
+	}
+}
+
+// applyProbeResult updates a config's failure counters from a probe result and
+// reports whether the provider just transitioned to an unhealthy state. The
+// caller must hold fm.mu.
+func applyProbeResult(config *HealthCheckConfig, err error) bool {
 	if err != nil {
 		config.LastError = err
 		config.CurrentFailures++
-
 		if config.CurrentFailures >= config.FailureThreshold && config.Healthy {
-			// Provider is now unhealthy
 			config.Healthy = false
-			fm.triggerFailover(config.Provider, fmt.Sprintf("health check failed %d times: %v", config.CurrentFailures, err))
+			return true
 		}
-	} else {
-		config.LastError = nil
-		if !config.Healthy {
-			config.CurrentFailures--
-			if config.CurrentFailures <= 0 {
-				// Provider is healthy again
-				config.Healthy = true
-				config.CurrentFailures = 0
-			}
-		} else {
-			config.CurrentFailures = 0
-		}
+		return false
 	}
+
+	config.LastError = nil
+	if config.Healthy {
+		config.CurrentFailures = 0
+		return false
+	}
+	config.CurrentFailures--
+	if config.CurrentFailures <= 0 {
+		config.Healthy = true
+		config.CurrentFailures = 0
+	}
+	return false
 }
 
-// checkProviderHealth checks if a provider is healthy.
-func (fm *FailoverManager) checkProviderHealth(ctx context.Context, provider StorageProvider) error {
-	// This would implement actual health checks
-	// For now, return nil (healthy)
-	return nil
+// checkProviderHealth probes a provider for reachability using its registered
+// HealthChecker, returning a non-nil error when the backend is unreachable or
+// when no checker is configured.
+func (fm *FailoverManager) checkProviderHealth(ctx context.Context, config *HealthCheckConfig) error {
+	if config.Checker == nil {
+		return fmt.Errorf("multicloud: no health checker registered for provider %s", config.Provider)
+	}
+	return config.Checker.Probe(ctx)
 }
 
-// triggerFailover triggers a failover event.
-func (fm *FailoverManager) triggerFailover(provider StorageProvider, reason string) {
-	// Find applicable failover rules
+// failoverTarget is a candidate destination for a failover, optionally sourced
+// from a specific failover rule.
+type failoverTarget struct {
+	provider StorageProvider
+	ruleID   string
+}
+
+// triggerFailover re-routes away from an unhealthy provider to a healthy
+// destination. On success it switches the active provider (when the failed
+// provider is the active one, or none is set) and records the transition. It
+// returns an honest error when no healthy destination is available.
+func (fm *FailoverManager) triggerFailover(ctx context.Context, provider StorageProvider, reason string) (*FailoverEvent, error) {
+	fm.mu.Lock()
+	defer fm.mu.Unlock()
+
+	event := &FailoverEvent{
+		ID:              uid.New("failover"),
+		TriggerProvider: provider,
+		Reason:          reason,
+		Timestamp:       time.Now(),
+	}
+
+	target, ok := fm.selectHealthyTarget(ctx, fm.failoverTargets(provider))
+	if !ok {
+		event.Error = fmt.Errorf("multicloud: no healthy failover target available for provider %s", provider)
+		fm.activeFailovers[event.ID] = event
+		return event, event.Error
+	}
+
+	event.RuleID = target.ruleID
+	event.TargetProvider = target.provider
+	event.Success = true
+	if provider == fm.activeProvider || fm.activeProvider == "" {
+		fm.activeProvider = target.provider
+	}
+	fm.activeFailovers[event.ID] = event
+	return event, nil
+}
+
+// failoverTargets returns ordered failover candidates for a failed provider.
+// Enabled rules matching the provider take precedence; otherwise all other
+// registered providers are used as candidates. The caller must hold fm.mu.
+func (fm *FailoverManager) failoverTargets(provider StorageProvider) []failoverTarget {
+	targets := make([]failoverTarget, 0)
+	matched := false
 	for _, rule := range fm.failoverRules {
-		if !rule.Enabled {
+		if !rule.Enabled || rule.TriggerProvider != provider {
 			continue
 		}
-
-		if rule.TriggerProvider == provider {
-			// Execute failover
-			event := &FailoverEvent{
-				ID:              uid.New("failover"),
-				RuleID:          rule.ID,
-				TriggerProvider: provider,
-				Reason:          reason,
-				Timestamp:       time.Now(),
-			}
-
-			// Select best target provider
-			if len(rule.TargetProviders) > 0 {
-				// Use first healthy target provider
-				for _, targetProvider := range rule.TargetProviders {
-					if hc, ok := fm.healthChecks[targetProvider]; ok && hc.Healthy {
-						event.TargetProvider = targetProvider
-						event.Success = true
-						break
-					}
-				}
-			}
-
-			fm.activeFailovers[event.ID] = event
+		matched = true
+		for _, tp := range rule.TargetProviders {
+			targets = append(targets, failoverTarget{provider: tp, ruleID: rule.ID})
 		}
 	}
+	if !matched {
+		targets = fm.registeredTargets(provider)
+	}
+	return targets
+}
+
+// registeredTargets returns failover candidates drawn from all registered
+// health checks except the failed provider, ordered by the cloud selector's
+// score when available. The caller must hold fm.mu.
+func (fm *FailoverManager) registeredTargets(failed StorageProvider) []failoverTarget {
+	candidates := make([]failoverTarget, 0, len(fm.healthChecks))
+	for provider := range fm.healthChecks {
+		if provider == failed {
+			continue
+		}
+		candidates = append(candidates, failoverTarget{provider: provider})
+	}
+	fm.orderBySelector(candidates)
+	return candidates
+}
+
+// orderBySelector orders candidates by descending cloud-selector score, falling
+// back to a deterministic ordering by provider name.
+func (fm *FailoverManager) orderBySelector(targets []failoverTarget) {
+	if fm.selector == nil {
+		sort.Slice(targets, func(i, j int) bool {
+			return targets[i].provider < targets[j].provider
+		})
+		return
+	}
+	sort.Slice(targets, func(i, j int) bool {
+		si, _ := fm.selector.BestScoreForProvider(targets[i].provider)
+		sj, _ := fm.selector.BestScoreForProvider(targets[j].provider)
+		if si == sj {
+			return targets[i].provider < targets[j].provider
+		}
+		return si > sj
+	})
+}
+
+// selectHealthyTarget returns the first candidate that is currently healthy,
+// verifying reachability with an on-demand probe when a checker is available.
+// The caller must hold fm.mu.
+func (fm *FailoverManager) selectHealthyTarget(ctx context.Context, targets []failoverTarget) (failoverTarget, bool) {
+	for _, t := range targets {
+		hc, ok := fm.healthChecks[t.provider]
+		if !ok || !hc.Healthy {
+			continue
+		}
+		if hc.Checker != nil && hc.Checker.Probe(ctx) != nil {
+			continue
+		}
+		return t, true
+	}
+	return failoverTarget{}, false
 }
 
 // GetHealthStatus returns the health status of all providers.

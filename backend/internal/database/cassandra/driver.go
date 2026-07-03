@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -16,13 +17,29 @@ import (
 	"github.com/sanskarpan/db-backup/internal/database"
 	pkgErrors "github.com/sanskarpan/db-backup/pkg/errors"
 	"github.com/sanskarpan/db-backup/pkg/utils"
+	"github.com/sanskarpan/db-backup/pkg/validation"
 )
 
 const (
 	snapshotBackupType = "snapshot"
 	cassandraDataDir   = "/var/lib/cassandra/data"
 	scyllaDataDir      = "/var/lib/scylla/data"
+
+	// dataDirOption is the ConnectionConfig.Options key that overrides the
+	// on-disk data directory (useful for non-default installs or when the
+	// backup tool runs on the same host with a custom layout).
+	dataDirOption = "data_dir"
 )
+
+// tableUUIDSuffix matches the "-<32 hex>" table-directory suffix Cassandra
+// appends to table data directories (e.g. "users-a1b2...ef").
+var tableUUIDSuffix = regexp.MustCompile(`-[0-9a-fA-F]{32}$`)
+
+// keyspaceTable identifies a single Cassandra table by keyspace and name.
+type keyspaceTable struct {
+	keyspace string
+	table    string
+}
 
 // CassandraDriver implements the database.Driver interface for Cassandra/ScyllaDB.
 //
@@ -167,10 +184,7 @@ func (d *CassandraDriver) backupSnapshot(ctx context.Context, opts *database.Bac
 	}
 
 	// Copy snapshot files to backup location
-	dataDir := cassandraDataDir // Default Cassandra data directory
-	if d.isScyllaDB {
-		dataDir = scyllaDataDir
-	}
+	dataDir := d.resolveDataDir()
 
 	backupDir := filepath.Join(opts.OutputDir, result.ID)
 	if err = os.MkdirAll(backupDir, 0o755); err != nil {
@@ -216,10 +230,7 @@ func (d *CassandraDriver) backupIncremental(opts *database.BackupOptions, result
 	// and create hard links in the backups directory
 
 	// Get incremental backup directory
-	dataDir := cassandraDataDir
-	if d.isScyllaDB {
-		dataDir = scyllaDataDir
-	}
+	dataDir := d.resolveDataDir()
 
 	backupsDir := filepath.Join(dataDir, "backups")
 	outputDir := filepath.Join(opts.OutputDir, result.ID)
@@ -255,13 +266,19 @@ func (d *CassandraDriver) GetBackupSize(ctx context.Context, opts *database.Back
 }
 
 // StreamBackup streams a backup to the provided writer.
-func (d *CassandraDriver) StreamBackup(ctx context.Context, opts *database.BackupOptions, writer io.Writer) error {
-	return fmt.Errorf("streaming backup not implemented for Cassandra")
+//
+// Cassandra backups are SSTable snapshots on disk and cannot be produced as a
+// single stream, so streaming is intentionally unsupported.
+func (d *CassandraDriver) StreamBackup(_ context.Context, _ *database.BackupOptions, _ io.Writer) error {
+	return fmt.Errorf("streaming backup is not supported for Cassandra; use a file-based snapshot backup")
 }
 
 // StreamRestore restores from a reader.
-func (d *CassandraDriver) StreamRestore(ctx context.Context, opts *database.RestoreOptions, reader io.Reader) error {
-	return fmt.Errorf("streaming restore not implemented for Cassandra")
+//
+// Cassandra restores load SSTable files from disk, so streaming restore is
+// intentionally unsupported.
+func (d *CassandraDriver) StreamRestore(_ context.Context, _ *database.RestoreOptions, _ io.Reader) error {
+	return fmt.Errorf("streaming restore is not supported for Cassandra; use a file-based snapshot restore")
 }
 
 // ValidateRestore validates that a restore can be performed.
@@ -336,43 +353,180 @@ func (d *CassandraDriver) SupportsPITR() bool {
 }
 
 // Restore restores the Cassandra database from a backup.
+//
+// It stages the backed-up SSTable files into the (configurable) data directory
+// and then reloads them into the running node with "nodetool refresh" per
+// restored table, so a manual service restart is not required. If a refresh
+// fails, an actionable error is returned instead of silently reporting success.
 func (d *CassandraDriver) Restore(ctx context.Context, opts *database.RestoreOptions) (*database.RestoreResult, error) {
 	result := &database.RestoreResult{
 		ID:        utils.GenerateRestoreID(),
 		StartTime: time.Now(),
 		Status:    database.RestoreStatusInProgress,
+		Metadata:  make(map[string]interface{}),
 	}
 
-	// Stop Cassandra service (in production, use proper service management)
-	// This is a simplified implementation
-
-	// Copy backup files to data directory
-	dataDir := cassandraDataDir
-	if d.isScyllaDB {
-		dataDir = scyllaDataDir
-	}
-
-	// Copy files
-	if err := d.copyDirectory(opts.BackupPath, dataDir); err != nil {
+	fail := func(err error) (*database.RestoreResult, error) {
 		result.Status = database.RestoreStatusFailed
 		result.Error = err
 		result.EndTime = time.Now()
 		return result, pkgErrors.ErrDatabaseRestore(err)
 	}
 
-	// Restart Cassandra service would happen here
+	if opts.BackupPath == "" {
+		return fail(fmt.Errorf("backup path is required"))
+	}
 
-	// Verify restore
+	dataDir := d.resolveDataDir()
+	result.Metadata["data_dir"] = dataDir
+
+	// Stage SSTable files into the live table directories.
+	tables, err := d.stageRestoreFiles(opts.BackupPath, dataDir)
+	if err != nil {
+		return fail(fmt.Errorf("failed to stage restore files: %w", err))
+	}
+
+	// Reload the staged SSTables into the running node.
+	if err := d.refreshTables(ctx, tables); err != nil {
+		return fail(err)
+	}
+
+	// Verify the node is still reachable after the reload.
 	if err := d.Ping(ctx); err != nil {
-		result.Status = database.RestoreStatusFailed
-		result.Error = err
-		result.EndTime = time.Now()
-		return result, pkgErrors.ErrDatabaseRestore(err)
+		return fail(err)
 	}
 
+	for _, kt := range tables {
+		result.RestoredTables = append(result.RestoredTables, kt.keyspace+"."+kt.table)
+	}
 	result.Status = database.RestoreStatusCompleted
 	result.EndTime = time.Now()
 	return result, nil
+}
+
+// resolveDataDir returns the on-disk data directory, honoring the "data_dir"
+// connection option and falling back to the engine default when unset.
+func (d *CassandraDriver) resolveDataDir() string {
+	if d.config != nil {
+		if dir := d.config.Options[dataDirOption]; dir != "" {
+			return dir
+		}
+	}
+	if d.isScyllaDB {
+		return scyllaDataDir
+	}
+	return cassandraDataDir
+}
+
+// stripTableUUID removes the "-<uuid>" suffix Cassandra appends to table data
+// directories, returning the bare table name.
+func stripTableUUID(dir string) string {
+	return tableUUIDSuffix.ReplaceAllString(dir, "")
+}
+
+// planRestoreEntry maps a backup-relative file path to the destination path
+// (relative to the data directory) and the keyspace/table it belongs to.
+//
+// SSTable files stored under a "snapshots/<name>/" (or "backups/") segment are
+// flattened into the live table directory so that "nodetool refresh" can load
+// them. ok is false for paths that are not recognizable table data.
+func planRestoreEntry(rel string) (destRel string, kt keyspaceTable, ok bool) {
+	segs := strings.Split(filepath.ToSlash(rel), "/")
+	if len(segs) < 3 {
+		return "", keyspaceTable{}, false
+	}
+
+	keyspace, tableDir := segs[0], segs[1]
+	kt = keyspaceTable{keyspace: keyspace, table: stripTableUUID(tableDir)}
+
+	rest := segs[2:]
+	switch {
+	case len(rest) >= 3 && rest[0] == "snapshots":
+		// rest = ["snapshots", "<name>", <file...>]
+		rest = rest[2:]
+	case len(rest) >= 2 && rest[0] == "backups":
+		// rest = ["backups", <file...>]
+		rest = rest[1:]
+	}
+
+	destRel = filepath.Join(append([]string{keyspace, tableDir}, rest...)...)
+	return destRel, kt, true
+}
+
+// stageRestoreFiles copies the backup files into the data directory, flattening
+// snapshot/backup subdirectories into the live table directories. It returns
+// the distinct keyspace/table pairs that were restored, in first-seen order.
+func (d *CassandraDriver) stageRestoreFiles(backupPath, dataDir string) ([]keyspaceTable, error) {
+	seen := make(map[keyspaceTable]struct{})
+	var tables []keyspaceTable
+
+	walkErr := filepath.Walk(backupPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		rel, err := filepath.Rel(backupPath, path)
+		if err != nil {
+			return err
+		}
+
+		destRel, kt, ok := planRestoreEntry(rel)
+		if !ok {
+			destRel = rel
+		}
+
+		destPath := filepath.Join(dataDir, destRel)
+		if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
+			return err
+		}
+		if err := d.copyFile(path, destPath); err != nil {
+			return err
+		}
+
+		if ok {
+			if _, dup := seen[kt]; !dup {
+				seen[kt] = struct{}{}
+				tables = append(tables, kt)
+			}
+		}
+		return nil
+	})
+
+	return tables, walkErr
+}
+
+// nodetoolRefreshArgs builds the "nodetool refresh <keyspace> <table>" args.
+func nodetoolRefreshArgs(kt keyspaceTable) []string {
+	return []string{"refresh", kt.keyspace, kt.table}
+}
+
+// refreshTables reloads the staged SSTables for each restored table via
+// "nodetool refresh". Keyspace/table names are validated before use so the
+// exec arguments cannot be attacker-controlled shell/flag injection.
+func (d *CassandraDriver) refreshTables(ctx context.Context, tables []keyspaceTable) error {
+	for _, kt := range tables {
+		if err := validation.ValidateDatabaseName(kt.keyspace); err != nil {
+			return fmt.Errorf("invalid keyspace name %q in backup: %w", kt.keyspace, err)
+		}
+		if err := validation.ValidateTableName(kt.table); err != nil {
+			return fmt.Errorf("invalid table name %q in backup: %w", kt.table, err)
+		}
+
+		//nolint:gosec // G204: keyspace/table validated by validation.Validate* above
+		cmd := exec.CommandContext(ctx, "nodetool", nodetoolRefreshArgs(kt)...)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf(
+				"nodetool refresh for %s.%s failed; SSTables were copied to the data directory but not loaded — "+
+					"run 'nodetool refresh %s %s' on the node or restart it: %w (output: %s)",
+				kt.keyspace, kt.table, kt.keyspace, kt.table, err, strings.TrimSpace(string(output)),
+			)
+		}
+	}
+	return nil
 }
 
 // GetDatabaseSize returns the total size of the database.
@@ -499,33 +653,55 @@ func NewClusterManager(driver *CassandraDriver) *ClusterManager {
 }
 
 // BackupMultiDC creates a backup across multiple datacenters.
-func (cm *ClusterManager) BackupMultiDC(ctx context.Context, opts *database.BackupOptions) (*database.BackupResult, error) {
-	// Stub implementation for multi-DC backup
-	return nil, fmt.Errorf("multi-DC backup not implemented")
+//
+// The single-node ClusterManager has no datacenter topology, so this is not
+// supported here; use MultiDCDriver (see cluster.go) with an explicit
+// datacenter-to-hosts mapping instead.
+func (cm *ClusterManager) BackupMultiDC(_ context.Context, _ *database.BackupOptions) (*database.BackupResult, error) {
+	return nil, fmt.Errorf(
+		"multi-datacenter backup is not supported by the single-node driver; " +
+			"use MultiDCDriver with a datacenter topology instead")
 }
 
-// EnableIncrementalBackup enables incremental backups on the cluster.
+// EnableIncrementalBackup enables incremental backups on the node via
+// "nodetool enablebackup".
 func (cm *ClusterManager) EnableIncrementalBackup(ctx context.Context) error {
-	// Stub implementation
-	return fmt.Errorf("incremental backup enable not implemented")
+	cmd := exec.CommandContext(ctx, "nodetool", "enablebackup")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("nodetool enablebackup failed: %w (output: %s)", err, strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
-// DisableIncrementalBackup disables incremental backups on the cluster.
+// DisableIncrementalBackup disables incremental backups on the node via
+// "nodetool disablebackup".
 func (cm *ClusterManager) DisableIncrementalBackup(ctx context.Context) error {
-	// Stub implementation
-	return fmt.Errorf("incremental backup disable not implemented")
+	cmd := exec.CommandContext(ctx, "nodetool", "disablebackup")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("nodetool disablebackup failed: %w (output: %s)", err, strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
-// IsIncrementalBackupEnabled checks if incremental backup is enabled.
+// IsIncrementalBackupEnabled checks whether incremental backup is enabled via
+// "nodetool statusbackup" (which prints "running" or "not running").
 func (cm *ClusterManager) IsIncrementalBackupEnabled(ctx context.Context) (bool, error) {
-	// Stub implementation
-	return false, fmt.Errorf("incremental backup status check not implemented")
+	cmd := exec.CommandContext(ctx, "nodetool", "statusbackup")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("nodetool statusbackup failed: %w (output: %s)", err, strings.TrimSpace(string(output)))
+	}
+	return strings.EqualFold(strings.TrimSpace(string(output)), "running"), nil
 }
 
 // testSSHConnection tests SSH connection for nodetool access.
-func (d *CassandraDriver) testSSHConnection(ctx context.Context) error {
-	// Stub implementation for SSH connection testing
-	return fmt.Errorf("SSH connection testing not implemented")
+//
+// This driver invokes nodetool on the local host; remote SSH execution is not
+// supported in this configuration.
+func (d *CassandraDriver) testSSHConnection(_ context.Context) error {
+	return fmt.Errorf("SSH-based nodetool access is not supported in this configuration")
 }
 
 // createSnapshot creates a Cassandra snapshot.

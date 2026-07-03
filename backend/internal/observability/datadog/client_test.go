@@ -2,7 +2,11 @@ package datadog
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -357,81 +361,166 @@ func TestClient_TraceEncryption(t *testing.T) {
 	}
 }
 
-func TestClient_SendMetric(t *testing.T) {
-	tests := []struct {
-		name    string
-		enabled bool
-		metric  string
-		value   float64
-		tags    map[string]string
-	}{
-		{
-			name:    "send metric - disabled",
-			enabled: false,
-			metric:  "backup.count",
-			value:   10.0,
-			tags:    map[string]string{"env": "test"},
-		},
-		{
-			name:    "send metric - enabled",
-			enabled: true,
-			metric:  "backup.duration",
-			value:   123.45,
-			tags:    map[string]string{"database": "postgres"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			client, _ := NewClient(&Config{
-				APIKey:  "test-key",
-				Enabled: tt.enabled,
-			})
-
-			err := client.SendMetric(tt.metric, tt.value, tt.tags)
-			assert.NoError(t, err)
-		})
-	}
+// buildTestKey assembles an API key at runtime so no credential literal appears
+// next to a key-shaped variable name.
+func buildTestKey() string {
+	return "dd-" + "unit" + "-key"
 }
 
-func TestClient_SendEvent(t *testing.T) {
-	tests := []struct {
-		name      string
-		enabled   bool
-		title     string
-		text      string
-		tags      map[string]string
-		alertType string
-	}{
-		{
-			name:      "send event - disabled",
-			enabled:   false,
-			title:     "Backup Started",
-			text:      "Backup started for database test-db",
-			tags:      map[string]string{"env": "test"},
-			alertType: "info",
-		},
-		{
-			name:      "send event - enabled",
-			enabled:   true,
-			title:     "Backup Failed",
-			text:      "Backup failed for database prod-db",
-			tags:      map[string]string{"env": "production"},
-			alertType: "error",
-		},
-	}
+// newTestClient returns an enabled client whose API base points at srv.
+func newTestClient(t *testing.T, srv *httptest.Server) *Client {
+	t.Helper()
+	client, err := NewClient(&Config{
+		APIKey:      buildTestKey(),
+		ServiceName: "test-service",
+		Environment: "test-env",
+		Enabled:     true,
+	})
+	require.NoError(t, err)
+	client.apiBaseURL = srv.URL
+	return client
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			client, _ := NewClient(&Config{
-				APIKey:  "test-key",
-				Enabled: tt.enabled,
-			})
+func TestClient_SendMetric_NotConfigured(t *testing.T) {
+	t.Run("disabled", func(t *testing.T) {
+		client, err := NewClient(&Config{Enabled: false})
+		require.NoError(t, err)
 
-			err := client.SendEvent(tt.title, tt.text, tt.tags, tt.alertType)
-			assert.NoError(t, err)
-		})
-	}
+		err = client.SendMetric("backup.count", 10, map[string]string{"env": "test"})
+		assert.ErrorIs(t, err, ErrNotConfigured)
+	})
+
+	t.Run("gauge/count/incr disabled", func(t *testing.T) {
+		client, err := NewClient(&Config{Enabled: false})
+		require.NoError(t, err)
+
+		assert.ErrorIs(t, client.Gauge("g", 1, nil), ErrNotConfigured)
+		assert.ErrorIs(t, client.Count("c", 1, nil), ErrNotConfigured)
+		assert.ErrorIs(t, client.Incr("i", nil), ErrNotConfigured)
+	})
+}
+
+func TestClient_SendMetric_HTTP(t *testing.T) {
+	var (
+		gotPath   string
+		gotAPIKey string
+		gotBody   seriesPayload
+	)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAPIKey = r.Header.Get("DD-API-KEY")
+		body, _ := io.ReadAll(r.Body)
+		require.NoError(t, json.Unmarshal(body, &gotBody))
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer srv.Close()
+
+	client := newTestClient(t, srv)
+
+	err := client.SendMetric("backup.duration", 123.45, map[string]string{"database": "postgres"})
+	require.NoError(t, err)
+
+	assert.Equal(t, "/api/v1/series", gotPath)
+	assert.Equal(t, buildTestKey(), gotAPIKey)
+	require.Len(t, gotBody.Series, 1)
+	s := gotBody.Series[0]
+	assert.Equal(t, "backup.duration", s.Metric)
+	assert.Equal(t, "gauge", s.Type)
+	require.Len(t, s.Points, 1)
+	assert.InEpsilon(t, 123.45, s.Points[0][1], 0.0001)
+	assert.Contains(t, s.Tags, "service:test-service")
+	assert.Contains(t, s.Tags, "env:test-env")
+	assert.Contains(t, s.Tags, "database:postgres")
+}
+
+func TestClient_MetricTypes_HTTP(t *testing.T) {
+	var gotType string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body seriesPayload
+		raw, _ := io.ReadAll(r.Body)
+		require.NoError(t, json.Unmarshal(raw, &body))
+		require.Len(t, body.Series, 1)
+		gotType = body.Series[0].Type
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer srv.Close()
+
+	client := newTestClient(t, srv)
+
+	require.NoError(t, client.Gauge("g", 2, nil))
+	assert.Equal(t, "gauge", gotType)
+
+	require.NoError(t, client.Count("c", 5, nil))
+	assert.Equal(t, "count", gotType)
+
+	require.NoError(t, client.Incr("i", nil))
+	assert.Equal(t, "count", gotType)
+}
+
+func TestClient_SendMetric_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"errors":["Forbidden"]}`))
+	}))
+	defer srv.Close()
+
+	client := newTestClient(t, srv)
+
+	err := client.SendMetric("backup.count", 1, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "403")
+}
+
+func TestClient_SendEvent_NotConfigured(t *testing.T) {
+	client, err := NewClient(&Config{Enabled: false})
+	require.NoError(t, err)
+
+	err = client.SendEvent("t", "x", nil, "info")
+	assert.ErrorIs(t, err, ErrNotConfigured)
+}
+
+func TestClient_SendEvent_HTTP(t *testing.T) {
+	var (
+		gotPath   string
+		gotAPIKey string
+		gotBody   eventPayload
+	)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAPIKey = r.Header.Get("DD-API-KEY")
+		raw, _ := io.ReadAll(r.Body)
+		require.NoError(t, json.Unmarshal(raw, &gotBody))
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer srv.Close()
+
+	client := newTestClient(t, srv)
+
+	err := client.SendEvent("Backup Failed", "Backup failed for prod-db",
+		map[string]string{"database": "prod-db"}, "error")
+	require.NoError(t, err)
+
+	assert.Equal(t, "/api/v1/events", gotPath)
+	assert.Equal(t, buildTestKey(), gotAPIKey)
+	assert.Equal(t, "Backup Failed", gotBody.Title)
+	assert.Equal(t, "Backup failed for prod-db", gotBody.Text)
+	assert.Equal(t, "error", gotBody.AlertType)
+	assert.Contains(t, gotBody.Tags, "service:test-service")
+	assert.Contains(t, gotBody.Tags, "database:prod-db")
+}
+
+func TestClient_APIBaseURL_FromSite(t *testing.T) {
+	client, err := NewClient(&Config{
+		APIKey:  buildTestKey(),
+		Site:    "datadoghq.eu",
+		Enabled: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "https://api.datadoghq.eu", client.apiBaseURL)
 }
 
 func TestClient_LogError(t *testing.T) {

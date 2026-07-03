@@ -119,6 +119,23 @@ func (cs *CloudSelector) RegisterProviderMetrics(metrics *ProviderMetrics) error
 	return nil
 }
 
+// BestScoreForProvider returns the highest performance score recorded for the
+// given provider across all regions, and whether any metrics were found.
+func (cs *CloudSelector) BestScoreForProvider(provider StorageProvider) (float64, bool) {
+	best := 0.0
+	found := false
+	for _, m := range cs.metrics {
+		if m.Provider != provider {
+			continue
+		}
+		if !found || m.PerformanceScore > best {
+			best = m.PerformanceScore
+			found = true
+		}
+	}
+	return best, found
+}
+
 // SelectProviders selects optimal providers based on criteria.
 func (cs *CloudSelector) SelectProviders(ctx context.Context, criteria *SelectionCriteria) ([]*ProviderSelection, error) {
 	if criteria == nil {

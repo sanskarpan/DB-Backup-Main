@@ -346,6 +346,13 @@ func expiredExclusionFilter() map[string]interface{} {
 // ParseQueryString parses a simple query string into a SearchQuery
 // Format: "database:mydb type:mysql status:success size:>1GB date:2024-01-01..2024-12-31 searchtext".
 func (se *SearchEngine) ParseQueryString(queryString string) (*SearchQuery, error) {
+	return parseQueryString(queryString)
+}
+
+// parseQueryString parses a simple query string into a SearchQuery. It is shared
+// by every SearchEngineInterface implementation because the parsing is backend
+// independent.
+func parseQueryString(queryString string) (*SearchQuery, error) {
 	query := &SearchQuery{}
 
 	tokens := strings.Fields(queryString)

@@ -143,14 +143,24 @@ func main() {
 		})
 	}
 
-	// Initialize catalog search engine (with nil indexer for now)
-	// TODO: Initialize Elasticsearch client when available
-	catalogIndexer, err := catalog.NewCatalogIndexer(nil)
-	if err != nil {
-		log.Warn("Catalog indexer initialization skipped - Elasticsearch not configured")
-		catalogIndexer = nil
+	// Catalog search engine. Elasticsearch is not wired in this build, so use the
+	// embedded, disk-persisted in-memory catalog so /catalog/* works out of the box.
+	catalogDir := cfg.Backup.MetadataDirectory
+	if catalogDir == "" {
+		catalogDir = cfg.Backup.TempDirectory
 	}
-	searchEngine := catalog.NewSearchEngine(catalogIndexer)
+	if catalogDir == "" {
+		catalogDir = "./data"
+	}
+	var searchEngine catalog.SearchEngineInterface
+	memCatalog, catErr := catalog.NewPersistentInMemorySearchEngine(filepath.Join(catalogDir, "catalog"))
+	if catErr != nil {
+		log.Warn("Persistent catalog init failed; using in-memory catalog: " + catErr.Error())
+		searchEngine = catalog.NewInMemorySearchEngine()
+	} else {
+		searchEngine = memCatalog
+	}
+	log.Info("Catalog: using embedded in-memory search engine")
 
 	// Initialize JWT service
 	jwtSecret := cfg.Security.JWT.Secret

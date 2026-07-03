@@ -12,6 +12,7 @@ import (
 type CostTracker struct {
 	mu             sync.RWMutex
 	costs          map[string]*DatabaseCosts
+	pricing        PricingSource
 	providerRates  map[StorageProvider]*ProviderRates
 	computeRates   *ComputeRates
 	transferRates  *TransferRates
@@ -29,6 +30,13 @@ type DatabaseCosts struct {
 	LastUpdated   time.Time
 	CostBreakdown map[string]float64
 	Tags          map[string]string
+	// Estimated reports that the figures derive from the pricing source's
+	// rates, which are estimates unless the operator supplied live prices.
+	Estimated bool
+	// PricingSource names the origin of the rates used.
+	PricingSource string
+	// PricingAsOf is when those rates are believed to be accurate.
+	PricingAsOf time.Time
 }
 
 // StorageCosts represents storage-related costs.
@@ -128,6 +136,12 @@ type CostSnapshot struct {
 	ByProvider   map[StorageProvider]float64
 	ByDatabase   map[string]float64
 	ByTag        map[string]float64
+	// Estimated reports that the figures derive from estimated rates.
+	Estimated bool
+	// PricingSource names the origin of the rates used.
+	PricingSource string
+	// PricingAsOf is when those rates are believed to be accurate.
+	PricingAsOf time.Time
 }
 
 // BackupOperation represents a backup operation for cost tracking.
@@ -147,16 +161,36 @@ type BackupOperation struct {
 	Tags          map[string]string
 }
 
-// NewCostTracker creates a new cost tracker.
+// NewCostTracker creates a new cost tracker backed by the built-in estimate
+// pricing source. Figures it produces are flagged as estimates.
 func NewCostTracker(maxHistoryDays int) *CostTracker {
+	return NewCostTrackerWithPricing(maxHistoryDays, NewStaticPricingSource())
+}
+
+// NewCostTrackerWithPricing creates a cost tracker that sources its rates from
+// the supplied pricing source, allowing operators to plug in real, current
+// prices. A nil source falls back to the built-in estimates.
+func NewCostTrackerWithPricing(maxHistoryDays int, pricing PricingSource) *CostTracker {
+	if pricing == nil {
+		pricing = NewStaticPricingSource()
+	}
 	return &CostTracker{
 		costs:          make(map[string]*DatabaseCosts),
-		providerRates:  make(map[StorageProvider]*ProviderRates),
-		computeRates:   DefaultComputeRates(),
-		transferRates:  DefaultTransferRates(),
+		pricing:        pricing,
+		providerRates:  pricing.ProviderRates(),
+		computeRates:   pricing.ComputeRates(),
+		transferRates:  pricing.TransferRates(),
 		costHistory:    make([]*CostSnapshot, 0),
 		maxHistoryDays: maxHistoryDays,
 	}
+}
+
+// PricingMetadata returns the provenance of the rates the tracker uses so
+// callers can signal that figures are estimates, not authoritative billing.
+func (ct *CostTracker) PricingMetadata() PricingMetadata {
+	ct.mu.RLock()
+	defer ct.mu.RUnlock()
+	return ct.pricing.Metadata()
 }
 
 // DefaultProviderRates returns default pricing rates.
@@ -276,6 +310,13 @@ func (ct *CostTracker) TrackBackupOperation(ctx context.Context, op *BackupOpera
 
 	dbCosts.LastUpdated = time.Now()
 
+	// Stamp provenance so callers know these are estimates unless the operator
+	// supplied live prices.
+	meta := ct.pricing.Metadata()
+	dbCosts.Estimated = meta.Estimated
+	dbCosts.PricingSource = meta.Source
+	dbCosts.PricingAsOf = meta.AsOf
+
 	// Update cost breakdown
 	dbCosts.CostBreakdown["storage"] = dbCosts.StorageCosts.TotalCost
 	dbCosts.CostBreakdown["transfer"] = dbCosts.TransferCosts.TotalCost
@@ -286,10 +327,11 @@ func (ct *CostTracker) TrackBackupOperation(ctx context.Context, op *BackupOpera
 
 // updateStorageCosts updates storage costs.
 func (ct *CostTracker) updateStorageCosts(storageCosts *StorageCosts, op *BackupOperation) {
-	// Get provider rates
+	// Get provider rates, falling back to the pricing source (not a hardcoded
+	// default) when the provider is not yet in the tracker's table.
 	rates, exists := ct.providerRates[op.Provider]
 	if !exists {
-		rates = DefaultProviderRates()[op.Provider]
+		rates = ct.pricing.ProviderRates()[op.Provider]
 	}
 
 	// Update storage size
@@ -391,12 +433,7 @@ func (ct *CostTracker) GetTotalCosts() *CostSnapshot {
 	ct.mu.RLock()
 	defer ct.mu.RUnlock()
 
-	snapshot := &CostSnapshot{
-		Timestamp:  time.Now(),
-		ByProvider: make(map[StorageProvider]float64),
-		ByDatabase: make(map[string]float64),
-		ByTag:      make(map[string]float64),
-	}
+	snapshot := ct.newStampedSnapshot()
 
 	for dbName, dbCosts := range ct.costs {
 		snapshot.TotalCost += dbCosts.TotalCost
@@ -473,14 +510,23 @@ func (ct *CostTracker) TakeSnapshot() *CostSnapshot {
 	return snapshot
 }
 
+// newStampedSnapshot builds an empty snapshot stamped with pricing provenance.
+func (ct *CostTracker) newStampedSnapshot() *CostSnapshot {
+	meta := ct.pricing.Metadata()
+	return &CostSnapshot{
+		Timestamp:     time.Now(),
+		ByProvider:    make(map[StorageProvider]float64),
+		ByDatabase:    make(map[string]float64),
+		ByTag:         make(map[string]float64),
+		Estimated:     meta.Estimated,
+		PricingSource: meta.Source,
+		PricingAsOf:   meta.AsOf,
+	}
+}
+
 // getTotalCostsInternal is the internal version without lock.
 func (ct *CostTracker) getTotalCostsInternal() *CostSnapshot {
-	snapshot := &CostSnapshot{
-		Timestamp:  time.Now(),
-		ByProvider: make(map[StorageProvider]float64),
-		ByDatabase: make(map[string]float64),
-		ByTag:      make(map[string]float64),
-	}
+	snapshot := ct.newStampedSnapshot()
 
 	for dbName, dbCosts := range ct.costs {
 		snapshot.TotalCost += dbCosts.TotalCost

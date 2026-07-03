@@ -166,10 +166,12 @@ func (d *MongoDBDriver) Backup(ctx context.Context, opts *database.BackupOptions
 }
 
 // StreamBackup streams a backup to the provided writer.
-func (d *MongoDBDriver) StreamBackup(ctx context.Context, opts *database.BackupOptions, writer io.Writer) error {
-	// MongoDB's mongodump doesn't support direct streaming to stdout
-	// We need to dump to a temp directory and then tar it
-	return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "MongoDB streaming backup not implemented - use file-based backup")
+//
+// mongodump produces a directory tree (BSON per collection) rather than a
+// single stream, so streaming is intentionally unsupported; use Backup for a
+// file-based backup instead.
+func (d *MongoDBDriver) StreamBackup(_ context.Context, _ *database.BackupOptions, _ io.Writer) error {
+	return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "MongoDB streaming backup is not supported; use file-based backup")
 }
 
 // GetBackupSize estimates the size of a backup.
@@ -304,9 +306,12 @@ func (d *MongoDBDriver) restoreWithPITR(ctx context.Context, opts *database.Rest
 }
 
 // StreamRestore restores from a reader.
-func (d *MongoDBDriver) StreamRestore(ctx context.Context, opts *database.RestoreOptions, reader io.Reader) error {
-	// MongoDB's mongorestore doesn't support streaming from stdin
-	return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "MongoDB streaming restore not implemented - use file-based restore")
+//
+// mongorestore consumes an on-disk dump directory rather than a single stream,
+// so streaming restore is intentionally unsupported; use Restore for a
+// file-based restore instead.
+func (d *MongoDBDriver) StreamRestore(_ context.Context, _ *database.RestoreOptions, _ io.Reader) error {
+	return pkgErrors.New(pkgErrors.ErrorTypeDatabase, "MongoDB streaming restore is not supported; use file-based restore")
 }
 
 // ValidateRestore validates that a restore can be performed.
